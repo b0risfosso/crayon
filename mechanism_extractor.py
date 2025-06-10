@@ -39,6 +39,7 @@ SYS_PROMPT = (
     "Return 1-3 mechanisms ordered by importance."
 )
 
+
 def extract_mechanisms(src: Source, max_mechs: int = 3) -> List[Mechanism]:
     messages = [
         {"role": "system", "content": SYS_PROMPT},
@@ -62,6 +63,7 @@ def extract_mechanisms(src: Source, max_mechs: int = 3) -> List[Mechanism]:
     out: List[Mechanism] = []
     for idx, m in enumerate(mechs_raw, 1):
         mid = hashlib.md5(f"{src.id}_{idx}_{m['principle']}".encode()).hexdigest()[:10]
+        conf = float(m.get("confidence", 0.5))   # default to 0.5 if missing
         out.append(
             Mechanism(
                 id=f"{src.id}_m{mid}",
@@ -70,7 +72,7 @@ def extract_mechanisms(src: Source, max_mechs: int = 3) -> List[Mechanism]:
                 inputs=m["inputs"],
                 outputs=m["outputs"],
                 principle=m["principle"],
-                confidence=float(m["confidence"])
+                confidence=conf
             )
         )
     return out

@@ -5,13 +5,20 @@ from scout import arxiv_search
 from source_extractor import extract_source
 from claim_extractor import extract_claims
 from mechanism_extractor import extract_mechanisms
-from loader import load_sources, load_claims, driver, load_mechanisms     # driver = Neo4j driver
+from artifact_generator import generate_artifacts
+from risk_control_extractor import extract_risks_controls
+from metric_extractor import extract_metrics
+
+from loader import load_sources, load_claims, driver, load_mechanisms, load_artifacts, load_risks_controls, load_metrics     # driver = Neo4j driver
+
 
 
 # ── configuration ────────────────────────────────────────────────────────────
-MAX_PAPERS      = 2          # per topic per run
-MAX_CLAIMS_PER  = 2           # per paper
-MAX_MECHS       = 2
+MAX_PAPERS      = 5          # per topic per run
+MAX_CLAIMS_PER  = 10           # per paper
+MAX_MECHS       = 10
+MAX_ARTS        = 10
+MAX_RISKS       = 10
 STALE_DAYS      = 7           # mark stale if unseen for this many days
 GRAPH_NAME      = "engineering_knowledge_graph"
 
@@ -34,10 +41,27 @@ def agent_run(topic: str) -> None:
 
     # Mechanism extraction + load
     mechanisms = []
+    artifacts_all = []
     for src in sources:
         mechs = extract_mechanisms(src, max_mechs=MAX_MECHS)
         load_mechanisms(mechs)
         mechanisms.extend(mechs)
+        mechanisms_by_topic = mechs
+        artifacts = generate_artifacts(src.topic, mechanisms_by_topic, max_artifacts=MAX_ARTS)
+        load_artifacts(artifacts)
+        artifacts_all.extend(artifacts)
+
+    for art in artifacts_all:
+        # gather mechanisms for this artifact (IDs stored in principle_chain)
+        mechs = [m for m in mechanisms if m.id in art.principle_chain]
+        risks, ctrls = extract_risks_controls(art, mechs, max_risks=MAX_RISKS)
+        load_risks_controls(risks, ctrls)
+
+    for art in artifacts_all:
+        mets = extract_metrics(art)
+        load_metrics(mets)
+
+    
 
     # 4. Mark topic nodes 'last_seen'
     _touch_topic(topic)
@@ -48,7 +72,8 @@ def agent_run(topic: str) -> None:
     # 6. Bump GraphMeta timestamp
     _update_graphmeta()
 
-    print(f"✅ {len(sources)} sources, {len(claims)} claims, {len(mechanisms)} mechanisms processed")
+    print(f"✅ {len(sources)} sources, {len(claims)} claims, {len(mechanisms)} mechanisms, {len(artifacts_all)} artifacts processed")
+    print(f"✅ {len(risks)} risks & {len(ctrls)} controls loaded for '{topic}'")
 
 # ── helper Cypher operations ─────────────────────────────────────────────────
 def _touch_topic(topic: str):

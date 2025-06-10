@@ -4,7 +4,7 @@ from typing import List
 from dotenv import load_dotenv
 from neo4j import GraphDatabase, Session
 from pydantic import BaseModel
-from models import Claim, Source, Mechanism
+from models import Claim, Source, Mechanism, Artifact, Risk, Control, Metric, Measurement
 from utils import assert_loader_fields
 
 # ------------- 1. Ontology models (or import your existing models) ----------
@@ -43,11 +43,12 @@ MERGE (t)<-[:ABOUT]-(s)
 
 CREATE_CLAIM = """
 MERGE (c:Claim {id: $id})
-SET c.text       = $text,
-    c.confidence = $confidence,
-    c.topic      = $topic,
-    c.last_seen  = timestamp(),
-    c.stale      = false
+SET c.text          = $text,
+    c.confidence    = $confidence,
+    c.topic         = $topic,
+    c.source_id     = $source_id,
+    c.last_seen     = timestamp(),
+    c.stale         = false
 """
 
 LINK_SOURCE_CLAIM = """
@@ -64,6 +65,7 @@ SET   m.inputs      = $inputs,
       m.principle   = $principle,
       m.topic       = $topic,
       m.confidence  = $confidence,
+      m.source_id   = $source_id,
       m.last_seen   = timestamp(),
       m.stale       = false
 """
@@ -72,6 +74,104 @@ LINK_SRC_MECH = """
 MATCH (s:Source {id: $source_id}), (m:Mechanism {id: $id})
 MERGE (s)-[:DESCRIBES]->(m)
 """
+
+# ---- create artifact mechanisms
+
+# ---- Artifact Cypher templates -----------------------------------------
+# ---- Artifact Cypher templates -------------------------------------------
+# ---- Artifact Cypher template (v2) ---------------------------------------
+CREATE_ART = """
+MERGE (a:Artifact {id:$id})
+SET  a.topic              = $topic,
+     a.name               = $name,
+     a.created_at         = $created_at,
+     a.created_from       = $created_from,
+
+     /* core concept */
+     a.rationale          = $rationale,
+     a.principle_chain    = $principle_chain,
+     a.description        = $description
+
+     /* design status */
+     a.trl                = $trl,
+     a.maturity           = $maturity,
+     a.novelty_score      = $novelty_score,
+     a.speculative        = $speculative,
+
+     /* engineering detail */
+     a.tool_anchor        = $tool_anchor,
+     a.bill_of_materials  = $bill_of_materials,
+     a.cost_capex_usd     = $cost_capex_usd,
+     a.running_cost_usd   = $running_cost_usd,
+     a.primary_metric     = $primary_metric,
+     a.target_range       = $target_range,
+     a.validation_steps   = $validation_steps,
+     a.workflow           = $workflow,
+     a.expected_outcomes  = $expected_outcomes,
+
+     /* dynamic */
+     a.supports           = $supports,
+     a.refutes            = $refutes,
+     a.measurement_ids    = $measurement_ids,
+
+     /* lineage + bookkeeping */
+     a.parent_ids         = $parent_ids,
+     a.last_updated       = $last_updated,
+     a.stale              = false
+"""
+
+LINK_MECH_ART = """
+MATCH (m:Mechanism {id:$mid}), (a:Artifact {id:$aid})
+MERGE (m)-[:ENABLES]->(a)
+"""
+
+
+# ---- Risk & Control Cypher templates -----------------------------------
+CREATE_RISK = """
+MERGE (r:Risk {id: $id})
+SET   r.description = $description,
+      r.severity    = $severity,
+      r.likelihood  = $likelihood,
+      r.topic       = $topic,
+      r.last_seen   = timestamp(),
+      r.stale       = false
+"""
+
+CREATE_CONTROL = """
+MERGE (c:Control {id: $id})
+SET   c.description   = $description,
+      c.effectiveness = $effectiveness,
+      c.cost_level    = $cost_level,
+      c.last_seen     = timestamp(),
+      c.stale         = false
+"""
+
+LINK_ART_RISK = """
+MATCH (a:Artifact {id:$aid}), (r:Risk {id:$rid})
+MERGE (a)-[:HAS_RISK]->(r)
+"""
+
+LINK_RISK_CONTROL = """
+MATCH (r:Risk {id:$rid}), (c:Control {id:$cid})
+MERGE (r)-[:MITIGATED_BY]->(c)
+"""
+
+# metric templates
+
+CREATE_METRIC = """
+MERGE (k:Metric {id:$id})
+SET   k.name         = $name,
+      k.unit         = $unit,
+      k.target_range = $target_range,
+      k.topic        = $topic,
+      k.last_seen    = timestamp(),
+      k.stale        = false
+"""
+LINK_ART_METRIC = """
+MATCH (a:Artifact {id:$aid}), (k:Metric {id:$kid})
+MERGE (a)-[:MEASURED_BY]->(k)
+"""
+
 
 
 # for tests ----------------------
@@ -123,6 +223,43 @@ def load_mechanisms(mechs: List[Mechanism]):
     with driver.session() as sess:
         for mech in mechs:
             sess.execute_write(_run_mech, mech)
+
+
+# -------------- Artifact loader -------------------------------------------
+def _art_props(art: Artifact) -> dict:
+    """Convert Pydantic model to dict and drop None values."""
+    props = art.model_dump()
+    return {k: v for k, v in props.items() if v is not None}
+
+# ---- Loader helper -------------------------------------------------------
+def _prune_none(d: dict) -> dict:
+    """Remove keys whose value is None to avoid storing nulls in Neo4j."""
+    return {k: v for k, v in d.items() if v is not None}
+
+def load_artifacts(arts: list[Artifact]) -> None:
+    with driver.session() as sess:
+        for art in arts:
+            sess.run(CREATE_ART, **art.model_dump())
+
+            for mid in art.principle_chain:
+                sess.run(LINK_MECH_ART, mid=mid, aid=art.id)
+
+# _________________ risk mechanisms ________________________________________
+def load_risks_controls(risks: list[Risk], controls: list[Control]):
+    with driver.session() as sess:
+        for r in risks:
+            sess.run(CREATE_RISK, **r.model_dump())
+            sess.run(LINK_ART_RISK, aid=r.artifact_id, rid=r.id)
+        for c in controls:
+            sess.run(CREATE_CONTROL, **c.model_dump())
+            sess.run(LINK_RISK_CONTROL, rid=c.risk_id, cid=c.id)
+
+# -------------- metric mechanisms -----------------------------
+def load_metrics(metrics: list[Metric]):
+    with driver.session() as sess:
+        for m in metrics:
+            sess.run(CREATE_METRIC, **m.model_dump())
+            sess.run(LINK_ART_METRIC, aid=m.artifact_id, kid=m.id)
 
 
 # ------------- 6. CLI test --------------------------------------------------
