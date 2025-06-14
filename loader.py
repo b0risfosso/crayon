@@ -90,7 +90,7 @@ SET  a.topic              = $topic,
      /* core concept */
      a.rationale          = $rationale,
      a.principle_chain    = $principle_chain,
-     a.description        = $description
+     a.description        = $description,
 
      /* design status */
      a.trl                = $trl,

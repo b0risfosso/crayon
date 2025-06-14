@@ -28,13 +28,6 @@ load_dotenv()
 client = OpenAI()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 
-# ── Objective model ───────────────────────────────────────────────────────
-class Objective(BaseModel):
-    id: str
-    text: str
-    topic: str
-    created_at: int = Field(default_factory=lambda: int(datetime.utcnow().timestamp()*1000))
-
 # ── Cypher templates ──────────────────────────────────────────────────────
 MERGE_OBJ = """
 MERGE (o:Objective {id:$id})
