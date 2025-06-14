@@ -74,7 +74,7 @@ ART_FUNC = {
 }
 
 SYS_PROMPT = (
-    "You are a design engineer. Using ONLY the source abstract and the objective, "
+    "You are a design engineer. Using ONLY the text and the objective, "
     "propose up to {k} concrete artifacts. Each artifact must include:\n"
     "• tool_anchor (real rig, genetic line, software)\n"
     "• primary_metric (one measurable KPI)\n"
