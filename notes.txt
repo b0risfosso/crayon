@@ -612,3 +612,62 @@ be friends with everybody.
 what do I know about this person? How can I help this person make money? 
 what is the sapce of friendship? How does that interact with the space fo friendship? How does that interact with the space of technology? How do I create the thing? 
 Can I create superman? Can I create Batman? Can I create teh flash? the flash inside of criime. The Flash inside another space? THe flash inside of fashion? The Flash inside education? Why can't I be the Flash? What would it take? ?'
+
+What are the artifacts of scientific discovery? 
+Which artifacts are ripe for automation? 
+Which artifacts do I have greatest access to? 
+Which artifacts lead my to artifacts that I want? 
+Question are artifacts 
+
+
+dead: 
+# what are all the dimensions of an artifact? 
+# exmaple stories/usages
+obj_stories = "Describe stories/usages of the following artifact, from beginning to end. Descibe {k} usages."
+# workflows
+obj_workflows = "Describe workflows utilizing the following artifact. Descibe {k} workflows."
+# architecture # how to design and build
+obj_architecture = "Describe the architecture of the following artifact. How is this system designed/built?"
+# design space
+obj_design = "What is the design space of the following artifact? What are the dimensions of that can be explored in the use of the following artifact?"
+# limitations / constraints
+obj_limitations = "What are the limitations/constraints of the following artifact? Describe {k} limitations."
+# best working artifacts
+obj_complement = "Describe artifacts that work in complement with the following artifacts. Describe {k} artifacts."
+# emerging directions
+obj_emerging = "Describe the emerging directions of in development/evolution/usage of the following artifact. Describe {k} emerging directions."
+# competition / opponents
+obj_competition = "Describe the artifacts that compete with the following artifact. Describe {k} competing artifacts."
+# artifacts deviate radically from the norm
+obj_deviate = "Describe usages of the following artifact that deviate radically from the norm. Describe {k} usages."
+# natural phenomenon involved
+obj_natural = "Describe the natural phenomenon underlying the operation of the following artifact."
+# decision-making
+obj_decision = "Describe the decision-making behind the operation/execution of the following artifact."
+# domain relationship
+obj_domain = "Describe the domain relationship behind the operation/execution of the following artifact."
+# actions
+obj_actions = "Describe the actions that can be carried out by the following artifact."
+
+
+
+
+# mutations
+obj_mutations = "Describe methods of "
+# problems solved
+# problem space
+# evolution
+# trajectory of innovation
+# artifacts deviate radically from the norm
+# relationship of this artifact with another. how to change this relationship. 
+# foundational theory of the following artifact
+# dead artifacts
+# decision-making
+# natural phenomenon involved
+# systems composed of this artifact
+# monetization
+# functional space
+# existing business ventures
+# actions
+# software
+# artifacts in storytelling, education, government, money
