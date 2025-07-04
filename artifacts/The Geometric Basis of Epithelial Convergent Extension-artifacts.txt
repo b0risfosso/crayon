@@ -1,0 +1,516 @@
+• Name: Relative tension in lateral ectoderm  
+• Description: The text describes how relative tension behaves in the lateral ectoderm (regions 3–8) during interface contraction, noting that it increases nonlinearly. Additionally, it explains that the tension on the emerging interface begins at a lower value and then rapidly decreases to a value below one.  
+• Action: The text focuses on the nonlinear increase of relative tension during interface contraction and the rapid relaxation of tension on the emerging interface in the lateral ectoderm, highlighting the differing tension behaviors.  
+• Keywords: lateral ectoderm, relative tension, nonlinear increase, interface contraction, emerging interface, tension relaxation, value below one.  
+
+• Name: Epithelial Convergent Extension  
+• Description: A process resulting from the controlled transformation of internal force balance geometry. It combines local self-organization with embryo-scale regulation by gene expression.  
+• Action: The text describes the interaction and combination of local self-organization at a cellular level with larger scale regulation through gene expression in producing the phenomena of epithelial convergent extension.  
+• Keywords: epithelial, convergent extension, internal force balance, local self-organization, embryo-scale regulation, gene expression, geometry, transformation, bottom-up, top-down.
+
+The provided text does not contain any specific systems, concepts, or objects to extract, as it is a general request to "discuss this point further" and lacks substantive content or context.
+
+• Name: Passive tension as viscous dissipation
+
+• Description: The text describes passive tension as being effectively viewed as viscous dissipation occurring on the elongating interface, with the process involving the turnover of crosslinkers.
+
+• Action: The text highlights the relationship between passive tension and its interpretation as viscous dissipation influenced by crosslinker turnover at the elongating interface.
+
+• Keywords: passive tension, viscous dissipation, elongating interface, crosslinkers, turnover, Clement et al. 2017, effective view.
+
+I'm sorry, but the provided text is too brief and lacks sufficient context or information to identify any specific systems, concepts, or objects. Please provide a more detailed passage for analysis.
+
+The provided text does not contain any systems, concepts, or objects to extract as it consists only of a Roman numeral, "I." Without additional context or information, it is not possible to extract meaningful content as requested.
+
+• Name: LTC order emergence  
+• Description: The text refers to the emergence of LTC order, indicating a concept or system related to LTC (though not further detailed in the text provided).  
+• Action: The text poses a question about the process or phenomena by which LTC order comes into existence, suggesting an inquiry into understanding its emergence.  
+• Keywords: LTC order, emergence, process, phenomena, inquiry, understanding, existence, questions.
+
+The text provided does not contain enough information to identify any systems, concepts, or objects. It merely references a figure and a movie (Fig. 2C and Movie 2) with no additional description or context. Therefore, no extraction of systems or concepts can be made from this text.
+
+It seems the provided text "A." does not contain enough information for identifying any systems, concepts, or objects. Please provide a more detailed excerpt or passage for analysis.
+
+• Name: Spatially Modulated Gene Expression
+  • Description: The text mentions this as a mechanism through which cortical responses can be controlled, suggesting its role in the regulation of gene expression in specific spatial patterns within tissues.
+  • Action: Spatially modulated gene expression has the potential to influence cortical responses significantly, and it is implied to be a tool evolution can use to shape the development of tissue structures during morphogenesis through controlling their spatial and temporal dynamics.
+  • Keywords: cortical responses, gene expression, spatial modulation, evolution, program, spatio-temporal dynamics, tissue, morphogenesis
+
+• Name: Non-Trivial Spatio-Temporal Dynamics
+  • Description: This term refers to complex and significant patterns within the development processes of tissues, not straightforward or easily predictable, as defined by the program evolution sets during morphogenesis.
+  • Action: The significant part of the text highlights that evolution uses these dynamics as part of a developmental program to achieve the structured formation of tissues during morphogenesis. 
+  • Keywords: non-trivial, spatio-temporal dynamics, tissue, morphogenesis, development, evolution, program, structure, formation
+
+• name — Tension–isogonal decomposition  
+• description — Tension–isogonal decomposition is a method based on the same assumptions as tension inference, which has been extensively validated in previous literature.  
+• action — The action discussed is the validation and grounding of tension–isogonal decomposition in the same assumptions as tension inference, indicating its basis in established research.  
+• keywords — Tension, Isogonal decomposition, Tension inference, Assumptions, Validation, Literature, Research, Method, Framework, Analysis.
+
+• Name: Unit Vectors (eij)
+• Description: The text refers to unit vectors labeled as eij, which point along the three interfaces meeting at a vertex. The labels i and j denote the pair of cells that share the respective interface.
+• Action: The unit vectors are used to identify and describe the orientation of interfaces between pairs of cells at a vertex.
+• Keywords: unit vectors, interfaces, vertex, eij, cells, labels, orientation, pair of cells, meet, share interface
+
+• name — "Polarization of Myosin II"  
+• description — Involves the organization and alignment of Myosin II molecules that plays a role in refining the material properties of tissues.  
+• action — The text highlights how the polarization of Myosin II contributes to buffering mechanical stress within developing tissues.  
+• keywords — Myosin II, polarization, tissue material properties, buffer, mechanical stress, development, refinement, organization, alignment, molecules.  
+
+• name — "Template-based mapping of dynamic motifs"  
+• description — A method used to analyze and understand patterns in tissue morphogenesis, likely through computational tools.  
+• action — This mapping allows for the study of dynamic motifs or structures during the formation of tissues.  
+• keywords — Template-based mapping, dynamic motifs, tissue morphogenesis, PLOS Computational Biology, analysis, patterns, formation, computational tools.  
+
+• name: Myosin Continuity at Vertices  
+  • description: The concept that assumes the continuity of myosin at vertices, suggesting that myosin molecules maintain a continuous presence or interaction at the points where vertexes come together.  
+  • action: This assumption is used in the context of relating motor molecule concentrations to tensions.  
+  • keywords: continuity, myosin, vertices, motor molecules, tension, interfaces, sum, cortices
+
+• name: Tension on an Interface  
+  • description: Describes the tension present on an interface as the sum of the tensions of the two cortices that form it.  
+  • action: This concept explains how tension is calculated by summing the individual tensions from each cortex that makes up the interface.  
+  • keywords: tension, interface, sum, cortices, motor molecule, assumption, myosin
+
+I'm sorry, but the provided text lacks sufficient detail to extract specific systems or concepts. It references a process related to tension and Voronoi construction, but without more context or information, it's not possible to describe these systems in detail. If you have additional text or data, please share it for further analysis.
+
+**Name**: Local Tension Configurations (LTC)
+
+**Description**: The text references the concept of quantifying local tension configurations in terms of their tension triangle shape. This suggests an analysis or measurement system focused on understanding the spatial configuration of tension within a specified context or material by interpreting it through the geometry of triangles.
+
+**Action**: The action pertains to the quantification and evaluation of tension configurations, where specific geometric shapes (triangles) are used as a method to represent and analyze local tension dynamics.
+
+**Keywords**: Local tension, Quantification, Tension triangle, Shape analysis, Geometry, Measurement, Configuration, Dynamics, Spatial configuration, Evaluation.
+
+• Name: Constant global scale factor η
+
+• Description: This factor is used to convert units from relative tensions (arbitrary units, a.u.) to length in micrometers (µm). It is calculated based on the average interface length at the first time point, utilizing the Voronoi–Delaunay duality. 
+
+• Action: The constant η translates relative tension measurements into physical length scale, providing a meaningful way to interpret the data by grounding it in spatial dimensions.
+
+• Keywords: Constant global scale factor, η, unit translation, relative tensions, length, µm, Voronoi–Delaunay duality, interface length, calculation, scale conversion.
+
+• name — Active T1 Transitions  
+• description — The text mentions that Clement et al. 2017 is compatible with the concept or framework of active T1 transitions, potentially indicating a relationship or corroboration with prior understanding or research.  
+• action — There is an agreement or consistency noted between Clement et al. 2017's findings and the concept of active T1 transitions, suggesting alignment or validation.  
+• keywords — Clement et al., 2017, active T1 transitions, compatibility, research, framework, validation, understanding, alignment, corroboration.
+
+• Name: Tension After 20 mins Post T1  
+  • Description: This refers to the measurement of tension 20 minutes after a particular event or process known as T1. The estimates of this tension are described as being very noisy.  
+  • Action: The text indicates that the tension measurements after the T1 events are inconsistent or unreliable due to noise, particularly because most T1s occur relatively close together.  
+  • Keywords: tension, estimates, T1, measurement, noisy, post-event, inconsistency, reliability, Fridtjof Brauns, eLife.
+
+• name: Voronoi tessellation based on the tension triangles  
+• description: The text refers to a method of dividing a space using a mathematical structure known as Voronoi tessellation, where the division is influenced by constructs called tension triangles. The context suggests that Voronoi tessellation is utilized in this setting to analyze or measure something related to inner interface length.  
+• action: The text illustrates that the dashed black line is used to show the reference inner interface length for this specific type of Voronoi tessellation.  
+• keywords: Voronoi tessellation, tension triangles, inner interface length, reference, mathematical structure, space division, dashed black line, interface analysis, measurement
+
+• Name — Active T1 Transition Simulation
+• Description — The text references a simulation that demonstrates an active T1 transition process involving a symmetric quartet.
+• Action — The text describes the depiction of an active T1 transition through a simulation, specifically mentioning the symmetry of the quartet involved in this process.
+• Keywords — simulation, active, T1 transition, symmetric, quartet, movie, process, depiction, demonstration, system.
+
+• name — Mutants in Movies  
+• description — The text suggests that there are movies available that feature these mutants. The context implies that viewing these movies could help in confirming predictions about the mutants.  
+• action — The text implies a relationship between the availability of movies and the confirmation of predictions regarding the mutants. The significant information is the proposed confirmation of predictions through available movies.  
+• keywords — Mutants, Movies, Predictions, Confirmation, Availability, Viewing, Predictions Validation, Confirmation Process, Verification, Media
+
+• name — Tension Cable  
+• description — A system where interconnected interfaces under high tension form a structure termed a tension cable.  
+• action — The contraction of this tension cable results in the formation of a rosette.  
+• keywords — high tension, tension cable, interface, contraction, rosette formation, connected interfaces, structure.
+
+• Name: Mutant Backgrounds
+
+• Description: The text mentions several mutant backgrounds ('fog, torso-like, scab, corkscrew, ksr') where certain developmental processes, specifically midgut invagination and germ band buckling, are disrupted. These disruptions are used to discuss the role of internal versus external forces in driving germ band extension (GBE).
+
+• Action: The analysis of these mutant backgrounds supports the idea that internal versus external forces are crucial in driving germ band extension, as evidenced by the disruption in developmental processes like midgut invagination and germ band buckling.
+
+• Keywords: mutant backgrounds, fog, torso-like, scab, corkscrew, ksr, midgut invagination, germ band buckling, internal forces, external forces, GBE (germ band extension).
+
+• name — Active force generation in the germ band
+• description — This refers to the ability of cells within the germ band to generate active forces that contribute to tissue dynamics, particularly influencing tissue flow.
+• action — Impairing active force generation in the germ band significantly affects the tissue flow anterior of the PMG (posterior midgut).
+• keywords — active force generation, germ band, tissue flow, anterior, PMG, influence, impairment, tissue dynamics, cell behavior, development.
+
+I'm unable to extract any systems or concepts from the provided text snippet since it lacks sufficient context or descriptive information. Please provide a more detailed excerpt for a meaningful extraction.
+
+• Name: Four Cell Centroids \( c_i \)  
+  • Description: The term refers to the centroids of a group of four cells involved in a simulation study featured in the text.  
+  • Action: Calculation of the centroids is performed as part of a simulation at time \( t \).  
+  • Keywords: cell centroids, calculation, simulation, cell quartets, centroids, system modeling, simulation time
+
+• Name: Diagonal Matrix \( S(t) \)  
+  • Description: A diagonal matrix in the context of the simulation, representing area-preserving shear, which increases over time.  
+  • Action: The matrix \( S(t) \) changes over time according to a constant shear rate \( \gamma \).  
+  • Keywords: diagonal matrix, shear, area-preserving, simulation, time evolution, constant shear rate, mathematical modeling
+
+• Name: Reference length (𝓁ref)
+  - Description: A measure determined purely in terms of the local relative tensions in the context of a cell quartet's central interface.
+  - Action: The reference length 𝓁ref is used to decompose the central interface length of a cell quartet.
+  - Keywords: reference length, local relative tensions, cell quartet, central interface, decomposition
+
+• Name: Isogonal length (Δ𝓁iso)
+  - Description: A measure depending on the quartet's isogonal strain, used in the decomposition of the length of a cell quartet's central interface.
+  - Action: The isogonal length Δ𝓁iso plays a role in determining the decomposition of the central interface length.
+  - Keywords: isogonal length, isogonal strain, cell quartet, decomposition, central interface
+
+• Name: Neighbor exchange
+  - Description: A process that takes place when the length of a cell quartet's central interface (𝓁) shrinks to zero.
+  - Action: A neighbor exchange occurs as a result of the central interface length decomposing and reducing to zero.
+  - Keywords: neighbor exchange, cell quartet, central interface, decomposition, length reduction
+
+• Name: Space of triangles in barycentric coordinates  
+• Description: This concept refers to a geometric representation of triangles using barycentric coordinates within the constraint that the sum of angles (α + β + γ) equals π (180 degrees), which is a fundamental property of Euclidean triangles. 
+• Action: The text describes the use of barycentric coordinates to define a space of triangles, emphasizing the relationship between the angles α, β, and γ, which collectively sum up to π, maintaining the inherent properties of a triangle.
+• Keywords: triangles, barycentric coordinates, angles, geometry, α, β, γ, π, Euclidean, representation.
+
+• Name: Fast mechanical relaxation and dominant active tensions  
+  • Description: This phrase suggests a scenario in which mechanical relaxation occurs rapidly and active tensions are predominant. It implies a context where certain parameters or conditions cause mechanical systems to relax quickly and for active forces or tensions within the system to play a dominant role.  
+  • Action: The text implies a relationship or condition where the concept of "fast mechanical relaxation" aligns with "dominant active tensions," indicating a specific state or limit that can be achieved or observed.  
+  • Keywords: fast mechanical relaxation, dominant active tensions, mechanical systems, active forces, system state, parameters, conditions, relaxation limit.
+
+• Name: Relative tension on contracting edge
+• Description: The text mentions that the relative tension remains constant on the contracting edge during a process involving intercalations.
+• Action: The action described is that the relative tension does not change, suggesting that intercalations are a passive process.
+• Keywords: relative tension, contracting edge, intercalations, constant, passive, process, indicates, remains.
+
+• Name: Adherens-junctional cytoskeleton ion  
+• Description: This is a concept related to the structure and function of the cell's cortex at cell-cell interfaces, particularly involving active motors.  
+• Action: The text describes the adherens-junctional cytoskeleton ion as being located in the cortex at cell-cell interfaces, and it operates through active motors, suggesting a structural or mechanical role in cellular interactions.  
+• Keywords: adherens junctions, cytoskeleton, ion, cortex, cell-cell interfaces, active motors, cellular interactions, structure, function, mechanics.
+
+• name: Relative Tension on the Inner Edge
+  • description: This concept describes how the relative tension on the inner edge remains almost constant at a value near 1 before a process called neighbor exchange occurs.
+  • action: The text highlights the stability of relative tension near the inner edge, where the vertex angles remain close to 120 degrees prior to neighbor exchange.
+  • keywords: relative tension, inner edge, constant, neighbor exchange, vertex angles, stability, 120 degrees.
+
+• name: Neighbor Exchange
+  • description: A process implied to occur following the condition where the tension remains constant, possibly involving changes in the angular configuration or connective structure.
+  • action: The text does not specify the exact action of neighbor exchange but implies it is a significant event following the stable state of tension and vertex angles.
+  • keywords: neighbor exchange, vertex angles, structure change, stability, dynamic process, tension, geometry.
+
+• Name: Adherens-junctional cytoskeleton  
+• Description: The text describes the adherens-junctional cytoskeleton as a structure that primarily carries mechanical stress within the epithelium. It is located at cell interfaces.  
+• Action: The text highlights the function of the adherens-junctional cytoskeleton in managing mechanical stress in epithelial tissues, suggesting a primary role in mechanical integrity and interaction at cell boundaries.  
+• Keywords: adherens junctions, cytoskeleton, mechanical stress, epithelium, cell interfaces, structural function, epithelial integrity, cell boundaries, junctional complexes, mechanical integrity.
+
+• Name: Force balance and cell geometry in an epithelial monolayer  
+• Description: This concept pertains to the underlying assumptions and concepts related to force balance and the geometry of cells within an epithelial monolayer.  
+• Action: The text sets the stage for the framework by laying out initial assumptions and concepts regarding force balance and cell geometry.  
+• Keywords: epithelial monolayer, force balance, cell geometry, assumptions, concepts, framework, underlying principles.
+
+• Name: Average edge length of centroidal triangles
+
+• Description: This is the average centroid distance between adjacent cells, calculated in the text to be 6.38 micrometers.
+
+• Action: The text describes a comparison process where this value (average edge length of the centroidal triangles) is used as a reference or parameter in determining η (not explicitly described in the text).
+
+• Keywords: centroidal triangles, centroid distance, adjacent cells, average edge length, 6.38 µm, cell distance, geometry, edge comparison, spatial measurement.
+
+• Name: Isogonal Deformation Tensor  
+• Description: A mathematical concept related to the deformation of geometric structures; specifically, its definition is tied to methods involving tension triangulation vertices and is different from one based on an explicit Voronoi construction.  
+• Action: The text highlights a comparison between two methods of defining the isogonal deformation tensor— one using tension triangulation vertices and another using an explicit Voronoi construction— highlighting that these methods are not identical.   
+• Keywords: Isogonal deformation tensor, tension triangulation, Voronoi construction, geometry, deformation, vertices, triangulation, comparison, method differences.
+
+• name — Normal vector  
+• description — The text mentions that the normal vector is determined by identifying the basis vector that corresponds to the smallest singular value.  
+• action — The normal vector is identified through the singular value decomposition process, where it is associated with the smallest singular value among the singular values derived from a matrix or data set.  
+• keywords — normal vector, basis vector, smallest singular value, singular value decomposition, matrix, data set, read-off, corresponding, vector, singular value analysis
+
+- **Name**: T1 threshold  
+  **Description**: The T1 threshold is defined within the context of the space of local tensions \( T_i \) using the isogonal length \( l_{iso} \).  
+  **Action**: The T1 threshold is associated with and defined by local tensions through a specific equation involving isogonal length.  
+  **Keywords**: T1 threshold, local tensions, isogonal length, space, equation, definition, \( T_i \), \( l_{iso} \)  
+
+I'm sorry, but without additional context or content from the text, it's not possible to extract a specific system, concept, or object. The provided excerpt does not contain sufficient information or detail to identify or describe any specific systems or concepts. If there is more text available, please provide it for further analysis.
+
+The text provided is too fragmentary and lacks sufficient context to extract any systems, concepts, or objects according to the specified criteria. If more context or a complete passage is provided, I may be able to assist further.
+
+• Name: Predictive Tissue-Scale Model  
+• Description: A model that reproduces experimentally observed dynamics at the level of cell quartets and serves as the basis for a larger tissue-scale model.  
+• Action: The model effectively simulates cell dynamics and lays the foundation for further tissue-scale modeling, supporting predictive capabilities.  
+• Keywords: model, cell quartets, tissue-scale, dynamics, predictive, experimental, observed, companion paper, foundation, formulation.
+
+- **Name**: Boundary Curve in Figure 3E  
+  **Description**: The text references a "boundary curve" specifically mentioned in context with "figure 3E." No additional information is available from the text itself.  
+  **Action**: The text raises a question regarding the definition of the "boundary curve," suggesting its existence and probable importance within "figure 3E." However, no further descriptive or functional details are provided.  
+  **Keywords**: Boundary curve, figure 3E, question, definition, context, analysis, importance.
+
+• name — Tissue Strain Rate Near Dorsal Pole  
+• description — This refers to the rate at which tissue undergoes strain due to the combined effects of cell deformation and cell rearrangements in the area near the dorsal pole.  
+• action — The text highlights that at the dorsal pole, the tissue strain rate is influenced by two key processes: the deformation of cells and their rearrangement, indicating a complex interplay that contributes to the overall strain.  
+• keywords — tissue strain rate, dorsal pole, cell deformation, cell rearrangements, tissue dynamics, strain, deformation, cell behavior, biological processes.
+
+• name — Tension Mode  
+  • description — The text indicates that in this context, the tension mode is constant, which suggests it is related to maintaining a stable tension, referred to as tension homeostasis.  
+  • action — The tension mode remains constant, indicating its role in maintaining tension homeostasis.  
+  • keywords — tension, mode, constant, homeostasis, cell, quartet, deformation, isogonal
+
+• name — Isogonal Mode  
+  • description — The text describes that the deformation of the cell quartet is entirely stored in the isogonal mode, implying it is a mode where deformation is captured or stored.  
+  • action — Deformation of the cell quartet is stored entirely in the isogonal mode, signifying its role in capturing deformation.  
+  • keywords — isogonal, mode, deformation, cell, quartet, tension, homeostasis, constant
+
+• name — Passive Elastic Energy  
+• description — The text mentions passive elastic energy in the context of its influence on angles, specifically in relation to imposed shear.  
+• action — The passive elastic energy, when combined with imposed shear, plays a role in determining angles.  
+• keywords — passive, elastic, energy, shear, determine, angles, influence, imposed
+
+name — Fridtjof Brauns et al., 2024 eLife
+
+description — This citation refers to a paper or research article authored by Fridtjof Brauns and others, which is expected to be published in the journal "eLife" in the year 2024.
+
+action — The text does not provide enough specific information to outline detailed actions or relationships but indicates a forthcoming publication in a reputable scientific journal.
+
+keywords — Fridtjof Brauns, eLife, research paper, publication, authorship, 2024, scientific journal, article, collaboration, research
+
+Note: The given text does not delve into specific systems or concepts within the research itself, only indicating an upcoming publication by the named authors.
+
+• name — Tension Pattern Dynamics
+• description — The study analyzes how tension pattern dynamics can reveal the contribution of active versus passive intercalation during tissue elongation.
+• action — The text highlights the importance of understanding the dynamics of tension patterns in determining the contributions of different types of intercalation to the process of tissue elongation.
+• keywords — tension pattern, dynamics, active intercalation, passive intercalation, tissue elongation, study, analyze, contribution
+
+• Name: Balanced network of active forces
+• Description: The text describes a balanced network of active forces that are generated and transmitted by cells. This is central to the approach mentioned in the text.
+• Action: The text highlights the importance of the generation and transmission of active forces by cells, emphasizing that this network is a fundamental aspect of the mentioned approach.
+• Keywords: balanced network, active forces, generated, transmitted, cells, approach, fundamental, network, active transmission.
+
+• Name: Initial Distribution 
+• Description: Refers to the arrangement or configuration being discussed. It matches a perturbed equilateral triangular lattice.
+• Action: The text describes how the initial distribution is arranged to resemble a perturbed form of a regular equilateral triangular lattice. 
+• Keywords: Initial distribution, perturbed, equilateral triangular lattice, arrangement, configuration, regular, form, resemblance, shape, geometry.
+
+Based on the given information, there is no detailed text content provided to extract systems, concepts, or objects along with their descriptions, actions, or keywords. The link and citation do not offer any explicit details by themselves. Thus, no extraction can be performed without further context or content from the source.
+
+It seems the provided text is incomplete, so I'm unable to extract any specific systems, concepts, or objects based on "Because Figs." If you have more text or additional context you can provide, please do so, and I'll be happy to help analyze it.
+
+The provided text does not offer sufficient information to extract any systems, concepts, or objects. It only references the existence of definitions for Ψ and a missing term, with an indication to see the main text for further details. Without additional context or content, no specific systems or concepts can be identified based on the text provided.
+
+• Name: Communication of Findings
+• Description: The text indicates that there was a failure in effectively communicating important aspects of their findings in the first version of their manuscript.
+• Action: The researchers identified a gap in their ability to clearly convey important information in their initial manuscript submission. This recognition implies a need for improvement in how research findings are presented to ensure clarity and understanding.
+• Keywords: communication, findings, manuscript, clarity, convey, assessment, realization, improvement, version.
+
+• Name: Anisotropic and Acute-vs-Obtuse Coloring in Triangle Shape Space  
+• Description: This concept involves coloring each point within a triangle shape space based on two criteria: anisotropy and the acute-vs-obtuse nature of the triangle at that point.  
+• Action: The text describes a method of assigning colors to points within a triangle shape space. The color is determined by assessing two properties of the triangle at each point—its anisotropy and whether it is more acute or obtuse.  
+• Keywords: triangle, shape space, anisotropic, acute, obtuse, coloring, points, geometry, properties, assessment
+
+• name — Local behavior of cells
+  • description — Refers to the individual actions and properties of cells in a given environment.
+  • action — Investigates how these localized cellular activities contribute to the broader movement and dynamics of tissue as a whole.
+  • keywords — Cells, behavior, local, individual, properties, dynamics, activities, actions
+
+• name — Global tissue flow
+  • description — The overall movement and reorganization of tissue, which results from the collective action of its constituent cells.
+  • action — The focus is on understanding how the combined effect of individual cell behaviors results in the large-scale flow and arrangement of tissue.
+  • keywords — Tissue, flow, global, movement, reorganization, collective, arrangement, large-scale
+
+I'm sorry, but the provided text is too limited to extract any systems, concepts, objects, or meaningful information. Please provide a more detailed or expanded text for analysis.
+
+I'm sorry, but the text provided is a citation reference and does not contain enough information or content to extract any systems, concepts, or objects. Please provide a more detailed text excerpt for analysis.
+
+There are no clear systems or concepts in the text to be extracted.
+
+I'm sorry, there is no substantial content or context in the provided text to extract any systems, concepts, or objects.
+
+• name — Cyto-D phenotype from Clement et al 2017  
+• description — A specific phenotype characterized by strongly reduced intercalation while still displaying normal extension.  
+• action — The action of the Cyto-D phenotype involves a significant reduction in intercalation processes while maintaining normal rates or levels of extension, as reported by Clement et al in their 2017 study.  
+• keywords — Cyto-D, phenotype, Clement et al 2017, intercalation, reduction, normal extension, study
+
+• name — Tension Homeostasis  
+• description — Tension homeostasis is hypothesized as a mechanism that enables the amnioserosa to undergo large cell deformations without compromising tissue integrity.  
+• action — The text suggests a hypothesis that tension homeostasis plays a role in maintaining structural integrity during significant cellular deformations in the amnioserosa.  
+• keywords — tension homeostasis, amnioserosa, cell deformations, tissue integrity, hypothesis, cellular mechanics, structural integrity.  
+
+• name: Voronoi dual  
+  • description: A Voronoi dual is a type of geometric structure that arises from an equilateral triangulation. In this context, it transforms into a hexagonal lattice with a specified edge length when the equilateral triangulation has an edge length of T = 2/31/4.
+  • action: The text describes the transformation from an equilateral triangulation to a Voronoi dual, specifically a hexagonal lattice, and provides a value for η that is approximately 4.1.
+  • keywords: Voronoi dual, equilateral triangulation, hexagonal lattice, edge length, transformation, η, geometric structure.
+
+• name: Equilateral triangulation  
+  • description: An equilateral triangulation is a form of triangulation where all edges of the triangles have the same length. In this case, the edge length is specified as T = 2/31/4.
+  • action: The text uses equilateral triangulation as the basis for deriving the Voronoi dual, which becomes a hexagonal lattice.
+  • keywords: equilateral triangulation, edge length, Voronoi dual, hexagonal lattice, geometric transformation, T = 2/31/4, triangulation.
+
+• name: Hexagonal lattice  
+  • description: A hexagonal lattice is a structure that is formed as the Voronoi dual of an equilateral triangulation with a specified edge length.
+  • action: The hexagonal lattice is the result of a transformation from an equilateral triangulation, indicating a structural relationship between these forms.
+  • keywords: hexagonal lattice, Voronoi dual, equilateral triangulation, edge length, geometric structure, transformation, lattice formation.
+
+• Name: Isogonal Strain
+  • Description: Refers to significant tissue strain observed just anterior of the PMG and on its lateral side.
+  • Action: Indicates the hyperbolic (convergent-extension) tissue flow near the dorsal pole exerts a pulling force on the PMG.
+  • Keywords: isogonal strain, anterior, PMG, lateral side, hyperbolic, convergent-extension, tissue flow, dorsal pole, pulling force.
+
+• name — Tpassive
+• description — Tpassive refers to a concept that exhibits an exponential decay behavior. Its change over time is characterized by a specific remodeling time denoted as τp.
+• action — The text describes the behavior of Tpassive as undergoing an exponential decay, highlighting that the rate or characteristic time of this decay is represented by τp.
+• keywords — Tpassive, exponential decay, characteristic remodeling time, τp, behavior, change, rate, time, decay, exponential.
+
+• Name: Self-organization via positive tension feedback  
+• Description: A process that orchestrates myosin contractility at the cellular level and drives T1 transitions.  
+• Action: This process involves a feedback mechanism that regulates and coordinates myosin contractility, affecting cellular structures or functions.  
+• Keywords: Self-organization, positive tension feedback, myosin, contractility, cellular scale, drives, T1 transitions.
+
+• Name: Cell Elastic Energy  
+• Description: The concept of cell elastic energy is defined in terms of the bulk modulus (λ) and shear modulus (µ). These are properties related to the material characteristics of the cell, likely describing how it responds to deformation or stress. 
+• Action: The text introduces the concept of cell elastic energy and specifies that it is defined using parameters like bulk modulus and shear modulus.
+• Keywords: cell elastic energy, bulk modulus, shear modulus, deformation, stress, material characteristics, λ, µ.
+
+- Name: Generalized Voronoi Tessellation  
+- Description: Mentioned as a possible reference state. It is a tessellation concept, which suggests division of a space into regions based on distance to a specified set of objects.  
+- Action: The text acknowledges it as one among other potential reference states for spatial division.  
+- Keywords: Voronoi, tessellation, reference state, spatial division, geometry, distance, regions, space partition, objects, generalized.
+
+• Name: Triangulation
+  - Description: The text mentions a triangulation that is dual to a cell array, meaning for each cell in the cell array, there is a corresponding vertex in the tension triangulation.
+  - Action: The text describes the relationship between a cell array and its corresponding tension triangulation, where each cell corresponds to a vertex.
+  - Keywords: triangulation, dual, cell array, vertex, tension, correspondence, Fig. 4B.
+
+• Name: Cell Array
+  - Description: The text refers to a cell array that is related to the tension triangulation by having a corresponding vertex for each cell.
+  - Action: The text explains the dual relationship between the cell array and the tension triangulation where each cell in the array is associated with a vertex in the triangulation.
+  - Keywords: cell array, triangulation, dual, vertex, tension, correspondence, Fig. 4B.
+
+• Name: Vertex in Tension Triangulation
+  - Description: The text identifies a vertex in the tension triangulation that corresponds to each cell in the cell array. 
+  - Action: It highlights the relationship where for every cell, there exists a corresponding vertex in the triangulation, forming a dual relationship.
+  - Keywords: vertex, tension triangulation, cell, dual, correspondence, Fig. 4B.
+
+Each of these bullets refers to elements directly mentioned within the provided text.
+
+• name — Cell Scale Forces
+• description — The text refers to the point where forces are generated within a system, implying the focus should be on this scale to gather conclusive evidence.
+• action — The text emphasizes the importance of focusing on the cell scale to gather the necessary evidence to conclusively settle a debate.
+• keywords — cell scale, forces, evidence, debate, generation, conclusive, settle, system
+
+• Name: Higher order rosettes
+• Description: The text refers to "higher order rosettes" as structures that can be "decomposed" into overlapping 5-fold rosettes.
+• Action: The action described involves decomposing higher order rosettes by identifying overlaps with 5-fold rosettes.
+• Keywords: Decomposition, 5-fold rosettes, Overlapping, Identification, Structures, Higher order, Rosettes, Patterns
+
+I'm sorry, but the provided text does not contain enough information to extract any systems, concepts, or objects as it mainly references document numbers and the authors of a paper. Please provide a more detailed excerpt for me to extract relevant systems or concepts.
+
+There are no identifiable systems or concepts provided in the text to extract details from, as the text consists solely of "F."
+
+• Name: Tension-driven and Isogonal Modes
+• Description: These are two modes that interact and contribute to tissue deformations simultaneously. 
+• Action: The text describes the interaction and contribution of both tension-driven and isogonal modes in causing tissue deformations, highlighting their simultaneous effect.
+• Keywords: tension-driven, isogonal, modes, tissue deformations, interaction, contribution, simultaneous, systems, concepts, processes.
+
+• Name: Tension feedback  
+• Description: A mechanism that continuously modifies the local force balance within cells and tissues.  
+• Action: It drives changes in the geometry of cells and tissues by altering the local force balance.  
+• Keywords: tension, feedback, local force balance, cell geometry, tissue geometry, continuous modification, change.
+
+The provided text contains no information to extract any systems or concepts as per the guidelines.
+
+• Name: Non-isosceles triangles   
+• Description: The text refers to a type of triangle that is not isosceles, meaning it does not have two sides of equal length.  
+• Action: The text discusses the range of values for a certain measure that quantifies the relative acuteness or obtuseness of angles in non-isosceles triangles, specifically within the interval [0, π].  
+• Keywords: non-isosceles triangles, acuteness, obtuseness, angles, triangle properties, degree, π, measurement, geometry, sides.
+
+• name — Light-sheet recording of a snail mutant  
+• description — The text discusses the analysis of a light-sheet recording, specifically focusing on a snail mutant that lacks a structure referred to as VF.  
+• action — The text describes the act of analyzing a recording to test a prediction regarding a snail mutant's characteristics, particularly its lack of VF.  
+• keywords - Light-sheet recording, Snail mutant, VF, Analysis, Test prediction, Fig. 7A, Structure analysis, Mutant characteristics, Snail study.
+
+• Name: High Tension Interfaces  
+• Description: These interfaces undergo contraction over a period of 30 minutes, which results in coordinated T1 transitions, likely within a biological or physical system.  
+• Action: The primary action involves contraction of the interfaces that facilitates coordinated transitions, indicative of a structural or process-driven mechanism.  
+• Keywords: tension interfaces, contraction, T1 transitions, coordination, mechanism, structure, process, time (30 min)
+
+• Name: Isogonal strain tensor (DV-DV component)  
+• Description: A mathematical construct used to estimate the isogonal contribution to the length of dorsoventral (DV) oriented interfaces in the lateral ectoderm.  
+• Action: The DV-DV component of the isogonal strain tensor is utilized to calculate the average isogonal contribution to interface length, resulting in an estimated value of ⟨Δ𝓁iso⟩ ≈ 1.9 µm in the lateral ectoderm.  
+• Keywords: isogonal strain tensor, DV-DV component, length estimation, interfaces, average isogonal contribution, dorsoventral, lateral ectoderm, ⟨Δ𝓁iso⟩, 1.9 µm, mathematical model.
+
+• Name: T1 events  
+• Description: T1 events refer to a specific aspect or type of occurrence that is being focused on for analysis. These are distinguished from rosettes, which are less numerous.  
+• Action: The text emphasizes the decision to concentrate analytical efforts on T1 events rather than rosettes due to their higher frequency or prevalence.  
+• Keywords: T1 events, rosettes, focus, analysis, frequency, prevalence, comparison, events, number, subsequent analysis.
+
+There is no clear system or concept present in the given text.
+
+• Name: Tension Triangulation  
+  • Description: Tension triangulation is used to construct a reference state for a polygonal cell array that is compatible with force balance constraints.  
+  • Action: From the tension triangulation, a reference state is constructed for polygonal cell arrays by using a Voronoi tessellation, ensuring it adheres to force balance constraints.  
+  • Keywords: Tension triangulation, reference state, polygonal cell array, force balance, constraints, Voronoi tessellation, construct
+
+• Name: Polygonal Cell Array  
+  • Description: It refers to an arrangement or configuration of polygonal cells that require a reference state compatible with force balance constraints.  
+  • Action: The polygonal cell array is adjusted to a reference state that satisfies force balance constraints, constructed from tension triangulation via Voronoi tessellation.  
+  • Keywords: Polygonal cell array, reference state, tension triangulation, force balance, constraints, Voronoi tessellation, construct
+
+• Name: Voronoi Tessellation  
+  • Description: Voronoi tessellation is used to achieve a reference state for polygonal cell arrays from tension triangulation, ensuring adherence to force balance constraints.  
+  • Action: The Voronoi tessellation serves as the method of constructing a reference state for a polygonal cell array using tension triangulation and adhering to force balance constraints.  
+  • Keywords: Voronoi tessellation, tension triangulation, reference state, polygonal cell array, force balance, constraints, construct
+
+• name — Threshold for Neighbor Exchanges
+• description — This concept refers to the criteria based on the (generalized) Delaunay condition that determines when neighbor exchanges occur for pairs of identical tension triangles.
+• action — Dashed white lines are used to indicate the threshold for when neighbor exchanges happen, based on certain geometric conditions involving identical tension triangles.
+• keywords — threshold, neighbor exchanges, Delaunay condition, tension triangles, identical pairs, geometric criteria, dashed white lines
+
+It appears there is no content or context in the provided text labeled "J." to extract any systems, concepts, or objects. If you can provide a more detailed or complete text, I may be able to assist further.
+
+I'm sorry, but the provided text does not contain enough information to extract specific systems or concepts. Please provide more detailed text that actually describes the systems or concepts for analysis.
+
+• Name: Available myosin pool  
+• Description: Refers to the quantity of myosin present in real cells, which determines the overall tension scale within the cellular environment.  
+• Action: The available myosin pool sets the overall tension scale in real cells, highlighting the relationship between myosin quantity and cellular tension.  
+• Keywords: myosin, tension scale, real cells, myosin pool, cellular tension, quantity, environment, overall tension, tension setting.  
+
+• Name: NSF PHY:1707973 and NSF PHY:2210612  
+• Description: These are grant numbers indicating support provided by the National Science Foundation (NSF) for research projects related to the field of Physics (PHY).  
+• Action: Acknowledgement of support and funding provided by NSF for specific research projects.  
+• Keywords: National Science Foundation, Physics, research funding, grants, support, NSF PHY:1707973, NSF PHY:2210612, funding acknowledgment, supported projects, research support.
+
+• Name: Tension Dynamics
+• Description: The text refers to angles that are determined by something called tension dynamics, although it does not provide further context about what tension dynamics specifically entails or how it operates.
+• Action: The text mentions that the angles are determined by the tension dynamics, suggesting a dependency or relationship between the two.
+• Keywords: angles, tension dynamics, determination, relationship, system, dependency, dynamics, action, tension
+
+There is no clear system or concept in the provided text fragment.
+
+I'm sorry, but with the text "1.5." there is no information on specific systems, concepts, or objects to extract. Please provide more detailed text to extract meaningful data.
+
+The provided text, "1.5 for details).", does not contain any information, systems, concepts, or terminology that can be extracted or summarized as requested. It appears to be an incomplete sentence or a fragment without context or content to analyze.
+
+• Name: Actin Cortex
+
+• Description: The actin cortex is described as a structure that behaves in a visco-elastic manner when subjected to external forces. The properties include a relaxation time on the order of minutes, which aligns with a specific model referenced in the text.
+
+• Action: The relationship between the actin cortex and external forces is highlighted, demonstrating its visco-elastic behavior with a defined relaxation time. This behavior is connected to a model for emerging interfaces after a T1 transformation.
+
+• Keywords: actin cortex, visco-elastic, external forces, relaxation time, minutes, model, emerging interfaces, post T1, Clement et al., behavior.
+
+• Name: C and C’ Quartet shape
+• Description: This refers to the shape properties, specifically the aspect ratio and stretch ratio, of a quartet undergoing isogonal deformation. 
+• Action: The text describes how the shape is depicted against the length of the quartet’s inner interface in the context of the T1 process, with this length acting as a pseudo-time parameter.
+• Keywords: aspect ratio, stretch ratio, isogonal deformation, quartet, inner interface, pseudo-time, T1 process, parametrization.
+
+• name: Gradient ∇t in Tension Space  
+• description: The gradient ∇t is applied within tension space, where the function Θ(ti) is defined on the vertices of the tension triangulation ti.  
+• action: The action involves taking the gradient ∇t in a specified space (tension space) for a function defined on vertices of a specific triangulation.  
+• keywords: gradient, tension space, function, vertices, triangulation, ∇t, Θ(ti), tension triangulation, Θi, mathematical concept.
+
+I'm sorry, but the given text does not contain any systems, concepts, or objects to extract. Please provide more detailed information to analyze.
+
+The text provided is very limited and does not contain any specific systems, concepts, or objects. Therefore, there are no systems or concepts to extract given the constraints.
+
+• name — Lagrangian (tissue frame) basis
+• description — A coordinate system that co-rotates with the tissue, used to quantify the dorsoventral (DV) component of the isogonal deformation tensor.
+• action — The Lagrangian basis is employed to measure the DV component of deformation in tissue by rotating with the tissue itself.
+• keywords — Lagrangian basis, tissue frame, co-rotates, quantify, DV component, isogonal deformation tensor, coordinate system, tissue deformation, rotation, tensor.
+
+I'm sorry, but the provided text does not contain enough specific information to extract any systems or concepts with the required details.
+
+• Name: Simple model for myosin "handover"  
+• Description: A simple model that predicts the low level of myosin at the emerging interface during a neighbor exchange.  
+• Action: The model provides a predictive mechanism for understanding the distribution and behavior of myosin during the process of neighbor exchange.  
+• Keywords: Myosin, emerging interface, prediction, model, neighbor exchange, myosin handover, low level.
+

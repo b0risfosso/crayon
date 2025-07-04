@@ -1,0 +1,425 @@
+• name: Single-Cell Trajectories  
+• description: This term describes the paths or courses of development that single cells undergo over time. It involves tracking these paths to understand the dynamics of developmental modes.  
+• action: The text suggests learning or extracting knowledge regarding how developmental modes change and evolve by studying the trajectories of individual cells.  
+• keywords: Single-cell, trajectories, learning, developmental modes, dynamics, cell development, dynamics tracking, evolution.
+
+• name — Circumferential Hoops Adjustment
+• description — This is a process where circumferential hoops, which are sampled at equally spaced distances based on their average proper distance along the longitudinal axis, are adjusted to be equally spaced in pullback space.
+• action — The text describes the process of adjusting the spacing of circumferential hoops from being equally spaced based on proper distance along a longitudinal axis to being equally spaced in a different space, referred to as pullback space.
+• keywords — circumferential hoops, longitudinal axis, average proper distance, equally spaced distances, pullback space, adjustment, spacing, sampling
+
+The provided text "Phys." is not sufficient to extract any systems, concepts, or objects as it does not contain any substantial information. Please provide more text for analysis.
+
+There are no extractable systems, concepts, or objects present in the given text.
+
+The text provided, "20.", does not contain enough information to extract systems, concepts, or objects as per your requirements. There are no terms or descriptions to analyze, and therefore no actions or keywords to list.
+
+• Name: Lagrangian measures of time-integrated tissue strain  
+  • Description: This refers to the approach of measuring the accumulated strain on tissue over time by using Lagrangian coordinates.  
+  • Action: The text introduces the concept of using Lagrangian measures to assess the strain experienced by tissue over a certain period.  
+  • Keywords: Lagrangian, time-integrated, tissue strain, evolving surface, material metric, coordinates, measures.
+
+• Name: Lagrangian coordinates  
+  • Description: A set of coordinates that is applied to an evolving surface to support the construction of a material metric.  
+  • Action: The application of Lagrangian coordinates induces the creation of a material metric, which is used for measuring tissue strain.  
+  • Keywords: Lagrangian, coordinates, evolving surface, material metric, tissue, strain, construction, measurement.
+
+• Name: Material metric  
+  • Description: A metric constructed by the application of Lagrangian coordinates on an evolving surface, used in measuring time-integrated tissue strain.  
+  • Action: The material metric is constructed by using a set of Lagrangian coordinates, enabling the assessment of tissue strain over time.  
+  • Keywords: material metric, Lagrangian, coordinates, evolving surface, tissue strain, construction, measurement.
+
+I'm sorry, but I can't provide specific information from the text of the article itself. However, if you have any questions about the publication, such as general inquiries about its content or how to interpret academic publications, I'd be glad to help.
+
+The text provided ("M.") does not contain any clear systems, concepts, or objects to extract.
+
+• Name: eLife 4, e07090 (2015)  
+• Description: This appears to be a reference to a scientific article published in the journal eLife in 2015. It is typically a research paper that contains scientific concepts, systems, or findings relevant to its field.  
+• Action: The reference indicates the existence of a scientific paper but does not provide further details on the content or findings of the paper itself.  
+• Keywords: eLife, scientific paper, publication, research, 2015, journal reference, e07090, citation, academic article, scientific journal.
+
+There are no systems, concepts, or objects detailed in the text provided. The text contains only numbers and a date reference without any accompanying information.
+
+• Name: Out-of-plane deformation  
+• Description: This refers to a specific type of deformation where the normal motion (vn) is multiplied by twice the mean curvature (H). This deformation is characterized by negative values at constriction points where the mean curvature becomes negative.  
+• Action: The text describes how the out-of-plane deformation exhibits negative values at points of constriction due to the negativity of the mean curvature.  
+• Keywords: out-of-plane deformation, normal motion, mean curvature, negative values, constriction, curvature, deformation, geometry, motion, constriction points
+
+I'm sorry, the provided text is insufficient for extracting any systems or concepts as it lacks context and relevant information. Please provide a more substantial excerpt for analysis.
+
+I'm sorry, but there is not enough information in the given text to identify any systems or concepts.
+
+• Name: Germ-line transmission of a myocardium-specific GFP transgene  
+  - Description: This refers to the process where a genetically engineered myocardium-specific GFP (green fluorescent protein) transgene is passed down through generations in zebrafish, allowing for the study of gene expression in cardiac tissues.
+  - Action: The text highlights the successful transmission of this transgene, which reveals critical regulatory elements within the cardiac myosin light chain 2 promoter, providing insight into genetic regulation in zebrafish hearts.
+  - Keywords: Germ-line transmission, myocardium-specific, GFP transgene, cardiac myosin, regulatory elements, promoter, zebrafish, gene expression, cardiac tissues, genetic regulation.
+
+The provided text "& Fedkiw, R." does not include any systems, concepts, or objects, nor does it provide any context or descriptions for an extraction. Therefore, nothing can be extracted based on the instructions given.
+
+The provided text does not contain any systems, concepts, or objects that meet the criteria for extraction. The text merely states that no data were excluded from the analyses, which does not elaborate on any specific systems or concepts. Therefore, there is nothing to return.
+
+I'm sorry, but the provided text does not contain enough information about any systems or concepts. It seems to be an incomplete reference or citation and lacks descriptive content or context needed to identify specific systems or concepts.
+
+• Name: 3D Heart Shape Reconstruction
+  - Description: This refers to the process of reconstructing the three-dimensional shape of a beating heart over time.
+  - Action: The text shows dynamic mapping to a material frame to measure tissue velocity and deformation in 3D.
+  - Keywords: 3D reconstruction, heart, beating heart, tissue velocity, tissue deformation, dynamic maps, material frame.
+
+• Name: In-plane (tangential) Tissue Velocity
+  - Description: This is a measure of the speed of tissue movement parallel to the plane of observation.
+  - Action: The in-plane tissue velocity is visually represented and presumably calculated over time.
+  - Keywords: in-plane velocity, tangential, tissue movement, speed, observation plane, deformation, dynamic mapping.
+
+• Name: Out-of-plane (normal) Tissue Velocity
+  - Description: This is a measure of the speed of tissue movement perpendicular to the observation plane.
+  - Action: The out-of-plane tissue velocity is part of the overall tissue movement measurement system.
+  - Keywords: out-of-plane velocity, normal, tissue movement, perpendicular, observation plane, speed, measurement.
+
+• Name: Covariant Measures of Tissue Velocity and Deformation
+  - Description: A methodological approach that standardizes measurements of tissue motion and deformation within a dynamic three-dimensional framework.
+  - Action: Provides a consistent and accurate representation of tissue dynamics in a 3D material frame.
+  - Keywords: covariant measures, tissue velocity, deformation, dynamic mapping, 3D framework, material frame, standardization.
+
+• Name: Divergence of In-plane Velocity
+  - Description: This concept describes the rate of separation between points in the tissue's in-plane velocity field.
+  - Action: It is calculated as a part of assessing tissue dynamics.
+  - Keywords: divergence, in-plane velocity, rate of separation, velocity field, tissue dynamics, calculation, mapping.
+
+• Name: Areal Dilation
+  - Description: A quantitative measure of the change in area of the tissue over time.
+  - Action: This is expressed as a ratio or difference, ∆A/A0.
+  - Keywords: areal dilation, area change, tissue area, quantitative measure, ratio, dynamic mapping, material frame.
+
+• Name: Tissue Shear
+  - Description: This reflects the amount of deformation experienced by the tissue when subjected to shear forces.
+  - Action: Expressed as ||ε – Trε/2||, it's a measure of the extent of shift experienced by the tissue.
+  - Keywords: tissue shear, deformation, shear forces, measurement, dynamic mapping, material frame, tissue dynamics.
+
+• Name: Curved Surfaces Extraction from 3D Data  
+• Description: This system involves identifying and extracting curved surfaces that are of interest from volumetric 3D data.  
+• Action: The action described is the extraction of dynamic textured surfaces originating from 3D volumetric data, focusing on those surfaces identified as having specific interest.  
+• Keywords: volumetric data, 3D, curved surfaces, extraction, dynamic, textured surfaces, interest, identification.
+
+• name — UAS-mCherry  
+• description — The text mentions 'w;UAS-mCherry' as a genetic component or tool often used in scientific experiments, particularly in the field of genetics or molecular biology. UAS refers to an upstream activating sequence used to regulate gene expression, while mCherry is a fluorescent protein used as a reporter to visualize or track specific cellular or molecular processes. 
+• action — The text highlights the genetic combination 'w;UAS-mCherry', indicating a specific genetic setup likely used in experiments, possibly in a laboratory setting involving organismal genetics, like Drosophila (fruit flies).
+• keywords — UAS, mCherry, fluorescent protein, genetic component, reporter gene, gene expression, Drosophila, molecular biology.
+
+(Note: 'Wieschaus' likely refers to the scientist who might be involved in work related to the genetic components mentioned, though the text does not provide additional information on this aspect.)
+
+There is no clear system or concept described in the provided text, as it only includes a fragment that reads "References 1." Therefore, I am unable to extract any systems or concepts from this text.
+
+• Name: TubULAR
+
+• Description: TubULAR is a system or tool mentioned in the text. Tutorials and documentation for using it are available online, and its method has been validated in specific sections of supplementary information.
+
+• Action: The text provides information about where to access tutorials and documentation for TubULAR and where to find validation details for the method.
+
+• Keywords: TubULAR, tutorials, documentation, validation, method, Supplementary Information, Sections IV, Sections X, online resources.
+
+• Name: Computational sectioning
+
+• Description: Computational sectioning is a process described in the text as being used to create circumferential disks from a parameterized surface, which represents an organ. This method allows for even sampling along the length of the organ.
+
+• Action: The text discusses the action of computationally sectioning a parameterized surface to produce evenly distributed circumferential disks along the organ's length. 
+
+• Keywords: computational sectioning, parameterized surface, circumferential disks, organ, sampling, length, even distribution
+
+The provided text is insufficient to extract any systems, concepts, or objects. Please provide more text for analysis.
+
+• Name: Radius Averaging 
+• Description: The process described involves calculating the average radius around the circumferential axis for each given axial position, denoted as 's'. 
+• Action: The main action is the averaging of the radius measurement around the circumferential axis at different points along the axial position.
+• Keywords: radius, averaging, circumferential axis, axial position, s, calculation, measurement, geometry.
+
+• Name: Syncytia Formation in Drosophila Midgut Visceral Musculature  
+• Description: The text describes the formation of syncytia, a structure where cells fuse to form a multinucleated cell, specifically within the visceral musculature of the Drosophila midgut. This process is dependent on the action of several key proteins or factors.  
+• Action: The formation of syncytia is facilitated by the interaction of the proteins DUF, SNS, and MBC, which are necessary components for this biological process.  
+• Keywords: syncytia, visceral musculature, Drosophila, midgut, DUF, SNS, MBC, cell fusion, multinucleated cell
+
+• name — K99HD110675
+• description — This appears to be a grant identification number, possibly related to research funding in a scientific or medical context. It doesn't provide specific details about a system, concept, or research focus.
+• action — The text does not provide enough details about actions, relationships, or significant information beyond identifying a potential funding or research identification number.
+• keywords — grant, research, funding, identification number, academic, scientific, medical, project, code, K99HD110675
+
+The provided text "N.P.M." is too brief and lacks sufficient context or content to extract any systems, concepts, or objects. There is no additional information, tools, terminology, or research described in the text to analyze or summarize.
+
+The text provided is minimal and lacks sufficient information to extract any systems, concepts, or objects along with their descriptions, actions, or keywords. Therefore, nothing can be returned based solely on "Chen, B.-C."
+
+The provided text, "& Wieschaus, E.", does not contain enough information to extract any systems, concepts, or objects. If more context or text is provided, I may be able to assist you better.
+
+The provided text is not sufficient to extract any systems, concepts, or objects. Please provide more detailed information or context from the document in question.
+
+The provided text does not contain enough information to extract any systems, concepts, or objects as per the guidelines specified. It is a fragment with insufficient context or content to analyze meaningfully.
+
+It seems that your provided text is too limited or does not contain enough information for me to extract any systems or concepts as per your requirements. If you have a more detailed text or additional information, please share it for further analysis.
+
+The provided text does not contain enough information or context to identify any systems or concepts. Without additional content or context, no specific systems, concepts, or objects can be extracted or described.
+
+Nothing
+
+The provided text "51." does not contain sufficient information to extract any systems, concepts, or objects. Without additional context or content, no relevant information or terminology can be identified or summarized. Therefore, no output can be generated based on the instructions given.
+
+• Name: 4d reconstruction of murine developmental trajectories using spherical harmonics  
+• Description: This system/concept involves the use of spherical harmonics to perform a four-dimensional reconstruction of developmental trajectories in mice.  
+• Action: The text indicates a method or process of understanding or visualizing how murine developmental pathways change over time using mathematical modeling (spherical harmonics) in a four-dimensional space, likely including three spatial dimensions plus time.  
+• Keywords: 4d reconstruction, murine, developmental trajectories, spherical harmonics, mathematical modeling, mice, spatial dimensions, time, visualization, developmental pathways.  
+
+• name — Helmholtz–Hodge decomposition
+• description — A method mentioned in the text for analyzing the tangential motion in each mode's normal motion.
+• action — The text discusses the use of Helmholtz–Hodge decomposition to analyze tangential motion and implies a decomposition of motion into different components.
+• keywords — Helmholtz-Hodge, decomposition, tangential motion, normal motion, analysis, modes, images, illustration
+
+I'm sorry, the provided text doesn't contain specific systems, concepts, or objects.
+
+The text provided is insufficient to extract any specific systems or concepts. There is only a name "van Rees, W." without additional context or information. No systems, concepts, or objects are mentioned, and thus no details can be summarized, no actions described, and no keywords generated.
+
+• Name: Cell behaviors and shape change
+
+• Description: The text describes how the collective behavior of cells can generate changes in shape. It suggests that there is a relationship between the actions of individual cells and the transformation of shape in a larger system, such as tissue or an organism.
+
+• Action: The significant information conveyed is the relationship between cell behaviors and the resulting shape change, emphasizing a cause-and-effect mechanism where cellular activity directly influences morphological transformations.
+
+• Keywords: cell behaviors, shape change, interpretation, collective, generate, transformation, morphology, system, relationship, mechanism.
+
+• name — Kymographs
+• description — Kymographs are visual representations used to depict motion over time, specifically highlighting waves of contraction in this context by averaging motion along the circumferential axis.
+• action — They illustrate the contraction waves by showing in-plane and out-of-plane motion, providing insight into the dynamic processes occurring.
+• keywords — Kymographs, in-plane motion, out-of-plane motion, circumferential axis, waves of contraction, motion averaging, dynamic processes.
+
+1. **Name:** Kymograph  
+   **Description:** A kymograph is used to visualize the areal strain rate during the development of a single embryo’s midgut.  
+   **Action:** The kymograph shows the change or deformation (strain) occurring over time in the midgut during embryonic development.  
+   **Keywords:** Kymograph, embryo, midgut, areal strain rate, development, visualization, deformation, single embryo, strain, persistent.
+
+2. **Name:** Areal Strain Rate  
+   **Description:** The areal strain rate refers to the rate at which area changes (deforms) in the developing midgut of an embryo, as shown in the kymograph.  
+   **Action:** It indicates the small but persistent changes in area (deformation) occurring in the midgut during the development of a single embryo.  
+   **Keywords:** Areal strain rate, midgut, embryo development, deformation, kymograph, persistent, single embryo, change, visualization, development.
+
+• Name: TubULAR
+• Description: TubULAR is involved in extracting the centroid of certain regions and performs point-matching to a mesh to identify endcap vertices.
+• Action: TubULAR identifies and matches the centroid of regions to a mesh in order to pinpoint endcap vertices.
+• Keywords: TubULAR, centroid, regions, point-matching, mesh, identify, endcap, vertices, extraction, geometry.
+
+The provided text "Berg, S." does not provide enough information or context to extract any systems, concepts, or objects.
+
+• Name: Exclusive Rights
+  - Description: The text refers to the exclusive rights held by Springer Nature or its licensor (e.g., a society or other partner) to an article under a publishing agreement with the author(s) or other rightsholder(s).
+  - Action: The text emphasizes the authority and control Springer Nature or its licensor has over the article, limiting how the author(s) can share or archive their work.
+  - Keywords: Exclusive rights, Springer Nature, publisher, licensor, society partner, publishing agreement, author rights, rightsholder, article, accepted manuscript.
+
+• Name: Publishing Agreement
+  - Description: The contract between the author(s) or other rightsholder(s) and Springer Nature or its licensor that outlines the exclusive rights to the article and governs the author’s ability to self-archive the article.
+  - Action: The text highlights the role of the publishing agreement in determining who holds the rights and what actions are permitted regarding the article.
+  - Keywords: Publishing agreement, author(s), rightsholder(s), Springer Nature, licensor, exclusive rights, article, self-archiving, applicable law, manuscript version.
+
+• Name: Author Self-Archiving
+  - Description: The aspect of the publishing agreement that governs how the author(s) can archive the accepted manuscript version of their article.
+  - Action: The text specifies that author self-archiving is solely governed by the terms of the publishing agreement and applicable law.
+  - Keywords: Author self-archiving, accepted manuscript, publishing agreement, Springer Nature, exclusive rights, author(s), rightsholder(s), licensor, applicable law, article.
+
+I'm sorry, but the provided text does not contain enough information to extract any systems or concepts. It seems to be a fragment without sufficient context or detail. If you have a more complete version or additional sections of the text, please provide them for analysis.
+
+The provided text, "18.", contains insufficient information to extract systems, concepts, or objects in accordance with your criteria. There are no terms, descriptions, relationships, or significant information from which to derive a meaningful list of systems/concepts.
+
+There is nothing extractable from the text provided since it only contains the letter "J."
+
+There are no clear systems or concepts in the provided text.
+
+The provided text does not contain enough information to extract systems, concepts, or objects as it consists solely of a numerical sequence and a year. This snippet appears to be part of a reference citation, possibly indicating pages and year, but lacks the substantive content needed for analysis or extraction of meaningful systems or concepts.
+
+The text you provided does not contain enough information to identify specific systems, concepts, or objects. Please provide more detailed text or context for further analysis.
+
+• name — Total enclosed volume and surface area oscillations  
+• description — The text describes the phenomenon where both the total enclosed volume and the surface area oscillate over time, indicating a dynamic change in these parameters.  
+• action — The text highlights the temporal changes in both the total enclosed volume and the surface area by using the word "oscillate," signifying periodic fluctuations.  
+• keywords — oscillation, total enclosed volume, surface area, time, dynamic change, temporal changes, periodic fluctuations, parameters, enclosed, surface.
+
+I'm sorry, but the text you provided does not contain any clear systems, concepts, or objects to extract. Please provide more detailed information or a different excerpt.
+
+• name — Constrained parameterization of the whole surface
+• description — This concept involves a method of representing the entire surface in a way that allows for tracking the movement of tissue.
+• action — The text describes how constraining the parameterization of the surface assists in monitoring tissue motion effectively.
+• keywords — constrained parameterization, whole surface, tracking, tissue motion, representation, method, movement, facilitate, monitoring, surface tracking
+
+• name — 3D tissue velocity
+
+• description — The text describes 3D tissue velocity as the velocity calculated between two adjacent timepoints, t1 and t2, using the formula v = (x2 − x1)/(t2 − t1). This formula represents the change in position (x2 - x1) divided by the change in time (t2 - t1), giving the rate of displacement over time within a 3D tissue context.
+
+• action — The action described in the text is the calculation of velocity between two timepoints. It involves using a simple formula to quantify how quickly the tissue changes position in a three-dimensional space. This is a fundamental calculation for understanding dynamic changes in tissue over time.
+
+• keywords — 3D tissue velocity, adjacent timepoints, t1, t2, velocity calculation, displacement, time change, formula, tissue dynamics, rate of displacement.
+
+There are no systems or concepts provided in the text "4." beyond the mere numeral. Consequently, I cannot extract any detailed systems, concepts, or objects based on the given text.
+
+The provided text does not contain any information or context to extract systems, concepts, or objects, as it only contains the number "24."
+
+The provided text does not contain sufficient information to extract any systems, concepts, or objects as per your request. If there is more context or additional text, please provide it for further analysis.
+
+• Name: Drosophila Midgut Surface Capture  
+• Description: The text describes the initial step in a process involving the Drosophila midgut, where the surface of the endoderm is captured and represented as a topological sphere.  
+• Action: The action involves capturing and representing the surface of the endoderm in the Drosophila midgut as a topological sphere, indicating a focus on structural or spatial analysis.  
+• Keywords: Drosophila, midgut, surface, endoderm, topological sphere, capture, structure, spatial analysis, representation.
+
+It seems that the provided text does not contain any discernible systems, concepts, or objects for extraction. Please provide more context or a more detailed text for analysis.
+
+There is no system or concept in the provided text that meets the criteria for extraction.
+
+I'm sorry, but the provided text does not contain sufficient information to extract any systems or concepts. It consists of a list of numbers associated with cells but does not provide context or details about any specific system, concept, or action.
+
+There is no clear system or concept described in the text provided.
+
+I'm sorry, but there isn't enough information in the given text to extract any systems or concepts. Please provide more text or context.
+
+• name: Tissue shear measurement in midgut endoderm
+• description: This system involves calculating tissue shear in the midgut endoderm by measuring the deviatoric component of the integrated strain. This measurement is computed using Lagrangian pathlines in a 3D context.
+• action: The text describes a method for directly measuring tissue shear by utilizing a specific mathematical computation involving Lagrangian pathlines to assess the deviatoric component of strain.
+• keywords: midgut endoderm, tissue shear, deviatoric component, integrated strain, Lagrangian pathlines, 3D computation, measurement, biomechanics, strain analysis, endoderm.
+
+The text provided is too limited to extract any systems or concepts. It appears to be an incomplete reference or citation. Please provide a more substantial excerpt for analysis.
+
+There is no clear system or concept in the text provided. Therefore, there is nothing to extract based on your instructions.
+
+• Name — Rate-of-deformation tensor
+• Description — A mathematical entity used to measure the deformation rate along pathlines, providing a Lagrangian measurement of cumulative tissue strain.
+• Action — The integration of the rate-of-deformation tensor along pathlines allows for the calculation of cumulative tissue strain in a Lagrangian framework.
+• Keywords — rate-of-deformation tensor, integration, pathlines, Lagrangian measurement, cumulative tissue strain, deformation rate, mathematical entity.
+
+• Name: Cyclic deformations of the heart  
+  • Description: Refers to the repetitive movements or changes in shape of the heart that lead to various motions.
+  • Action: These deformations result in both in-plane velocities (v∥) and out-of-plane motion (vn), which either constrict or dilate the heart's structure, described as a "tube."
+  • Keywords: Heart, Cyclic deformations, In-plane velocities, Out-of-plane motion, Constriction, Dilation, Tube.
+
+• Name: In-plane velocities (v∥)
+  • Description: Refers to movements or velocities occurring within the plane of the heart's structure as a result of cyclic deformations.
+  • Action: Represented as v∥, these velocities are directly associated with the in-plane motion caused by the heart's deformations.
+  • Keywords: In-plane velocities, Heart deformations, Motion, Plane, v∥, Cyclic, Heart.
+
+• Name: Out-of-plane motion (vn)
+  • Description: Refers to the motion occurring perpendicular to the plane of the heart's structure, influenced by cyclic deformations.
+  • Action: Denoted as vn, it contributes to constricting or dilating the heart, indicating a significant change in structure.
+  • Keywords: Out-of-plane motion, Heart deformations, Constriction, Dilation, Perpendicular, vn, Cyclic.
+
+• Name: Integration with ImSAnE
+• Description: A system or process described for integrating with ImSAnE, a tool or framework managed by a GitHub repository.
+• Action: The text provides information on where to access the integration with ImSAnE, specifically referencing a GitHub URL.
+• Keywords: ImSAnE, integration, GitHub, repository, access, framework, tool, URL, system, process.
+
+• name: TubULAR  
+• description: TubULAR is designed to manage surfaces characterized by exaggerated and dynamic geometries.    
+• action: TubULAR is capable of analyzing surfaces with these complex geometries, though extreme variations can still present analytical challenges.    
+• keywords: TubULAR, surfaces, exaggerated geometries, dynamic geometries, analysis, extreme geometries, inherent difficulties, system.
+
+• name — TubULAR
+
+• description — TubULAR is a system that maps the tangential component of the 3D velocity field onto the pullback plane. It likely involves computational or visualization techniques for analyzing 3D velocity fields.
+
+• action — The action involves the mapping process, specifically translating the tangential aspects of a 3D velocity field into a different coordinate plane, known as the pullback plane.
+
+• keywords — TubULAR, 3D velocity field, tangential component, pullback plane, mapping, computational tool, visualization, coordinate transformation, analysis, visualization technique.
+
+• name — Elastic theory of unconstrained non-Euclidean plates
+• description — The text refers to a theoretical framework related to the elasticity of plates that do not conform to Euclidean geometry. This theory likely addresses behaviors and properties of such plates under various conditions without constraints typical in Euclidean space.
+• action — The action refers to the theoretical examination or modeling of non-Euclidean plates' elasticity. It highlights an area of study in material science or applied physics that deals with complex geometries.
+• keywords — Elastic theory, Non-Euclidean plates, Geometry, Elasticity, Theoretical framework, Material science, Applied physics, Unconstrained, Plates, Non-conformity.
+
+The provided text is too short and lacks enough context or information to extract any specific systems, concepts, or objects.
+
+• Name: Typical Workflow for Tissue Surface Analysis  
+  • Description: This workflow is used to analyze tissue surfaces from 3D imaging data. It involves extracting the tissue surface, generating a pullback representation for parameterization and visualization, analyzing tissue motion using Discrete Exterior Calculus (DEC), and potentially decomposing dynamics into a mode-based description.  
+  • Action: The workflow is a step-by-step process that transforms 3D imaging data into a detailed analysis of tissue motion and dynamics. It integrates various techniques to facilitate the visualization and understanding of tissue surface behavior.  
+  • Keywords: workflow, tissue surface, 3D imaging, confocal, light-sheet, pullback representation, surface parameterization, visualization, tissue motion, DEC, dynamic decomposition, mode-based description.
+
+• name — Periodic Surface Parameterization
+• description — This is a parameterization method where the surface is described periodically along the circumferential direction. It is specifically tiled along the φ axis, indicating a repetition or a pattern in the structure along this direction.
+• action — The text emphasizes the periodic nature of the parameterization along the circumferential direction of the surface, focusing on how it is tiled or repeated along the φ axis.
+• keywords — periodic surface, parameterization, circumferential direction, φ axis, tiling, repetition, pattern, periodicity, axis, surface.
+
+• Name: Particle Image Velocimetry (PIV) for MATLAB
+• Description: PIV is a method used for visualizing fluid flow and movement by tracking particles within the fluid. The text implies that PIV is implemented or utilized within MATLAB, likely involving aspects of simulation or data analysis.
+• Action: The text highlights the focus on accuracy and enhanced algorithms within the PIVlab, suggesting improvements or refinements in the processing or analysis techniques related to particle image velocimetry within a MATLAB environment.
+• Keywords: Particle Image Velocimetry, MATLAB, PIVlab, accuracy, enhanced algorithms, fluid flow, data analysis, visualization, simulation, tracking.
+
+• name — Z transformation
+• description — A transformation applied where 'u' is mapped to 's', with 's' representing a distance along the longitude of the tissue.
+• action — The transformation process converts a parameter 'u' into a distance 's' along the tissue's longitude.
+• keywords — transformation, distance, longitude, tissue, mapping, parameter, Z function, u, s, equation
+
+• Name: Surface Extraction Step
+• Description: A process that provides an instantaneous description of surface geometry.
+• Action: Describes the surface geometry but does not track or identify the movement and deformation of the tissue over time.
+• Keywords: surface geometry, instantaneous description, movement, deformation, tissue, timepoint, extraction step.
+
+I'm sorry, but the provided text does not contain enough information to extract any systems, concepts, or objects as defined by your request.
+
+There is no clear system or concept present in the text provided.
+
+• Name: J: (s, φ) → (s0, φ0)
+
+• Description: This system or concept refers to a transformation that removes any residual motion of the material in the pullback plane relative to the material coordinate frame. This is achieved by subtracting optical flow, which is determined through particle image velocimetry.
+
+• Action: The transformation involves subtracting optical flow to eliminate residual motion in the material, ensuring alignment with the material coordinate frame.
+
+• Keywords: transformation, residual motion, pullback plane, material coordinate frame, optical flow, particle image velocimetry, subtraction, alignment.
+
+I’m sorry, but the provided text appears to be incomplete or a fragment, as it ends abruptly and doesn’t provide sufficient information to clearly delineate any specific systems, concepts, or objects according to your request. An accurate extraction would require more context or a more complete passage.
+
+• Name: Tissue deformation tracking  
+• Description: This concept involves tracking motion in two dimensions to interpret tissue deformation across a tube in three dimensions. It specifically uses accumulated dilatational strain to illustrate these deformations.  
+• Action: The action involves reading out tissue deformation by tracking motion in two dimensions, allowing for a full three-dimensional understanding of the tissue changes using dilatational strain.  
+• Keywords: tissue deformation, motion tracking, two dimensions, three dimensions, accumulated dilatational strain, tube, interpretation, deformation, analysis.
+
+• name: TubULAR
+  - description: TubULAR is a system that extends previous cartographic approaches such as ImSAnE. It is used to construct constrained in toto parameterizations of surfaces, tracking tissue patches as they move and deform over time.
+  - action: TubULAR enhances and builds on the capabilities of previous methodologies like ImSAnE, focusing on detailed spatial and temporal mapping of dynamic surfaces in biological contexts.
+  - keywords: TubULAR, cartographic approaches, ImSAnE, parameterizations, surfaces, tissue patches, movement, deformation, temporal mapping
+
+• name: ImSAnE
+  - description: ImSAnE is a previous cartographic approach that TubULAR extends. It is implied to be a system for mapping or analyzing surfaces, likely in a biological or computational context.
+  - action: ImSAnE serves as a foundational methodology that TubULAR builds upon, suggesting it provides a basis or framework for surface analysis that TubULAR further develops.
+  - keywords: ImSAnE, cartographic approaches, surface mapping, methodology, parameterizations, foundational framework, analysis
+
+There is no clear system, concept, or object in the given text to extract information from.
+
+The provided text "& Dunkel, J." does not offer any systems, concepts, or objects that can be extracted. Therefore, there is no relevant information to summarize or describe based on this text alone, as it lacks sufficient content.
+
+I'm sorry, but the text you provided does not contain enough information to extract any systems or concepts. Please provide a more detailed text for analysis.
+
+There are no systems, concepts, or objects described in the provided text.
+
+The provided text "H." does not contain enough information or context to extract any systems, concepts, or objects. Therefore, no relevant items can be produced from this text.
+
+• name: Level Set Methods  
+• description: Level set methods are a mathematical technique used for segmenting structures within an image. In this context, these methods are applied to segment only the heart tissue in a zebrafish heart dataset, rather than the space enclosed by the tissue.  
+• action: The use of level set methods allows for precise segmentation of heart tissue, helping to accurately identify and exclude non-tissue areas within medical imaging of a zebrafish heart.  
+• keywords: segmentation, zebrafish heart, heart tissue, level set methods, image analysis, mathematical technique, medical imaging, dataset.
+
+There is not enough information provided in the given text to extract any systems or concepts.
+
+The provided text is incomplete and does not contain sufficient information about any systems, concepts, or objects to analyze or extract according to the specified criteria. Therefore, I cannot fulfill the request based on the given text.
+
+The text you provided, "J.", does not contain any substantial information or context from which systems, concepts, or objects can be derived. Please provide more detailed text for analysis.
+
+• Name: Automated Method for Registering Dynamic Surfaces  
+• Description: This system is a proposed automated technique designed to register dynamic surfaces that have the topology of a cylinder but can have complex geometry. It is also intended to classify the signatures of tissue deformation that occur during organ-scale shape change.  
+• Action: The text proposes this method as a tool for accurately recording and analyzing tissue deformation patterns, which occur during changes in the shape of organs with cylindrical topology.  
+• Keywords: automated method, registering dynamic surfaces, cylinder topology, complex geometry, tissue deformation, organ-scale shape change, classification, signatures, geometry, topology.
+
+• Name: Particle Image Velocimetry (Phase Correlation Analysis)  
+• Description: Particle Image Velocimetry (PIV) is a method used for capturing material motion. Phase correlation analysis is used within PIV to measure motion relative to the previous timepoint.  
+• Action: The text discusses stabilizing resulting coordinates using the metric J, based on material motion measured through PIV. This implies a process where the motion is analyzed and then applied to adjust coordinates for consistency over time.  
+• Keywords: Particle Image Velocimetry, Phase Correlation Analysis, Material Motion, J, Coordinate Stabilization, Measurement, Previous Timepoint, Motion Analysis
+
+• Name — ImSAnE cartographic projections
+• Description — ImSAnE is a system that generates high-quality cartographic projections by dividing a surface into multiple coordinate patches. It operates at any given timepoint, which allows for detailed mapping of surfaces in this context.
+• Action — The text discusses the challenge posed by tissue motion within and between coordinate patches generated by ImSAnE. This motion is unconstrained between timepoints, creating difficulties in tracking and interpreting cell and tissue motion in dynamic geometries.
+• Keywords — ImSAnE, cartographic projections, coordinate patches, surface division, tissue motion, cell tracking, dynamic geometries, timepoints, motion interpretation, challenges.
+
+• name — Cylindrical Topology
+• description — The text refers to surfaces that have a cylindrical topology, which indicates that these surfaces have characteristics or properties akin to that of a cylinder.
+• action — The text states that certain conditions or processes result in the formation of surfaces that possess a cylindrical topology.
+• keywords — surfaces, cylindrical, topology, formation, properties, characteristics, geometry, structure, shape, cylindrical surfaces
+
+The provided text does not contain sufficient information or context to extract any systems, concepts, or objects.
+

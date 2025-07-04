@@ -1,0 +1,449 @@
+• name — Myosin 1D (Myo1D) 
+  - description — Myosin 1D (Myo1D) is a protein mentioned in the context of interacting with another element, vangl2, to influence cilia orientation in zebrafish. 
+  - action — Myo1D interacts with vangl2, suggesting a regulatory or functional relationship between these elements that affects the orientation of cilia in the zebrafish left-right organizer. 
+  - keywords — Myosin 1D, cilia orientation, zebrafish, left-right organizer, protein interaction, regulation, Myo1D, vangl2.
+
+• name — Vangl2
+  - description — Vangl2 is a protein involved in the regulation of cilia orientation within the zebrafish left-right organizer, interacting with Myo1D.
+  - action — Vangl2 interacts with Myo1D, indicating a collaborative role in the modulation of cilia's directional orientation. The combination of vangl2 and Myo1D influences the biological process under study.
+  - keywords — Vangl2, cilia orientation, zebrafish, left-right organizer, protein interaction, regulation, Myo1D, functional relationship.
+
+• name — Cilia Orientation
+  - description — Refers to the orientation of cilia, which is regulated by the interaction between Myo1D and vangl2 in the zebrafish left–right organizer.
+  - action — The orientation of cilia is under the regulatory influence of Myo1D and vangl2 interaction, which is critical for the proper functioning of the left-right organizer in zebrafish.
+  - keywords — Cilia orientation, Myo1D, vangl2, zebrafish, left-right organizer, protein interaction, regulation, biological process.
+
+• name — Zebrafish Left–Right Organizer
+  - description — A biological system where Myo1D and vangl2 interact to control cilia orientation, contributing to developmental processes in zebrafish.
+  - action — Acts as a site of interaction between Myo1D and vangl2, where this interaction regulates the orientation of cilia, a crucial step for proper organism development.
+  - keywords — Zebrafish, left-right organizer, Myo1D, vangl2, developmental process, regulation, cilia orientation, interaction site.
+
+• Name: Antero-posterior asymmetry  
+• Description: Refers to the orientation asymmetry along the anterior-posterior axis. In the context provided, it is observed that this asymmetry remains unaffected.  
+• Action: The text indicates that the antero-posterior asymmetry does not change in the presence of MZ myo1D, suggesting MZ myo1D does not influence this specific asymmetry.  
+• Keywords: antero-posterior asymmetry, MZ myo1D, unaffected, orientation, anterior-posterior axis, symmetry, Fig. 3m.
+
+• Name: IBMX and Forskolin Treatment  
+  • Description: A combination of IBMX and Forskolin is used to activate CFTR by elevating cAMP levels and PKA activity.  
+  • Action: The treatment with IBMX and Forskolin successfully rescues the KV size but does not correct laterality defects in MZ myo1D mutants.  
+  • Keywords: IBMX, Forskolin, CFTR, cAMP levels, PKA activity, KV size, laterality defects, MZ myo1D mutants, activation, treatment.
+
+• Name: CFTR Activation  
+  • Description: CFTR is activated through the elevation of cAMP levels and PKA activity.  
+  • Action: Activation of CFTR by increasing cAMP levels and PKA activity is linked to rescuing KV size in mutants.  
+  • Keywords: CFTR, activation, cAMP levels, PKA activity, rescue, KV size, IBMX, Forskolin, MZ myo1D mutants.
+
+• Name: KV Size Rescue  
+  • Description: KV size is rescued through the activation of CFTR despite the presence of specific genetic mutations.  
+  • Action: The treatment aimed at activating CFTR results in the recovery of KV size in the specific genetic context of MZ myo1D mutants.  
+  • Keywords: KV size, rescue, IBMX, Forskolin, CFTR activation, cAMP levels, PKA activity, MZ myo1D mutants, treatment, recovery.
+
+• Name: Laterality Defects  
+  • Description: Laterality defects are not corrected by the treatment that rescues KV size.  
+  • Action: The inability of the IBMX and Forskolin treatment to address laterality defects highlights a specific limitation in its effect on MZ myo1D mutants.  
+  • Keywords: laterality defects, MZ myo1D mutants, IBMX, Forskolin, treatment limitation, KV size rescue, CFTR activation, cAMP levels, PKA activity, specificity.
+
+The given text does not provide any specific systems, concepts, or objects to extract. Therefore, there are no items to present based on the provided instructions.
+
+I'm sorry, but the provided text is not sufficient to extract any specific systems, concepts, or objects. If you can provide more context or additional text, I may be able to help further.
+
+• Name: MZ myo1D mutants
+
+• Description: MZ myo1D mutants exhibit defects in specific developmental processes. They impact the leftward looping of the gut and the asymmetric development of the liver and pancreas.
+
+• Action: The text describes the phenotypic effects observed in organisms with MZ myo1D mutations, specifically focusing on abnormal organ development and positioning.
+
+• Keywords: MZ myo1D mutants, leftward looping, gut, asymmetric development, liver, pancreas, defects, mutations, developmental processes, organ positioning.
+
+The provided text is too minimal to extract any systems, concepts, or objects. There is not enough information to create a meaningful entry with the required elements such as name, description, action, or keywords. Please provide more context or text for further analysis.
+
+• Name: Myosin 1D (myo1D) activities  
+• Description: The text mentions experiments involving embryos that lack either only maternal (M) or both maternal and zygotic (MZ) myo1D activities, indicating that myo1D is a genetic factor whose activity is needed for normal embryonic development.   
+• Action: The process described involves generating embryos with specific genetic deficiencies in myo1D to study its role; specifically, the lack of maternal or both maternal and zygotic myo1D activities.  
+• Keywords: homozygous mutant, embryos, maternal myo1D, zygotic myo1D, myo1D activities, genetic factor, experimental design, developmental biology, myosin.
+
+• name — PEMT (Potentially a buffer or medium)
+• description — A solution used for washing embryos following incubation. It is also used in a blocking step in combination with BSA (Bovine Serum Albumin).
+• action — Embryos are washed in PEMT for different time durations (5, 10, 15, and 20 minutes) and then blocked in PEMT with 2% BSA before being incubated with secondary antibodies.
+• keywords — PEMT, incubation, embryos, washing, blocking, secondary antibodies, BSA, time durations, solution, laboratory protocol.
+
+The text provided does not contain any information or context to extract systems, concepts, or objects as requested.
+
+There is no clear system or concept in the provided text extract to fulfill the given task.
+
+The provided text does not contain enough information to extract any systems, concepts, or objects. There is nothing present in the text except for the number "51." Therefore, no information can be provided based on this text.
+
+It seems that the provided text is limited to the mention of "N., Tyska, M." without any additional context or information. Therefore, there is insufficient information to extract systems, concepts, or objects based on this text alone. There are no systems or concepts mentioned or described, and no actions or keywords can be derived.
+
+The provided text does not include sufficient information about any systems or concepts, as it only provides the names of authors (Yuan, S., Zhao, L., Brueckner, M.) without any additional context, description, or content. Therefore, it is not possible to extract any systems or concepts based solely on the given text.
+
+• name — myo1Gtj18b mutation  
+• description — This is a genetic mutation characterized by the deletion of a CA dinucleotide at positions 198/199 in the open reading frame, resulting in a premature stop codon replacing amino acid 66.  
+• action — The deletion of the CA dinucleotide directly leads to the formation of a premature stop codon, interrupting the usual translation process and presumably affecting the synthesis of the protein.  
+• keywords — myo1Gtj18b mutation, CA dinucleotide, deletion, premature stop codon, amino acid 66, open reading frame, genetic mutation, translation process, protein synthesis.
+
+I'm unable to extract systems or concepts from the text as it only contains a partial word "Biol." If you provide more context or a complete section of text, I'd be happy to assist further.
+
+I'm sorry, but the text provided does not contain sufficient information or context to extract any systems, concepts, or objects. Please provide additional text or context for analysis.
+
+• name — myo1Cb ORF amplification 
+• description — The text describes the amplification of the open reading frame (ORF) of the myo1Cb gene. This process involves using specific primers to increase the quantity of this DNA segment. 
+• action — The significant action in the text is the amplification of myo1Cb ORF from a mixed stage pool of cDNAs using specified primers and its cloning into the pCS2+ vector.
+• keywords — myo1Cb, ORF, amplification, primers, cDNAs, cloning, vector, pCS2+, DNA segment, gene.
+
+• Name: Evolutionarily Conserved Mechanism for Animal LR Asymmetry  
+• Description: The text refers to a mechanism believed to be evolutionarily conserved, involved in establishing left-right (LR) asymmetry in animals. This has been a topic of debate in the scientific community.  
+• Action: The text discusses the ongoing debate and scientific discourse surrounding whether there is a conserved mechanism across species for determining LR asymmetry.  
+• Keywords: evolutionarily conserved mechanism, animal, left-right asymmetry, establishment, debate, scientific community, species, conserved, mechanism, LR asymmetry.  
+
+• Name: Reference point for angle measurement  
+• Description: The process described involves defining a reference point for measuring angles by manually fitting an oval Region of Interest (ROI) to an embryo image. The ImageJ software's Measure function is then used to determine the coordinates of the centroid of the ROI.  
+• Action: The procedure starts with manually fitting an oval ROI to the embryo, followed by using ImageJ's Measure function to obtain the centroid's coordinates, establishing a reference point for angle measurement.  
+• Keywords: reference point, angle measurement, manual fitting, oval ROI, embryo, ImageJ, Measure function, coordinates, centroid, image analysis.
+
+• name: Myo1D
+• description: A protein that controls the ciliary left-right organizer (LRO) flow.
+• action: Myo1D regulates the flow within the left-right organizer, which may be crucial for proper functioning or development.
+• keywords: Myo1D, ciliary, LRO, flow, control, regulation, left-right organizer, protein, movement, development.
+
+- **Name**: Kupffer's vesicle (KV)
+  
+- **Description**: Kupffer's vesicle (KV) is identified as the zebrafish LR organizer (LRO). It is a transient vesicular organ characterized by the presence of motile cilia on its interior.
+
+- **Action**: The motile cilia inside Kupffer's vesicle create a counter-clockwise fluid flow, which is crucial for establishing left-right (LR) asymmetry in zebrafish.
+
+- **Keywords**: Kupffer's vesicle, LR organizer, zebrafish, transient vesicular organ, motile cilia, counter-clockwise fluid flow, LR asymmetry.
+
+The provided text is too fragmentary and lacks sufficient detail to extract any specific systems, concepts, or objects. No information is given regarding actions, relationships, or terminology.
+
+- Name: High-resolution in situ hybridization to whole-mount zebrafish embryos
+- Description: This is a technique used to study gene expression in zebrafish embryos by hybridizing a probe to detect specific RNA sequences in situ, i.e., within the natural tissue environment, while observing the entire mount of the embryo.
+- Action: The process involves using a sensitive hybridization method to visualize gene expression patterns throughout the developmental stages of zebrafish embryos in high resolution.
+- Keywords: high-resolution, in situ hybridization, zebrafish, embryos, gene expression, probe, RNA, visualization, developmental stages, whole-mount.
+
+- Name: KV size
+- Description: The text refers to the KV (Kupffer's vesicle) size in embryos and emphasizes that this size is consistent, regardless of whether the embryos have normal or defective laterality.
+- Action: The text communicates that the size of Kupffer’s vesicle does not differ between embryos with normal laterality and those with defective laterality.
+- Keywords: KV, Kupffer's vesicle, embryo, normal laterality, defective laterality, size, consistency, comparison.
+
+It appears that the provided text is extremely limited and does not offer sufficient information to extract any systems, concepts, objects, or significant details. If you have a more detailed excerpt or additional context, please provide it for further analysis.
+
+The provided text lacks sufficient information to identify any systems, concepts, or objects, as it only contains a partial name. More context or additional text is needed to analyze and extract the required elements.
+
+The provided text is incomplete and does not contain enough information to extract any systems, concepts, or objects. There is nothing to extract based on the available content.
+
+• name — myo1D
+  • description — myo1D is a system involved in the spatial positioning of the basal body within the zebrafish left-right organizer (LRO).
+  • action — The inactivation of myo1D causes anterior displacement of the basal body in the zebrafish LRO.
+  • keywords — myo1D, basal body, zebraﬁsh, anterior displacement, inactivation, LRO, spatial positioning
+
+• name — vangl2
+  • description — vangl2 is another system similarly involved in the positioning of the basal body within the zebrafish LRO.
+  • action — The inactivation of vangl2 causes anterior displacement of the basal body in the zebrafish LRO.
+  • keywords — vangl2, basal body, zebraﬁsh, anterior displacement, inactivation, LRO, spatial positioning
+
+I'm sorry, but there are no systems, concepts, or objects provided in the text you provided.
+
+• Name: Myo1D-like antagonists and Myo1C antagonists  
+• Description: The text describes Myo1D-like antagonists and Myo1C antagonists as components that form an evolutionarily conserved toolkit fundamental for establishing animal laterality.  
+• Action: The text suggests these antagonists, by being part of a conserved system, play a significant role in determining the asymmetrical organization of body structures in animals.  
+• Keywords: Myo1D, Myo1C, antagonists, evolutionarily conserved, toolkit, animal laterality, asymmetrical organization, body structures, establishment, conserved system.  
+
+The provided text "McIntosh, B." does not provide sufficient information to extract specific systems, concepts, or objects with detailed descriptions, actions, or keywords. Therefore, there is nothing to return based on the given text.
+
+• Name: Myo1D and Vangl2 Interaction in LRO
+
+• Description: The text discusses the relationship between myo1D and vangl2 genes. Both mutants have similar flow phenotypes in the KV (Kupffer's Vesicle), a structure involved in establishing left-right asymmetry in vertebrates. However, removing one copy of vangl2 partially rescues the KV flow defects observed in MZ myo1D embryos, suggesting that these genes influence the left-right organizer (LRO) in opposing manners.
+
+• Action: The text highlights a genetic interaction where the removal of one copy of the vangl2 gene compensates for the defects caused by mutations in myo1D, indicating that these genes have opposing effects on the LRO.
+
+• Keywords: myo1D, vangl2, mutants, KV flow, rescue, LRO, gene interaction, opposite ways, flow phenotypes, embryonic development.
+
+I'm sorry, but the text provided is not sufficient to extract any systems, concepts, or objects. If you could provide more complete or detailed text, I can assist you better.
+
+The provided text "J." does not contain enough information or context to extract any systems, concepts, or objects. It contains no references to specific terms, descriptions, actions, or keywords that can be identified or summarized.
+
+The text provided is incomplete and does not contain enough information to identify any systems, concepts, or objects as described in the instructions. Without additional context or content, it is not possible to extract meaningful data that aligns with the specified criteria.
+
+• Name: ZO-1
+
+• Description: ZO-1 is described as a junctional marker used in the given text. 
+
+• Action: The text states that ZO-1 was used to outline KV cells and determine the antero-posterior extent of each cell.
+
+• Keywords: ZO-1, junctional marker, KV cells, antero-posterior, cell outline, cell extent, junctional outline
+
+• Name: Motile cilia number monitoring  
+• Description: The text refers to the evaluation or documentation of the number of motile cilia in individual embryos.  
+• Action: The action described in the text is using a dot plot to represent data on motile cilia numbers in embryos, which suggests a focus on visualizing and quantifying motile cilia.  
+• Keywords: dot plot, motile cilia, embryos, visualization, quantification, data representation, individual examination
+
+• name — Myo1D
+• description — A protein whose loss results in a modest reduction in cilia size but does not affect the percentage of motile cilia.
+• action — Loss of myo1D leads to reduced cilia size, although it does not impact the percentage of motile cilia.
+• keywords — myo1D, cilia size, motile cilia, protein loss, reduction, incidence, Fig. 3g, Fig. 3h, Fig. 3j
+
+The provided text "45." does not contain any systems, concepts, or objects that can be described.
+
+• name — vangl2 gene dosage reduction  
+• description — The reduction in vangl2 gene dosage partially rescues the flow within the Kupffer's vesicle (KV) and corrects some morphological laterality defects.  
+• action — The adjustment in the vangl2 gene dosage primarily restores the rotational orientation of the left-right organizer (LRO) cilia, though it does not correct the position of the basal body.  
+• keywords — vangl2, gene dosage, KV flow, morphological laterality, rotational orientation, basal body position, LRO cilia, rescue, defects, reduction.
+
+• name — Myo1D-Planar Cell Polarity Pathway Interactions in Adult Hindgut
+• description — This system involves the functional interactions of Myo1D with components of the planar cell polarity (PCP) pathway, which are responsible for governing cellular chirality and facilitating asymmetric gut looping in the adult hindgut.
+• action — The text describes the role of Myo1D's interaction with PCP pathway components in managing cellular orientations and structural asymmetries essential for correct gut formation.
+• keywords - Myo1D, planar cell polarity, PCP pathway, cellular chirality, gut looping, asymmetric, adult hindgut, interactions, components, chirality regulation
+
+• Name: ImageJ angle tool  
+• Description: ImageJ angle tool is used to quantify angles in images. In this context, it was utilized to measure the angle between the anterior extremity of the hatching gland and the posterior extremity of the tail bud in embryos.  
+• Action: The text describes the use of the ImageJ angle tool to quantify specific anatomical angles in embryos by analyzing images taken with a Leica M205FA stereomicroscope.  
+• Keywords: ImageJ, angle tool, quantify, embryos, Leica M205FA, stereomicroscope, hatching gland, tail bud, imaging, measurement.
+
+• Name: Tracking of fluorescent beads in the LRO  
+• Description: The tracking of fluorescent beads is likely used to monitor or observe some dynamic processes or spatial movements, though the text does not specify the purpose or method of tracking within the LRO (likely Laboratory Reference Object or similar, but not clarified).  
+• Action: Monitoring or observation through tracking in the LRO is implied, wherein fluorescent beads are tracked, but the exact nature of the action or the role of this tracking is not detailed.  
+• Keywords: Tracking, Fluorescent Beads, LRO, Observation, Monitoring, Spatial Movement, Dynamic Processes, Fluorescence.
+
+There are no systems or concepts to extract from the provided text "5."
+
+• name — Male genital plates scoring  
+• description — This system refers to the method of evaluating male genital plates by measuring the angle formed between the dorsoventral and anus–penis axes when observed from the posterior perspective.  
+• action — The text describes a scoring method for assessing male genital plates based on their angular relationship with specified anatomical axes.  
+• keywords — male genital plates, scoring, angle, dorsoventral axis, anus, penis, posterior view, evaluation, anatomical axes, assessment.
+
+I'm sorry, but the text you provided does not contain sufficient information to extract any systems, concepts, or objects.
+
+• Name: sa17276 point mutation  
+• Description: The sa17276 point mutation results in the substitution of a premature stop codon for amino acid 460 in a protein sequence. This mutation leads to the deletion of the entire C-terminal half of the protein that contains the actin- and cargo-binding domains.  
+• Action: The mutation's key effect is the truncation of the protein, specifically eliminating the sections responsible for binding actin and cargo, which likely disrupts the function of the protein.  
+• Keywords: sa17276, point mutation, premature stop codon, amino acid 460, C-terminal half, protein, actin-binding domain, cargo-binding domain, deletion, protein truncation.
+
+I'm sorry, but the text provided does not offer enough information to extract any systems, concepts, or objects. Please provide more detailed text for analysis.
+
+• name — Myo1D control of KV flow
+• description — The text refers to the concept or scientific question of how the protein Myo1D influences or regulates the flow within the Kartagener's vesicle (KV), which is related to a biological process or mechanism.
+• action — The text poses a question regarding the mechanism by which Myo1D exerts control over the flow within KV, indicating an interest in understanding the role of Myo1D in this process.
+• keywords — Myo1D, control, KV flow, Kartagener's vesicle, biological process, protein regulation, mechanism, influence, regulation, vesicle flow.
+
+It appears that the provided text is insufficient to extract any systems, concepts, or objects as it only includes author names or initials. Consequently, there isn't enough context or information to identify or describe any systems or concepts as specified.
+
+• Name: Myo1D mutants
+  - Description: Myo1D mutants are characterized by motile cilia but exhibit an erratic left-right organizer (LRO) flow. This phenotype is similar to mutants of the PCP (planar cell polarity) pathway component vangl2, which show less penetrant left-right (LR) defects.
+  - Action: In the context of the text, Myo1D mutations result in disrupted ciliary motion and irregular LRO flow, sharing a resemblance with the effects seen in vangl2 mutants concerning LR axis development.
+  - Keywords: Myo1D, cilia, LRO flow, erratic, PCP pathway, vangl2, phenotype, motile, mutants, directional flow.
+
+I'm sorry, but the provided text snippet is too limited and lacks context to extract any specific systems, concepts, or objects. Please provide a more detailed excerpt for further analysis.
+
+• Name: Myo1D
+• Description: Myo1D is a protein being studied for its contribution to vertebrate laterality.
+• Action: The text describes the analysis of Myo1D's function in zebrafish to understand its role in vertebrate laterality.
+• Keywords: Myo1D, vertebrate laterality, zebrafish, function analysis, protein, contribution, role, study.
+
+• name — Brightfield Imaging
+• description — Brightfield imaging is a microscopy technique used to acquire an image that visualizes the outline or structure of a biological specimen, in this case, the KV (Kupffer's Vesicle). 
+• action — The text states that a single brightfield image was acquired, indicating the action of capturing an image to visualize the outline of the KV.
+• keywords — brightfield imaging, microscopy, image acquisition, visualization, KV outline, Kupffer's Vesicle, biological specimen, microscopy technique, image capture, outline visualization
+
+• Name: MZ myo1D mutants
+  - Description: Organisms with mutations in the myo1D gene that exhibit laterality defects.
+  - Action: These mutants present laterality defects, particularly in the heart, viscera, and brain, suggesting a role for myo1D in controlling the formation and/or function of certain structures in zebrafish.
+  - Keywords: MZ myo1D mutants, laterality defects, heart, viscera, brain, myo1D, zebrafish
+
+• Name: Central zebrafish LRO (laterality organ)
+  - Description: An organ potentially involved in the laterality of zebrafish organs, influenced by myo1D.
+  - Action: Suggests a connection between myo1D function or formation and the development or operation of the central zebrafish LRO.
+  - Keywords: central zebrafish LRO, laterality organ, myo1D, zebrafish, organ development, function
+
+• Name: KV6,31
+  - Description: A component related to the central zebrafish LRO potentially influenced by myo1D.
+  - Action: Indicates a point of interest in the relationship between myo1D and the formation/function of the LRO.
+  - Keywords: KV6,31, central zebrafish LRO, myo1D, zebrafish, organ formation, function
+
+The text provided does not contain any clear systems, concepts, or objects for extraction.
+
+It seems that the text provided is incomplete and does not offer enough information about any systems or concepts. Please provide more text if available.
+
+• name — Wild-type Kupffer’s Vesicle (KV)
+• description — The text provides a schematic representation of a wild-type Kupffer’s vesicle, but does not go into detail about its function or characteristics.
+• action — The text indicates the presence of a schematic representation but does not describe the interaction or detailed structure of the Kupffer’s vesicle. It highlights its presence as an object of study or visualization.
+• keywords — wild-type, Kupffer’s vesicle, KV, schematic, representation, object, visualization, vesicle, wild-type organ, depiction.
+
+• Name — Translation-blocking morpholino  
+• Description — The text mentions the use of a translation-blocking morpholino, a type of molecule that can inhibit the function of myo1D by interfering with its translation process.  
+• Action — The action described involves the injection of a translation-blocking morpholino to inhibit myo1D function at a concentration of 750 µM, indicating a direct approach to suppress the gene’s function through translation inhibition.  
+• Keywords — translation-blocking, morpholino, myo1D, inhibit, function, sequence, injected, 750 µM, gene expression, interference.
+
+• name — MZ myo1D mutants
+• description — MZ myo1D mutants are organisms which have been genetically modified to have mutations in the myo1D gene. These mutants display a reduced number of motile cilia compared to wild-type (WT) organisms.
+• action — The text compares the number of motile cilia between MZ myo1D mutants and wild-type (WT) organisms, highlighting that the mutants display lower numbers.
+• keywords — MZ myo1D, mutants, cilia, motile cilia, wild-type, WT, genetic modification, myo1D gene, lower numbers, comparison
+
+• Name: Notochord control of cell shapes in the zebrafish laterality organ
+• Description: The text mentions the notochord's role in breaking bilateral symmetry by affecting the cell shapes in the zebrafish laterality organ.
+• Action: The notochord influences the cellular architecture, which in turn plays a role in disrupting bilateral symmetry in zebrafish.
+• Keywords: notochord, bilateral symmetry, cell shapes, zebrafish, laterality organ, cellular architecture, symmetry breaking, control, influence, development.
+
+• Name: Primary Antibodies Used in Study  
+• Description: The text lists specific primary antibodies utilized in a scientific study. These antibodies are used for detecting certain proteins or antigens in research. The antibodies listed are Mouse monoclonal antibody against ZO-1, Mouse monoclonal antibody against Acetylated Tubulin, and Rabbit polyclonal antibody against γ-Tubulin.  
+• Action: The text provides detailed information about the sources and dilutions of primary antibodies used in a research experiment, indicating their application in identifying or quantifying the presence of specific proteins.  
+• Keywords: Primary antibodies, ZO-1, Acetylated Tubulin, γ-Tubulin, Mouse antibodies, Rabbit antibodies, Invitrogen, Sigma, Protein detection, Antibody dilution ratios.
+
+The text provided, "Natl Acad," does not contain enough information to extract any systems or concepts as it stands alone. Please provide additional context or a longer excerpt for a more detailed analysis.
+
+The text provided, "B., Ballard, W.", does not contain enough information or context to extract any systems or concepts based on the guidelines given. There are no systems, concepts, or objects explicitly mentioned or described in the text excerpt to analyze or summarize.
+
+The given text is insufficient to extract any systems, concepts, or objects.
+
+It appears that the text provided is a citation or reference to a publication without additional context or detail about concepts or systems. Therefore, without further information from the text itself, it is not possible to extract specific systems, concepts, or objects based on the guidelines given. If more text or details from the content of the publication were provided, I could assist further in extracting relevant systems or concepts.
+
+• name: Removal of one copy of vangl2  
+• description: The text indicates that removing one copy of the vangl2 gene results in a flow velocity similar to that of the wild type (WT). 
+• action: The action described is the removal of one copy of the vangl2 gene, which normalizes flow velocity to levels similar to WT, as indicated by the statistical result (n = 19, p = 0.62).
+• keywords: vangl2, flow velocity, wild type, gene, removal, normalization, statistical result
+
+• Name: Myosin1G (Myo1G)  
+  Description: A gene in zebrafish that shares a high degree of amino acid similarity with Myosin1D, indicating a close genetic relationship.  
+  Action: The significant information provided is the high similarity (79%) in amino acids between Myosin1G and Myosin1D.  
+  Keywords: zebrafish, Myosin1G, Myo1G, Myosin1D, amino acids, genome analysis, genetic similarity, Myosins, protein comparison
+
+• Name: Myosin1D (Myo1D)  
+  Description: A gene that is compared with Myosin1G in terms of amino acid sequence similarity, illustrating genetic and potential functional relatedness.  
+  Action: Myo1D is identified as having a high amino acid similarity with Myo1G (79%), emphasizing their close genetic relationship.  
+  Keywords: zebrafish, Myosin1D, Myo1D, Myosin1G, amino acids, genome analysis, genetic similarity, Myosins, protein comparison
+
+• Name: Myo1D
+
+• Description: Myo1D is described as governing both the positioning of ciliary basal bodies and the orientation of the ciliary rotation cone. This implicates its role in both translational and rotational planar cell polarity (PCP).
+
+• Action: The text indicates that Myo1D has a regulatory role in positioning and orienting cellular structures involved in ciliary function, specifically affecting the planar cell polarity mechanisms.
+
+• Keywords: Myo1D, ciliary basal bodies, positioning, orientation, ciliary rotation cone, translational PCP, rotational PCP, planar cell polarity.
+
+• Name: Error bars in l, m  
+• Description: The text mentions error bars associated with the variables "l" and "m"; these are statistical tools used to represent the standard error of the mean (SEM) in data. 
+• Action: The text highlights the use of error bars as a way to illustrate variability or uncertainty in the measurement of "l" and "m" by representing the SEM.
+• Keywords: error bars, SEM, standard error, variability, uncertainty, measurement, data representation, statistical tools, l, m
+
+• Name: Zebrafish myo1G
+• Description: myo1G is a gene in zebrafish, identified using its Ensembl gene identifier ENSDARG00000036104.
+• Action: The text describes the genetic invalidation of the myo1G gene in zebrafish using two complementary experimental strategies.
+• Keywords: zebrafish, gene, myo1G, Ensembl, genetic invalidation, experimental strategies, ENSDARG00000036104, complementary, biotechnology, molecular biology.
+
+• Name: Basal Body Displacement in Mutants  
+• Description: Basal bodies are cellular structures that are displaced anteriorly in specific mutants, as observed in MZ myo1D and vangl2 compared to a wild-type (WT) group.  
+• Action: The text describes the observation and comparison of anterior displacement of basal bodies in two types of mutants (MZ myo1D and vangl2) relative to a wild-type group, using specific sample sizes of embryos and basal bodies.  
+• Keywords: basal body, displacement, MZ myo1D, vangl2, mutants, anteriorly, WT, embryos, comparison, cellular structures.
+
+The text provided, "28." does not contain any systems, concepts, or objects for extraction. There are no descriptions, actions, or keywords to derive from this text.
+
+• Name: Rescue experiments of fly myo1D mutants with zmyo1D  
+• Description: This system involves experiments where the gene zmyo1D is used to perform rescue operations on mutants lacking functional myo1D in flies.  
+• Action: The text discusses the use of zmyo1D to potentially restore function in mutants that have defects in the myo1D gene, likely to study its effects or functionalities.  
+• Keywords: myo1D, zmyo1D, mutants, flies, rescue experiments, gene, functional restoration, biology, genetics, experiment.
+
+• Name: Basal bodies  
+  • Description: Basal bodies are described as γ-tubulin positive spots that are situated at the base of a ciliary axoneme.  
+  • Action: The text specifies the identification of basal bodies through γ-tubulin positivity and their location at the base of acetylated tubulin positive ciliary axonemes.  
+  • Keywords: basal bodies, γ-tubulin, acetylated tubulin, ciliary axoneme, identification, positive spots, base location.
+
+• name — CRISPR/Cas9 genome editing in zebrafish  
+• description — This is a system used for modifying the genome of zebrafish with precision, characterized by low off-target effects. CRISPR/Cas9 is a widely used genome-editing tool that allows for specific targeting and cutting of DNA sequences.  
+• action — The text highlights the efficiency of the CRISPR/Cas9 system in editing the genome of zebrafish while maintaining low off-target effects, which is crucial for ensuring accuracy and safety in genetic modifications.  
+• keywords — CRISPR/Cas9, genome editing, zebrafish, low off-target effects, DNA, precision, genetic modification, efficiency, accuracy, tool.
+
+I'm sorry, but the provided text does not contain enough information to extract any systems or concepts.
+
+I'm sorry, there is no specific system or concept mentioned in the provided text.
+
+The provided text, "Dev.", does not contain any systems, concepts, or objects to extract information from. It's too brief and lacks context or detail, making it impossible to fulfill the requested criteria of name, description, action, and keywords.
+
+I'm sorry, but the provided text does not contain enough context or detailed information about any specific systems or concepts. Please provide more text or context for further analysis.
+
+• Name: Myo1D RNA rescue experiments  
+  • Description: These experiments involve using RNA to rescue or recover certain functions or properties in organisms or systems where the Myo1D protein may be deficient or malfunctioning.  
+  • Action: Researchers conducted experiments to rescue Myo1D function and observed the effects on floor plate cilia and Vangl2-GFP localization in Myo1D mutants.  
+  • Keywords: Myo1D, RNA, rescue experiments, floor plate cilia, Vangl2-GFP, mutants, localization, Myo1D mutants, analysis, experiments.  
+
+• Name: Floor plate cilia  
+  • Description: Cilia located on the floor plate, a structure in the developing nervous system, which are being analyzed in the context of Myo1D function.  
+  • Action: The structure was analyzed as part of the study on Myo1D RNA rescue experiments, specifically observing effects in Myo1D mutants.  
+  • Keywords: Floor plate, cilia, Myo1D, nervous system, Myo1D mutants, analysis, RNA rescue, Vangl2-GFP, localization, experiments.  
+
+• Name: Vangl2-GFP localization  
+  • Description: Localization refers to the spatial distribution or positioning of Vangl2-GFP, a fusion protein used as a marker, within cells or tissues.  
+  • Action: Analyzed in the context of Myo1D mutants and Myo1D RNA rescue experiments to study effects on its localization.  
+  • Keywords: Vangl2-GFP, localization, Myo1D, mutants, RNA rescue, analysis, fusion protein, spatial distribution, floor plate, experiments.
+
+• Name: Myo1D  
+• Description: Myo1D is identified as essential for the formation and function of the zebrafish Left-Right Organizer (LRO). It is noted as a common regulator of left-right (LR) asymmetry in both vertebrates and invertebrates.  
+• Action: The text highlights the role of Myo1D in regulating LR asymmetry, indicating its crucial involvement in the biological processes related to the LRO in zebrafish and its broader relevance across species.  
+• Keywords: Myo1D, formation, function, zebrafish, LRO, LR asymmetry, vertebrates, invertebrates, regulator, biological processes.
+
+• Name: Left-right patterning mechanisms
+
+• Description: The text refers to evolutionary and conservation aspects of mechanisms that establish left-right patterning in organisms during development. This involves the processes that lead to the differentiation and organization of biological structures along the left-right axis.
+
+• Action: The text discusses the evolution and conservation of these mechanisms, indicating that while left-right patterning is subject to evolutionary changes, certain mechanisms are conserved across different species, highlighting their fundamental role in biological development.
+
+• Keywords: evolution, conservation, left-right patterning, mechanisms, development, differentiation, biological structures, organisms, axis, species.
+
+There are no systems or concepts present in the provided text.
+
+• Name: vangl2  
+• Description: Vangl2 is involved in the regulation of planar cell polarity (PCP) and is responsible for the PCP-dependent positioning and orientation of floor plate cilia.  
+• Action: Vangl2 regulates the orientation and positioning of cilia on the floor plate through mechanisms that depend on planar cell polarity.  
+• Keywords: vangl2, PCP, planar cell polarity, cilia, floor plate, orientation, positioning, regulation, LRO, processes.
+
+I'm sorry, but based on the provided text, there are no extractable systems, concepts, or objects to describe. The text appears to be a citation or a reference to a document without further detail or context.
+
+• Name: KV Cilia Positioning  
+• Description: The text describes the orientation of KV (Kupffer's vesicle) cilia in embryos of different genotypes, specifying their direction as either pointing anteriorly or posteriorly.  
+• Action: The text provides a method to visualize KV cilia orientation using two-dimensional dot plots, indicating specific directional positioning (anterior or posterior) by color-coding (red for anterior, green for posterior) across different genotypes.  
+• Keywords: KV cilia, orientation, anterior, posterior, embryos, genotypes, dot plots, two-dimensional, visual representation, Kupffer's vesicle.
+
+There is not enough information in the given text to extract any systems, concepts, or objects.
+
+I'm sorry, but the provided text does not contain sufficient information to identify any systems, concepts, or objects.
+
+• Name: myo1D  
+• Description: Myo1D is a gene in zebrafish that is essential for establishing left-right (LR) asymmetry.  
+• Action: The text provides genetic evidence highlighting the critical role of myo1D in the development of LR asymmetry in zebrafish.  
+• Keywords: myo1D, genetic evidence, zebrafish, LR asymmetry, left-right asymmetry, essential, establishment, genetics, development.  
+
+The provided text "36." does not contain enough information to identify any systems, concepts, or objects. Therefore, no relevant items can be extracted from it.
+
+• Name: Orthologous Proteins  
+• Description: The text refers to two proteins that are orthologous, meaning they are proteins in different species that evolved from a common ancestral gene. These proteins show 69% sequence similarity, indicating that they share a significant portion of their amino acid sequences.  
+• Action: The text specifically highlights the degree of sequence similarity between the two orthologous proteins, which is quantified at 69%. This indicates a close evolutionary relationship and structural/functional similarity.  
+• Keywords: orthologous proteins, sequence similarity, evolutionary relationship, proteins, amino acid sequence, common ancestral gene, structural similarity, functional similarity, percent similarity.
+
+I'm sorry, but the text provided ("Res.") is too brief and does not contain sufficient information to extract any systems, concepts, or objects. Please provide a more detailed text for meaningful extraction.
+
+• Name: KV cells (ZO-1) with cilia (acetylated tubulin) and basal bodies (γ-tubulin)
+
+• Description: The text describes high magnification views of a particular cellular structure consisting of KV cells, which are associated with the protein ZO-1, and feature cilia composed of acetylated tubulin. Additionally, these KV cells contain basal bodies associated with γ-tubulin.
+
+• Action: The text provides a visualization or study of KV cells highlighting the presence and interaction of specific proteins (ZO-1, acetylated tubulin, γ-tubulin) within cellular structures (cilia and basal bodies), indicating the details of cellular composition and structure.
+
+• Keywords: KV cells, ZO-1, cilia, basal bodies, acetylated tubulin, γ-tubulin, high magnification views, cellular structures, proteins, visualization.
+
+I'm sorry, but the provided text does not contain enough information to extract any systems or concepts. It appears to be a fragment referencing figures or sections from a larger document. Please provide more context or a more complete excerpt for analysis.
+
+The given text "Dev." is incomplete and does not provide enough information to extract any systems or concepts. Therefore, there are no systems or concepts to present.
+
+• name — Myo1D expression in transient LRO  
+• description — Myo1D is expressed in a transient left-right organizer (LRO) and interacts with the global planar cell polarity (PCP) component Dachsous.
+• action — Myo1D binds to Dachsous, leading to Vangl2-dependent chiral morphogenesis in a nearby tissue.
+• keywords — Myo1D, transient LRO, Dachsous, global PCP, Vangl2, chiral morphogenesis, adjacent tissue, expression, binding, left-right organizer.
+
+• name — Myo1D
+• description — Myo1D is identified as a conserved regulator of laterality in both vertebrates and invertebrates.
+• action — The text presents Myo1D as playing a role in regulating laterality, indicating its conserved function across different species.
+• keywords — Myo1D, conserved regulator, laterality, vertebrates, invertebrates, experiment, identification, conserved function.
+
+• Name: Myo1D and Vangl2 Interaction
+• Description: The text refers to an interaction between myo1D and vangl2, although the specific molecular mechanism of this interaction is yet to be determined.
+• Action: The text highlights that although myo1D and vangl2 interact, the precise molecular mechanism underlying this interaction has not been established.
+• Keywords: molecular mechanism, myo1D, vangl2, interaction, molecular interaction, precise mechanism, molecular biology, mechanism establishment, interaction research, unknown mechanism
+

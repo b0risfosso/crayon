@@ -671,3 +671,21 @@ obj_mutations = "Describe methods of "
 # actions
 # software
 # artifacts in storytelling, education, government, money
+
+
+# complete the picture. compute crayon and the coloring book, then build out to data. 
+
+# domains communicate. artifacts communicate. # mutate communication, evolving methods of communication.
+# mutate domains. mutate artifacts. 
+# mutate LLMs. 
+# what are the measures for the success in a niches? 
+# which niches bring in money? 
+
+# until next. 
+
+# which niches bring novel tools? 
+
+# which niches bring novel tools? novel tools??? which niches bring novel tools? 
+
+# infinite recursion. the evolution at the scale of ecosystems. what happens if you do? What happens if you dont? 
+# evolution is evolution. how many layers of exploration is useful? 

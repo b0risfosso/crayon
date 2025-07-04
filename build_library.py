@@ -307,7 +307,7 @@ if __name__ == "__main__":
     cx = sqlite3.connect(DB_FILE)
 
     # assume you already have `library = {Path(...): "text", ...}`
-    library_dir = "/Users/b/fantasiagenesis/crayon/library/"
+    library_dir = "/Users/b/fantasiagenesis/crayon/library/20250702/"
     #files = list(Path(library_dir).rglob("*"))  # recursive
     all_files   = (p for p in Path(library_dir).rglob("*") if p.is_file())
 

@@ -1,0 +1,444 @@
+• Name — Circularity Measurement
+
+• Description — This refers to the process of determining the circularity of KV images by using the largest Z stack to measure the area and perimeter. Circularity values are calculated using a specific mathematical formula.
+
+• Action — The action involves measuring the area and perimeter to calculate circularity values through the formula provided, which is shown as \( f = \frac{4πA}{P^2} \). The text references another source for a more detailed description of the calculation method.
+
+• Keywords — circularity, Z stack, KV images, area, perimeter, formula, measurement, calculation, mathematical formula, circularity values
+
+• Name: KV epithelial cells   
+  Description: KV (Kupffer's vesicle) epithelial cells are described as monociliated, meaning each cell has a single cilium.  
+  Action: The text mentions counting the KV nuclei bordering the lumen and observing fewer cells in myo1d MZ embryos, which corresponded to a decrease in the number of cilia.  
+  Keywords: KV epithelial cells, monociliated, nuclei, lumen, myo1d MZ embryos, cilia, Kupffer's vesicle
+
+• Name: Myo1d MZ embryos  
+  Description: These are embryos with a specific genetic characterization, referred to as myo1d MZ, related to a decrease in the number of epithelial cells and cili in KV.  
+  Action: The text correlates the myo1d MZ embryos with a reduced number of cells in the KV, accounting for fewer cilia.  
+  Keywords: Myo1d MZ embryos, KV cells, cilia number, genetic characterization, epithelial cells, Kupffer's vesicle, lumen
+
+• Name: Left–Right Asymmetry 
+• Description: A fundamental process essential for the arrangement of visceral organs during development.
+• Action: The text emphasizes the importance of establishing left–right asymmetry in the developmental process to ensure proper arrangement of visceral organs.
+• Keywords: left–right asymmetry, fundamental process, visceral organs, development, arrangement, embryogenesis, organ positioning.
+
+• Name: Kupffer’s vesicle size
+
+• Description: This term refers to the size of the Kupffer's vesicle, which is an important factor in establishing left-right patterning in the zebrafish embryo.
+
+• Action: The text suggests that there is a threshold size for Kupffer's vesicle to ensure robust left-right patterning, implying that deviations from this size could affect the developmental patterning of the embryo.
+
+• Keywords: Kupffer’s vesicle, size threshold, robust, left-right patterning, zebrafish, embryo, development, symmetry, biological threshold, embryogenesis.
+
+• name — Myo1d Regulation of Laterality
+• description — The text addresses the role of Myo1d in regulating laterality in different model systems. This suggests a focus on the mechanisms by which Myo1d influences asymmetrical development or orientation in biological systems.
+• action — The text highlights the inquiry into how Myo1d regulates laterality across different model systems, suggesting a comparative or investigative approach to understanding this regulation.
+• keywords — Myo1d, regulation, laterality, model systems, asymmetry, biological development, mechanisms, orientation, comparative analysis, investigation.
+
+Based on the provided text, it does not contain enough information to identify a clear system or concept as described in your instructions. It only briefly mentions "myo1d targeting strategies" without further elaboration or context. Therefore, there is nothing to extract that meets all the criteria for what you’re asking (i.e., name, description, action, and keywords).
+
+• Name: Calmodulin binding IQ motifs  
+  • Description: A structural domain shared within a class of proteins.  
+  • Action: The text identifies calmodulin binding IQ motifs as a shared structural domain within a particular class of proteins.  
+  • Keywords: calmodulin, IQ motifs, structural domain, proteins, binding, shared, class
+
+• Name: SH3 domains  
+  • Description: Another structural domain shared within the same class of proteins.  
+  • Action: The text indicates that SH3 domains, like calmodulin binding IQ motifs, are structural domains common among a class of proteins.  
+  • Keywords: SH3 domains, structural domain, proteins, shared, class, motifs, binding
+
+• Name: Myosin-I in ancient unicellular eukaryotes  
+• Description: Myosin-I is a motor protein involved in transporting water through contractile vacuoles in ancient unicellular eukaryotes. This process is crucial for maintaining amoeboid cell shape and regulating directed cell motility.  
+• Action: The text describes the role of myosin-I in the transport of water through contractile vacuoles, which is essential for cell shape and motility.  
+• Keywords: myosin-I, unicellular eukaryotes, contractile vacuoles, water transport, amoeboid cell shape, cell motility, directed motility.
+
+The provided text does not contain enough information to extract any systems or concepts. Please provide more detailed or complete information for analysis.
+
+• Name: KV Epithelial Cells
+
+• Description: The text refers to KV epithelial cells as part of a biological process, specifically mentioning the context of these cells in myo1d MZ mutants.
+
+• Action: The text suggests that a similar process to one previously mentioned (not specified in the given text) is occurring in these cells when myo1d is mutated, indicating a likely role or change in function in the mutants.
+
+• Keywords: KV epithelial cells, myo1d, MZ mutants, biological process, mutation, cell function, epithelial, reasoning, occurrence.
+
+I'm sorry, there is not enough information or context in the provided text to extract any systems or concepts.
+
+There are no systems or concepts described in the provided text excerpt.
+
+The text provided does not contain any systems, concepts, or objects with detailed descriptions, actions, or relationships. Therefore, there are no entries to create for this request based on the given text.
+
+• Name: Acanthamoeba myosin-IC mRNA
+  - Description: A type of mRNA derived from Acanthamoeba that was injected into myo1d MZ embryos.
+  - Action: This mRNA was able to rescue KV lumen and AP cell morphology defects in embryos as efficiently as a version derived from rats.
+  - Keywords: Acanthamoeba, myosin-IC, mRNA, injection, myo1d, embryos, rescue, KV lumen, AP cell morphology
+
+• Name: Myosin 1d
+  - Description: A version of Myosin 1d derived from rat that is phylogenetically closer to the subject of study.
+  - Action: Used as a comparison to Acanthamoeba myosin-IC mRNA for rescuing embryo defects.
+  - Keywords: Myosin 1d, rat, phylogenetic, comparison, embryos, rescue, morphology
+
+• Name: KV lumen and AP cell morphology defects
+  - Description: Specific defects in embryos that are targeted to be rescued by mRNA injections.
+  - Action: These defects in morphology and lumen formation in embryos are corrected by the introduction of specific mRNAs.
+  - Keywords: KV lumen, AP cell morphology, defects, embryos, rescue, mRNA, injection
+
+• Name: Unconventional myosin
+
+• Description: The text indicates that this unconventional myosin plays a significant role in vacuole trafficking, lumen formation, and determining laterality across evolutionary contexts.
+
+• Action: The system described shows that an unconventional myosin is crucial in multiple cellular processes, specifically in vacuole trafficking, facilitating lumen formation, and determining biological laterality. The text emphasizes its conserved function through evolution.
+
+• Keywords: unconventional myosin, vacuole trafficking, lumen formation, laterality, evolutionary conserved, role, cellular processes, biological functions.
+
+I'm sorry, I cannot extract systems or concepts from the text "17" as it does not provide any context, information, or terms to analyze.
+
+I'm sorry, but the provided text does not contain sufficient information regarding specific systems, concepts, or objects for extraction. Please provide more detailed text for analysis.
+
+• name — Acanthamoeba castellanii myosin-IC  
+• description — Acanthamoeba castellanii myosin-IC is a protein whose activity, when inhibited by specific antibodies, results in the accumulation of CV (contractile vacuoles) in the cell, leading to eventual cell rupture.  
+• action — The text indicates that the inhibition of Acanthamoeba castellanii myosin-IC activity by antibodies causes an accumulation of contractile vacuoles, which then leads to the rupture of the cell.  
+• keywords — Acanthamoeba castellanii, myosin-IC, inhibitory antibodies, CV accumulation, cell rupture, protein activity, contractile vacuoles.
+
+• Name: Phyre2  
+• Description: Phyre2 is a web portal designed for protein modeling, prediction, and analysis.  
+• Action: The text outlines the existence of Phyre2 as a web-based tool used for tasks related to understanding and analyzing proteins.   
+• Keywords: Phyre2, protein, modeling, prediction, analysis, web portal, tool, structure, bioinformatics.
+
+There is no clear system or concept mentioned in the text provided.
+
+I'm sorry, but the provided text does not contain sufficient information to extract any systems, concepts, or objects as per your instructions.
+
+I'm sorry, but there is no system, concept, or object provided in the text to extract information from.
+
+• name: Heart and gut looping scored by myl7 and foxa3 expression
+  • description: This system or concept involves the observation of heart and gut looping processes in an organism, specifically measured at 72 hours post-fertilization, using the expressions of myl7 and foxa3 as markers.
+  • action: The text describes the use of myl7 and foxa3 expression as indicators to score or evaluate the looping of the heart and gut at a specified developmental stage (72 hpf).
+  • keywords: heart looping, gut looping, myl7 expression, foxa3 expression, developmental biology, 72 hpf, embryonic development
+
+• name: spaw expression at 17S
+  • description: This refers to the expression of the spaw gene, which is noted at the 17-somite stage of development, with a white arrowhead marking the specific expression location.
+  • action: The text indicates the presence and observation of spaw gene expression at the 17-somite stage, marking a developmental point with a visual indicator.
+  • keywords: spaw expression, 17-somite stage, gene expression, developmental marker, white arrowhead, embryogenesis, developmental biology
+
+• Name: Vacuole movement toward KV apex in the myo1d MZ;Tg(dusp6:GFP-MA) mutant  
+• Description: This concept describes the observed phenomenon of reduced vacuole movement in a specific genetic mutant model. In the context of the study, the movement toward the KV (likely Kupffer's vesicle) apex is specifically noted as being decreased in the myo1d MZ; Tg(dusp6:GFP-MA) mutant.  
+• Action: The text highlights a relationship between the genetic mutation (myo1d MZ) and a transgenic line (Tg(dusp6:GFP-MA)) which results in decreased movement of vacuoles toward the KV apex. This suggests an impact of this mutation on vacuole dynamics.  
+• Keywords: vacuole, movement, myo1d MZ, Tg(dusp6:GFP-MA), mutant, KV apex, decreased, genetics, dynamics.
+
+I'm sorry, but the provided text "Tingler, M." is too limited for me to extract any systems, concepts, or objects. Can you please provide more detailed information from the text?
+
+There is no clear system or concept provided in the text, "Anat," to extract or describe.
+
+• name — Node monocilia
+
+• description — Node monocilia are cellular structures involved in the initiation of left-right asymmetry during embryonic development in mice.
+
+• action — The text describes the action of node monocilia as initiating left-right asymmetry in the mouse, suggesting a critical role in developmental biology and the establishment of body axis orientation.
+
+• keywords - node monocilia, left-right asymmetry, mouse, embryonic development, body axis, orientation, cellular structures
+
+• Name: Water expulsion mechanism in protozoans
+• Description: This process involves protozoans trafficking water and other fluid-filled contractile vacuoles to the plasma membrane for expulsion.
+• Action: The text describes the mechanism where protozoans move water and fluid-filled vacuoles to their plasma membrane, highlighting its significance as a notable process.
+• Keywords: water expulsion, protozoans, contractile vacuoles, plasma membrane, fluid trafficking, biological mechanism, protozoan process, fluid expulsion, cellular function
+
+• Name: Myo1d
+• Description: The text suggests that myo1d is being considered for its possible evolutionary conserved role in determining laterality in vertebrates.
+• Action: The text implies an inquiry or investigation into the role of myo1d in the context of evolutionary biology, specifically focusing on its function related to laterality in vertebrates.
+• Keywords: Myo1d, evolutionary, conserved role, specifying, laterality, vertebrates, function, evolutionary biology, investigation, role.
+
+The provided text does not contain sufficient information to extract systems, concepts, or objects as per the instructions given. Therefore, no output can be generated based on the text "Hellman, N."
+
+I'm sorry, but the provided text is not sufficient to extract any systems or concepts as it lacks detailed content or context.
+
+I'm sorry, but there are no clear systems or concepts in the text provided.
+
+• name — Zygotic homozygous mutants (myo1dpt31a/pt31a)
+• description — These are mutants that have two copies of the mutant allele myo1dpt31a. The presence of these mutants surviving to adulthood in a Mendelian ratio suggests that maternal expression of the myo1d gene is sufficient for embryonic development.
+• action — The study indicates that maternal expression of the myo1d gene can compensate for the lack of zygotic expression, allowing homozygous mutants to survive until adulthood.
+• keywords — zygotic homozygous mutants, myo1dpt31a, Mendelian ratio, maternal expression, embryonic development, adulthood, survival
+
+• Name: Vacuoles
+
+• Description: Vacuoles are cellular organelles that appeared near the plasma membrane of every KV epithelial rosette cell. The context suggests that this occurrence is part of a specific stage or condition noted in the study.
+
+• Action: The vacuoles are located near the plasma membrane, which indicates a spatial relationship within the KV epithelial rosette cells. This positioning may imply a specific function or process occurring in this cellular context.
+
+• Keywords: Vacuoles, plasma membrane, KV epithelial rosette cell, 3S, cellular organelles, spatial relationship, epithelial cells
+
+• Name: Particle tracking  
+• Description: The process of following the movement of particles over time, likely used in a scientific or analytical context as described in the text. 
+• Action: The particle tracking was carried out using the Imaris software, indicating a method or tool used for this purpose.
+• Keywords: Particle tracking, Imaris, Bitplane, software, movement, analytical, scientific.
+
+There are no systems, concepts, or objects described in the text provided.
+
+• Name: Myo1d
+• Description: Myo1d is depicted as essential for the formation of fluid-filled structures during development, particularly in the context of lumen formation defects observed in the otic vesicle.
+• Action: The text suggests a relationship between the myo1d gene and proper lumen formation in developmental structures like the otic vesicle.
+• Keywords: Myo1d, lumen formation, otic vesicle, OV, defect, development, fluid-filled structures, essential, formation.
+
+It seems there is no clear system or concept in the text provided, as it only contains the letter "H". Please provide more detailed text for further analysis.
+
+- Name: Myo1d  
+- Description: Myo1d is described as an essential component necessary for KV morphogenesis and function.  
+- Action: The text suggests that myo1d plays a crucial role in both the development (morphogenesis) and the operation (function) of KV.  
+- Keywords: Myo1d, KV, morphogenesis, function, essential component, development, operation, necessary, results, component.
+
+• Name: KV lumen expansion phase  
+• Description: This refers to a phase in which the lumen of the Kupffer's vesicle (KV) expands.  
+• Action: During this phase, the shape arrangement of AP (anterior-posterior) cells is crucial for the asymmetric distribution of cilia.  
+• Keywords: KV lumen, expansion phase, AP cells, cell shape arrangement, asymmetric distribution, cilia, Kupffer's vesicle.  
+
+The provided text "40." does not contain enough information or context to extract any systems, concepts, or objects. No description, actions, or keywords can be derived from this text alone.
+
+There is no clear system or concept described in the given text for extraction.
+
+I'm sorry, there isn't enough information in the provided text to extract any systems, concepts, or objects. Please provide more detailed content for analysis.
+
+• Name: Myosin1D
+• Description: Myosin1D is identified as a protein that functions as an evolutionarily conserved regulator of animal left-right asymmetry. This implies that Myosin1D plays a crucial role in the development or maintenance of asymmetrical body structures in animals, a characteristic that has been preserved across different species through evolution.
+• Action: Myosin1D acts as a regulator, implying it influences or controls the process of establishing or maintaining left-right asymmetry in animals.
+• Keywords: Myosin1D, evolutionarily conserved, regulator, animal, left-right asymmetry, protein, development, body structure, evolution, asymmetrical.
+
+The provided text fragment "& Lopes, S." is insufficient to extract any systems, concepts, or objects as described in your instructions. To provide meaningful information based on your requirements, more context or content from the text is necessary. If you have additional or more complete text, please provide it so I can assist you more effectively.
+
+• Name: Myo1d MZ embryos
+  - Description: Refers to embryos with a specific genetic modification involving the myo1d gene, which affects the distribution and movement of vacuoles within the cellular cytoplasm.
+  - Action: The myo1d MZ embryos exhibit a dispersed and largely cytoplasmic distribution of vacuoles, and their movements are misdirected.
+  - Keywords: myo1d, embryos, cytoplasmic distribution, vacuoles, movements, genetic modification, misdirected, cellular, dispersion, Fig. 3e.
+
+I'm sorry, but the provided text "Nature 440, 803–807 (2006)" does not contain enough information or context about specific systems, concepts, or objects. I would need more detailed content from the text to extract and describe systems or concepts as requested.
+
+The provided text "& Noselli, S." does not offer contextual information about systems, concepts, or objects. There is no extractable data within this fragment to form a comprehensive entry for systems or concepts based on the instructions provided.
+
+• Name: myo1d mediated vacuole trafficking
+  • Description: This concept refers to the process whereby the myo1d protein regulates the movement of vacuoles within cells. It is suggested as a common mechanism for lumen formation, particularly in the organ of vestibular (OV) development.
+  • Action: The text discusses that defects in lumen formation were observed in myo1d MZ mutants, indicating the importance of myo1d in vacuole trafficking and its potential impact on such cellular structures.
+  • Keywords: myo1d, vacuole trafficking, lumen formation, OV development, mutants, directed movement, regulation, vacuoles, cellular structures, mechanism.
+
+I'm sorry, but the text provided is too limited and lacks the necessary context and information to extract any systems, concepts, or objects as per your request. If you have a larger section of text, please provide it for a more comprehensive analysis.
+
+• name — Tg(dusp6:GFP-MA)  
+  • description — A transgenic marker used in a specific type of embryos, likely for visualization purposes.  
+  • action — This marker is involved in embryos that exhibit fragmented nuclei in KV epithelial cells.  
+  • keywords — transgenic marker, GFP-MA, embryos, nuclei, fragmentation, KV epithelial cells, visualization
+
+• name — myo1d MZ  
+  • description — Refers to a particular genotype of embryos, involving the myo1d gene, often used in genetic studies.  
+  • action — These embryos, when injected with H2BmCherry mRNA, show fragmented nuclei in KV epithelial cells.  
+  • keywords — myo1d MZ, gene, embryos, H2BmCherry mRNA, nuclei fragmentation, KV epithelial cells
+
+• name — H2BmCherry mRNA  
+  • description — A type of mRNA used for injection into embryos, possibly for visualization of nuclei.  
+  • action — Its injection results in the observation of fragmented nuclei per KV sample in the described embryos.  
+  • keywords — H2BmCherry mRNA, injection, embryos, visualization, nuclei fragmentation, KV samples
+
+• name — Fragmented nuclei  
+  • description — A phenomenon observed in KV epithelial cells, characterized by the appearance of nuclei being fragmented.  
+  • action — Quantified as fragmented nuclei per KV sample in specific experimental setups.  
+  • keywords — fragmented nuclei, KV epithelial cells, quantification, per sample, observation, phenomenon
+
+• name — KV epithelial cells  
+  • description — A type of cell where fragmented nuclei are observed in the experimental setups described in the text.  
+  • action — The presence and state of their nuclei are key observations in the described experiments.  
+  • keywords — KV epithelial cells, nuclei, cell type, observation, embryos, fragmentation, experiments
+
+There is no clear system or concept mentioned in the given text.
+
+There is no clear system or concept in the provided text "Riordan, J." It lacks sufficient context or information to extract systems, concepts, or objects as requested.
+
+• name — Leica EM AC20 automatic grid staining machine
+• description — A machine used to stain ultrathin sections on copper grids.
+• action — The ultrathin sections are collected on copper grids and stained using the machine with uranyl acetate and lead citrate.
+• keywords — ultrathin sections, copper grids, Leica EM AC20, staining machine, uranyl acetate, lead citrate, 200 mesh, automatic, Reynold’s lead, 70 nm
+
+• name: Myosin-IC Plasmid Construct  
+• description: The text mentions a "myosin-IC plasmid construct," which likely refers to a plasmid or DNA sequence designed for the expression or study of Myosin IC, a motor protein involved in various cellular functions.  
+• action: The text's focus is primarily on the mention of a "myosin-IC plasmid construct," but it does not provide further context or describe any specific actions or relationships between objects related to the construct.  
+• keywords: Myosin IC, Plasmid, Construct, S., Motor Protein, Cellular Functions, DNA Sequence, Expression, Biochemistry, Molecular Biology  
+
+The text provided is too limited to extract any systems, concepts, or objects as it only contains the word "Sci." without any additional context or information. Therefore, nothing can be extracted.
+
+• name — Numeration of lumen area with treatments  
+• description — This refers to the enumeration of lumen areas under various treatment conditions. The treatments mentioned are WT-DMSO, WT-ouabain, WT-FIBMX, myo1d MZ-DMSO, myo1d MZ-ouabain, and myo1d MZ-FIBMX, with corresponding sample sizes (n-values) provided for each condition.  
+• action — The text provides data on the numeration of lumen area across different experimental conditions, specifically concerning the various treatments and mutant types.  
+• keywords — Numeration, Lumen area, Treatments, WT-DMSO, WT-ouabain, WT-FIBMX, myo1d MZ-DMSO, myo1d MZ-ouabain, myo1d MZ-FIBMX.
+
+The text provided is too minimal and does not offer any systems, concepts, or objects that can be extracted or described. Therefore, there is nothing to return based on the given text.
+
+It seems that the text provided is just a partial citation ("& Rebagliati, M.") and does not provide enough information about any systems, concepts, or objects. Therefore, no systems or concepts can be extracted based on this text. If you have a more complete text or another excerpt, please provide it for analysis.
+
+• Name: H,K-ATPase protein localization and Kir4.1 function
+
+• Description: The systems involve the localization of H,K-ATPase proteins and the function of Kir4.1 and their roles in the early determination of left-right asymmetry.
+
+• Action: The text describes the concordance, or agreement, of three axes in relation to the early determination of left-right asymmetry, with specific reference to the localization of H,K-ATPase and the function of Kir4.1.
+
+• Keywords: H,K-ATPase, protein localization, Kir4.1, function, left-right asymmetry, early determination, concordance, axes, biological systems, symmetry
+
+The provided text does not contain sufficient information about any systems, concepts, or objects. Therefore, there are no systems or concepts to extract while adhering to the given instructions.
+
+I'm sorry, but the provided text "X." does not contain content from which systems or concepts can be extracted. Please provide a more detailed text for further analysis.
+
+• name — Directed vacuolar trafficking in KV epithelial cells  
+• description — This process involves the movement or transportation of vacuoles within the epithelial cells of the Kupffer's Vesicle (KV). It suggests a specific direction or pathway that the vacuoles follow in order to carry out their functions within these cells.  
+• action — The text emphasizes the necessity of directed vacuolar trafficking for a specific process in KV epithelial cells, implying a critical role in cellular or biological function.  
+• keywords — vacuolar trafficking, KV epithelial cells, Kupffer's Vesicle, epithelial cells, process, movement, transportation, directed pathway, biological function, vacuoles.
+
+I'm sorry, but the text you've provided is too brief and lacks any specific systems, concepts, or objects to extract information from. If you have a more detailed or extended text, please feel free to share it for further analysis.
+
+There are no clear systems or concepts in the provided text snippet.
+
+• Name: Lumen quantification  
+• Description: The text describes a process where lumens marked by dotted circular lines are quantified for their area and circularity, involving two groups: WT (wild type) and myo1d MZ.  
+• Action: The relationship here involves comparing the quantification results of lumen areas and circularities between the wild type and myo1d MZ groups, with specific sample sizes provided for each measurement.  
+• Keywords: Lumen, Wild type, Myo1d MZ, Area, Circularity, Quantification, Dotted circular lines, Measurement, Comparison, Sample sizes.
+
+It seems that the provided text does not contain sufficient information to identify any specific systems, concepts, or objects. Please provide a more detailed text for analysis.
+
+It appears that the text provided is incomplete, ending with "Methods Zebrafish handling and maintenance." There is no additional information or context about any systems, concepts, or objects that can be extracted from this text. Without more content, it's impossible to identify any specific systems, actions, or keywords. If you can provide more of the text, I may be able to help.
+
+The provided text does not contain enough information to extract any systems, concepts, or objects.
+
+The text provided does not contain clear systems or concepts, nor does it provide information on any particular topic. Therefore, there is nothing to extract in terms of systems, concepts, or objects as per the guidelines given.
+
+I'm sorry, but the text provided does not contain enough information to extract any systems, concepts, or objects as requested. Please provide more context or a different section of text for further analysis.
+
+I'm sorry, but there is not enough information in the provided text to extract any specific systems, concepts, or objects. The text "KV imaging and analysis" lacks context, description, and details required to articulate a comprehensive summary or description.
+
+The provided text snippet is too brief and lacks sufficient information to extract any systems, concepts, or objects as outlined in your instructions. It mentions only the initiation of a project concept without further context or details. Therefore, there is nothing to extract or summarize according to the specified criteria.
+
+• name — Positive F1 heterozygotes
+  • description — These are organisms that are the first filial generation resulting from a cross and carrying a particular genetic trait. "Positive" indicates the presence of the trait being tracked.
+  • action — They were used in cross-breeding to produce homozygous zygotic mutants.
+  • keywords — Positive, F1, heterozygotes, filial generation, genetic trait, breeding, organisms.
+
+• name — Homozygous zygotic (Z) mutants
+  • description — These are organisms that have two identical alleles for a specific trait at the zygotic stage, resulting in a mutation.
+  • action — They were generated by in-crossing the positive F1 heterozygotes.
+  • keywords — Homozygous, zygotic, mutants, alleles, in-crossing, genetic, mutation.
+
+The provided text does not contain enough information or context to identify any systems, concepts, or objects. It appears to be a citation or reference, and without additional relevant text or details, it is impossible to extract meaningful information based on the guidelines provided.
+
+• name — Cftr-Myo1d Independence in KV
+• description — The text states that Cftr (Cystic Fibrosis Transmembrane Conductance Regulator) functions independently of Myo1d (Myosin 1d) in the KV (Kupffer's Vesicle). 
+• action — The text suggests that there is no dependent interaction between Cftr and Myo1d within the context of KV, indicating that the function of Cftr does not rely on Myo1d in this specific environment.
+• keywords — Cftr, Myo1d, independence, Kupffer's Vesicle, function, regulation, interaction, Cystic Fibrosis Transmembrane Conductance Regulator, Myosin 1d, KV.
+
+I'm sorry, but the provided text "Aw, S., Adams, D." is insufficient for identifying any systems, concepts, or objects as it doesn't contain any descriptive or substantive information. Please provide more detailed text for analysis.
+
+Unfortunately, the provided text does not describe a complete system or concept with enough context or detail to extract or summarize. It references statistical testing methods, but without any specific subject or context, no detailed systems or concepts can be extracted.
+
+• Name: 4D STED time-lapse images
+• Description: The text refers to a series of images captured using 4D STED (Stimulated Emission Depletion) microscopy, capturing time-lapse still images of a representative Kupffer's Vesicle (KV) epithelial cell.
+• Action: The text highlights the use of 4D STED microscopy to capture detailed time-lapse images, likely showing changes or developments over time within a KV epithelial cell.
+• Keywords: 4D STED, time-lapse, microscopy, imaging, Kupffer's Vesicle, epithelial cell, still images, representative cell.
+
+The provided text does not contain sufficient information to extract any systems, concepts, or objects, as it appears to be an incomplete or improperly formatted reference entry, likely part of a bibliographic citation.
+
+• name — Unpaired t test
+• description — A statistical test used to determine if there are significant differences between the means of two unrelated groups.
+• action — The text indicates the use of the unpaired t test with results denoted as significant if p < 0.001 or highly significant if p < 0.0001.
+• keywords — statistical test, significant difference, mean comparison, p-value, unpaired t test, unrelated groups, data analysis
+
+The provided text does not contain enough information regarding any specific system, concept, or object.
+
+• name — KV lumen formation  
+• description — KV lumen formation in zebrafish is identified as a process known as cord hollowing.  
+• action — This process has a threshold size that is crucial for establishing a unidirectional flow and ensuring consistent laterality in zebrafish.  
+• keywords — zebrafish, KV lumen, cord hollowing, threshold size, unidirectional flow, laterality, formation process.
+
+I'm sorry, but the provided text does not contain any clear systems or concepts. It appears to be an incomplete citation or part of a reference list which does not provide sufficient information for further analysis.
+
+• name — cDNA constructs for myl746, spaw47, foxa348, foxj1a28, dand549, ntla40, and myod140
+• description — These are cDNA constructs used to create riboprobes, which are likely involved in gene expression studies. 
+• action — The text describes the preparation of riboprobes using these specific cDNA constructs, along with a digoxygenin RNA labeling kit, which is used for labeling RNA in various molecular biology experiments.
+• keywords — cDNA constructs, riboprobes, digoxygenin, RNA labeling, myl746, spaw47, foxa348, foxj1a28, dand549, ntla40, myod140
+
+I'm sorry, the input "A." does not provide enough information or context to extract any systems, concepts, or objects. Please provide more text for analysis.
+
+• Name: 8S embryo samples fixation  
+• Description: The text refers to a process involving 8S embryo samples being fixed, which is a method used in biological research to preserve tissue samples for further analysis.  
+• Action: The samples were fixed overnight using a 2.5% solution of glutaraldehyde in 0.01 M PBS, indicating a methodical preservation process.  
+• Keywords: 8S embryo, samples, fixation, glutaraldehyde, PBS, preservation, biological research, overnight process, 0.01 M concentration, cold fixation.
+
+• Name: Manuscript Preparation
+
+• Description: The process described involves analyzing data, preparing figures, and drafting a manuscript. These are essential steps in the creation of an academic or scientific paper.
+
+• Action: The text outlines the sequential steps involved in preparing a manuscript for publication, which include data analysis, figure preparation, and drafting.
+
+• Keywords: data analysis, figure preparation, manuscript drafting, publication process, scientific writing, academic paper, research, data interpretation, visualization, writing process
+
+The text provided does not contain enough information about any systems, concepts, or objects to extract meaningful data based solely on the given text.
+
+• name — Luminal growth  
+• description — The process that begins with the trafficking of membrane vesicles targeted to the apical surface. These vesicles fuse with the plasma membrane.  
+• action — Membrane vesicles are transported (trafficked) to the apical surface where they undergo a fusion process with the plasma membrane, initiating luminal growth.  
+• keywords — luminal growth, trafficking, membrane vesicles, apical surface, plasma membrane, fusion, targeting
+
+I'm sorry, but the given text unfortunately lacks sufficient information to extract any systems, concepts, or objects using the criteria provided.
+
+• Name: Data shown in the graphs
+• Description: The text provides a reference to data representation, suggesting that the data in question has been processed and is presented in graphical form, with a focus on statistical parameters.
+• Action: The data in the graphs is presented as mean ± SEM, indicating the central tendency (mean) and the variability or precision of the mean (SEM, Standard Error of the Mean).
+• Keywords: Data, Graph, Mean, SEM, Standard Error, Presentation, Statistical Parameters, Variability, Precision, Central Tendency.
+
+• Name: 4D STED Imaging
+  • Description: A method utilized for imaging, specifically to capture the speed and volume of vacuoles. This method involves the use of STED (Stimulated Emission Depletion) microscopy in a four-dimensional setting, potentially capturing spatial and temporal data.
+  • Action: The action involves manual measurement of vacuole speed and volume from images obtained using this imaging technique, utilizing the Fiji software for analysis.
+  • Keywords: 4D STED, imaging, vacuole, speed, volume, manual measurement, Fiji, microscopy, analysis, data
+
+The text "Pharmacological treatment" does not provide any specific systems or concepts, descriptions, actions, or keywords. Therefore, based on the instructions, there is nothing to extract.
+
+• Name: Intracellular Chirality  
+  • Description: A system or concept related to the intracellular aspect, involving notions of asymmetrical organization or orientation within cells.  
+  • Action: Mentioned as part of the systems or concepts included in the context.  
+  • Keywords: intracellular, chirality, asymmetrical, organization, orientation, cell, system
+  
+• Name: Voltage Gradient Flow  
+  • Description: A concept involving the flow or movement of electrical gradients, possibly within biological contexts such as cellular processes.  
+  • Action: Identified among the systems or concepts in the text.  
+  • Keywords: voltage, gradient, flow, electrical, movement, cellular, process
+  
+• Name: Chromatid Segregation  
+  • Description: The process or concept related to the distribution or separation of chromatids during cellular division.  
+  • Action: Listed as one of the included concepts.  
+  • Keywords: chromatid, segregation, separation, distribution, cell division, process, concept
+  
+• Name: Motile Cilia  
+  • Description: Refers to cilia with the ability to move or exhibit motility, likely within the context of cellular or biological activity.  
+  • Action: Presented as one of the systems or concepts in the provided list.  
+  • Keywords: motile, cilia, movement, cellular, biology, activity, system
+
+• Name: dand5 quantification  
+• Description: The process of quantifying dand5, specifically calculating the right to left ratio in embryos at the 8S stage for both wild type (WT) and myo1d mutant zebrafish (MZ). This process utilizes a software tool for analysis.  
+• Action: The text describes the method of calculating the ratio of dand5 on the right and left in embryos, comparing results between wild type and mutant conditions using ImageJ as the quantification tool.  
+• Keywords: dand5, quantification, right to left ratio, 8S stage embryos, WT, myo1d MZ, ImageJ, zebrafish.
+
+• Name: myo1d  
+• Description: Myo1d is indicated as necessary for KV function and for establishing laterality in the system described.  
+• Action: The results presented suggest that myo1d plays a critical role in vacuole delivery, KV function, and the establishment of laterality within the biological system being studied.  
+• Keywords: myo1d, KV function, laterality, vacuole delivery, necessity, biology, function establishment, results, role, system.
+
+• Name: Animal Models for LR Asymmetry
+• Description: Various animal models are employed to explore and analyze different theories regarding the establishment of left-right (LR) asymmetry.
+• Action: The text states that several animal models are actively used to investigate theories, implying observational and experimental research to understand LR asymmetry.
+• Keywords: Animal models, LR asymmetry, establishment, theories, investigation, research, experimentation, anatomy, biology, models.
+
+• Name: Myo1d  
+  • Description: The text mentions "Myo1d" without additional context or details. Myo1d usually refers to a type of unconventional myosin, a motor protein involved in cellular processes. However, specific information about its role or function in this context is not provided in the text.  
+  • Action: The text simply lists "Myo1d" without any further explanation or described interactions.  
+  • Keywords: Myo1d, protein, myosin, cellular processes, motor protein, context, interaction, role, function, mention.
+
+• Name: myo1d MZ  
+  • Description: "myo1d MZ" is mentioned in the text without further elaboration. MZ could possibly refer to a specific context or variant related to myo1d, but the text does not clarify what this means.  
+  • Action: The text lists "myo1d MZ" without providing additional details or relationships.  
+  • Keywords: myo1d MZ, context, variant, mention, specific, clarification, role, function, detail, description.
+
+• Name: Fixed samples processing
+• Description: The text describes a procedure for preparing fixed samples, which involves washing the samples three times in PBS (phosphate-buffered saline) and then post-fixing them in an aqueous solution containing 1% OsO4 (osmium tetroxide) and 1% K3Fe(CN)6 (potassium ferricyanide) for one hour.
+• Action: The action involves washing and post-fixing samples, indicating a step in sample preparation for further analysis, likely in microscopy or imaging.
+• Keywords: fixed samples, PBS, post-fixing, OsO4, K3Fe(CN)6, aqueous solution, wash, 1 hour, sample preparation, microscopy.
+
