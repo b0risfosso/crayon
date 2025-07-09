@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 from ebooklib import epub, ITEM_DOCUMENT
 import pypandoc
 from openai import OpenAI, OpenAIError
+import openai
 from keybert import KeyBERT
 
 
@@ -277,6 +278,16 @@ def safe_get_metadata(path: Path, text: str, retries: int = MAX_RETRIES):
                 return None
             time.sleep(RETRY_DELAY)
 
+def ask(sys_msg, usr_msg):
+    resp = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": sys_msg},
+            {"role": "user", "content": usr_msg}
+        ]
+    )
+    return resp.choices[0].message.content
+
 # ---------------------------------------------------------------------------
 # SQLite helpers
 # ---------------------------------------------------------------------------
@@ -319,8 +330,8 @@ def ingest(library: Dict[Path, str], metadata: Dict[Path, dict], db_file: Path) 
         for path, md in metadata.items():
             cx.execute(
                 """
-                INSERT OR REPLACE INTO info(path, title, author, size, hash)
-                VALUES (?,?,?,?,?)
+                INSERT OR REPLACE INTO info(path, title, author, size, hash, tags, category)
+                VALUES (?,?,?,?,?,?,?)
                 """,
                 (
                     str(path),
@@ -337,13 +348,36 @@ def ingest(library: Dict[Path, str], metadata: Dict[Path, dict], db_file: Path) 
     cx.close()
     print(f"✓ Ingested {len(library)} documents ({total_docs} total) → {db_file}")
 
+
+
+def classify_category_with_gpt(title: str, tags: list[str]) -> str:
+    prompt = f"""
+        You are an assistant that classifies documents into categories.
+
+        Given the title: "{title}"
+        And the keywords: {', '.join(tags)}
+
+        Choose the most appropriate category from the following list:
+        [Medicine, Crafts, History, Philosophy, Technology, Economics, Religion, Literature, Uncategorized]
+
+        Category:
+        """
+    resp = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return resp.choices[0].message.content
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     DB_FILE = Path("library_temp.sqlite")
-    LIBRARY_DIR = Path("/Users/b/fantasiagenesis/crayon/library/dressmaking")
+    LIBRARY_DIR = Path("/Users/b/fantasiagenesis/crayon/library/learning")
 
     all_files = [p for p in LIBRARY_DIR.rglob("*") if p.is_file()]
 
@@ -384,7 +418,11 @@ if __name__ == "__main__":
             info = get_more_info(path, text)
             md["tags"], md["category"] = info["tags"], info["category"]
         except:
-            md["tags"] = model.extract_keywords(text, keyphrase_ngram_range=(1, 2), stop_words='english', top_n=5)
+            tags = model.extract_keywords(text, keyphrase_ngram_range=(1, 2), stop_words='english', top_n=5)
+            keywords   = [kw for kw, _score in tags]
+            md["tags"] = ", ".join(keywords)
+            md["category"] = classify_category_with_gpt(md["title"], keywords)
+            print(md["tags"], md["category"])
 
         metadata[path] = md
 

@@ -3,5 +3,6 @@ library/
 
 # Ignore the SQLite database and its associated files
 library.sqlite
+library_temp.sqlite
 library.sqlite-shm
 library.sqlite-wal
