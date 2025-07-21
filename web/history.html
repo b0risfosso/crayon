@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"><title>History</title>
+  <style>
+    body{font-family:sans-serif;max-width:800px;margin:40px auto}
+    .item{border-bottom:1px solid #ccc;padding:8px 0}
+    .role{font-weight:bold}
+    pre{white-space:pre-wrap;margin:2px 0}
+  </style>
+</head>
+<body>
+  <nav><a href="prompt.html">Prompt</a> | <a href="history.html">History</a></nav>
+  <h2>Conversation history</h2>
+  <div id="list">Loading…</div>
+
+<script>
+async function loadHistory(){
+  const r = await fetch('/api/history');
+  const data = await r.json();      // newest first
+  const div = document.getElementById('list');
+  div.innerHTML='';
+  if (data.length===0){div.textContent='No history yet.'; return;}
+  data.forEach((x,i)=>{
+    div.insertAdjacentHTML('beforeend',`
+      <div class="item">
+        <div class="role">#${data.length-i}</div>
+        <pre><span class="role">System:</span> ${x.system}</pre>
+        <pre><span class="role">User:</span> ${x.user}</pre>
+        <pre><span class="role">Answer:</span> ${x.answer}</pre>
+      </div>
+    `);
+  });
+}
+loadHistory();
+</script>
+</body>
+</html>
