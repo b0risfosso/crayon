@@ -1,33 +1,39 @@
-# app.py
-from dotenv import load_dotenv
-from openai import OpenAI, OpenAIError
+# ... top of file unchanged ...
 from flask import Flask, request, jsonify
-import os, logging
+from collections import deque
 
-load_dotenv()                    # loads .env in this folder
+load_dotenv()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 client = OpenAI()
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
+
+# ---- new global store (keep last 100 interactions) ----
+HISTORY = deque(maxlen=100)   # each item: {"system":..., "user":..., "answer":...}
 
 def ask(sys_msg: str, usr_msg: str) -> str:
-    try:
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": sys_msg},
-                {"role": "user",   "content": usr_msg}
-            ]
-        )
-        return resp.choices[0].message.content
-    except OpenAIError as e:
-        logging.exception("OpenAI API error")
-        return f"ERROR: {e}"
+    resp = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": sys_msg},
+            {"role": "user",   "content": usr_msg}
+        ]
+    )
+    return resp.choices[0].message.content
 
+# -------- API routes --------
 @app.route("/api/ask", methods=["POST"])
 def handle_ask():
     data = request.get_json(force=True)
     sys_msg = data.get("system", "")
     usr_msg = data.get("user", "")
-    return jsonify({"answer": ask(sys_msg, usr_msg)})
+    answer  = ask(sys_msg, usr_msg)
+
+    # save to history
+    HISTORY.append({"system": sys_msg, "user": usr_msg, "answer": answer})
+    return jsonify({"answer": answer})
+
+@app.route("/api/history", methods=["GET"])
+def handle_history():
+    # newest → oldest
+    return jsonify(list(reversed(HISTORY)))
