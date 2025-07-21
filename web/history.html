@@ -1,38 +1,49 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8"><title>History</title>
+  <meta charset="utf-8">
+  <title>History (Tree)</title>
   <style>
-    body{font-family:sans-serif;max-width:800px;margin:40px auto}
-    .item{border-bottom:1px solid #ccc;padding:8px 0}
-    .role{font-weight:bold}
-    pre{white-space:pre-wrap;margin:2px 0}
+    body{font-family:sans-serif;max-width:900px;margin:40px auto}
+    .node{margin-left:20px;border-left:2px solid #ccc;padding-left:8px}
+    .sys{font-weight:bold}
+    pre{white-space:pre-wrap}
   </style>
 </head>
 <body>
-  <nav><a href="prompt.html">Prompt</a> | <a href="history.html">History</a></nav>
-  <h2>Conversation history</h2>
-  <div id="list">Loading…</div>
+  <nav><a href="prompt.html">Prompt</a> | <a href="history.html">History</a> |
+       <a href="organize.html">Organize</a></nav>
+  <h2>Conversation tree</h2>
+  <div id="tree">Loading…</div>
 
 <script>
-async function loadHistory(){
-  const r = await fetch('/api/history');
-  const data = await r.json();      // newest first
-  const div = document.getElementById('list');
-  div.innerHTML='';
-  if (data.length===0){div.textContent='No history yet.'; return;}
-  data.forEach((x,i)=>{
-    div.insertAdjacentHTML('beforeend',`
-      <div class="item">
-        <div class="role">#${data.length-i}</div>
-        <pre><span class="role">System:</span> ${x.system}</pre>
-        <pre><span class="role">User:</span> ${x.user}</pre>
-        <pre><span class="role">Answer:</span> ${x.answer}</pre>
-      </div>
-    `);
+function buildTree(list){
+  const byId = Object.fromEntries(list.map(x=>[x.id, x]));
+  const roots=[];
+  list.forEach(x=>{
+    x.children=[];                             // init
   });
+  list.forEach(x=>{
+    if(x.parent && byId[x.parent]) byId[x.parent].children.push(x);
+    else roots.push(x);
+  });
+
+  function render(node){
+    return `<div class="node">
+              <div class="sys">🗨️ ${node.user}</div>
+              <pre>${node.answer}</pre>
+              ${node.children.map(render).join('')}
+            </div>`;
+  }
+  return roots.map(render).join('');
 }
-loadHistory();
+
+async function load(){
+  const r=await fetch('/api/history');
+  const list=await r.json();
+  document.getElementById('tree').innerHTML= buildTree(list);
+}
+load();
 </script>
 </body>
 </html>

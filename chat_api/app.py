@@ -51,13 +51,42 @@ def handle_ask():
 def get_history():
     return jsonify(list(HISTORY))              # flat list
 
+# -------- reparent route (unchanged) ----------
 @app.route("/api/reparent", methods=["POST"])
 def reparent():
-    data = request.get_json(force=True)        # {"id":child, "parent":newParentOrNone}
-    cid   = data.get("id")
-    new_parent = data.get("parent")            # None for root
-    for item in HISTORY:
-        if item["id"] == cid:
-            item["parent"] = new_parent
-            return jsonify({"status": "ok"})
-    return jsonify({"error": "id not found"}), 404
+    data = request.get_json(force=True)
+    item = find_item(data.get("id"))
+    if not item:
+        return jsonify({"error":"id not found"}), 404
+    item["parent"] = data.get("parent")
+    return jsonify({"status":"ok"})
+
+# -------- delete route ----------
+@app.route("/api/delete", methods=["POST"])
+def delete():
+    data = request.get_json(force=True)
+    cid = data.get("id")
+    victim = find_item(cid)
+    if not victim:
+        return jsonify({"error":"id not found"}), 404
+
+    # adopt its children
+    for x in HISTORY:
+        if x["parent"] == cid:
+            x["parent"] = victim["parent"]
+
+    HISTORY.remove(victim)
+    return jsonify({"status":"deleted"})
+
+# -------- edit route ----------
+@app.route("/api/edit", methods=["POST"])
+def edit():
+    data = request.get_json(force=True)
+    item = find_item(data.get("id"))
+    if not item:
+        return jsonify({"error":"id not found"}), 404
+    # update only the provided fields
+    for key in ("system","user","answer"):
+        if key in data:
+            item[key] = data[key]
+    return jsonify({"status":"edited"})
