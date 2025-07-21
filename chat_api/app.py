@@ -1,6 +1,9 @@
-# ... top of file unchanged ...
+# app.py
+from dotenv import load_dotenv
+from openai import OpenAI, OpenAIError
 from flask import Flask, request, jsonify
 from collections import deque
+import os, logging
 
 load_dotenv()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
