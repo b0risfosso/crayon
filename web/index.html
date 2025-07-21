@@ -1,1 +1,52 @@
-<h1>fantasiagenesis</h1>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Chat‑Demo</title>
+  <style>
+    body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 1rem}
+    textarea{width:100%;min-height:90px;margin-top:6px}
+    button{padding:6px 14px;margin:12px 0;font-size:1rem}
+    #answer{white-space:pre-wrap;border:1px solid #ddd;padding:10px;margin-top:12px}
+  </style>
+</head>
+<body>
+  <h2>System message</h2>
+  <textarea id="sys">You are concise.</textarea>
+
+  <h2>User message</h2>
+  <textarea id="usr"></textarea>
+
+  <button id="askBtn">Ask</button>
+
+  <h2>Answer</h2>
+  <div id="answer">(waiting…)</div>
+
+<script>
+document.getElementById('askBtn').addEventListener('click', async () => {
+  const btn   = document.getElementById('askBtn');
+  const out   = document.getElementById('answer');
+  btn.disabled = true; out.textContent = 'Thinking…';
+
+  try {
+    const res = await fetch('/api/ask', {
+      method : 'POST',
+      headers: {'Content-Type':'application/json'},
+      body   : JSON.stringify({
+        system: document.getElementById('sys').value,
+        user  : document.getElementById('usr').value
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    out.textContent = data.answer ?? '(no answer field)';
+  } catch (err) {
+    out.textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
