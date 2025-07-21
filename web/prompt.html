@@ -14,18 +14,44 @@
   <h2>Answer</h2>
   <pre id="out">(waiting…)</pre>
 
-<script>
-document.getElementById('send').onclick = async () => {
-  const btn=document.getElementById('send'); btn.disabled=true;
-  const out=document.getElementById('out'); out.textContent='Thinking…';
-  const body = {
-    system: document.getElementById('sys').value,
-    user  : document.getElementById('usr').value
-  };
-  const r = await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  out.textContent = (await r.json()).answer ?? '(no answer)';
-  btn.disabled=false;
-};
-</script>
+  <script>
+  async function sendPrompt(){
+    const btn=document.getElementById('send');
+    const out=document.getElementById('out');
+    btn.disabled=true; out.textContent='Thinking…';
+  
+    const body = {
+      system: document.getElementById('sys').value,
+      user  : document.getElementById('usr').value
+    };
+  
+    try {
+      const res = await fetch('/api/ask', {
+        method :'POST',
+        headers:{'Content-Type':'application/json'},
+        body   : JSON.stringify(body)
+      });
+  
+      // Log status for debugging
+      console.log('Status', res.status);
+  
+      if (!res.ok){
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}\n${text.slice(0,200)}`);
+      }
+  
+      const data = await res.json();
+      out.textContent = data.answer ?? '(no answer)';
+    } catch(err){
+      out.textContent = 'Error – see console';
+      console.error(err);
+    } finally{
+      btn.disabled=false;
+    }
+  }
+  
+  document.getElementById('send').onclick = sendPrompt;
+  </script>
+    
 </body>
 </html>
