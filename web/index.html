@@ -2,51 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Chat‑Demo</title>
+  <title>FantasiaGenesis — Home</title>
+
   <style>
-    body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 1rem}
-    textarea{width:100%;min-height:90px;margin-top:6px}
-    button{padding:6px 14px;margin:12px 0;font-size:1rem}
-    #answer{white-space:pre-wrap;border:1px solid #ddd;padding:10px;margin-top:12px}
+    body{
+      font-family:sans-serif;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      height:100vh;
+      margin:0;
+      background:#f5f7fa;
+    }
+    h1{margin-bottom:32px}
+    .links{
+      display:flex;
+      gap:20px;
+    }
+    .btn{
+      display:inline-block;
+      padding:14px 28px;
+      font-size:1.1rem;
+      border:2px solid #333;
+      border-radius:8px;
+      background:#fff;
+      text-decoration:none;
+      color:#333;
+      transition:.15s;
+      min-width:120px;
+      text-align:center;
+    }
+    .btn:hover{
+      background:#333;
+      color:#fff;
+    }
   </style>
 </head>
 <body>
-  <h2>System message</h2>
-  <textarea id="sys">You are concise.</textarea>
 
-  <h2>User message</h2>
-  <textarea id="usr"></textarea>
+  <h1>FantasiaGenesis</h1>
 
-  <button id="askBtn">Ask</button>
+  <div class="links">
+    <a class="btn" href="prompt.html">Prompt</a>
+    <a class="btn" href="history.html">History</a>
+    <a class="btn" href="organize.html">Organize</a>
+  </div>
 
-  <h2>Answer</h2>
-  <div id="answer">(waiting…)</div>
-
-<script>
-document.getElementById('askBtn').addEventListener('click', async () => {
-  const btn   = document.getElementById('askBtn');
-  const out   = document.getElementById('answer');
-  btn.disabled = true; out.textContent = 'Thinking…';
-
-  try {
-    const res = await fetch('/api/ask', {
-      method : 'POST',
-      headers: {'Content-Type':'application/json'},
-      body   : JSON.stringify({
-        system: document.getElementById('sys').value,
-        user  : document.getElementById('usr').value
-      })
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    out.textContent = data.answer ?? '(no answer field)';
-  } catch (err) {
-    out.textContent = 'Error: ' + err.message;
-  } finally {
-    btn.disabled = false;
-  }
-});
-</script>
 </body>
 </html>
