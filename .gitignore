@@ -8,4 +8,4 @@ library.sqlite-shm
 library.sqlite-wal
 library.db
 library_temp.sqlite-shm
-library_temp.sqlite-wal
+library_temp.sqlite-walchat_api/.env
