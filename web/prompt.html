@@ -1,57 +1,85 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"><title>Prompt</title>
-  <style>body{font-family:sans-serif;max-width:800px;margin:40px auto}</style>
+  <meta charset="utf-8">
+  <title>Prompt</title>
+
+  <style>
+    body{
+      font-family:sans-serif;
+      max-width:800px;
+      margin:40px auto;
+    }
+    textarea{
+      width:100%;
+      min-height:90px;
+    }
+    pre#out{
+      white-space:pre-wrap;   /* preserve line‑breaks but allow wrapping */
+      overflow-wrap:anywhere; /* break very long words / URLs if needed */
+      border:1px solid #ccc;
+      padding:8px;
+      background:#f8f8f8;
+      min-height:60px;
+    }
+    nav a{margin-right:8px}
+  </style>
 </head>
+
 <body>
-  <nav><a href="prompt.html">Prompt</a> | <a href="history.html">History</a></nav>
+  <nav>
+    <a href="prompt.html">Prompt</a> |
+    <a href="history.html">History</a>
+  </nav>
+
   <h2>System message</h2>
-  <textarea id="sys" rows="4" style="width:100%">You are concise.</textarea>
+  <textarea id="sys" rows="4">You are concise.</textarea>
+
   <h2>User message</h2>
-  <textarea id="usr" rows="4" style="width:100%"></textarea><br>
+  <textarea id="usr" rows="4"></textarea><br>
+
   <button id="send">Ask</button>
+
   <h2>Answer</h2>
   <pre id="out">(waiting…)</pre>
 
-  <script>
-  async function sendPrompt(){
-    const btn=document.getElementById('send');
-    const out=document.getElementById('out');
-    btn.disabled=true; out.textContent='Thinking…';
-  
-    const body = {
-      system: document.getElementById('sys').value,
-      user  : document.getElementById('usr').value
-    };
-  
-    try {
-      const res = await fetch('/api/ask', {
-        method :'POST',
-        headers:{'Content-Type':'application/json'},
-        body   : JSON.stringify(body)
-      });
-  
-      // Log status for debugging
-      console.log('Status', res.status);
-  
-      if (!res.ok){
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status}\n${text.slice(0,200)}`);
-      }
-  
-      const data = await res.json();
-      out.textContent = data.answer ?? '(no answer)';
-    } catch(err){
-      out.textContent = 'Error – see console';
-      console.error(err);
-    } finally{
-      btn.disabled=false;
+<script>
+async function sendPrompt(){
+  const btn = document.getElementById('send');
+  const out = document.getElementById('out');
+  btn.disabled = true;
+  out.textContent = 'Thinking…';
+
+  const payload = {
+    system: document.getElementById('sys').value,
+    user  : document.getElementById('usr').value
+  };
+
+  try{
+    const res  = await fetch('/api/ask', {
+      method :'POST',
+      headers:{'Content-Type':'application/json'},
+      body   : JSON.stringify(payload)
+    });
+    console.log('Status', res.status);
+
+    if(!res.ok){
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status}\n${text.slice(0,200)}`);
     }
+
+    const data = await res.json();
+    out.textContent = data.answer ?? '(no answer field)';
+  }catch(err){
+    out.textContent = 'Error – see console';
+    console.error(err);
+  }finally{
+    btn.disabled = false;
   }
-  
-  document.getElementById('send').onclick = sendPrompt;
-  </script>
-    
+}
+
+document.getElementById('send').onclick = sendPrompt;
+</script>
+
 </body>
 </html>
