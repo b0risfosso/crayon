@@ -9,3 +9,9 @@ library.sqlite-wal
 library.db
 library_temp.sqlite-shm
 library_temp.sqlite-walchat_api/.env
+
+# ignore Python runtime artefacts
+chat_api/.env
+chat_api/venv/
+chat_api/__pycache__/
+
