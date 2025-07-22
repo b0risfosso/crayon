@@ -76,6 +76,7 @@ const edgesSvg   = document.getElementById('edges');
 const wrapper    = document.getElementById('board-wrapper');
 const zoomLabel  = document.getElementById('zoom-level');
 let scale = 1, origin = {x:0,y:0};
+const minScale = 0.2, maxScale = 2.5;
 
 async function loadData(){
   const r = await fetch('/api/history');
@@ -224,12 +225,23 @@ function enableCollapse(){
   });
 }
 
-// --- helper: convert screen coords → board coords (pre-scale space)
+// Utility
+function clamp(v,a,b){ return v<a?a : v>b?b : v; }
+function applyTransform(){
+  wrapper.style.transform =
+    `translate(${-origin.x*scale}px, ${-origin.y*scale}px) scale(${scale})`;
+}
+function drawAndLabel(){
+  drawEdges();
+  zoomLabel.textContent = Math.round(scale*100)+'%';
+}
+
+// Convert screen -> board coords
 function screenToBoard(clientX, clientY){
   const rect = board.getBoundingClientRect();
   return {
-    x: (clientX - rect.left) / scale,
-    y: (clientY - rect.top)  / scale
+    x: (clientX - rect.left)/scale + origin.x,
+    y: (clientY - rect.top)/scale  + origin.y
   };
 }
 
@@ -263,51 +275,37 @@ function autoLayout(){
 }
 
 // ---------- zoom / pan ----------
-let isPanning=false, panStart={x:0,y:0}, originStart={x:0,y:0};
-wrapper.addEventListener('mousedown', e=>{
-  if(e.target.closest('.note')) return; // don't pan when grabbing notes
-  isPanning=true; panStart={x:e.clientX,y:e.clientY}; originStart={...origin};
-  document.body.style.cursor='grab';
-});
-window.addEventListener('mouseup', ()=>{isPanning=false;document.body.style.cursor='';});
-window.addEventListener('mousemove', e=>{
-  if(!isPanning) return;
-  origin.x = originStart.x + (e.clientX-panStart.x)/scale;
-  origin.y = originStart.y + (e.clientY-panStart.y)/scale;
-  applyTransform();
-});
-
-// --- listener (put after loadData/render setup) ---
-wrapper.addEventListener('dblclick', e=>{
-  // ignore dblclicks on a note if you’d rather use them to edit
-  // if(e.target.closest('.note')) return;
-
-  const {x, y} = screenToBoard(e.clientX, e.clientY);
-  centerOnPoint(x, y);
-});
-
-// wheel to zoom (Ctrl/Meta for precision NOT required)
+// ---- WHEEL HANDLER ----
 window.addEventListener('wheel', e=>{
-  if(e.target.closest('.note')) return; // avoid accidental zoom while scrolling note text
-  const delta = e.deltaY>0 ? -0.1 : 0.1;
-  const newScale = clamp(scale + delta*scale, 0.2, 2.5);
-  // zoom to mouse position
-  const rect = wrapper.getBoundingClientRect();
-  const mx = (e.clientX - rect.left)/scale + origin.x;
-  const my = (e.clientY - rect.top)/scale + origin.y;
-  scale = newScale;
-  origin.x = mx - (e.clientX - rect.left)/scale;
-  origin.y = my - (e.clientY - rect.top)/scale;
+  // stop browser scrolling
+  e.preventDefault();
+
+  if (e.metaKey) {          // ⌘ + two-finger = ZOOM
+    const before = screenToBoard(e.clientX, e.clientY);
+    // zoom factor from deltaY (trackpads give small deltas)
+    const factor = Math.exp(-e.deltaY * 0.002); // tweak sensitivity
+    scale = clamp(scale * factor, minScale, maxScale);
+    const after = screenToBoard(e.clientX, e.clientY);
+
+    // keep cursor point stable
+    origin.x += before.x - after.x;
+    origin.y += before.y - after.y;
+
+    applyTransform();
+    drawAndLabel();
+    return;
+  }
+
+  // no metaKey -> PAN with wheel deltas
+  origin.x += e.deltaX / scale;
+  origin.y += e.deltaY / scale;
   applyTransform();
   drawEdges();
-  zoomLabel.textContent = Math.round(scale*100)+'%';
 }, {passive:false});
 
 function applyTransform(){
   wrapper.style.transform = `translate(${-origin.x*scale}px, ${-origin.y*scale}px) scale(${scale})`;
 }
-
-function clamp(v,min,max){return v<min?min:v>max?max:v;}
 
 // ---------- utils ----------
 function escapeHtml(str){
