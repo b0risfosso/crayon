@@ -61,6 +61,9 @@
     <button id="auto-layout">Auto layout</button>
     <button id="save-pos">Save positions</button>
     <button id="reset-pos">Reset positions</button>
+    <button id="zoom-in">+</button>
+    <button id="zoom-out">−</button>
+
     <div style="margin-top:6px">Zoom: <span id="zoom-level">100%</span></div>
   </div>
 
@@ -255,7 +258,7 @@ window.addEventListener('mousemove', e=>{
 
 // wheel to zoom (Ctrl/Meta for precision NOT required)
 window.addEventListener('wheel', e=>{
-  if(!e.ctrlKey && !e.metaKey && e.target.closest('.note')) return; // avoid accidental zoom while scrolling note text
+  if(e.target.closest('.note')) return; // avoid accidental zoom while scrolling note text
   const delta = e.deltaY>0 ? -0.1 : 0.1;
   const newScale = clamp(scale + delta*scale, 0.2, 2.5);
   // zoom to mouse position
@@ -291,6 +294,22 @@ function flash(msg){
  document.getElementById('save-pos').addEventListener('click', savePositions);
  document.getElementById('reset-pos').addEventListener('click', resetPositions);
  document.getElementById('auto-layout').addEventListener('click', autoLayout);
+ document.getElementById('zoom-in').onclick  = ()=> setZoom(scale*1.15);
+ document.getElementById('zoom-out').onclick = ()=> setZoom(scale/1.15);
+
+function setZoom(newScale){
+  const rect = wrapper.getBoundingClientRect();
+  const cx = rect.width/2, cy = rect.height/2; // zoom toward center
+  const mx = cx/scale + origin.x;
+  const my = cy/scale + origin.y;
+  scale = clamp(newScale, 0.2, 2.5);
+  origin.x = mx - cx/scale;
+  origin.y = my - cy/scale;
+  applyTransform();
+  drawEdges();
+  zoomLabel.textContent = Math.round(scale*100)+'%';
+}
+
 
 loadData();
 </script>
