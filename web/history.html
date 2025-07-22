@@ -119,6 +119,18 @@ function render(){
   enableCollapse();
 }
 
+
+
+// --- add near other globals ---
+function centerOnPoint(boardX, boardY){
+  const rect = wrapper.getBoundingClientRect();
+  origin.x = boardX - rect.width  / (2*scale);
+  origin.y = boardY - rect.height / (2*scale);
+  applyTransform();
+  drawEdges();
+}
+
+
 // ---------- edges ----------
 function drawEdges(){
   edgesSvg.innerHTML = `
@@ -212,6 +224,15 @@ function enableCollapse(){
   });
 }
 
+// --- helper: convert screen coords → board coords (pre-scale space)
+function screenToBoard(clientX, clientY){
+  const rect = board.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left) / scale,
+    y: (clientY - rect.top)  / scale
+  };
+}
+
 // ---------- save / restore ----------
 function savePositions(){
   const pos={};
@@ -254,6 +275,15 @@ window.addEventListener('mousemove', e=>{
   origin.x = originStart.x + (e.clientX-panStart.x)/scale;
   origin.y = originStart.y + (e.clientY-panStart.y)/scale;
   applyTransform();
+});
+
+// --- listener (put after loadData/render setup) ---
+wrapper.addEventListener('dblclick', e=>{
+  // ignore dblclicks on a note if you’d rather use them to edit
+  // if(e.target.closest('.note')) return;
+
+  const {x, y} = screenToBoard(e.clientX, e.clientY);
+  centerOnPoint(x, y);
 });
 
 // wheel to zoom (Ctrl/Meta for precision NOT required)
