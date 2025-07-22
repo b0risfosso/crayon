@@ -28,6 +28,7 @@
     .note.dragging{opacity:.85;cursor:grabbing;box-shadow:0 8px 16px rgba(0,0,0,.35);}    
     .note-header{font-weight:600;margin-bottom:6px;font-size:14px;cursor:pointer;}
     .note.collapsed .note-body{display:none;}
+    .note.active{ box-shadow:0 0 0 3px #4aa3ff66; }
     .note-body{white-space:pre-wrap;font-size:13px;line-height:1.25;max-height:400px;overflow:auto;}
     .note-actions{position:absolute;right:6px;bottom:4px;font-size:11px;color:#333;}
     .note-actions button{background:none;border:none;padding:0 4px;cursor:pointer;color:#333}
@@ -77,6 +78,10 @@ const wrapper    = document.getElementById('board-wrapper');
 const zoomLabel  = document.getElementById('zoom-level');
 let scale = 1, origin = {x:0,y:0};
 const minScale = 0.2, maxScale = 2.5;
+
+let activeNote = null;
+
+
 
 async function loadData(){
   const r = await fetch('/api/history');
@@ -162,6 +167,12 @@ function drawEdges(){
 function edgePath(a,b){
   const dx=(b.x-a.x)*0.3;
   return `<path class="edge" d="M ${a.x},${a.y} C ${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}" />`;
+}
+
+function activateNote(el){
+  if(activeNote) activeNote.classList.remove('active');
+  activeNote = el;
+  el.classList.add('active');
 }
 
 // ---------- drag ----------
@@ -274,9 +285,21 @@ function autoLayout(){
   render(); flash('auto layout');
 }
 
+board.addEventListener('click', e=>{
+  const n = e.target.closest('.note');
+  if(!n) return;
+  activateNote(n);
+});
+
 // ---------- zoom / pan ----------
 // ---- WHEEL HANDLER ----
 window.addEventListener('wheel', e=>{
+
+  // If wheel happened inside the active note, do nothing (let it scroll)
+  if(activeNote && activeNote.contains(e.target)){
+    return;  // don't preventDefault, don't pan/zoom
+  }
+
   // stop browser scrolling
   e.preventDefault();
 
@@ -302,6 +325,13 @@ window.addEventListener('wheel', e=>{
   applyTransform();
   drawEdges();
 }, {passive:false});
+
+wrapper.addEventListener('click', e=>{
+  if(!e.target.closest('.note') && activeNote){
+    activeNote.classList.remove('active');
+    activeNote = null;
+  }
+});
 
 function applyTransform(){
   wrapper.style.transform = `translate(${-origin.x*scale}px, ${-origin.y*scale}px) scale(${scale})`;
