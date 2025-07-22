@@ -7,24 +7,28 @@
   <style>
     :root{
       --bg:#f5f5f5; --note:#fff8a6; --note-border:#d4c96b; --line:#888;
-      --maxw:1400px; --font: system-ui, sans-serif;
+      --font: system-ui, sans-serif;
     }
     html,body{height:100%;margin:0;background:var(--bg);font-family:var(--font);}    
     body{display:flex;flex-direction:column;}
     nav{padding:8px 16px;background:#222;color:#eee;font-size:14px}
     nav a{color:#9fd3ff;margin-right:12px;text-decoration:none}
-    #canvas-wrap{position:relative;flex:1;overflow:auto;}
+
+    /* the whole infinite board is inside a pan/zoom viewport */
+    #viewport{position:relative;flex:1;overflow:hidden;background:var(--bg);}
+    #board-wrapper{position:absolute;inset:0;transform-origin:0 0;}
     #board{position:relative;min-height:2000px;min-width:2000px;}
 
     .note{
-      position:absolute; width:260px; min-height:120px; box-sizing:border-box;
-      background:var(--note); border:2px solid var(--note-border); border-radius:6px;
-      box-shadow:0 3px 6px rgba(0,0,0,.2); padding:8px 8px 28px 8px; cursor:grab;
-      user-select:none;
+      position:absolute;width:260px;min-height:120px;box-sizing:border-box;
+      background:var(--note);border:2px solid var(--note-border);border-radius:6px;
+      box-shadow:0 3px 6px rgba(0,0,0,.2);padding:8px 8px 28px 8px;cursor:grab;user-select:none;
+      transition:height .15s ease;
     }
-    .note.dragging{opacity:.8; cursor:grabbing; box-shadow:0 8px 16px rgba(0,0,0,.35);}
-    .note-header{font-weight:600;margin-bottom:6px;font-size:14px;}
-    .note-body{white-space:pre-wrap;font-size:13px;line-height:1.25;}
+    .note.dragging{opacity:.85;cursor:grabbing;box-shadow:0 8px 16px rgba(0,0,0,.35);}    
+    .note-header{font-weight:600;margin-bottom:6px;font-size:14px;cursor:pointer;}
+    .note.collapsed .note-body{display:none;}
+    .note-body{white-space:pre-wrap;font-size:13px;line-height:1.25;max-height:400px;overflow:auto;}
     .note-actions{position:absolute;right:6px;bottom:4px;font-size:11px;color:#333;}
     .note-actions button{background:none;border:none;padding:0 4px;cursor:pointer;color:#333}
     .note-actions button:hover{text-decoration:underline;}
@@ -45,10 +49,11 @@
     <a href="organize.html">Organize</a>
   </nav>
 
-  <div id="canvas-wrap">
-    <!-- svg for arrows sits under notes -->
-    <svg id="edges"></svg>
-    <div id="board"></div>
+  <div id="viewport">
+    <div id="board-wrapper">
+      <svg id="edges"></svg>
+      <div id="board"></div>
+    </div>
   </div>
 
   <div id="toolbar">
@@ -56,45 +61,40 @@
     <button id="auto-layout">Auto layout</button>
     <button id="save-pos">Save positions</button>
     <button id="reset-pos">Reset positions</button>
+    <div style="margin-top:6px">Zoom: <span id="zoom-level">100%</span></div>
   </div>
 
   <div id="status" hidden></div>
 
 <script>
-// ----------------- data fetch -----------------
 let DATA = [];
+const board      = document.getElementById('board');
+const edgesSvg   = document.getElementById('edges');
+const wrapper    = document.getElementById('board-wrapper');
+const zoomLabel  = document.getElementById('zoom-level');
+let scale = 1, origin = {x:0,y:0};
+
 async function loadData(){
   const r = await fetch('/api/history');
   DATA = await r.json();
   buildTree();
 }
 
-// index by id and attach children
 function buildTree(){
   const byId = Object.fromEntries(DATA.map(x=>[x.id,x]));
   DATA.forEach(x=>x.children=[]);
   const roots=[];
-  DATA.forEach(x=>{
-    if(x.parent && byId[x.parent]) byId[x.parent].children.push(x);
-    else roots.push(x);
-  });
-  render(roots, byId);
+  DATA.forEach(x=>{ if(x.parent && byId[x.parent]) byId[x.parent].children.push(x); else roots.push(x); });
+  render();
 }
 
-// ----------------- render -----------------
-const board = document.getElementById('board');
-const edgesSvg = document.getElementById('edges');
-
-function render(roots, byId){
+function render(){
   board.innerHTML='';
-  // restore positions from localStorage (keyed by id)
   const saved = JSON.parse(localStorage.getItem('notePositions')||'{}');
-
   DATA.forEach((node,i)=>{
     const div = document.createElement('div');
     div.className='note';
     div.dataset.id = node.id;
-
     const pos = saved[node.id] || {x: 80 + (i%4)*300, y: 80 + Math.floor(i/4)*220};
     div.style.left = pos.x + 'px';
     div.style.top  = pos.y + 'px';
@@ -105,6 +105,7 @@ function render(roots, byId){
       <div class="note-actions">
         <button data-action="focus">focus</button>
         <button data-action="edit">edit</button>
+        <button data-action="collapse">toggle</button>
       </div>`;
 
     board.appendChild(div);
@@ -112,9 +113,10 @@ function render(roots, byId){
 
   drawEdges();
   enableDrag();
+  enableCollapse();
 }
 
-// ----------------- edges -----------------
+// ---------- edges ----------
 function drawEdges(){
   edgesSvg.innerHTML = `
     <defs>
@@ -123,144 +125,173 @@ function drawEdges(){
       </marker>
     </defs>`;
 
-  const show = document.getElementById('toggle-arrows').checked;
-  if(!show) return;
+  if(!document.getElementById('toggle-arrows').checked) return;
 
-  const bboxCache = {};
-  const getCenter = (id)=>{
-    if(bboxCache[id]) return bboxCache[id];
+  const cache = {};
+  const getCenter = id => {
+    if(cache[id]) return cache[id];
     const el = document.querySelector(`.note[data-id="${id}"]`);
-    const r  = el.getBoundingClientRect();
-    const wrap = board.getBoundingClientRect();
-    // center relative to board origin
-    const c = { x: r.left - wrap.left + r.width/2, y: r.top - wrap.top + r.height/2 };
-    bboxCache[id]=c; return c;
+    const r = el.getBoundingClientRect();
+    const wb = board.getBoundingClientRect();
+    return cache[id] = { x:(r.left-wb.left + r.width/2)/scale, y:(r.top-wb.top + r.height/2)/scale };
   };
 
-  DATA.forEach(node=>{
-    if(!node.parent) return;
-    const from = getCenter(node.parent);
-    const to   = getCenter(node.id);
-    edgesSvg.insertAdjacentHTML('beforeend', pathSvg(from,to));
+  DATA.forEach(n=>{
+    if(!n.parent) return;
+    const a=getCenter(n.parent), b=getCenter(n.id);
+    edgesSvg.insertAdjacentHTML('beforeend', edgePath(a,b));
   });
 }
 
-function pathSvg(a,b){
-  // simple quadratic curve
-  const dx = (b.x - a.x) * 0.3;
-  const d = `M ${a.x},${a.y} C ${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}`;
-  return `<path class="edge" d="${d}" />`;
+function edgePath(a,b){
+  const dx=(b.x-a.x)*0.3;
+  return `<path class="edge" d="M ${a.x},${a.y} C ${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}" />`;
 }
 
-// ----------------- dragging -----------------
+// ---------- drag ----------
+let dragState=null;
 function enableDrag(){
-  const notes = document.querySelectorAll('.note');
-  notes.forEach(n=>{
+  document.querySelectorAll('.note').forEach(n=>{
     n.addEventListener('mousedown', startDrag);
     n.addEventListener('touchstart', startDrag, {passive:false});
   });
 }
-
-let dragState=null;
 function startDrag(e){
-  if(e.target.closest('.note-actions')) return; // clicking a button
+  if(e.target.closest('.note-actions')) return;
   e.preventDefault();
-  const el = e.currentTarget;
-  const startX = (e.touches?e.touches[0].clientX:e.clientX);
-  const startY = (e.touches?e.touches[0].clientY:e.clientY);
-  const rect = el.getBoundingClientRect();
-  const wrapRect = board.getBoundingClientRect();
-  dragState = {
-    el,
-    offsetX: startX - rect.left,
-    offsetY: startY - rect.top,
-    wrapLeft: wrapRect.left,
-    wrapTop: wrapRect.top
-  };
+  const el=e.currentTarget;
+  const pt = pointerPos(e);
+  dragState={el, offX:pt.x-parseInt(el.style.left), offY:pt.y-parseInt(el.style.top)};
   el.classList.add('dragging');
-  document.addEventListener('mousemove', onDrag);
-  document.addEventListener('mouseup', endDrag);
-  document.addEventListener('touchmove', onDrag, {passive:false});
-  document.addEventListener('touchend', endDrag);
+  window.addEventListener('mousemove', onDrag);
+  window.addEventListener('mouseup', endDrag);
+  window.addEventListener('touchmove', onDrag, {passive:false});
+  window.addEventListener('touchend', endDrag);
 }
-
 function onDrag(e){
   if(!dragState) return;
   e.preventDefault();
-  const pX = (e.touches?e.touches[0].clientX:e.clientX);
-  const pY = (e.touches?e.touches[0].clientY:e.clientY);
-  const x = pX - dragState.wrapLeft - dragState.offsetX;
-  const y = pY - dragState.wrapTop  - dragState.offsetY;
-  dragState.el.style.left = x + 'px';
-  dragState.el.style.top  = y + 'px';
+  const pt = pointerPos(e);
+  dragState.el.style.left = (pt.x-dragState.offX) + 'px';
+  dragState.el.style.top  = (pt.y-dragState.offY) + 'px';
   drawEdges();
 }
-
 function endDrag(){
   if(!dragState) return;
   dragState.el.classList.remove('dragging');
   savePositions();
   dragState=null;
-  document.removeEventListener('mousemove', onDrag);
-  document.removeEventListener('mouseup', endDrag);
-  document.removeEventListener('touchmove', onDrag);
-  document.removeEventListener('touchend', endDrag);
+  window.removeEventListener('mousemove', onDrag);
+  window.removeEventListener('mouseup', endDrag);
+  window.removeEventListener('touchmove', onDrag);
+  window.removeEventListener('touchend', endDrag);
+}
+function pointerPos(e){
+  const clientX = e.touches?e.touches[0].clientX:e.clientX;
+  const clientY = e.touches?e.touches[0].clientY:e.clientY;
+  const rect = board.getBoundingClientRect();
+  return { x:(clientX-rect.left)/scale, y:(clientY-rect.top)/scale };
 }
 
-// ----------------- persist positions -----------------
+// ---------- collapse / expand ----------
+function enableCollapse(){
+  document.querySelectorAll('.note-header').forEach(h=>{
+    h.addEventListener('click', ()=>{
+      const n = h.parentElement; n.classList.toggle('collapsed');
+      drawEdges(); savePositions();
+    });
+  });
+  document.querySelectorAll('.note-actions [data-action="collapse"]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const n = e.target.closest('.note'); n.classList.toggle('collapsed');
+      drawEdges(); savePositions();
+    });
+  });
+}
+
+// ---------- save / restore ----------
 function savePositions(){
-  const pos = {};
+  const pos={};
   document.querySelectorAll('.note').forEach(n=>{
-    pos[n.dataset.id] = {x: parseInt(n.style.left), y: parseInt(n.style.top)};
+    pos[n.dataset.id]={x:parseInt(n.style.left), y:parseInt(n.style.top), collapsed:n.classList.contains('collapsed')};
   });
   localStorage.setItem('notePositions', JSON.stringify(pos));
-  flash('positions saved');
+  flash('saved');
 }
-
 function resetPositions(){
   localStorage.removeItem('notePositions');
-  buildTree();
-  flash('positions reset');
+  render();
+  flash('reset');
 }
 
-// ----------------- auto layout (very naive) -----------------
+// ---------- auto layout ----------
 function autoLayout(){
-  // simple layered layout by depth
-  const depth = {}; // id->depth
-  function dfs(node,d){ depth[node.id]=d; node.children.forEach(c=>dfs(c,d+1)); }
   const byId = Object.fromEntries(DATA.map(x=>[x.id,x]));
   const roots = DATA.filter(x=>!x.parent || !byId[x.parent]);
+  const depth={};
+  function dfs(n,d){depth[n.id]=d;n.children.forEach(c=>dfs(c,d+1));}
   roots.forEach(r=>dfs(r,0));
-
-  const columns = {};
-  Object.entries(depth).forEach(([id,d])=>{ (columns[d] ||= []).push(id); });
-  const gapX = 320, gapY = 220;
-  const pos = {};
-  Object.entries(columns).forEach(([d,ids])=>{
-    ids.forEach((id,i)=>{ pos[id] = {x: 80 + d*gapX, y: 80 + i*gapY}; });
-  });
+  const cols={}; Object.entries(depth).forEach(([id,d])=>{(cols[d]||=[]).push(id);});
+  const gapX=320,gapY=220; const pos={};
+  Object.entries(cols).forEach(([d,ids])=>{ids.forEach((id,i)=>{pos[id]={x:80+d*gapX,y:80+i*gapY};});});
   localStorage.setItem('notePositions', JSON.stringify(pos));
-  buildTree();
-  flash('auto layout applied');
+  render(); flash('auto layout');
 }
 
-// ----------------- tiny utils -----------------
+// ---------- zoom / pan ----------
+let isPanning=false, panStart={x:0,y:0}, originStart={x:0,y:0};
+wrapper.addEventListener('mousedown', e=>{
+  if(e.target.closest('.note')) return; // don't pan when grabbing notes
+  isPanning=true; panStart={x:e.clientX,y:e.clientY}; originStart={...origin};
+  document.body.style.cursor='grab';
+});
+window.addEventListener('mouseup', ()=>{isPanning=false;document.body.style.cursor='';});
+window.addEventListener('mousemove', e=>{
+  if(!isPanning) return;
+  origin.x = originStart.x + (e.clientX-panStart.x)/scale;
+  origin.y = originStart.y + (e.clientY-panStart.y)/scale;
+  applyTransform();
+});
+
+// wheel to zoom (Ctrl/Meta for precision NOT required)
+window.addEventListener('wheel', e=>{
+  if(!e.ctrlKey && !e.metaKey && e.target.closest('.note')) return; // avoid accidental zoom while scrolling note text
+  const delta = e.deltaY>0 ? -0.1 : 0.1;
+  const newScale = clamp(scale + delta*scale, 0.2, 2.5);
+  // zoom to mouse position
+  const rect = wrapper.getBoundingClientRect();
+  const mx = (e.clientX - rect.left)/scale + origin.x;
+  const my = (e.clientY - rect.top)/scale + origin.y;
+  scale = newScale;
+  origin.x = mx - (e.clientX - rect.left)/scale;
+  origin.y = my - (e.clientY - rect.top)/scale;
+  applyTransform();
+  drawEdges();
+  zoomLabel.textContent = Math.round(scale*100)+'%';
+}, {passive:false});
+
+function applyTransform(){
+  wrapper.style.transform = `translate(${-origin.x*scale}px, ${-origin.y*scale}px) scale(${scale})`;
+}
+
+function clamp(v,min,max){return v<min?min:v>max?max:v;}
+
+// ---------- utils ----------
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]));
 }
 function flash(msg){
   const box=document.getElementById('status');
   box.textContent=msg; box.hidden=false;
-  clearTimeout(box._t); box._t=setTimeout(()=>box.hidden=true,1500);
+  clearTimeout(box._t); box._t=setTimeout(()=>box.hidden=true,1200);
 }
 
-// ----------------- toolbar events -----------------
+// toolbar events
  document.getElementById('toggle-arrows').addEventListener('change', drawEdges);
  document.getElementById('save-pos').addEventListener('click', savePositions);
  document.getElementById('reset-pos').addEventListener('click', resetPositions);
  document.getElementById('auto-layout').addEventListener('click', autoLayout);
 
-// start
 loadData();
 </script>
 </body>
