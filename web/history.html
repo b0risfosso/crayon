@@ -48,6 +48,7 @@
     <a href="prompt.html">Imagine</a> |
     <a href="history.html">Narratives</a> |
     <a href="organize.html">Organize</a>
+    <select id="narrativeSelect" style="margin-left:12px;"></select>
   </nav>
 
   <div id="viewport">
@@ -70,7 +71,7 @@
 
   <div id="status" hidden></div>
 
-<script>
+<script type="module">
 let DATA = [];
 const board      = document.getElementById('board');
 const edgesSvg   = document.getElementById('edges');
@@ -81,13 +82,100 @@ const minScale = 0.2, maxScale = 2.5;
 
 let activeNote = null;
 
+import { NARRATIVES } from './assets/narratives.js';
+
+const params = new URLSearchParams(location.search);
+let CURRENT_NARR = params.get('page') || 'hindgut'; // default
+
+// populate dropdown
+const sel = document.getElementById('narrativeSelect');
+function populateDropdown(currentId){
+  sel.innerHTML = '';
+  NARRATIVES.forEach(n=>{
+    const opt = document.createElement('option');
+    opt.value = n.id;
+    opt.textContent = n.title;
+    sel.appendChild(opt);
+  });
+
+  // divider (optional)
+  const div = document.createElement('option');
+  div.disabled = true;
+  div.textContent = '──────────';
+  sel.appendChild(div);
+
+  // "new" option
+  const add = document.createElement('option');
+  add.value = '__new__';
+  add.textContent = '➕ New narrative…';
+  sel.appendChild(add);
+
+  sel.value = currentId;
+}
+sel.addEventListener('change', e=>{
+  const v = e.target.value;
+  if(v === '__new__'){
+    newNarrativeFlow();
+    return;
+  }
+  // normal navigation
+  const url = new URL(location.href);
+  url.searchParams.set('page', v);
+  location.href = url.toString();
+});
+
+async function newNarrativeFlow(){
+  const title = prompt('Title for the new narrative page?');
+  if(!title){ sel.value = CURRENT_NARR; return; }
+
+  const id = slugify(title);
+  if(NARRATIVES.some(n=>n.id===id)){
+    alert('That ID already exists. Pick another title.');
+    sel.value = CURRENT_NARR;
+    return;
+  }
+
+  // ---- Server-backed version ----
+  // Tell backend to create & persist it (and maybe generate the HTML file)
+  try{
+    await fetch('/api/narratives', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, title })
+    });
+  }catch(e){
+    console.error(e);
+    alert('Failed to create narrative on server.');
+    sel.value = CURRENT_NARR;
+    return;
+  }
+
+  // Update local list & UI
+  NARRATIVES.push({ id, title });
+  populateDropdown(id);
+
+  // Jump to its page
+  location.href = `history.html?page=${encodeURIComponent(id)}`;
+}
+
+function slugify(str){
+  return str.toLowerCase()
+            .replace(/[^a-z0-9]+/g,'-')
+            .replace(/^-+|-+$/g,'');
+}
+
+populateDropdown(CURRENT_NARR);
+
+
 
 
 async function loadData(){
-  const r = await fetch('/api/history');
+  const r = await fetch(`/api/history?narrative=${encodeURIComponent(CURRENT_NARR)}`);
   DATA = await r.json();
   buildTree();
 }
+
+function lsKey(name){ return `${name}:${CURRENT_NARR}`; }
 
 function buildTree(){
   const byId = Object.fromEntries(DATA.map(x=>[x.id,x]));
@@ -99,7 +187,7 @@ function buildTree(){
 
 function render(){
   board.innerHTML='';
-  const saved = JSON.parse(localStorage.getItem('notePositions')||'{}');
+  const saved = JSON.parse(localStorage.getItem(lsKey('notePositions'))||'{}');
   DATA.forEach((node,i)=>{
     const div = document.createElement('div');
     div.className='note';
@@ -260,15 +348,18 @@ function screenToBoard(clientX, clientY){
 function savePositions(){
   const pos={};
   document.querySelectorAll('.note').forEach(n=>{
-    pos[n.dataset.id]={x:parseInt(n.style.left), y:parseInt(n.style.top), collapsed:n.classList.contains('collapsed')};
+    pos[n.dataset.id]={
+      x:parseInt(n.style.left),
+      y:parseInt(n.style.top),
+      collapsed:n.classList.contains('collapsed')
+    };
   });
-  localStorage.setItem('notePositions', JSON.stringify(pos));
+  localStorage.setItem(lsKey('notePositions'), JSON.stringify(pos));
   flash('saved');
 }
 function resetPositions(){
-  localStorage.removeItem('notePositions');
-  render();
-  flash('reset');
+  localStorage.removeItem(lsKey('notePositions'));
+  render(); flash('reset');
 }
 
 // ---------- auto layout ----------
@@ -281,7 +372,7 @@ function autoLayout(){
   const cols={}; Object.entries(depth).forEach(([id,d])=>{(cols[d]||=[]).push(id);});
   const gapX=320,gapY=220; const pos={};
   Object.entries(cols).forEach(([d,ids])=>{ids.forEach((id,i)=>{pos[id]={x:80+d*gapX,y:80+i*gapY};});});
-  localStorage.setItem('notePositions', JSON.stringify(pos));
+  localStorage.setItem(lsKey('notePositions'), JSON.stringify(pos));
   render(); flash('auto layout');
 }
 
@@ -332,10 +423,6 @@ wrapper.addEventListener('click', e=>{
     activeNote = null;
   }
 });
-
-function applyTransform(){
-  wrapper.style.transform = `translate(${-origin.x*scale}px, ${-origin.y*scale}px) scale(${scale})`;
-}
 
 // ---------- utils ----------
 function escapeHtml(str){

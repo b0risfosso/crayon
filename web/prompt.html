@@ -3,45 +3,58 @@
 <head>
   <meta charset="utf-8">
   <title>Imagine</title>
-
   <style>
-    body{
-      font-family:sans-serif;
-      max-width:800px;
-      margin:40px auto;
-    }
-    textarea{
-      width:100%;
-      min-height:90px;
-    }
+    body{font-family:sans-serif;max-width:800px;margin:40px auto;}
+    textarea{width:100%;min-height:90px;}
     pre#out{
-      white-space:pre-wrap;   /* preserve line‑breaks but allow wrapping */
-      overflow-wrap:anywhere; /* break very long words / URLs if needed */
-      border:1px solid #ccc;
-      padding:8px;
-      background:#f8f8f8;
-      min-height:60px;
+      white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #ccc;
+      padding:8px;background:#f8f8f8;min-height:60px;
     }
     nav a{margin-right:8px}
+    label{display:block;margin:14px 0 6px 0;font-weight:600;}
+    select{width:100%;padding:4px;}
+    button{margin-top:12px;padding:6px 14px;}
   </style>
 </head>
-
 <body>
-  <nav><a href="prompt.html">Imagine</a> | <a href="history.html">Narratives</a> |
-    <a href="organize.html">Organize</a></nav>
+  <nav>
+    <a href="prompt.html">Imagine</a> |
+    <a href="history.html">Narratives</a> |
+    <a href="organize.html">Organize</a>
+  </nav>
 
   <h2>System message</h2>
   <textarea id="sys" rows="4">Imagine.</textarea>
 
   <h2>User message</h2>
-  <textarea id="usr" rows="4"></textarea><br>
+  <textarea id="usr" rows="4"></textarea>
+
+  <label for="targetPage">Send to narrative</label>
+  <select id="targetPage"></select>
 
   <button id="send">Ask</button>
 
   <h2>Answer</h2>
   <pre id="out">(waiting…)</pre>
 
-<script>
+<script type="module">
+/* ---------- 1. Declare or import narratives ---------- */
+import { NARRATIVES } from './assets/narratives.js';
+
+/* ---------- 2. Populate dropdown & default from URL ---------- */
+const params = new URLSearchParams(location.search);
+const initial = params.get('page') || NARRATIVES[0].id;
+
+const sel = document.getElementById('targetPage');
+NARRATIVES.forEach(n=>{
+  const opt = document.createElement('option');
+  opt.value = n.id;
+  opt.textContent = n.title;
+  sel.appendChild(opt);
+});
+sel.value = initial;
+
+/* ---------- 3. Send prompt ---------- */
 async function sendPrompt(){
   const btn = document.getElementById('send');
   const out = document.getElementById('out');
@@ -49,8 +62,9 @@ async function sendPrompt(){
   out.textContent = 'Thinking…';
 
   const payload = {
-    system: document.getElementById('sys').value,
-    user  : document.getElementById('usr').value
+    system    : document.getElementById('sys').value,
+    user      : document.getElementById('usr').value,
+    narrative : sel.value
   };
 
   try{
@@ -59,15 +73,16 @@ async function sendPrompt(){
       headers:{'Content-Type':'application/json'},
       body   : JSON.stringify(payload)
     });
-    console.log('Status', res.status);
-
     if(!res.ok){
       const text = await res.text();
       throw new Error(`HTTP ${res.status}\n${text.slice(0,200)}`);
     }
-
     const data = await res.json();
     out.textContent = data.answer ?? '(no answer field)';
+
+    // OPTIONAL: jump to that narrative's history right after
+    // location.href = `history.html?page=${encodeURIComponent(sel.value)}`;
+
   }catch(err){
     out.textContent = 'Error – see console';
     console.error(err);
@@ -78,6 +93,5 @@ async function sendPrompt(){
 
 document.getElementById('send').onclick = sendPrompt;
 </script>
-
 </body>
 </html>
