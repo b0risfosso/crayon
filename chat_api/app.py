@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from uuid import uuid4
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
@@ -6,13 +5,32 @@ from openai import OpenAI
 import os
 import json
 from pathlib import Path
+import sqlite3
+import re
 
 load_dotenv()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 client = OpenAI()
 
+DB_FILE = Path(__file__).parent / "narratives_data.db"
 NARRATIVES_FILE = Path(__file__).parent / "narratives.json"
-print("📖 Loading narratives from:", NARRATIVES_FILE.resolve())
+
+# allow access from multiple Flask threads
+conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+conn.row_factory = sqlite3.Row
+
+with conn:
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+      id          TEXT PRIMARY KEY,
+      narrative   TEXT,
+      parent      TEXT,
+      system      TEXT,
+      user        TEXT,
+      answer      TEXT,
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
 def load_narratives():
     try:
@@ -32,34 +50,19 @@ def save_narratives(list_of_dicts):
         print("❌ Failed to write narratives.json:", e)
 
 app = Flask(__name__)
-NARRATIVES = load_narratives()
-
-# --------------------------------------------------------------------
-# In‑memory store  ----------------------------------------------------
-MAX_HISTORY = 20000
-HISTORY: "OrderedDict[str, dict]" = OrderedDict()   # flat, but each dict has .narrative
+NARRATIVES = load_narratives() or [{"id":"default","title":"Default"}]
 # ────────────────────────────────────────────────────────────
 
 
 # helpers -------------------------------------------------------------
-def find_item(cid: str):
-    """O(1) lookup; returns None if missing."""
-    return HISTORY.get(cid)
-
 def add_record(narrative: str, sys_msg: str, usr_msg: str, answer: str):
     rid = str(uuid4())
-    if len(HISTORY) >= MAX_HISTORY:
-        HISTORY.popitem(last=False)
-    HISTORY[rid] = {
-        "id": rid,
-        "narrative": narrative,   # ← NEW
-        "parent": None,
-        "system": sys_msg,
-        "user": usr_msg,
-        "answer": answer,
-    }
+    with conn:  # opens a transaction and commits
+        conn.execute("""
+            INSERT INTO notes(id, narrative, parent, system, user, answer)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (rid, narrative, None, sys_msg, usr_msg, answer))
     return rid
-
 
 def ask(sys_msg: str, usr_msg: str) -> str:
     resp = client.chat.completions.create(
@@ -70,6 +73,12 @@ def ask(sys_msg: str, usr_msg: str) -> str:
         ],
     )
     return resp.choices[0].message.content
+
+def slugify(s: str) -> str:
+    """Turn a title into a URL‑friendly lowercase slug."""
+    s = s.lower()
+    s = re.sub(r'[^a-z0-9]+', '-', s)
+    return re.sub(r'^-+|-+$', '', s)
 
 # --------------------------------------------------------------------
 # Routes  -------------------------------------------------------------
@@ -84,44 +93,61 @@ def handle_ask():
 @app.route("/api/history", methods=["GET"])
 def get_history():
     narrative = request.args.get("narrative", "hindgut")
-    # keep insertion order but only those that match
-    items = [rec for rec in HISTORY.values() if rec["narrative"] == narrative]
-    return jsonify(items)
+    cur = conn.execute("""
+        SELECT id, narrative, parent, system, user, answer
+        FROM notes
+        WHERE narrative = ?
+        ORDER BY created_at
+    """, (narrative,))
+    rows = [dict(row) for row in cur.fetchall()]
+    return jsonify(rows)
+
 
 @app.route("/api/reparent", methods=["POST"])
 def reparent():
     data = request.get_json(force=True)
-    item = find_item(data.get("id", ""))
-    if not item:
-        return jsonify({"error": "id not found"}), 404
-    item["parent"] = data.get("parent")
-    return jsonify({"status": "ok"})
+    new_parent = data.get("parent")
+    with conn:
+        cur = conn.execute("UPDATE notes SET parent = ? WHERE id = ?", (new_parent, data["id"]))
+    if cur.rowcount == 0:
+        return jsonify({"error":"id not found"}), 404
+    return jsonify({"status":"ok"})
 
 @app.route("/api/delete", methods=["POST"])
 def delete():
     data = request.get_json(force=True)
-    cid = data.get("id", "")
-    victim = HISTORY.pop(cid, None)
-    if victim is None:
-        return jsonify({"error": "id not found"}), 404
-
-    # adopt its children
-    for rec in HISTORY.values():
-        if rec["parent"] == cid:
-            rec["parent"] = victim["parent"]
-
-    return jsonify({"status": "deleted"})  # 200 OK
+    cid = data.get("id","")
+    # first pull its parent so children can be re‑adopted
+    row = conn.execute("SELECT parent FROM notes WHERE id = ?", (cid,)).fetchone()
+    if not row:
+        return jsonify({"error":"id not found"}), 404
+    old_parent = row["parent"]
+    with conn:
+        # delete the node
+        conn.execute("DELETE FROM notes WHERE id = ?", (cid,))
+        # reparent its children
+        conn.execute("UPDATE notes SET parent = ? WHERE parent = ?", (old_parent, cid))
+    return jsonify({"status":"deleted"})
 
 @app.route("/api/edit", methods=["POST"])
 def edit():
     data = request.get_json(force=True)
-    item = find_item(data.get("id", ""))
-    if not item:
-        return jsonify({"error": "id not found"}), 404
-    for key in ("system", "user", "answer"):
+    fields = []
+    vals   = []
+    for key in ("system","user","answer"):
         if key in data:
-            item[key] = data[key]
-    return jsonify({"status": "edited"})
+            fields.append(f"{key} = ?")
+            vals.append(data[key])
+    if not fields:
+        return jsonify({"error":"nothing to update"}), 400
+    vals.append(data["id"])
+    with conn:
+        cur = conn.execute(f"""
+            UPDATE notes SET {','.join(fields)} WHERE id = ?
+        """, vals)
+    if cur.rowcount == 0:
+        return jsonify({"error":"id not found"}), 404
+    return jsonify({"status":"edited"})
 
 @app.route("/api/narratives", methods=["GET", "POST"])
 def manage_narratives():
@@ -130,17 +156,21 @@ def manage_narratives():
     if request.method == "GET":
         return jsonify(NARRATIVES)
 
-    data = request.get_json(force=True)
-    nid   = data.get("id")
-    title = data.get("title")
-    print(f"📬 POST /api/narratives → id={nid!r}, title={title!r}")
+    data  = request.get_json(force=True)
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"error":"Title is required"}), 400
 
-    if not nid or not title:
-        return jsonify({"error":"Both id and title are required"}), 400
-    if any(n["id"] == nid for n in NARRATIVES):
-        return jsonify({"error":"Narrative already exists"}), 409
+    base_id      = slugify(title)
+    unique_id    = base_id
+    existing_ids = {n["id"] for n in NARRATIVES}
+    suffix       = 1
+    # bump the slug until it's not already taken
+    while unique_id in existing_ids:
+        unique_id = f"{base_id}-{suffix}"
+        suffix += 1
 
-    new_item = {"id": nid, "title": title}
+    new_item = {"id": unique_id, "title": title}
     NARRATIVES.append(new_item)
 
     try:
