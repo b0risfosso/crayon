@@ -12,17 +12,24 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 client = OpenAI()
 
 NARRATIVES_FILE = Path(__file__).parent / "narratives.json"
+print("📖 Loading narratives from:", NARRATIVES_FILE.resolve())
 
 def load_narratives():
-    if not NARRATIVES_FILE.exists():
-        return []
-    with open(NARRATIVES_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        if NARRATIVES_FILE.exists():
+            with open(NARRATIVES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print("❌ Failed to load narratives.json:", e)
+    return []
 
 def save_narratives(list_of_dicts):
-    with open(NARRATIVES_FILE, "w", encoding="utf-8") as f:
-        # indent for readability
-        json.dump(list_of_dicts, f, ensure_ascii=False, indent=2)
+    try:
+        with open(NARRATIVES_FILE, "w", encoding="utf-8") as f:
+            json.dump(list_of_dicts, f, ensure_ascii=False, indent=2)
+        print("✅ narratives.json updated")
+    except Exception as e:
+        print("❌ Failed to write narratives.json:", e)
 
 app = Flask(__name__)
 NARRATIVES = load_narratives()
@@ -123,10 +130,10 @@ def manage_narratives():
     if request.method == "GET":
         return jsonify(NARRATIVES)
 
-    # POST → add new
     data = request.get_json(force=True)
     nid   = data.get("id")
     title = data.get("title")
+    print(f"📬 POST /api/narratives → id={nid!r}, title={title!r}")
 
     if not nid or not title:
         return jsonify({"error":"Both id and title are required"}), 400
@@ -135,5 +142,10 @@ def manage_narratives():
 
     new_item = {"id": nid, "title": title}
     NARRATIVES.append(new_item)
-    save_narratives(NARRATIVES)
+
+    try:
+        save_narratives(NARRATIVES)
+    except Exception:
+        return jsonify({"error":"Could not persist narratives"}), 500
+
     return jsonify(new_item), 201
