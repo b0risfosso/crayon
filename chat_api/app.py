@@ -13,26 +13,29 @@ app = Flask(__name__)
 
 # --------------------------------------------------------------------
 # In‑memory store  ----------------------------------------------------
-MAX_HISTORY = 200
-HISTORY: "OrderedDict[str, dict]" = OrderedDict()   # insertion‑ordered
+MAX_HISTORY = 20000
+HISTORY: "OrderedDict[str, dict]" = OrderedDict()   # flat, but each dict has .narrative
+# ────────────────────────────────────────────────────────────
 
 # helpers -------------------------------------------------------------
 def find_item(cid: str):
     """O(1) lookup; returns None if missing."""
     return HISTORY.get(cid)
 
-def add_record(sys_msg: str, usr_msg: str, answer: str):
+def add_record(narrative: str, sys_msg: str, usr_msg: str, answer: str):
     rid = str(uuid4())
-    if len(HISTORY) >= MAX_HISTORY:          # drop oldest
+    if len(HISTORY) >= MAX_HISTORY:
         HISTORY.popitem(last=False)
     HISTORY[rid] = {
         "id": rid,
-        "parent": None,        # root
+        "narrative": narrative,   # ← NEW
+        "parent": None,
         "system": sys_msg,
         "user": usr_msg,
         "answer": answer,
     }
     return rid
+
 
 def ask(sys_msg: str, usr_msg: str) -> str:
     resp = client.chat.completions.create(
@@ -49,14 +52,17 @@ def ask(sys_msg: str, usr_msg: str) -> str:
 @app.route("/api/ask", methods=["POST"])
 def handle_ask():
     data = request.get_json(force=True)
+    narrative = data.get("narrative", "hindgut")   # default or require it
     answer = ask(data.get("system", ""), data.get("user", ""))
-    add_record(data.get("system", ""), data.get("user", ""), answer)
+    add_record(narrative, data.get("system", ""), data.get("user", ""), answer)
     return jsonify({"answer": answer})
 
 @app.route("/api/history", methods=["GET"])
 def get_history():
-    # keep client contract: flat list, newest last (OrderedDict preserves order)
-    return jsonify(list(HISTORY.values()))
+    narrative = request.args.get("narrative", "hindgut")
+    # keep insertion order but only those that match
+    items = [rec for rec in HISTORY.values() if rec["narrative"] == narrative]
+    return jsonify(items)
 
 @app.route("/api/reparent", methods=["POST"])
 def reparent():
