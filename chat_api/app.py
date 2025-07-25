@@ -28,9 +28,12 @@ with conn:
       system      TEXT,
       user        TEXT,
       answer      TEXT,
+      x           REAL DEFAULT 0,
+      y           REAL DEFAULT 0,
       created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
     )
     """)
+
 
 def load_narratives():
     try:
@@ -94,13 +97,27 @@ def handle_ask():
 def get_history():
     narrative = request.args.get("narrative", "hindgut")
     cur = conn.execute("""
-        SELECT id, narrative, parent, system, user, answer
-        FROM notes
-        WHERE narrative = ?
-        ORDER BY created_at
+        SELECT id, narrative, parent, system, user, answer, x, y
+          FROM notes
+         WHERE narrative = ?
+      ORDER BY created_at
     """, (narrative,))
     rows = [dict(row) for row in cur.fetchall()]
     return jsonify(rows)
+
+@app.route("/api/positions", methods=["POST"])
+def update_positions():
+    data = request.get_json(force=True)
+    positions = data.get("positions", {})  # expect { id: {x:…, y:…}, … }
+
+    with conn:
+        for cid, coords in positions.items():
+            conn.execute(
+              "UPDATE notes SET x = ?, y = ? WHERE id = ?",
+              (coords.get("x", 0), coords.get("y", 0), cid)
+            )
+    return jsonify({"status":"ok"})
+
 
 
 @app.route("/api/reparent", methods=["POST"])

@@ -142,13 +142,17 @@ function buildTree(){
 }
 
 function render(){
-  board.innerHTML='';
-  const saved = JSON.parse(localStorage.getItem(lsKey('notePositions'))||'{}');
-  DATA.forEach((node,i)=>{
+  board.innerHTML = '';
+  DATA.forEach((node,i) => {
     const div = document.createElement('div');
-    div.className='note';
+    div.className = 'note';
     div.dataset.id = node.id;
-    const pos = saved[node.id] || {x: 80 + (i%4)*300, y: 80 + Math.floor(i/4)*220};
+
+    // position from DB, or fallback
+    const pos = (node.x != null && node.y != null)
+      ? { x: node.x, y: node.y }
+      : { x: 80 + (i%4)*300, y: 80 + Math.floor(i/4)*220 };
+
     div.style.left = pos.x + 'px';
     div.style.top  = pos.y + 'px';
 
@@ -168,7 +172,6 @@ function render(){
   enableDrag();
   enableCollapse();
 }
-
 
 
 // --- add near other globals ---
@@ -301,18 +304,29 @@ function screenToBoard(clientX, clientY){
 }
 
 // ---------- save / restore ----------
-function savePositions(){
-  const pos={};
-  document.querySelectorAll('.note').forEach(n=>{
-    pos[n.dataset.id]={
-      x:parseInt(n.style.left),
-      y:parseInt(n.style.top),
-      collapsed:n.classList.contains('collapsed')
+async function savePositions(){
+  const positions = {};
+  document.querySelectorAll('.note').forEach(n => {
+    positions[n.dataset.id] = {
+      x: parseFloat(n.style.left),
+      y: parseFloat(n.style.top)
     };
   });
-  localStorage.setItem(lsKey('notePositions'), JSON.stringify(pos));
-  flash('saved');
+
+  // send to server
+  try {
+    await fetch('/api/positions', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ positions })
+    });
+    flash('saved');
+  } catch (err) {
+    console.error("❌ failed to save positions:", err);
+    flash('error');
+  }
 }
+
 function resetPositions(){
   localStorage.removeItem(lsKey('notePositions'));
   render(); flash('reset');
@@ -331,6 +345,8 @@ function autoLayout(){
   localStorage.setItem(lsKey('notePositions'), JSON.stringify(pos));
   render(); flash('auto layout');
 }
+
+
 
 board.addEventListener('click', e=>{
   const n = e.target.closest('.note');
