@@ -72,35 +72,38 @@
   <div id="status" hidden></div>
 
 <script type="module">
-(async()=>{
-  // 1️⃣ Load the narratives registry
-  const NARRATIVES = await fetch('/api/narratives')
-    .then(r => r.ok ? r.json() : Promise.reject(r.statusText));
+  (async()=>{
+    // ── 1) Fetch the master list of narratives ────────────────────
+    const NARRATIVES = await fetch('/api/narratives')
+      .then(r=> r.ok ? r.json() : Promise.reject(r.statusText));
 
-  // 2️⃣ Get the current page from URL
-  const params       = new URLSearchParams(location.search);
-  const CURRENT_NARR = params.get('page') || NARRATIVES[0].id;
+    // ── 2) Derive current narrative from ?page=… ──────────────────
+    const params       = new URLSearchParams(location.search);
+    const CURRENT_NARR = params.get('page') || NARRATIVES[0].id;
 
-  // 3️⃣ Populate the dropdown
-  const sel = document.getElementById('narrativeSelect');
-  sel.innerHTML = '';
-  NARRATIVES.forEach(n=>{
-    const opt = document.createElement('option');
-    opt.value       = n.id;
-    opt.textContent = n.title;
-    sel.appendChild(opt);
-  });
-  sel.value = CURRENT_NARR;
+    // ── 3) Populate <select id="narrativeSelect"> ────────────────
+    const sel = document.getElementById('narrativeSelect');
+    sel.innerHTML = '';
+    NARRATIVES.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value       = n.id;
+      opt.textContent = n.title;
+      sel.appendChild(opt);
+    });
+    sel.value = CURRENT_NARR;
 
-  // 4️⃣ Navigate on change
-  sel.addEventListener('change', e=>{
-    const url = new URL(location.href);
-    url.searchParams.set('page', e.target.value);
-    location.href = url;
-  });
+    // ── 4) Switch pages on change ────────────────────────────────
+    sel.addEventListener('change', e=>{
+      const url = new URL(location.href);
+      url.searchParams.set('page', e.target.value);
+      location.href = url;
+    });
 
-  await loadData();
-})();
+    // ── 5) Now that CURRENT_NARR is set, fetch its notes ─────────
+    await loadData(CURRENT_NARR);
+
+    // ── Everything else (rendering, drag, pan, etc.) can now run ─
+  })();
 
 let DATA = [];
 const board      = document.getElementById('board');
@@ -109,10 +112,18 @@ const wrapper    = document.getElementById('board-wrapper');
 const zoomLabel  = document.getElementById('zoom-level');
 let scale = 1, origin = {x:0,y:0};
 const minScale = 0.2, maxScale = 2.5;
-
 let activeNote = null;
 
+async function loadData(narrative){
+  const r = await fetch(`/api/history?narrative=${encodeURIComponent(narrative)}`);
+  DATA = await r.json();
+  buildTree();
+}
 
+function lsKey(name){
+    // persist per narrative
+    return `${name}:${new URLSearchParams(location.search).get('page')}`;
+  }
 
 
 function slugify(str){
@@ -121,23 +132,6 @@ function slugify(str){
             .replace(/^-+|-+$/g,'');
 }
 
-populateDropdown(CURRENT_NARR);
-
-sel.addEventListener('change', e => {
-  const v = e.target.value;
-  const url = new URL(location.href);
-  url.searchParams.set('page', v);
-  location.href = url.toString();
-});
-
-
-async function loadData(){
-  const r = await fetch(`/api/history?narrative=${encodeURIComponent(CURRENT_NARR)}`);
-  DATA = await r.json();
-  buildTree();
-}
-
-function lsKey(name){ return `${name}:${CURRENT_NARR}`; }
 
 function buildTree(){
   const byId = Object.fromEntries(DATA.map(x=>[x.id,x]));
