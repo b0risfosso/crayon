@@ -104,59 +104,9 @@ function populateDropdown(currentId){
   div.textContent = '──────────';
   sel.appendChild(div);
 
-  // "new" option
-  const add = document.createElement('option');
-  add.value = '__new__';
-  add.textContent = '➕ New narrative…';
-  sel.appendChild(add);
-
   sel.value = currentId;
 }
-sel.addEventListener('change', e=>{
-  const v = e.target.value;
-  if(v === '__new__'){
-    newNarrativeFlow();
-    return;
-  }
-  // normal navigation
-  const url = new URL(location.href);
-  url.searchParams.set('page', v);
-  location.href = url.toString();
-});
 
-async function newNarrativeFlow(){
-  const title = prompt('Title for the new narrative page?');
-  if(!title){ sel.value = CURRENT_NARR; return; }
-
-  const id = slugify(title);
-  if(NARRATIVES.some(n=>n.id===id)){
-    alert('That ID already exists. Pick another title.');
-    sel.value = CURRENT_NARR;
-    return;
-  }
-
-  // ---- Server-backed version ----
-  // Tell backend to create & persist it (and maybe generate the HTML file)
-  try{
-    await fetch('/api/narratives', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ id, title })
-    });
-  }catch(e){
-    console.error(e);
-    alert('Failed to create narrative on server.');
-    sel.value = CURRENT_NARR;
-    return;
-  }
-
-  // Update local list & UI
-  NARRATIVES.push({ id, title });
-  populateDropdown(id);
-
-  // Jump to its page
-  location.href = `history.html?page=${encodeURIComponent(id)}`;
-}
 
 function slugify(str){
   return str.toLowerCase()
@@ -166,7 +116,12 @@ function slugify(str){
 
 populateDropdown(CURRENT_NARR);
 
-
+sel.addEventListener('change', e => {
+  const v = e.target.value;
+  const url = new URL(location.href);
+  url.searchParams.set('page', v);
+  location.href = url.toString();
+});
 
 
 async function loadData(){
