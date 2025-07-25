@@ -38,139 +38,140 @@
   <pre id="out">(waiting…)</pre>
 
 <script type="module">
-(async()=>{
-  // 1️⃣ Fetch the narratives from the server
-  const NARRATIVES = await fetch('/api/narratives')
-    .then(r => r.ok ? r.json() : Promise.reject(r.statusText));
-
-  // 2️⃣ Grab elements & URL param
-  const params  = new URLSearchParams(location.search);
-  const initial = params.get('page') || NARRATIVES[0].id;
-  const sel     = document.getElementById('targetPage');
-
-  // 3️⃣ Populate the <select>
-  sel.innerHTML = '';
-  NARRATIVES.forEach(n=>{
-    const opt = document.createElement('option');
-    opt.value   = n.id;
-    opt.textContent = n.title;
-    sel.appendChild(opt);
-  });
-
-  const divider = document.createElement('option');
-  divider.disabled = true;
-  divider.textContent = '──────────';
-  sel.appendChild(divider);
-
-  const addOpt = document.createElement('option');
-  addOpt.value       = '__new__';
-  addOpt.textContent = '➕ New narrative…';
-  sel.appendChild(addOpt);
-
-  // 4️⃣ Set initial value and hook “new” flow
-  sel.value = initial;
-  sel.addEventListener('change', e=>{
-    if(e.target.value === '__new__') return newNarrativeFlow();
-  });
-
-  sel.value = initial;
-  sel.addEventListener('change', e=>{
-    if(e.target.value === '__new__') return newNarrativeFlow();
-  });
-
-  // 5️⃣ Hook the send button (sendPrompt can reference sel.value)
-  document.getElementById('send').onclick = sendPrompt;
-})()
- 
-
-/* ---------- 3. Send prompt ---------- */
-async function sendPrompt(){
-  const btn = document.getElementById('send');
-  const out = document.getElementById('out');
-  btn.disabled = true;
-  out.textContent = 'Thinking…';
-
-  const payload = {
-    system    : document.getElementById('sys').value,
-    user      : document.getElementById('usr').value,
-    narrative : sel.value
-  };
-
-  try{
-    const res  = await fetch('/api/ask', {
-      method :'POST',
-      headers:{'Content-Type':'application/json'},
-      body   : JSON.stringify(payload)
+  (async ()=>{
+    // ─── 1️⃣ Fetch narratives from server ───────────────────────
+    const NARRATIVES = await fetch('/api/narratives')
+      .then(r => r.ok ? r.json() : Promise.reject(r.statusText));
+  
+    // ─── 2️⃣ Grab URL param & <select> element ──────────────────
+    const params  = new URLSearchParams(location.search);
+    const initial = params.get('page') || NARRATIVES[0].id;
+    const sel     = document.getElementById('targetPage');
+  
+    // ─── 3️⃣ Populate the dropdown ─────────────────────────────
+    sel.innerHTML = '';
+    NARRATIVES.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value       = n.id;
+      opt.textContent = n.title;
+      sel.appendChild(opt);
     });
-    if(!res.ok){
-      const text = await res.text();
-      throw new Error(`HTTP ${res.status}\n${text.slice(0,200)}`);
+  
+    // divider
+    const divider = document.createElement('option');
+    divider.disabled    = true;
+    divider.textContent = '──────────';
+    sel.appendChild(divider);
+  
+    // “new narrative” option
+    const addOpt = document.createElement('option');
+    addOpt.value       = '__new__';
+    addOpt.textContent = '➕ New narrative…';
+    sel.appendChild(addOpt);
+  
+    // ─── 4️⃣ Set initial selection & hook new‑narrative flow ────
+    sel.value = initial;
+    sel.addEventListener('change', e => {
+      if (e.target.value === '__new__') {
+        return newNarrativeFlow();
+      }
+    });
+  
+    // ─── 5️⃣ Hook the “Ask” button ─────────────────────────────
+    document.getElementById('send').addEventListener('click', sendPrompt);
+  
+  
+    // ─────────────────────────────────────────────────────────────
+    // All functions below live inside this IIFE so they close over
+    // `sel`, `NARRATIVES`, and `initial`.
+    // ─────────────────────────────────────────────────────────────
+  
+    async function sendPrompt(){
+      const btn = document.getElementById('send');
+      const out = document.getElementById('out');
+      btn.disabled   = true;
+      out.textContent = 'Thinking…';
+  
+      const payload = {
+        system    : document.getElementById('sys').value,
+        user      : document.getElementById('usr').value,
+        narrative : sel.value
+      };
+  
+      try {
+        const res = await fetch('/api/ask', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}\n${txt.slice(0,200)}`);
+        }
+        const data = await res.json();
+        out.textContent = data.answer ?? '(no answer field)';
+      } catch(err) {
+        out.textContent = 'Error – see console';
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+      }
     }
-    const data = await res.json();
-    out.textContent = data.answer ?? '(no answer field)';
-
-    // OPTIONAL: jump to that narrative's history right after
-    // location.href = `history.html?page=${encodeURIComponent(sel.value)}`;
-
-  }catch(err){
-    out.textContent = 'Error – see console';
-    console.error(err);
-  }finally{
-    btn.disabled = false;
-  }
-}
-
-document.getElementById('send').onclick = sendPrompt;
-
-/* ---------- 4. New‑narrative flow ---------- */
-async function newNarrativeFlow(){
-  const title = prompt('Title for the new narrative page?');
-  if (!title) { sel.value = initial; return; }
-
-  // make an ID
-  const id = slugify(title);
-  if (NARRATIVES.some(n=>n.id===id)){
-    alert('That ID already exists.');
-    sel.value = initial;
-    return;
-  }
-
-  // tell server to persist it
-  try {
-    await fetch('/api/narratives', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ id, title })
-    });
-  } catch(err) {
-    console.error(err);
-    alert('Failed to create narrative.');
-    sel.value = initial;
-    return;
-  }
-
-  // update local list + UI
-  NARRATIVES.push({id, title});
-  // clear & repopulate
-  sel.innerHTML = '';
-  NARRATIVES.forEach(n=>{
-    const o = document.createElement('option');
-    o.value=n.id; o.textContent=n.title;
-    sel.appendChild(o);
-  });
-  sel.appendChild(divider);
-  sel.appendChild(addOpt);
-  sel.value = id;
-
-  // redirect to its history
-  location.href = `history.html?page=${encodeURIComponent(id)}`;
-}
-
-function slugify(str){
-  return str.toLowerCase()
-            .replace(/[^a-z0-9]+/g,'-')
-            .replace(/^-+|-+$/g,'');
-}
-</script>
+  
+    async function newNarrativeFlow(){
+      const title = prompt('Title for the new narrative page?');
+      if (!title) {
+        sel.value = initial;
+        return;
+      }
+  
+      const id = slugify(title);
+      if (NARRATIVES.some(n => n.id === id)) {
+        alert('That ID already exists.');
+        sel.value = initial;
+        return;
+      }
+  
+      // persist on the server
+      try {
+        const res = await fetch('/api/narratives', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ id, title })
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}\n${txt}`);
+        }
+        // add the real object (may include more fields later)
+        NARRATIVES.push(await res.json());
+      } catch(err) {
+        console.error(err);
+        alert('Failed to create narrative.');
+        sel.value = initial;
+        return;
+      }
+  
+      // rebuild dropdown and re‑select new one
+      sel.innerHTML = '';
+      NARRATIVES.forEach(n =>{
+        const o = document.createElement('option');
+        o.value = n.id; o.textContent = n.title;
+        sel.appendChild(o);
+      });
+      sel.appendChild(divider);
+      sel.appendChild(addOpt);
+      sel.value = id;
+    }
+  
+    function slugify(str){
+      return str.toLowerCase()
+        .replace(/[^a-z0-9]+/g,'-')
+        .replace(/^-+|-+$/g,'');
+    }
+  
+  })();  // end async IIFE
+  </script>
+    
 </body>
 </html>
