@@ -4,18 +4,35 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from openai import OpenAI
 import os
+import json
+from pathlib import Path
 
 load_dotenv()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 client = OpenAI()
 
+NARRATIVES_FILE = Path(__file__).parent / "narratives.json"
+
+def load_narratives():
+    if not NARRATIVES_FILE.exists():
+        return []
+    with open(NARRATIVES_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_narratives(list_of_dicts):
+    with open(NARRATIVES_FILE, "w", encoding="utf-8") as f:
+        # indent for readability
+        json.dump(list_of_dicts, f, ensure_ascii=False, indent=2)
+
 app = Flask(__name__)
+NARRATIVES = load_narratives()
 
 # --------------------------------------------------------------------
 # In‑memory store  ----------------------------------------------------
 MAX_HISTORY = 20000
 HISTORY: "OrderedDict[str, dict]" = OrderedDict()   # flat, but each dict has .narrative
 # ────────────────────────────────────────────────────────────
+
 
 # helpers -------------------------------------------------------------
 def find_item(cid: str):
@@ -98,3 +115,25 @@ def edit():
         if key in data:
             item[key] = data[key]
     return jsonify({"status": "edited"})
+
+@app.route("/api/narratives", methods=["GET", "POST"])
+def manage_narratives():
+    global NARRATIVES
+
+    if request.method == "GET":
+        return jsonify(NARRATIVES)
+
+    # POST → add new
+    data = request.get_json(force=True)
+    nid   = data.get("id")
+    title = data.get("title")
+
+    if not nid or not title:
+        return jsonify({"error":"Both id and title are required"}), 400
+    if any(n["id"] == nid for n in NARRATIVES):
+        return jsonify({"error":"Narrative already exists"}), 409
+
+    new_item = {"id": nid, "title": title}
+    NARRATIVES.append(new_item)
+    save_narratives(NARRATIVES)
+    return jsonify(new_item), 201
