@@ -52,7 +52,26 @@ NARRATIVES.forEach(n=>{
   opt.textContent = n.title;
   sel.appendChild(opt);
 });
+
+// add divider
+const divider = document.createElement('option');
+divider.disabled = true;
+divider.textContent = '──────────';
+sel.appendChild(divider);
+// add “new narrative” option
+const addOpt = document.createElement('option');
+addOpt.value = '__new__';
+addOpt.textContent = '➕ New narrative…';
+sel.appendChild(addOpt);
+
 sel.value = initial;
+
+
+// if user picks “new”, run our creation flow
+sel.addEventListener('change', e => {
+  if (e.target.value === '__new__') newNarrativeFlow();
+});
+ 
 
 /* ---------- 3. Send prompt ---------- */
 async function sendPrompt(){
@@ -92,6 +111,56 @@ async function sendPrompt(){
 }
 
 document.getElementById('send').onclick = sendPrompt;
+
+/* ---------- 4. New‑narrative flow ---------- */
+async function newNarrativeFlow(){
+  const title = prompt('Title for the new narrative page?');
+  if (!title) { sel.value = initial; return; }
+
+  // make an ID
+  const id = slugify(title);
+  if (NARRATIVES.some(n=>n.id===id)){
+    alert('That ID already exists.');
+    sel.value = initial;
+    return;
+  }
+
+  // tell server to persist it
+  try {
+    await fetch('/api/narratives', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id, title })
+    });
+  } catch(err) {
+    console.error(err);
+    alert('Failed to create narrative.');
+    sel.value = initial;
+    return;
+  }
+
+  // update local list + UI
+  NARRATIVES.push({id, title});
+  // clear & repopulate
+  sel.innerHTML = '';
+  NARRATIVES.forEach(n=>{
+    const o = document.createElement('option');
+    o.value=n.id; o.textContent=n.title;
+    sel.appendChild(o);
+  });
+  sel.appendChild(divider);
+  sel.appendChild(addOpt);
+  sel.value = id;
+
+  // redirect to its history
+  location.href = `history.html?page=${encodeURIComponent(id)}`;
+}
+
+function slugify(str){
+  return str.toLowerCase()
+            .replace(/[^a-z0-9]+/g,'-')
+            .replace(/^-+|-+$/g,'');
+}
 </script>
 </body>
 </html>
