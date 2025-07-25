@@ -72,6 +72,36 @@
   <div id="status" hidden></div>
 
 <script type="module">
+(async()=>{
+  // 1️⃣ Load the narratives registry
+  const NARRATIVES = await fetch('/api/narratives')
+    .then(r => r.ok ? r.json() : Promise.reject(r.statusText));
+
+  // 2️⃣ Get the current page from URL
+  const params       = new URLSearchParams(location.search);
+  const CURRENT_NARR = params.get('page') || NARRATIVES[0].id;
+
+  // 3️⃣ Populate the dropdown
+  const sel = document.getElementById('narrativeSelect');
+  sel.innerHTML = '';
+  NARRATIVES.forEach(n=>{
+    const opt = document.createElement('option');
+    opt.value       = n.id;
+    opt.textContent = n.title;
+    sel.appendChild(opt);
+  });
+  sel.value = CURRENT_NARR;
+
+  // 4️⃣ Navigate on change
+  sel.addEventListener('change', e=>{
+    const url = new URL(location.href);
+    url.searchParams.set('page', e.target.value);
+    location.href = url;
+  });
+
+  await loadData();
+})();
+
 let DATA = [];
 const board      = document.getElementById('board');
 const edgesSvg   = document.getElementById('edges');
@@ -82,30 +112,7 @@ const minScale = 0.2, maxScale = 2.5;
 
 let activeNote = null;
 
-import { NARRATIVES } from './assets/narratives.js';
 
-const params = new URLSearchParams(location.search);
-let CURRENT_NARR = params.get('page') || 'hindgut'; // default
-
-// populate dropdown
-const sel = document.getElementById('narrativeSelect');
-function populateDropdown(currentId){
-  sel.innerHTML = '';
-  NARRATIVES.forEach(n=>{
-    const opt = document.createElement('option');
-    opt.value = n.id;
-    opt.textContent = n.title;
-    sel.appendChild(opt);
-  });
-
-  // divider (optional)
-  const div = document.createElement('option');
-  div.disabled = true;
-  div.textContent = '──────────';
-  sel.appendChild(div);
-
-  sel.value = currentId;
-}
 
 
 function slugify(str){

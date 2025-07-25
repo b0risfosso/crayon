@@ -38,39 +38,49 @@
   <pre id="out">(waiting…)</pre>
 
 <script type="module">
-/* ---------- 1. Declare or import narratives ---------- */
-import { NARRATIVES } from './assets/narratives.js';
+(async()=>{
+  // 1️⃣ Fetch the narratives from the server
+  const NARRATIVES = await fetch('/api/narratives')
+    .then(r => r.ok ? r.json() : Promise.reject(r.statusText));
 
-/* ---------- 2. Populate dropdown & default from URL ---------- */
-const params = new URLSearchParams(location.search);
-const initial = params.get('page') || NARRATIVES[0].id;
+  // 2️⃣ Grab elements & URL param
+  const params  = new URLSearchParams(location.search);
+  const initial = params.get('page') || NARRATIVES[0].id;
+  const sel     = document.getElementById('targetPage');
 
-const sel = document.getElementById('targetPage');
-NARRATIVES.forEach(n=>{
-  const opt = document.createElement('option');
-  opt.value = n.id;
-  opt.textContent = n.title;
-  sel.appendChild(opt);
-});
+  // 3️⃣ Populate the <select>
+  sel.innerHTML = '';
+  NARRATIVES.forEach(n=>{
+    const opt = document.createElement('option');
+    opt.value   = n.id;
+    opt.textContent = n.title;
+    sel.appendChild(opt);
+  });
 
-// add divider
-const divider = document.createElement('option');
-divider.disabled = true;
-divider.textContent = '──────────';
-sel.appendChild(divider);
-// add “new narrative” option
-const addOpt = document.createElement('option');
-addOpt.value = '__new__';
-addOpt.textContent = '➕ New narrative…';
-sel.appendChild(addOpt);
+  const divider = document.createElement('option');
+  divider.disabled = true;
+  divider.textContent = '──────────';
+  sel.appendChild(divider);
 
-sel.value = initial;
+  const addOpt = document.createElement('option');
+  addOpt.value       = '__new__';
+  addOpt.textContent = '➕ New narrative…';
+  sel.appendChild(addOpt);
 
+  // 4️⃣ Set initial value and hook “new” flow
+  sel.value = initial;
+  sel.addEventListener('change', e=>{
+    if(e.target.value === '__new__') return newNarrativeFlow();
+  });
 
-// if user picks “new”, run our creation flow
-sel.addEventListener('change', e => {
-  if (e.target.value === '__new__') newNarrativeFlow();
-});
+  sel.value = initial;
+  sel.addEventListener('change', e=>{
+    if(e.target.value === '__new__') return newNarrativeFlow();
+  });
+
+  // 5️⃣ Hook the send button (sendPrompt can reference sel.value)
+  document.getElementById('send').onclick = sendPrompt;
+})()
  
 
 /* ---------- 3. Send prompt ---------- */
