@@ -9,7 +9,8 @@ import sqlite3
 import re
 
 load_dotenv()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+#OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16")
 client = OpenAI()
 
 DB_FILE = Path(__file__).parent / "narratives_data.db"
