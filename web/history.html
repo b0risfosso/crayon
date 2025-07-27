@@ -29,7 +29,25 @@
     .note-header{font-weight:600;margin-bottom:6px;font-size:14px;cursor:pointer;}
     .note.collapsed .note-body{display:none;}
     .note.active{ box-shadow:0 0 0 3px #4aa3ff66; }
-    .note-body{white-space:pre-wrap;font-size:13px;line-height:1.25;max-height:400px;overflow:auto;}
+    /* existing rule … */
+    .note-body{
+      white-space:pre-wrap;
+      font-size:13px;
+      line-height:1.25;
+      max-height:400px;
+      overflow:auto;
+
+      /* NEW ↓ */
+      user-select:text;   /* allow normal text selection */
+      cursor:text;        /* I‑beam instead of the grab hand */
+    }
+
+    /* optional: customise the highlight colour */
+    .note-body::selection{
+      background:#b3d4ff;   /* any colour you like */
+      color:#000;
+    }
+
     .note-actions{position:absolute;right:6px;bottom:4px;font-size:11px;color:#333;}
     .note-actions button{background:none;border:none;padding:0 4px;cursor:pointer;color:#333}
     .note-actions button:hover{text-decoration:underline;}
@@ -229,17 +247,24 @@ function enableDrag(){
   });
 }
 function startDrag(e){
-  if(e.target.closest('.note-actions')) return;
+  // do nothing if the click began in the body (where the text lives)
+  if (e.target.closest('.note-body') || e.target.closest('.note-actions')) return;
+
   e.preventDefault();
-  const el=e.currentTarget;
+  const el = e.currentTarget;
   const pt = pointerPos(e);
-  dragState={el, offX:pt.x-parseInt(el.style.left), offY:pt.y-parseInt(el.style.top)};
+  dragState = {
+    el,
+    offX: pt.x - parseInt(el.style.left,10),
+    offY: pt.y - parseInt(el.style.top ,10)
+  };
   el.classList.add('dragging');
   window.addEventListener('mousemove', onDrag);
-  window.addEventListener('mouseup', endDrag);
+  window.addEventListener('mouseup',   endDrag);
   window.addEventListener('touchmove', onDrag, {passive:false});
-  window.addEventListener('touchend', endDrag);
+  window.addEventListener('touchend',  endDrag);
 }
+
 function onDrag(e){
   if(!dragState) return;
   e.preventDefault();
