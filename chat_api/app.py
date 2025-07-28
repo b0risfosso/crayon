@@ -31,9 +31,11 @@ with conn:
       answer      TEXT,
       x           REAL DEFAULT 0,
       y           REAL DEFAULT 0,
+      is_protocol INTEGER DEFAULT 0,        -- ⬅︎ NEW
       created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
     )
     """)
+
 
 SYSTEM_PROMPT = (
     "You are “Narrative‑to‑Protocol Designer,” an expert experimentalist.\n"
@@ -84,14 +86,18 @@ def save_narratives(list_of_dicts):
         print("❌ Failed to write narratives.json:", e)
 
 
-def add_record(narrative: str, sys_msg: str, usr_msg: str, answer: str):
+def add_record(narrative, sys_msg, usr_msg, answer,
+               parent=None, is_protocol=False):
     rid = str(uuid4())
-    with conn:  # opens a transaction and commits
+    with conn:
         conn.execute("""
-            INSERT INTO notes(id, narrative, parent, system, user, answer)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (rid, narrative, None, sys_msg, usr_msg, answer))
+            INSERT INTO notes(id, narrative, parent, system,
+                              user, answer, is_protocol)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (rid, narrative, parent, sys_msg,
+              usr_msg, answer, int(is_protocol)))
     return rid
+
 
 def ask(sys_msg: str, usr_msg: str) -> str:
     resp = client.chat.completions.create(
