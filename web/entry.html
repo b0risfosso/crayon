@@ -18,6 +18,10 @@
     .banner details[open]{border-color:var(--accent);}  
     .banner .content{padding:0 18px 18px;font-size:14px;line-height:1.4;white-space:pre-wrap;}
 
+    /* execute button */
+    #executeBtn{margin-bottom:26px;padding:10px 22px;font-size:15px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;}
+    #executeBtn[disabled]{opacity:.5;cursor:default;}
+
     /* create form */
     form#createForm{background:var(--card);border:1px solid #ccc;border-radius:10px;padding:20px;margin-bottom:36px;box-shadow:0 2px 6px rgba(0,0,0,.05);} 
     textarea{width:100%;min-height:110px;font-family:inherit;font-size:14px;padding:10px;border:1px solid #bbb;border-radius:6px;resize:vertical;}
@@ -25,6 +29,7 @@
 
     /* sub‑note list */
     .note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;padding:14px 18px;box-shadow:0 1px 4px rgba(0,0,0,.04);white-space:pre-wrap;line-height:1.35;font-size:14px;}
+    .note.protocol{border-color:var(--accent);}  
     #status{text-align:center;margin-top:60px;font-size:1rem;color:#666;}
   </style>
 </head>
@@ -35,6 +40,8 @@
   </header>
   <main>
     <section class="banner" id="narrativeBanner"></section>
+
+    <button id="executeBtn">Execute</button>
 
     <form id="createForm">
       <h3 style="margin-top:0">Add a sub‑note</h3>
@@ -55,6 +62,7 @@
     const banner   = document.getElementById('narrativeBanner');
     const notesWrap= document.getElementById('notesContainer');
     const heading  = document.getElementById('heading');
+    const execBtn  = document.getElementById('executeBtn');
 
     init();
 
@@ -71,8 +79,8 @@
       heading.textContent = n.user.slice(0,60);
       banner.innerHTML = '';
 
-      banner.appendChild(makeDetails('Prompt', n.user, /*open*/ false));
-      banner.appendChild(makeDetails('Narrative', n.answer, /*open*/ true));
+      banner.appendChild(makeDetails('Prompt', n.user, false));
+      banner.appendChild(makeDetails('Narrative', n.answer, true));
     }
 
     function makeDetails(title, text, open){
@@ -93,7 +101,7 @@
       if(!data.length){notesWrap.innerHTML='<div id="status">No sub‑notes yet.</div>';return;}
       data.forEach(d=>{
         const div=document.createElement('div');
-        div.className='note';
+        div.className='note'+(d.is_protocol?' protocol':'');
         div.textContent=d.content;
         notesWrap.appendChild(div);
       });
@@ -116,6 +124,28 @@
       }catch(err){alert('Failed to save');console.error(err);}finally{btn.disabled=false;}
     });
 
+    // execute button -> call LLM protocol generation
+    execBtn.addEventListener('click', async ()=>{
+      execBtn.disabled = true;
+      execBtn.textContent = 'Running…';
+      try{
+        const res = await fetch('/api/execute',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:ID})
+        });
+        const j = await res.json();
+        if(!res.ok){throw new Error(j.error||'failed');}
+        // prepend protocol note
+        const div=document.createElement('div');
+        div.className='note protocol';
+        div.textContent=j.protocol;
+        notesWrap.prepend(div);
+      }catch(err){alert('Execution failed');console.error(err);}finally{
+        execBtn.disabled=false;
+        execBtn.textContent='Execute';
+      }
+    });
+
     async function fetchJson(url){
       const r = await fetch(url);
       if(!r.ok) throw new Error(r.statusText);
@@ -124,4 +154,5 @@
   </script>
 </body>
 </html>
+
 
