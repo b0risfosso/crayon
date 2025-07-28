@@ -9,7 +9,7 @@ import sqlite3
 import re
 
 load_dotenv()
-#OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+# OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16")
 client = OpenAI()
 
@@ -21,7 +21,8 @@ conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 conn.row_factory = sqlite3.Row
 
 with conn:
-    conn.execute("""
+    conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS notes (
       id          TEXT PRIMARY KEY,
       narrative   TEXT,
@@ -33,7 +34,8 @@ with conn:
       y           REAL DEFAULT 0,
       created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
     )
-    """)
+    """
+    )
 
 
 def load_narratives():
@@ -45,6 +47,7 @@ def load_narratives():
         print("❌ Failed to load narratives.json:", e)
     return []
 
+
 def save_narratives(list_of_dicts):
     try:
         with open(NARRATIVES_FILE, "w", encoding="utf-8") as f:
@@ -53,58 +56,73 @@ def save_narratives(list_of_dicts):
     except Exception as e:
         print("❌ Failed to write narratives.json:", e)
 
+
 app = Flask(__name__)
-NARRATIVES = load_narratives() or [{"id":"default","title":"Default"}]
+NARRATIVES = load_narratives() or [{"id": "default", "title": "Default"}]
+
 # ────────────────────────────────────────────────────────────
-
-
 # helpers -------------------------------------------------------------
-def add_record(narrative: str, sys_msg: str, usr_msg: str, answer: str):
+
+def add_record(narrative: str, sys_msg: str, usr_msg: str, answer: str, parent: str | None = None):
+    """Insert a note and return its id."""
     rid = str(uuid4())
     with conn:  # opens a transaction and commits
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO notes(id, narrative, parent, system, user, answer)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (rid, narrative, None, sys_msg, usr_msg, answer))
+        """,
+            (rid, narrative, parent, sys_msg, usr_msg, answer),
+        )
     return rid
+
 
 def ask(sys_msg: str, usr_msg: str) -> str:
     resp = client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=[
             {"role": "system", "content": sys_msg},
-            {"role": "user",   "content": usr_msg},
+            {"role": "user", "content": usr_msg},
         ],
     )
     return resp.choices[0].message.content
 
+
 def slugify(s: str) -> str:
     """Turn a title into a URL‑friendly lowercase slug."""
     s = s.lower()
-    s = re.sub(r'[^a-z0-9]+', '-', s)
-    return re.sub(r'^-+|-+$', '', s)
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return re.sub(r"^-+|-+$", "", s)
+
 
 # --------------------------------------------------------------------
 # Routes  -------------------------------------------------------------
+
+
 @app.route("/api/ask", methods=["POST"])
 def handle_ask():
     data = request.get_json(force=True)
-    narrative = data.get("narrative", "hindgut")   # default or require it
+    narrative = data.get("narrative", "hindgut")  # default or require it
     answer = ask(data.get("system", ""), data.get("user", ""))
     add_record(narrative, data.get("system", ""), data.get("user", ""), answer)
     return jsonify({"answer": answer})
 
+
 @app.route("/api/history", methods=["GET"])
 def get_history():
     narrative = request.args.get("narrative", "hindgut")
-    cur = conn.execute("""
+    cur = conn.execute(
+        """
         SELECT id, narrative, parent, system, user, answer, x, y
           FROM notes
-         WHERE narrative = ?
+         WHERE narrative = ? AND parent IS NULL
       ORDER BY created_at
-    """, (narrative,))
+    """,
+        (narrative,),
+    )
     rows = [dict(row) for row in cur.fetchall()]
     return jsonify(rows)
+
 
 @app.route("/api/positions", methods=["POST"])
 def update_positions():
@@ -114,11 +132,10 @@ def update_positions():
     with conn:
         for cid, coords in positions.items():
             conn.execute(
-              "UPDATE notes SET x = ?, y = ? WHERE id = ?",
-              (coords.get("x", 0), coords.get("y", 0), cid)
+                "UPDATE notes SET x = ?, y = ? WHERE id = ?",
+                (coords.get("x", 0), coords.get("y", 0), cid),
             )
-    return jsonify({"status":"ok"})
-
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/reparent", methods=["POST"])
@@ -128,44 +145,50 @@ def reparent():
     with conn:
         cur = conn.execute("UPDATE notes SET parent = ? WHERE id = ?", (new_parent, data["id"]))
     if cur.rowcount == 0:
-        return jsonify({"error":"id not found"}), 404
-    return jsonify({"status":"ok"})
+        return jsonify({"error": "id not found"}), 404
+    return jsonify({"status": "ok"})
+
 
 @app.route("/api/delete", methods=["POST"])
 def delete():
     data = request.get_json(force=True)
-    cid = data.get("id","")
+    cid = data.get("id", "")
     # first pull its parent so children can be re‑adopted
     row = conn.execute("SELECT parent FROM notes WHERE id = ?", (cid,)).fetchone()
     if not row:
-        return jsonify({"error":"id not found"}), 404
+        return jsonify({"error": "id not found"}), 404
     old_parent = row["parent"]
     with conn:
         # delete the node
         conn.execute("DELETE FROM notes WHERE id = ?", (cid,))
         # reparent its children
         conn.execute("UPDATE notes SET parent = ? WHERE parent = ?", (old_parent, cid))
-    return jsonify({"status":"deleted"})
+    return jsonify({"status": "deleted"})
+
 
 @app.route("/api/edit", methods=["POST"])
 def edit():
     data = request.get_json(force=True)
     fields = []
-    vals   = []
-    for key in ("system","user","answer"):
+    vals = []
+    for key in ("system", "user", "answer"):
         if key in data:
             fields.append(f"{key} = ?")
             vals.append(data[key])
     if not fields:
-        return jsonify({"error":"nothing to update"}), 400
+        return jsonify({"error": "nothing to update"}), 400
     vals.append(data["id"])
     with conn:
-        cur = conn.execute(f"""
+        cur = conn.execute(
+            f"""
             UPDATE notes SET {','.join(fields)} WHERE id = ?
-        """, vals)
+        """,
+            vals,
+        )
     if cur.rowcount == 0:
-        return jsonify({"error":"id not found"}), 404
-    return jsonify({"status":"edited"})
+        return jsonify({"error": "id not found"}), 404
+    return jsonify({"status": "edited"})
+
 
 @app.route("/api/narratives", methods=["GET", "POST"])
 def manage_narratives():
@@ -174,15 +197,15 @@ def manage_narratives():
     if request.method == "GET":
         return jsonify(NARRATIVES)
 
-    data  = request.get_json(force=True)
+    data = request.get_json(force=True)
     title = data.get("title", "").strip()
     if not title:
-        return jsonify({"error":"Title is required"}), 400
+        return jsonify({"error": "Title is required"}), 400
 
-    base_id      = slugify(title)
-    unique_id    = base_id
+    base_id = slugify(title)
+    unique_id = base_id
     existing_ids = {n["id"] for n in NARRATIVES}
-    suffix       = 1
+    suffix = 1
     # bump the slug until it's not already taken
     while unique_id in existing_ids:
         unique_id = f"{base_id}-{suffix}"
@@ -194,6 +217,57 @@ def manage_narratives():
     try:
         save_narratives(NARRATIVES)
     except Exception:
-        return jsonify({"error":"Could not persist narratives"}), 500
+        return jsonify({"error": "Could not persist narratives"}), 500
 
     return jsonify(new_item), 201
+
+
+# ────────────────────────────────────────────────────────────
+# New endpoints for entry.html
+# --------------------------------------------------------------------
+
+@app.route("/api/note", methods=["GET"])
+def get_single_note():
+    nid = request.args.get("id")
+    if not nid:
+        return jsonify({"error": "id parameter is required"}), 400
+    row = conn.execute(
+        "SELECT id, narrative, parent, system, user, answer, x, y, created_at FROM notes WHERE id = ?",
+        (nid,),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(dict(row))
+
+
+@app.route("/api/subnotes", methods=["GET", "POST"])
+def handle_subnotes():
+    if request.method == "GET":
+        parent = request.args.get("parent")
+        if not parent:
+            return jsonify({"error": "parent parameter is required"}), 400
+        cur = conn.execute(
+            "SELECT id, answer AS content, created_at FROM notes WHERE parent = ? ORDER BY created_at",
+            (parent,),
+        )
+        rows = [dict(row) for row in cur.fetchall()]
+        return jsonify(rows)
+
+    # POST -> create new sub‑note
+    data = request.get_json(force=True)
+    parent = data.get("parent")
+    content = data.get("content", "").strip()
+    if not parent or not content:
+        return jsonify({"error": "parent and content are required"}), 400
+
+    prow = conn.execute("SELECT narrative FROM notes WHERE id = ?", (parent,)).fetchone()
+    if not prow:
+        return jsonify({"error": "parent not found"}), 404
+    narrative = prow["narrative"]
+
+    rid = add_record(narrative, "", "", content, parent=parent)
+    return jsonify({"id": rid}), 201
+
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
