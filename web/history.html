@@ -1,539 +1,168 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Narratives</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <title>Fantasiagenesis — Narratives</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     :root{
-      --bg:#f5f5f5; --note:#fff8a6; --note-border:#d4c96b; --line:#888;
-      --font: system-ui, sans-serif;
+      --bg:#f5f5f5;
+      --card:#ffffff;
+      --accent:#4aa3ff;
     }
-    html,body{height:100%;margin:0;background:var(--bg);font-family:var(--font);}    
-    body{display:flex;flex-direction:column;}
-    nav{padding:8px 16px;background:#222;color:#eee;font-size:14px}
-    nav a{color:#9fd3ff;margin-right:12px;text-decoration:none}
-
-    /* the whole infinite board is inside a pan/zoom viewport */
-    #viewport{position:relative;flex:1;overflow:hidden;background:var(--bg);}
-    #board-wrapper{position:absolute;inset:0;transform-origin:0 0;}
-    #board{position:relative;min-height:2000px;min-width:2000px;}
-
-    .note{
-      position:absolute;width:260px;min-height:120px;box-sizing:border-box;
-      background:var(--note);border:2px solid var(--note-border);border-radius:6px;
-      box-shadow:0 3px 6px rgba(0,0,0,.2);padding:8px 8px 28px 8px;cursor:grab;user-select:none;
-      transition:height .15s ease;
+    html,body{
+      margin:0;
+      font-family:system-ui,sans-serif;
+      background:var(--bg);
     }
-    .note.dragging{opacity:.85;cursor:grabbing;box-shadow:0 8px 16px rgba(0,0,0,.35);}    
-    .note-header{font-weight:600;margin-bottom:6px;font-size:14px;cursor:pointer;}
-    .note.collapsed .note-body{display:none;}
-    .note.active{ box-shadow:0 0 0 3px #4aa3ff66; }
-    /* existing rule … */
+    /* top bar */
+    nav{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      padding:12px 20px;
+      background:#222;
+      color:#eee;
+      font-size:14px;
+    }
+    nav a{
+      color:#9fd3ff;
+      text-decoration:none;
+    }
+    nav select{
+      margin-left:auto;
+      padding:4px 6px;
+      font-size:14px;
+    }
+
+    main{
+      max-width:900px;
+      margin:0 auto;
+      padding:32px 20px 60px;
+    }
+
+    details.note{
+      background:var(--card);
+      border:1px solid #ccc;
+      border-radius:8px;
+      margin-bottom:16px;
+      box-shadow:0 2px 6px rgba(0,0,0,.06);
+      overflow:hidden;
+      transition:border-color .15s;
+    }
+    details.note[open]{
+      border-color:var(--accent);
+    }
+    summary{
+      cursor:pointer;
+      padding:14px 20px;
+      font-weight:600;
+      list-style:none;
+    }
+    summary::-webkit-details-marker{display:none;}
     .note-body{
+      padding:16px 20px 24px;
+      border-top:1px solid #eee;
       white-space:pre-wrap;
-      font-size:13px;
-      line-height:1.25;
-      max-height:400px;
-      overflow:auto;
-
-      /* NEW ↓ */
-      user-select:text;   /* allow normal text selection */
-      cursor:text;        /* I‑beam instead of the grab hand */
+      line-height:1.4;
+      font-size:15px;
+    }
+    /* smooth animation for opening */
+    details.note[open] .note-body{
+      animation:fadeIn .25s ease;
+    }
+    @keyframes fadeIn{
+      from{opacity:0;transform:translateY(-4px);} to{opacity:1;transform:none;}
     }
 
-    /* optional: customise the highlight colour */
-    .note-body::selection{
-      background:#b3d4ff;   /* any colour you like */
-      color:#000;
+    #status{
+      text-align:center;
+      font-size:1rem;
+      color:#666;
+      margin-top:60px;
     }
-
-    .note-actions{position:absolute;right:6px;bottom:4px;font-size:11px;color:#333;}
-    .note-actions button{background:none;border:none;padding:0 4px;cursor:pointer;color:#333}
-    .note-actions button:hover{text-decoration:underline;}
-
-    svg#edges{position:absolute;inset:0;overflow:visible;pointer-events:none;}
-    path.edge{stroke:var(--line);stroke-width:2;fill:none;marker-end:url(#arrowhead);} 
-
-    #status{position:fixed;bottom:8px;left:8px;background:#0008;color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;}
-    #toolbar{position:fixed;top:70px;right:12px;background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px;box-shadow:0 3px 8px rgba(0,0,0,.2);font-size:12px}
-    #toolbar label{display:block;margin-bottom:4px}
-    #toolbar input[type="checkbox"]{vertical-align:middle}
   </style>
 </head>
 <body>
   <nav>
-    <a href="history.html">Narratives</a> |
-    <a href="prompt.html">Admin</a>
-    <select id="narrativeSelect" style="margin-left:12px;"></select>
+    <a href="index.html">← Home</a>
+    <span>Narratives</span>
+    <select id="narrativeSelect"></select>
   </nav>
 
-  <div id="viewport">
-    <div id="board-wrapper">
-      <svg id="edges"></svg>
-      <div id="board"></div>
-    </div>
-  </div>
+  <main id="listContainer">
+    <div id="status">Loading…</div>
+  </main>
 
-  <div id="toolbar">
-    <label><input id="toggle-arrows" type="checkbox" checked> show arrows</label>
-    <button id="auto-layout">Auto layout</button>
-    <button id="reset-pos">Reset positions</button>
-    <button id="zoom-in">+</button>
-    <button id="zoom-out">−</button>
+  <script type="module">
+    const sel   = document.getElementById('narrativeSelect');
+    const list  = document.getElementById('listContainer');
+    const params = new URLSearchParams(location.search);
+    let CURRENT_PAGE;
 
-    <div style="margin-top:6px">Zoom: <span id="zoom-level">100%</span></div>
-  </div>
+    init();
 
-  <div id="status" hidden></div>
-
-<script type="module">
-  (async()=>{
-    // ── 1) Fetch the master list of narratives ────────────────────
-    const NARRATIVES = await fetch('/api/narratives')
-      .then(r=> r.ok ? r.json() : Promise.reject(r.statusText));
-
-    // ── 2) Derive current narrative from ?page=… ──────────────────
-    const params       = new URLSearchParams(location.search);
-    const CURRENT_NARR = params.get('page') || NARRATIVES[0].id;
-
-    // ── 3) Populate <select id="narrativeSelect"> ────────────────
-    const sel = document.getElementById('narrativeSelect');
-    sel.innerHTML = '';
-    NARRATIVES.forEach(n=>{
-      const opt = document.createElement('option');
-      opt.value       = n.id;
-      opt.textContent = n.title;
-      sel.appendChild(opt);
-    });
-    sel.value = CURRENT_NARR;
-
-    // ── 4) Switch pages on change ────────────────────────────────
-    sel.addEventListener('change', e=>{
-      const url = new URL(location.href);
-      url.searchParams.set('page', e.target.value);
-      location.href = url;
-    });
-
-    // ── 5) Now that CURRENT_NARR is set, fetch its notes ─────────
-    await loadData(CURRENT_NARR);
-
-    // ── Everything else (rendering, drag, pan, etc.) can now run ─
-  })();
-
-let DATA = [];
-const board      = document.getElementById('board');
-const edgesSvg   = document.getElementById('edges');
-const wrapper    = document.getElementById('board-wrapper');
-const zoomLabel  = document.getElementById('zoom-level');
-let scale = 1, origin = {x:0,y:0};
-const minScale = 0.2, maxScale = 2.5;
-let activeNote = null;
-
-async function loadData(narrative){
-  const r = await fetch(`/api/history?narrative=${encodeURIComponent(narrative)}`);
-  DATA = await r.json();
-  buildTree();
-}
-
-function lsKey(name){
-    // persist per narrative
-    return `${name}:${new URLSearchParams(location.search).get('page')}`;
-  }
-
-
-function slugify(str){
-  return str.toLowerCase()
-            .replace(/[^a-z0-9]+/g,'-')
-            .replace(/^-+|-+$/g,'');
-}
-
-
-function buildTree(){
-  const byId = Object.fromEntries(DATA.map(x=>[x.id,x]));
-  DATA.forEach(x=>x.children=[]);
-  const roots=[];
-  DATA.forEach(x=>{ if(x.parent && byId[x.parent]) byId[x.parent].children.push(x); else roots.push(x); });
-  render();
-}
-
-function render(){
-  board.innerHTML = '';
-  DATA.forEach((node,i) => {
-    const div = document.createElement('div');
-    div.className = 'note';
-    div.dataset.id = node.id;
-
-    // position from DB, or fallback
-    const pos = (node.x != null && node.y != null)
-      ? { x: node.x, y: node.y }
-      : { x: 80 + (i%4)*300, y: 80 + Math.floor(i/4)*220 };
-
-    div.style.left = pos.x + 'px';
-    div.style.top  = pos.y + 'px';
-
-    div.innerHTML = `
-      <div class="note-header">🗨️ ${escapeHtml(node.user.slice(0,80))}</div>
-      <div class="note-body">${escapeHtml(node.answer)}</div>
-      <div class="note-actions">
-        <button data-action="focus">focus</button>
-        <button data-action="edit">edit</button>
-        <button data-action="collapse">toggle</button>
-      </div>`;
-
-    board.appendChild(div);
-  });
-
-  drawEdges();
-  enableDrag();
-  enableCollapse();
-}
-
-
-// --- add near other globals ---
-function centerOnPoint(boardX, boardY){
-  const rect = wrapper.getBoundingClientRect();
-  origin.x = boardX - rect.width  / (2*scale);
-  origin.y = boardY - rect.height / (2*scale);
-  applyTransform();
-  drawEdges();
-}
-
-
-// ---------- edges ----------
-function drawEdges(){
-  edgesSvg.innerHTML = `
-    <defs>
-      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="var(--line)"></polygon>
-      </marker>
-    </defs>`;
-
-  if(!document.getElementById('toggle-arrows').checked) return;
-
-  const cache = {};
-  const getCenter = id => {
-    if(cache[id]) return cache[id];
-    const el = document.querySelector(`.note[data-id="${id}"]`);
-    const r = el.getBoundingClientRect();
-    const wb = board.getBoundingClientRect();
-    return cache[id] = { x:(r.left-wb.left + r.width/2)/scale, y:(r.top-wb.top + r.height/2)/scale };
-  };
-
-  DATA.forEach(n=>{
-    if(!n.parent) return;
-    const a=getCenter(n.parent), b=getCenter(n.id);
-    edgesSvg.insertAdjacentHTML('beforeend', edgePath(a,b));
-  });
-}
-
-function edgePath(a,b){
-  const dx=(b.x-a.x)*0.3;
-  return `<path class="edge" d="M ${a.x},${a.y} C ${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}" />`;
-}
-
-function activateNote(el){
-  if(activeNote) activeNote.classList.remove('active');
-  activeNote = el;
-  el.classList.add('active');
-}
-
-// ---------- drag ----------
-let dragState=null;
-function enableDrag(){
-  document.querySelectorAll('.note').forEach(n=>{
-    n.addEventListener('mousedown', startDrag);
-    n.addEventListener('touchstart', startDrag, {passive:false});
-  });
-}
-function startDrag(e){
-  // do nothing if the click began in the body (where the text lives)
-  if (e.target.closest('.note-body') || e.target.closest('.note-actions')) return;
-
-  e.preventDefault();
-  const el = e.currentTarget;
-  const pt = pointerPos(e);
-  dragState = {
-    el,
-    offX: pt.x - parseInt(el.style.left,10),
-    offY: pt.y - parseInt(el.style.top ,10)
-  };
-  el.classList.add('dragging');
-  window.addEventListener('mousemove', onDrag);
-  window.addEventListener('mouseup',   endDrag);
-  window.addEventListener('touchmove', onDrag, {passive:false});
-  window.addEventListener('touchend',  endDrag);
-}
-
-function onDrag(e){
-  if(!dragState) return;
-  e.preventDefault();
-  const pt = pointerPos(e);
-  dragState.el.style.left = (pt.x-dragState.offX) + 'px';
-  dragState.el.style.top  = (pt.y-dragState.offY) + 'px';
-  drawEdges();
-}
-function endDrag(){
-  if(!dragState) return;
-  dragState.el.classList.remove('dragging');
-  savePositions();
-  dragState=null;
-  window.removeEventListener('mousemove', onDrag);
-  window.removeEventListener('mouseup', endDrag);
-  window.removeEventListener('touchmove', onDrag);
-  window.removeEventListener('touchend', endDrag);
-}
-function pointerPos(e){
-  const clientX = e.touches?e.touches[0].clientX:e.clientX;
-  const clientY = e.touches?e.touches[0].clientY:e.clientY;
-  const rect = board.getBoundingClientRect();
-  return { x:(clientX-rect.left)/scale, y:(clientY-rect.top)/scale };
-}
-
-// ---------- collapse / expand ----------
-function enableCollapse(){
-  document.querySelectorAll('.note-header').forEach(h=>{
-    h.addEventListener('click', ()=>{
-      const n = h.parentElement; n.classList.toggle('collapsed');
-      drawEdges(); savePositions();
-    });
-  });
-  document.querySelectorAll('.note-actions [data-action="collapse"]').forEach(btn=>{
-    btn.addEventListener('click', (e)=>{
-      const n = e.target.closest('.note'); n.classList.toggle('collapsed');
-      drawEdges(); savePositions();
-    });
-  });
-}
-
-// Utility
-function clamp(v,a,b){ return v<a?a : v>b?b : v; }
-function applyTransform(){
-  wrapper.style.transform =
-    `translate(${-origin.x*scale}px, ${-origin.y*scale}px) scale(${scale})`;
-}
-function drawAndLabel(){
-  drawEdges();
-  zoomLabel.textContent = Math.round(scale*100)+'%';
-}
-
-// Convert screen -> board coords
-function screenToBoard(clientX, clientY){
-  const rect = board.getBoundingClientRect();
-  return {
-    x: (clientX - rect.left)/scale + origin.x,
-    y: (clientY - rect.top)/scale  + origin.y
-  };
-}
-
-// ---------- save / restore ----------
-async function savePositions(){
-  const positions = {};
-  document.querySelectorAll('.note').forEach(n => {
-    positions[n.dataset.id] = {
-      x: parseFloat(n.style.left),
-      y: parseFloat(n.style.top)
-    };
-  });
-
-  // send to server
-  try {
-    await fetch('/api/positions', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ positions })
-    });
-    flash('saved');
-  } catch (err) {
-    console.error("❌ failed to save positions:", err);
-    flash('error');
-  }
-}
-
-function resetPositions(){
-  localStorage.removeItem(lsKey('notePositions'));
-  render(); flash('reset');
-}
-
-// ---------- auto layout ----------
-function autoLayout(){
-  const byId = Object.fromEntries(DATA.map(x=>[x.id,x]));
-  const roots = DATA.filter(x=>!x.parent || !byId[x.parent]);
-  const depth={};
-  function dfs(n,d){depth[n.id]=d;n.children.forEach(c=>dfs(c,d+1));}
-  roots.forEach(r=>dfs(r,0));
-  const cols={}; Object.entries(depth).forEach(([id,d])=>{(cols[d]||=[]).push(id);});
-  const gapX=320,gapY=220; const pos={};
-  Object.entries(cols).forEach(([d,ids])=>{ids.forEach((id,i)=>{pos[id]={x:80+d*gapX,y:80+i*gapY};});});
-  localStorage.setItem(lsKey('notePositions'), JSON.stringify(pos));
-  render(); flash('auto layout');
-}
-
-
-
-board.addEventListener('click', e=>{
-  const n = e.target.closest('.note');
-  if(!n) return;
-  activateNote(n);
-});
-
-
-// ---------- zoom / pan ----------
-// ---- WHEEL HANDLER ----
-window.addEventListener('wheel', e=>{
-
-  // If wheel happened inside the active note, do nothing (let it scroll)
-  if(activeNote && activeNote.contains(e.target)){
-    return;  // don't preventDefault, don't pan/zoom
-  }
-
-  // stop browser scrolling
-  e.preventDefault();
-
-  if (e.metaKey) {          // ⌘ + two-finger = ZOOM
-    const before = screenToBoard(e.clientX, e.clientY);
-    // zoom factor from deltaY (trackpads give small deltas)
-    const factor = Math.exp(-e.deltaY * 0.002); // tweak sensitivity
-    scale = clamp(scale * factor, minScale, maxScale);
-    const after = screenToBoard(e.clientX, e.clientY);
-
-    // keep cursor point stable
-    origin.x += before.x - after.x;
-    origin.y += before.y - after.y;
-
-    applyTransform();
-    drawAndLabel();
-    return;
-  }
-
-  // no metaKey -> PAN with wheel deltas
-  origin.x += e.deltaX / scale;
-  origin.y += e.deltaY / scale;
-  applyTransform();
-  drawEdges();
-}, {passive:false});
-
-wrapper.addEventListener('click', e=>{
-  if(!e.target.closest('.note') && activeNote){
-    activeNote.classList.remove('active');
-    activeNote = null;
-  }
-});
-
-// ---------- utils ----------
-function escapeHtml(str){
-  return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]));
-}
-function flash(msg){
-  const box=document.getElementById('status');
-  box.textContent=msg; box.hidden=false;
-  clearTimeout(box._t); box._t=setTimeout(()=>box.hidden=true,1200);
-}
-
-// toolbar events
- document.getElementById('toggle-arrows').addEventListener('change', drawEdges);
- document.getElementById('save-pos').addEventListener('click', savePositions);
- document.getElementById('reset-pos').addEventListener('click', resetPositions);
- document.getElementById('auto-layout').addEventListener('click', autoLayout);
- document.getElementById('zoom-in').onclick  = ()=> setZoom(scale*1.15);
- document.getElementById('zoom-out').onclick = ()=> setZoom(scale/1.15);
-
-function setZoom(newScale){
-  const rect = wrapper.getBoundingClientRect();
-  const cx = rect.width/2, cy = rect.height/2; // zoom toward center
-  const mx = cx/scale + origin.x;
-  const my = cy/scale + origin.y;
-  scale = clamp(newScale, 0.2, 2.5);
-  origin.x = mx - cx/scale;
-  origin.y = my - cy/scale;
-  applyTransform();
-  drawEdges();
-  zoomLabel.textContent = Math.round(scale*100)+'%';
-}
-
-// ─────────────────────────────────────────────────────────────
-// Mobile touch gestures: pinch‑zoom, single‑finger pan, double‑tap
-// ─────────────────────────────────────────────────────────────
-let isPinching = false;
-let pinchStart = { dist: 0, scale: 1, center: {x:0,y:0} };
-let panStart   = { x:0, y:0, originX:0, originY:0 };
-let lastTap    = 0;
-
-function getTouchDist(t0, t1) {
-  const dx = t1.clientX - t0.clientX;
-  const dy = t1.clientY - t0.clientY;
-  return Math.hypot(dx, dy);
-}
-
-function getTouchCenter(t0, t1) {
-  return {
-    x: (t0.clientX + t1.clientX) / 2,
-    y: (t0.clientY + t1.clientY) / 2
-  };
-}
-
-wrapper.addEventListener('touchstart', e => {
-  if (e.touches.length === 2) {
-    // begin pinch
-    isPinching = true;
-    pinchStart.dist  = getTouchDist(e.touches[0], e.touches[1]);
-    pinchStart.scale = scale;
-    pinchStart.center = getTouchCenter(e.touches[0], e.touches[1]);
-  } else if (e.touches.length === 1) {
-    // begin pan or detect double‑tap
-    const now = Date.now();
-    if (now - lastTap < 300) {
-      // double‑tap → center on that point
-      const pt = screenToBoard(e.touches[0].clientX, e.touches[0].clientY);
-      centerOnPoint(pt.x, pt.y);
-      e.preventDefault();
+    async function init(){
+      // 1) Load category list
+      const cats = await fetchJson('/api/narratives');
+      populateSelect(cats);
+      CURRENT_PAGE = params.get('page') || cats[0]?.id;
+      sel.value = CURRENT_PAGE;
+      // 2) Load narratives inside that category
+      loadNarratives(CURRENT_PAGE);
     }
-    lastTap = now;
-    // pan start
-    panStart.x = e.touches[0].clientX;
-    panStart.y = e.touches[0].clientY;
-    panStart.originX = origin.x;
-    panStart.originY = origin.y;
-  }
-}, {passive:false});
 
-wrapper.addEventListener('touchmove', e => {
-  if (isPinching && e.touches.length===2) {
-    // pinch‑to‑zoom
-    const newDist = getTouchDist(e.touches[0], e.touches[1]);
-    const factor  = newDist / pinchStart.dist;
-    // focal point remains stable
-    const before = screenToBoard(pinchStart.center.x, pinchStart.center.y);
-    scale = clamp(pinchStart.scale * factor, minScale, maxScale);
-    const after  = screenToBoard(pinchStart.center.x, pinchStart.center.y);
-    origin.x += before.x - after.x;
-    origin.y += before.y - after.y;
-    applyTransform();
-    drawEdges();
-    e.preventDefault();
-  }
-  else if (!isPinching && e.touches.length===1) {
-    // one‑finger pan
-    const dx = (panStart.x - e.touches[0].clientX) / scale;
-    const dy = (panStart.y - e.touches[0].clientY) / scale;
-    origin.x = panStart.originX + dx;
-    origin.y = panStart.originY + dy;
-    applyTransform();
-    drawEdges();
-    e.preventDefault();
-  }
-}, {passive:false});
+    function populateSelect(arr){
+      sel.innerHTML='';
+      arr.forEach(n=>{
+        const o = document.createElement('option');
+        o.value = n.id;
+        o.textContent = n.title;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change',e=>{
+        params.set('page',e.target.value);
+        history.replaceState(null,'',`${location.pathname}?${params}`);
+        list.innerHTML='<div id="status">Loading…</div>';
+        loadNarratives(e.target.value);
+      });
+    }
 
-wrapper.addEventListener('touchend', e => {
-  if (isPinching && e.touches.length < 2) {
-    isPinching = false;
-  }
-}, {passive:false});
-// ─────────────────────────────────────────────────────────────
+    async function loadNarratives(id){
+      try{
+        const data = await fetchJson(`/api/history?narrative=${encodeURIComponent(id)}`);
+        renderList(data);
+      }catch(err){
+        list.innerHTML='<div id="status">Failed to load.</div>';
+        console.error(err);
+      }
+    }
 
+    function renderList(data){
+      list.innerHTML='';
+      if(!data.length){
+        list.innerHTML='<div id="status">No entries in this category.</div>';
+        return;
+      }
+      data.forEach(item=>{
+        const details = document.createElement('details');
+        details.className='note';
+        const summary = document.createElement('summary');
+        summary.textContent = `🗨️ ${item.user.slice(0,120)}`;
+        const body = document.createElement('div');
+        body.className='note-body';
+        body.textContent = item.answer;
+        details.append(summary,body);
+        list.appendChild(details);
+      });
+    }
 
-
-loadData();
-</script>
+    async function fetchJson(url){
+      const r = await fetch(url);
+      if(!r.ok) throw new Error(r.statusText);
+      return r.json();
+    }
+  </script>
 </body>
 </html>
+
