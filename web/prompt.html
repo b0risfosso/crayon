@@ -31,6 +31,8 @@
   <label for="targetPage">Send to narrative</label>
   <select id="targetPage"></select>
 
+  <label><input type="checkbox" id="testMode"> Test mode — do NOT save</label>
+
   <button id="send">Ask</button>
 
   <h2>Answer</h2>
@@ -91,12 +93,13 @@
       btn.disabled   = true;
       out.textContent = 'Thinking…';
   
-      const payload = {
-        system    : document.getElementById('sys').value,
-        user      : document.getElementById('usr').value,
-        narrative : sel.value
-      };
-  
+    const payload = {
+      system    : document.getElementById('sys').value,
+      user      : document.getElementById('usr').value,
+      narrative : sel.value,
+      test      : document.getElementById('testMode').checked   // ← NEW
+    };
+    
       try {
         const res = await fetch('/api/ask', {
           method: 'POST',

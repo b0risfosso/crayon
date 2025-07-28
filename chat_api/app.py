@@ -160,9 +160,20 @@ def execute():
 @app.route("/api/ask", methods=["POST"])
 def handle_ask():
     data = request.get_json(force=True)
-    narrative = data.get("narrative", "hindgut")   # default or require it
+
+    narrative = data.get("narrative", "")
+    test_mode = bool(data.get("test"))          # ← NEW
+
     answer = ask(data.get("system", ""), data.get("user", ""))
-    add_record(narrative, data.get("system", ""), data.get("user", ""), answer)
+
+    if not test_mode:                           # ← CHANGED
+        add_record(
+            narrative,
+            data.get("system", ""),
+            data.get("user", ""),
+            answer
+        )
+
     return jsonify({"answer": answer})
 
 @app.route("/api/history", methods=["GET"])
