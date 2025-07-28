@@ -10,77 +10,29 @@
       --card:#ffffff;
       --accent:#4aa3ff;
     }
-    html,body{
-      margin:0;
-      font-family:system-ui,sans-serif;
-      background:var(--bg);
-    }
+    html,body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);}
+
     /* top bar */
-    nav{
-      display:flex;
-      align-items:center;
-      gap:14px;
-      padding:12px 20px;
-      background:#222;
-      color:#eee;
-      font-size:14px;
-    }
-    nav a{
-      color:#9fd3ff;
-      text-decoration:none;
-    }
-    nav select{
-      margin-left:auto;
-      padding:4px 6px;
-      font-size:14px;
-    }
+    nav{display:flex;align-items:center;gap:14px;padding:12px 20px;background:#222;color:#eee;font-size:14px}
+    nav a{color:#9fd3ff;text-decoration:none;}
+    nav select{margin-left:auto;padding:4px 6px;font-size:14px}
 
-    main{
-      max-width:900px;
-      margin:0 auto;
-      padding:32px 20px 60px;
-    }
+    main{max-width:900px;margin:0 auto;padding:32px 20px 60px;}
 
-    details.note{
-      background:var(--card);
-      border:1px solid #ccc;
-      border-radius:8px;
-      margin-bottom:16px;
-      box-shadow:0 2px 6px rgba(0,0,0,.06);
-      overflow:hidden;
-      transition:border-color .15s;
-    }
-    details.note[open]{
-      border-color:var(--accent);
-    }
-    summary{
-      cursor:pointer;
-      padding:14px 20px;
-      font-weight:600;
-      list-style:none;
-    }
+    details.note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;box-shadow:0 2px 6px rgba(0,0,0,.06);overflow:hidden;transition:border-color .15s;}
+    details.note[open]{border-color:var(--accent);}
+
+    summary{cursor:pointer;padding:14px 20px;display:flex;align-items:center;gap:12px;font-weight:600;list-style:none;}
     summary::-webkit-details-marker{display:none;}
-    .note-body{
-      padding:16px 20px 24px;
-      border-top:1px solid #eee;
-      white-space:pre-wrap;
-      line-height:1.4;
-      font-size:15px;
-    }
-    /* smooth animation for opening */
-    details.note[open] .note-body{
-      animation:fadeIn .25s ease;
-    }
-    @keyframes fadeIn{
-      from{opacity:0;transform:translateY(-4px);} to{opacity:1;transform:none;}
-    }
+    .note-title{flex:1;}
+    .enter-btn{padding:4px 10px;font-size:13px;border:1px solid var(--accent);border-radius:6px;background:#fff;color:var(--accent);text-decoration:none;transition:.15s;white-space:nowrap;}
+    .enter-btn:hover{background:var(--accent);color:#fff;}
 
-    #status{
-      text-align:center;
-      font-size:1rem;
-      color:#666;
-      margin-top:60px;
-    }
+    .note-body{padding:16px 20px 24px;border-top:1px solid #eee;white-space:pre-wrap;line-height:1.4;font-size:15px;}
+    details.note[open] .note-body{animation:fadeIn .25s ease;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+
+    #status{text-align:center;font-size:1rem;color:#666;margin-top:60px;}
   </style>
 </head>
 <body>
@@ -103,66 +55,41 @@
     init();
 
     async function init(){
-      // 1) Load category list
       const cats = await fetchJson('/api/narratives');
       populateSelect(cats);
       CURRENT_PAGE = params.get('page') || cats[0]?.id;
       sel.value = CURRENT_PAGE;
-      // 2) Load narratives inside that category
       loadNarratives(CURRENT_PAGE);
     }
 
     function populateSelect(arr){
       sel.innerHTML='';
       arr.forEach(n=>{
-        const o = document.createElement('option');
-        o.value = n.id;
-        o.textContent = n.title;
-        sel.appendChild(o);
-      });
-      sel.addEventListener('change',e=>{
-        params.set('page',e.target.value);
-        history.replaceState(null,'',`${location.pathname}?${params}`);
-        list.innerHTML='<div id="status">Loading…</div>';
-        loadNarratives(e.target.value);
-      });
+        const o=document.createElement('option');o.value=n.id;o.textContent=n.title;sel.appendChild(o);});
+      sel.addEventListener('change',e=>{params.set('page',e.target.value);history.replaceState(null,'',`${location.pathname}?${params}`);list.innerHTML='<div id="status">Loading…</div>';loadNarratives(e.target.value);});
     }
 
     async function loadNarratives(id){
-      try{
-        const data = await fetchJson(`/api/history?narrative=${encodeURIComponent(id)}`);
-        renderList(data);
-      }catch(err){
-        list.innerHTML='<div id="status">Failed to load.</div>';
-        console.error(err);
-      }
-    }
+      try{const data=await fetchJson(`/api/history?narrative=${encodeURIComponent(id)}`);renderList(data);}catch(err){list.innerHTML='<div id="status">Failed to load.</div>';console.error(err);} }
 
     function renderList(data){
       list.innerHTML='';
-      if(!data.length){
-        list.innerHTML='<div id="status">No entries in this category.</div>';
-        return;
-      }
+      if(!data.length){list.innerHTML='<div id="status">No entries in this category.</div>';return;}
       data.forEach(item=>{
-        const details = document.createElement('details');
-        details.className='note';
-        const summary = document.createElement('summary');
-        summary.textContent = `🗨️ ${item.user.slice(0,120)}`;
-        const body = document.createElement('div');
-        body.className='note-body';
-        body.textContent = item.answer;
+        const details=document.createElement('details');details.className='note';
+        const summary=document.createElement('summary');
+        const titleSpan=document.createElement('span');titleSpan.className='note-title';titleSpan.textContent=`🗨️ ${item.user.slice(0,120)}`;
+        const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`entry.html?id=${item.id}`;
+        summary.append(titleSpan,btn);
+        const body=document.createElement('div');body.className='note-body';body.textContent=item.answer;
         details.append(summary,body);
         list.appendChild(details);
       });
     }
 
-    async function fetchJson(url){
-      const r = await fetch(url);
-      if(!r.ok) throw new Error(r.statusText);
-      return r.json();
-    }
+    async function fetchJson(url){const r=await fetch(url);if(!r.ok) throw new Error(r.statusText);return r.json();}
   </script>
 </body>
 </html>
+
 
