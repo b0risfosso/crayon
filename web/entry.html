@@ -6,22 +6,25 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     :root{--bg:#f5f5f5;--card:#fff;--accent:#4aa3ff;}
-    html,body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);}
+    html,body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);}  
     header{display:flex;align-items:center;gap:14px;padding:12px 20px;background:#222;color:#eee;font-size:14px}
     header a{color:#9fd3ff;text-decoration:none;}
     main{max-width:900px;margin:0 auto;padding:32px 20px 80px;}
 
-    /* narrative banner */
-    .banner{background:var(--card);border:1px solid #ccc;border-radius:10px;padding:20px;margin-bottom:30px;box-shadow:0 2px 6px rgba(0,0,0,.05);}  
-    .banner h2{margin-top:0;}
+    /* banner accordion */
+    .banner details{background:var(--card);border:1px solid #ccc;border-radius:10px;margin-bottom:14px;box-shadow:0 2px 5px rgba(0,0,0,.05);overflow:hidden;}
+    .banner summary{cursor:pointer;padding:14px 18px;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px;}
+    .banner summary::-webkit-details-marker{display:none;}
+    .banner details[open]{border-color:var(--accent);}  
+    .banner .content{padding:0 18px 18px;font-size:14px;line-height:1.4;white-space:pre-wrap;}
 
     /* create form */
     form#createForm{background:var(--card);border:1px solid #ccc;border-radius:10px;padding:20px;margin-bottom:36px;box-shadow:0 2px 6px rgba(0,0,0,.05);} 
-    textarea{width:100%;min-height:120px;font-family:inherit;font-size:15px;padding:10px;border:1px solid #bbb;border-radius:6px;resize:vertical;}
-    button[type="submit"]{margin-top:12px;padding:8px 18px;font-size:15px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;}
+    textarea{width:100%;min-height:110px;font-family:inherit;font-size:14px;padding:10px;border:1px solid #bbb;border-radius:6px;resize:vertical;}
+    button[type="submit"]{margin-top:12px;padding:8px 18px;font-size:14px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;}
 
     /* sub‑note list */
-    .note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.04);white-space:pre-wrap;line-height:1.4;font-size:15px;}
+    .note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;padding:14px 18px;box-shadow:0 1px 4px rgba(0,0,0,.04);white-space:pre-wrap;line-height:1.35;font-size:14px;}
     #status{text-align:center;margin-top:60px;font-size:1rem;color:#666;}
   </style>
 </head>
@@ -34,7 +37,7 @@
     <section class="banner" id="narrativeBanner"></section>
 
     <form id="createForm">
-      <h3>Add a sub‑note</h3>
+      <h3 style="margin-top:0">Add a sub‑note</h3>
       <textarea id="noteInput" placeholder="Write your note here…"></textarea>
       <button type="submit">Save</button>
     </form>
@@ -45,42 +48,64 @@
   </main>
 
   <script type="module">
-    const params=new URLSearchParams(location.search);
-    const ID=params.get('id');
+    const params = new URLSearchParams(location.search);
+    const ID     = params.get('id');
     if(!ID){document.getElementById('status').textContent='Missing id param';throw new Error('Missing id');}
 
-    const banner=document.getElementById('narrativeBanner');
-    const notesWrap=document.getElementById('notesContainer');
-    const heading=document.getElementById('heading');
+    const banner   = document.getElementById('narrativeBanner');
+    const notesWrap= document.getElementById('notesContainer');
+    const heading  = document.getElementById('heading');
 
     init();
 
     async function init(){
       try{
-        const narrative=await fetchJson(`/api/note?id=${encodeURIComponent(ID)}`);
-        renderBanner(narrative);
+        const n = await fetchJson(`/api/note?id=${encodeURIComponent(ID)}`);
+        renderBanner(n);
         loadNotes();
-      }catch(err){notesWrap.innerHTML='<div id="status">Failed to load.</div>';console.error(err);}
+      }catch(err){notesWrap.innerHTML='<div id="status">Failed to load.</div>';console.error(err);}  
     }
 
+    /* banner rendering with accordion */
     function renderBanner(n){
-      heading.textContent=n.user.slice(0,60);
-      banner.innerHTML=`<h2>${n.user}</h2><p>${n.answer}</p>`;
+      heading.textContent = n.user.slice(0,60);
+      banner.innerHTML = '';
+
+      banner.appendChild(makeDetails('Prompt', n.user, /*open*/ false));
+      banner.appendChild(makeDetails('Narrative', n.answer, /*open*/ true));
+    }
+
+    function makeDetails(title, text, open){
+      const det = document.createElement('details');
+      if(open) det.setAttribute('open','');
+      const sum = document.createElement('summary');
+      sum.textContent = title;
+      const body = document.createElement('div');
+      body.className = 'content';
+      body.textContent = text;
+      det.append(sum, body);
+      return det;
     }
 
     async function loadNotes(){
-      const data=await fetchJson(`/api/subnotes?parent=${encodeURIComponent(ID)}`);
-      notesWrap.innerHTML='';
+      const data = await fetchJson(`/api/subnotes?parent=${encodeURIComponent(ID)}`);
+      notesWrap.innerHTML = '';
       if(!data.length){notesWrap.innerHTML='<div id="status">No sub‑notes yet.</div>';return;}
-      data.forEach(d=>{const div=document.createElement('div');div.className='note';div.textContent=d.content;notesWrap.appendChild(div);});
+      data.forEach(d=>{
+        const div=document.createElement('div');
+        div.className='note';
+        div.textContent=d.content;
+        notesWrap.appendChild(div);
+      });
     }
 
     // create new sub‑note
-    document.getElementById('createForm').addEventListener('submit',async e=>{
+    document.getElementById('createForm').addEventListener('submit', async e=>{
       e.preventDefault();
-      const txt=document.getElementById('noteInput').value.trim();
+      const txt = document.getElementById('noteInput').value.trim();
       if(!txt) return;
-      e.target.querySelector('button').disabled=true;
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
       try{
         await fetch('/api/subnotes',{
           method:'POST',headers:{'Content-Type':'application/json'},
@@ -88,10 +113,15 @@
         });
         document.getElementById('noteInput').value='';
         loadNotes();
-      }catch(err){alert('Failed to save');console.error(err);}finally{e.target.querySelector('button').disabled=false;}
+      }catch(err){alert('Failed to save');console.error(err);}finally{btn.disabled=false;}
     });
 
-    async function fetchJson(url){const r=await fetch(url);if(!r.ok) throw new Error(r.statusText);return r.json();}
+    async function fetchJson(url){
+      const r = await fetch(url);
+      if(!r.ok) throw new Error(r.statusText);
+      return r.json();
+    }
   </script>
 </body>
 </html>
+
