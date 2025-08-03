@@ -21,7 +21,8 @@
     /* create forms */
     form.box{background:var(--card);border:1px solid #ccc;border-radius:10px;padding:20px;margin-bottom:36px;box-shadow:0 2px 6px rgba(0,0,0,.05);} 
     textarea{width:100%;min-height:110px;font-family:inherit;font-size:14px;padding:10px;border:1px solid #bbb;border-radius:6px;resize:vertical;}
-    button[type="submit"]{margin-top:12px;padding:8px 18px;font-size:14px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;}
+    button[type="submit"], select{margin-top:12px;padding:8px 18px;font-size:14px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;}
+    select{background:#fff;color:#000;border:1px solid #bbb;}
 
     /* sub-note list */
     details.note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.04);overflow:hidden;transition:border-color .15s;}
@@ -44,20 +45,28 @@
   <main>
     <section class="banner" id="narrativeBanner"></section>
 
-    <!-- Manual sub‑note form -->
+    <!-- Manual sub-note form -->
     <form id="createForm" class="box">
-      <h3 style="margin-top:0">Add a sub‑note (manual)</h3>
+      <h3 style="margin-top:0">Add a sub-note (manual)</h3>
       <textarea id="noteInput" placeholder="Write your note here…"></textarea>
       <button type="submit">Save</button>
     </form>
 
-    <!-- LLM‑generated sub‑note form -->
+    <!-- LLM-generated sub-note form -->
     <form id="llmForm" class="box">
-      <h3 style="margin-top:0">Generate sub‑note with LLM</h3>
+      <h3 style="margin-top:0">Generate sub-note with LLM</h3>
+      <label for="templateSelect">Template</label><br>
+      <select id="templateSelect">
+        <option value="">— choose a template —</option>
+        <option value="narrative">Scientific Narrative</option>
+        <option value="theory">Theory / Method</option>
+        <option value="hypothesis">Hypothesis List</option>
+      </select>
+
       <label for="llmSystem">System message</label>
-      <textarea id="llmSystem" rows="3" placeholder="(optional)"></textarea>
+      <textarea id="llmSystem" rows="5"></textarea>
       <label for="llmUser">User message</label>
-      <textarea id="llmUser" rows="4" placeholder="Prompt to the LLM…"></textarea>
+      <textarea id="llmUser" rows="4"></textarea>
       <button type="submit">Ask & Save</button>
     </form>
 
@@ -74,6 +83,36 @@
     const banner   = document.getElementById('narrativeBanner');
     const notesWrap= document.getElementById('notesContainer');
     const heading  = document.getElementById('heading');
+
+    const templateSelect = document.getElementById('templateSelect');
+    const sysField       = document.getElementById('llmSystem');
+    const usrField       = document.getElementById('llmUser');
+
+    const TEMPLATES = {
+      narrative: {
+        sys: "Construct a comprehensive scientific narrative of the following topic.",
+        usr: "Construct a narrative of [topic]."
+      },
+      theory: {
+        sys: `You are a research assistant who combines rigorous scientific reasoning with speculative creativity.\nWhen the user asks for a theory/method to achieve a given outcome, always:\nState key assumptions (environment, available technology, time‑scale).\nProvide a set of hypotheses.\nDescribe a step‑by‑step pathway grounded in known physics, chemistry, and biology; where knowledge is missing, propose plausible advanced or hypothetical techniques, clearly marking them speculative.\nQuantify requirements (energy, catalysts, genetic templates, computational design, reaction conditions).\nHighlight major bottlenecks, risks, and ethical issues.\nConclude with a feasibility score (0–10) and the breakthroughs needed to reach it.\nWrite in clear, precise prose. Use numbered lists, short paragraphs, and cite real concepts or literature when relevant. Maintain a neutral, informative tone; do not role‑play or add narrative flair unless explicitly requested.`,
+        usr: "Construct scientific theories/methods on [topic]."
+      },
+      hypothesis: {
+        sys: `You are a scientific reasoning engine. Your sole task is to output a compact list of high-quality, testable hypotheses—nothing else.\nWhen responding:\n1. Produce 3 – 7 numbered hypotheses (H1, H2 …).\n2. For each hypothesis include exactly three short clauses in parentheses, in this order:\n  • Mechanism – one sentence naming the causal process.\n  • Prediction – one falsifiable, quantitative statement.\n  • Test – the minimal experiment or measurement that would confirm or refute it.\n3. Mark ideas that rely on unproven physics or engineering with “(speculative)” at the end of the clause where speculation occurs.\n4. Do not write any introduction, explanation, headings, or concluding text. Only the hypotheses list.\n5. Keep each hypothesis ≤ 40 words (including the three clauses).\n6. Cite real concepts or literature inline when relevant—e.g. (via actomyosin ring, Rauzi 2008)—but do not add full references or footnotes.\n7. Maintain clear, precise prose; avoid jargon when a simpler term suffices.\n8. If insufficient information is available to form a hypothesis, output “No testable hypothesis can be formed with the given information.” and nothing else.`,
+        usr: "Construct a set of hypotheses on [topic]."
+      }
+    };
+
+    templateSelect.addEventListener('change', e => {
+      const t = TEMPLATES[e.target.value];
+      if(t){
+        sysField.value = t.sys;
+        usrField.value = t.usr;
+      } else {
+        sysField.value = '';
+        usrField.value = '';
+      }
+    });
 
     init();
 
@@ -109,7 +148,7 @@
     async function loadNotes(){
       const data = await fetchJson(`/api/subnotes?parent=${encodeURIComponent(ID)}`);
       notesWrap.innerHTML = '';
-      if(!data.length){notesWrap.innerHTML='<div id="status">No sub‑notes yet.</div>';return;}
+      if(!data.length){notesWrap.innerHTML='<div id="status">No sub-notes yet.</div>';return;}
       data.forEach(d=>{
         notesWrap.appendChild(renderNote(d));
       });
@@ -127,7 +166,7 @@
       return details;
     }
 
-    // create new sub‑note (manual)
+    // create new sub-note (manual)
     document.getElementById('createForm').addEventListener('submit', async e=>{
       e.preventDefault();
       const txt = document.getElementById('noteInput').value.trim();
@@ -139,46 +178,4 @@
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({parent:ID,content:txt})
         });
-        document.getElementById('noteInput').value='';
-        loadNotes();
-      }catch(err){alert('Failed to save');console.error(err);}finally{btn.disabled=false;}
-    });
-
-    // LLM‑generated sub‑note form
-    document.getElementById('llmForm').addEventListener('submit', async e=>{
-      e.preventDefault();
-      const sys = document.getElementById('llmSystem').value;
-      const usr = document.getElementById('llmUser').value.trim();
-      if(!usr) return;
-      const btn = e.target.querySelector('button');
-      btn.disabled = true;
-      btn.textContent = 'Thinking…';
-      try{
-        // First, ask LLM without saving (test mode)
-        const res = await fetch('/api/ask',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({system:sys,user:usr,narrative:'',test:true})
-        });
-        const j = await res.json();
-        const answer = j.answer;
-        // Save as sub‑note
-        await fetch('/api/subnotes',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({parent:ID,content:answer})
-        });
-        document.getElementById('llmUser').value='';
-        loadNotes();
-      }catch(err){alert('LLM call failed');console.error(err);}finally{
-        btn.disabled=false;
-        btn.textContent='Ask & Save';
-      }
-    });
-
-    async function fetchJson(url){
-      const r = await fetch(url);
-      if(!r.ok) throw new Error(r.statusText);
-      return r.json();
-    }
-  </script>
-</body>
-</html>
+        document.getElementById
