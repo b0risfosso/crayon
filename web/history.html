@@ -10,9 +10,7 @@
       --card:#ffffff;
       --accent:#4aa3ff;
     }
-    html,body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);}
-
-    /* top bar */
+    html,body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);}    /* top bar */
     nav{display:flex;align-items:center;gap:14px;padding:12px 20px;background:#222;color:#eee;font-size:14px}
     nav a{color:#9fd3ff;text-decoration:none;}
     nav select{margin-left:auto;padding:4px 6px;font-size:14px}
@@ -73,12 +71,15 @@
       try{const data=await fetchJson(`/api/history?narrative=${encodeURIComponent(id)}`);renderList(data);}catch(err){list.innerHTML='<div id="status">Failed to load.</div>';console.error(err);} }
 
     function renderList(data){
+      // ➡️ Filter out sub‑notes (those that have a parent ID)
+      const roots = data.filter(item => !item.parent);
+
       list.innerHTML='';
-      if(!data.length){list.innerHTML='<div id="status">No entries in this category.</div>';return;}
-      data.forEach(item=>{
+      if(!roots.length){list.innerHTML='<div id="status">No entries in this category.</div>';return;}
+      roots.forEach(item=>{
         const details=document.createElement('details');details.className='note';
         const summary=document.createElement('summary');
-        const titleSpan=document.createElement('span');titleSpan.className='note-title';titleSpan.textContent=`🗨️ ${item.user.slice(0,120)}`;
+        const titleSpan=document.createElement('span');titleSpan.className='note-title';titleSpan.textContent=`🗨️ ${item.user?.slice(0,120) || '(system)'}`;
         const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`entry.html?id=${item.id}`;
         summary.append(titleSpan,btn);
         const body=document.createElement('div');body.className='note-body';body.textContent=item.answer;
@@ -91,5 +92,4 @@
   </script>
 </body>
 </html>
-
 

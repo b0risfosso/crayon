@@ -15,5 +15,7 @@ chat_api/.env
 chat_api/venv/
 chat_api/__pycache__/
 
+.env
+
 chat_api/narratives_data.db
 chat_api/narratives.json
