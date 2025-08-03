@@ -18,18 +18,21 @@
     .banner details[open]{border-color:var(--accent);}  
     .banner .content{padding:0 18px 18px;font-size:14px;line-height:1.4;white-space:pre-wrap;}
 
-    /* execute button */
-    #executeBtn{margin-bottom:26px;padding:10px 22px;font-size:15px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;}
-    #executeBtn[disabled]{opacity:.5;cursor:default;}
-
-    /* create form */
-    form#createForm{background:var(--card);border:1px solid #ccc;border-radius:10px;padding:20px;margin-bottom:36px;box-shadow:0 2px 6px rgba(0,0,0,.05);} 
+    /* create forms */
+    form.box{background:var(--card);border:1px solid #ccc;border-radius:10px;padding:20px;margin-bottom:36px;box-shadow:0 2px 6px rgba(0,0,0,.05);} 
     textarea{width:100%;min-height:110px;font-family:inherit;font-size:14px;padding:10px;border:1px solid #bbb;border-radius:6px;resize:vertical;}
     button[type="submit"]{margin-top:12px;padding:8px 18px;font-size:14px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;}
 
-    /* sub‑note list */
-    .note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;padding:14px 18px;box-shadow:0 1px 4px rgba(0,0,0,.04);white-space:pre-wrap;line-height:1.35;font-size:14px;}
-    .note.protocol{border-color:var(--accent);}  
+    /* sub-note list */
+    details.note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.04);overflow:hidden;transition:border-color .15s;}
+    details.note[open]{border-color:var(--accent);}  
+    summary{cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:12px;font-weight:600;list-style:none;}
+    summary::-webkit-details-marker{display:none;}
+    .note-title{flex:1;}
+    .enter-btn{padding:4px 10px;font-size:13px;border:1px solid var(--accent);border-radius:6px;background:#fff;color:var(--accent);text-decoration:none;transition:.15s;white-space:nowrap;}
+    .enter-btn:hover{background:var(--accent);color:#fff;}
+    .note-body{padding:16px 18px 24px;border-top:1px solid #eee;white-space:pre-wrap;line-height:1.35;font-size:14px;}
+
     #status{text-align:center;margin-top:60px;font-size:1rem;color:#666;}
   </style>
 </head>
@@ -41,12 +44,21 @@
   <main>
     <section class="banner" id="narrativeBanner"></section>
 
-    <button id="executeBtn">Execute</button>
-
-    <form id="createForm">
-      <h3 style="margin-top:0">Add a sub‑note</h3>
+    <!-- Manual sub‑note form -->
+    <form id="createForm" class="box">
+      <h3 style="margin-top:0">Add a sub‑note (manual)</h3>
       <textarea id="noteInput" placeholder="Write your note here…"></textarea>
       <button type="submit">Save</button>
+    </form>
+
+    <!-- LLM‑generated sub‑note form -->
+    <form id="llmForm" class="box">
+      <h3 style="margin-top:0">Generate sub‑note with LLM</h3>
+      <label for="llmSystem">System message</label>
+      <textarea id="llmSystem" rows="3" placeholder="(optional)"></textarea>
+      <label for="llmUser">User message</label>
+      <textarea id="llmUser" rows="4" placeholder="Prompt to the LLM…"></textarea>
+      <button type="submit">Ask & Save</button>
     </form>
 
     <div id="notesContainer">
@@ -62,7 +74,6 @@
     const banner   = document.getElementById('narrativeBanner');
     const notesWrap= document.getElementById('notesContainer');
     const heading  = document.getElementById('heading');
-    const execBtn  = document.getElementById('executeBtn');
 
     init();
 
@@ -100,14 +111,23 @@
       notesWrap.innerHTML = '';
       if(!data.length){notesWrap.innerHTML='<div id="status">No sub‑notes yet.</div>';return;}
       data.forEach(d=>{
-        const div=document.createElement('div');
-        div.className='note'+(d.is_protocol?' protocol':'');
-        div.textContent=d.content;
-        notesWrap.appendChild(div);
+        notesWrap.appendChild(renderNote(d));
       });
     }
 
-    // create new sub‑note
+    function renderNote(d){
+      const details=document.createElement('details');
+      details.className='note'+(d.is_protocol?' protocol':'');
+      const summary=document.createElement('summary');
+      const titleSpan=document.createElement('span');titleSpan.className='note-title';titleSpan.textContent=`🗨️ ${d.content.slice(0,120)}`;
+      const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`entry.html?id=${d.id}`;
+      summary.append(titleSpan,btn);
+      const body=document.createElement('div');body.className='note-body';body.textContent=d.content;
+      details.append(summary,body);
+      return details;
+    }
+
+    // create new sub‑note (manual)
     document.getElementById('createForm').addEventListener('submit', async e=>{
       e.preventDefault();
       const txt = document.getElementById('noteInput').value.trim();
@@ -124,25 +144,33 @@
       }catch(err){alert('Failed to save');console.error(err);}finally{btn.disabled=false;}
     });
 
-    // execute button -> call LLM protocol generation
-    execBtn.addEventListener('click', async ()=>{
-      execBtn.disabled = true;
-      execBtn.textContent = 'Running…';
+    // LLM‑generated sub‑note form
+    document.getElementById('llmForm').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const sys = document.getElementById('llmSystem').value;
+      const usr = document.getElementById('llmUser').value.trim();
+      if(!usr) return;
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Thinking…';
       try{
-        const res = await fetch('/api/execute',{
+        // First, ask LLM without saving (test mode)
+        const res = await fetch('/api/ask',{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({id:ID})
+          body:JSON.stringify({system:sys,user:usr,narrative:'',test:true})
         });
         const j = await res.json();
-        if(!res.ok){throw new Error(j.error||'failed');}
-        // prepend protocol note
-        const div=document.createElement('div');
-        div.className='note protocol';
-        div.textContent=j.protocol;
-        notesWrap.prepend(div);
-      }catch(err){alert('Execution failed');console.error(err);}finally{
-        execBtn.disabled=false;
-        execBtn.textContent='Execute';
+        const answer = j.answer;
+        // Save as sub‑note
+        await fetch('/api/subnotes',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({parent:ID,content:answer})
+        });
+        document.getElementById('llmUser').value='';
+        loadNotes();
+      }catch(err){alert('LLM call failed');console.error(err);}finally{
+        btn.disabled=false;
+        btn.textContent='Ask & Save';
       }
     });
 
@@ -154,5 +182,3 @@
   </script>
 </body>
 </html>
-
-
