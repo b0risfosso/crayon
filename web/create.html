@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ask LLM & Save</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body{font-family:sans-serif;max-width:820px;margin:40px auto;padding:0 10px;}
+    textarea{width:100%;min-height:90px;}
+    pre#out{white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #ccc;padding:8px;background:#f8f8f8;min-height:60px;}
+    nav a{margin-right:8px;text-decoration:none;color:#0077cc;}
+    label{display:block;margin:14px 0 6px;font-weight:600;}
+    select,button{padding:6px 14px;font-size:1rem;}
+    button{margin-top:12px;cursor:pointer;}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="history.html">Narratives</a>|
+    <a href="create.html">Create</a>
+  </nav>
+
+  <h2>System message</h2>
+  <textarea id="sys" rows="4">Imagine.</textarea>
+
+  <h2>User message</h2>
+  <textarea id="usr" rows="4"></textarea>
+
+  <label for="targetPage">Send to narrative</label>
+  <select id="targetPage"></select>
+
+  <label><input type="checkbox" id="testMode"> Test mode — do NOT save</label>
+
+  <button id="send">Ask</button>
+
+  <h2>Answer</h2>
+  <pre id="out">(waiting…)</pre>
+
+<script type="module">
+(async ()=>{
+  // 1. Fetch narratives (prefixed IDs)
+  const NARRATIVES = await fetch('/api/narratives').then(r=>r.json());
+
+  // 2. Populate <select>
+  const sel   = document.getElementById('targetPage');
+  const params= new URLSearchParams(location.search);
+  const initial=params.get('page')||NARRATIVES[0]?.id;
+
+  function rebuildSelect(){
+    sel.innerHTML='';
+    NARRATIVES.forEach(n=>{
+      const o=document.createElement('option');o.value=n.id;o.textContent=n.title;sel.appendChild(o);});
+    // divider + add new
+    sel.appendChild(Object.assign(document.createElement('option'),{disabled:true,textContent:'──────────'}));
+    sel.appendChild(Object.assign(document.createElement('option'),{value:'__new__',textContent:'➕ New narrative…'}));
+    sel.value=initial;
+  }
+  rebuildSelect();
+
+  sel.addEventListener('change',e=>{if(e.target.value==='__new__') newNarrativeFlow();});
+
+  // 3. Ask button
+  document.getElementById('send').addEventListener('click',async ()=>{
+    const btn=document.getElementById('send');const out=document.getElementById('out');
+    btn.disabled=true;out.textContent='Thinking…';
+    try{
+      const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        system:document.getElementById('sys').value,
+        user  :document.getElementById('usr').value,
+        narrative:sel.value,
+        test  :document.getElementById('testMode').checked})});
+      const j=await res.json();out.textContent=j.answer||'(no answer)';
+    }catch(err){console.error(err);out.textContent='Error — see console';}
+    finally{btn.disabled=false;}
+  });
+
+  // 4. New narrative flow with section choice
+  async function newNarrativeFlow(){
+    const title=prompt('Title for the new narrative category?');
+    if(!title){sel.value=initial;return;}
+    const section=prompt('Section? Type "fantasia" or "genesis" (default fantasia)').toLowerCase().trim()||'fantasia';
+    if(!['fantasia','genesis'].includes(section)){alert('Invalid section');sel.value=initial;return;}
+    try{
+      const res=await fetch('/api/narratives',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,section})});
+      if(!res.ok){const txt=await res.text();throw new Error(txt);}      
+      const obj=await res.json();NARRATIVES.push(obj);rebuildSelect();sel.value=obj.id;
+    }catch(err){console.error(err);alert('Failed to create narrative');sel.value=initial;}
+  }
+})();
+</script>
+</body>
+</html>
