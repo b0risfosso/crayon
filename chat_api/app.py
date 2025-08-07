@@ -2,24 +2,28 @@ from uuid import uuid4
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from openai import OpenAI
-import os
-import json
+import os, json, sqlite3, re
 from pathlib import Path
-import sqlite3
-import re
 
+# ── Config ─────────────────────────────────────────────────────────
 load_dotenv()
-#OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16")
+OPENAI_MODEL  = os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16")
+SECTIONS      = {               # prefix mapping
+    "fantasia": "fantasia-",
+    "genesis" : "genesis-"
+}
+
+# ── IO paths ───────────────────────────────────────────────────────
+BASE_DIR       = Path(__file__).parent
+DB_FILE        = BASE_DIR / "narratives_data.db"
+NARRATIVES_FILE= BASE_DIR / "narratives.json"
+
+# ── OpenAI client ──────────────────────────────────────────────────
 client = OpenAI()
 
-DB_FILE = Path(__file__).parent / "narratives_data.db"
-NARRATIVES_FILE = Path(__file__).parent / "narratives.json"
-
-# allow access from multiple Flask threads
+# ── SQLite connection ─────────────────────────────────────────────
 conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 conn.row_factory = sqlite3.Row
-
 with conn:
     conn.execute("""
     CREATE TABLE IF NOT EXISTS notes (
@@ -31,10 +35,9 @@ with conn:
       answer      TEXT,
       x           REAL DEFAULT 0,
       y           REAL DEFAULT 0,
-      is_protocol INTEGER DEFAULT 0,        -- ⬅︎ NEW
+      is_protocol INTEGER DEFAULT 0,
       created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
+    )""")
 
 
 SYSTEM_PROMPT = (
@@ -68,58 +71,91 @@ SYSTEM_PROMPT = (
 )
 
 
-def load_narratives():
-    try:
-        if NARRATIVES_FILE.exists():
-            with open(NARRATIVES_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except Exception as e:
-        print("❌ Failed to load narratives.json:", e)
-    return []
-
-def save_narratives(list_of_dicts):
-    try:
-        with open(NARRATIVES_FILE, "w", encoding="utf-8") as f:
-            json.dump(list_of_dicts, f, ensure_ascii=False, indent=2)
-        print("✅ narratives.json updated")
-    except Exception as e:
-        print("❌ Failed to write narratives.json:", e)
-
-
-def add_record(narrative, sys_msg, usr_msg, answer,
-               parent=None, is_protocol=False):
-    rid = str(uuid4())
-    with conn:
-        conn.execute("""
-            INSERT INTO notes(id, narrative, parent, system,
-                              user, answer, is_protocol)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (rid, narrative, parent, sys_msg,
-              usr_msg, answer, int(is_protocol)))
-    return rid
-
-
-def ask(sys_msg: str, usr_msg: str) -> str:
-    resp = client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": sys_msg},
-            {"role": "user",   "content": usr_msg},
-        ],
-    )
-    return resp.choices[0].message.content
+# ── Helper functions ──────────────────────────────────────────────
 
 def slugify(s: str) -> str:
-    """Turn a title into a URL‑friendly lowercase slug."""
+    """URL‑friendly slug, lowercase alnum + dash"""
     s = s.lower()
     s = re.sub(r'[^a-z0-9]+', '-', s)
     return re.sub(r'^-+|-+$', '', s)
 
+
+def load_narratives():
+    try:
+        if NARRATIVES_FILE.exists():
+            return json.loads(NARRATIVES_FILE.read_text("utf-8"))
+    except Exception as e:
+        print("❌ Failed to load narratives.json:", e)
+    return []
+
+
+def save_narratives(data):
+    try:
+        NARRATIVES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), "utf-8")
+    except Exception as e:
+        print("❌ Failed to write narratives.json:", e)
+
+
+def add_record(narrative, sys_msg, usr_msg, answer, parent=None, *, is_protocol=False):
+    rid = str(uuid4())
+    with conn:
+        conn.execute("""
+            INSERT INTO notes(id, narrative, parent, system, user, answer, is_protocol)
+                 VALUES (?,?,?,?,?,?,?)""",
+            (rid, narrative, parent, sys_msg, usr_msg, answer, int(is_protocol)))
+    return rid
+
+
+def ask(sys_msg, usr_msg):
+    resp = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[{"role":"system","content":sys_msg},
+                  {"role":"user",  "content":usr_msg}],
+    )
+    return resp.choices[0].message.content
+
+
+# ── Flask app ─────────────────────────────────────────────────────
 app = Flask(__name__)
 NARRATIVES = load_narratives() or [{"id":"default","title":"Default"}]
 
 # --------------------------------------------------------------------
 # Routes  -------------------------------------------------------------
+
+# -----------------------------------------------------------------
+# Routes
+# -----------------------------------------------------------------
+
+@app.route("/api/narratives", methods=["GET", "POST"])
+def manage_narratives():
+    """GET returns list; POST creates new category.
+       Body: {title:"Cell shape", section:"fantasia"|"genesis"|null}
+    """
+    global NARRATIVES
+    if request.method == "GET":
+        return jsonify(NARRATIVES)
+
+    data     = request.get_json(force=True)
+    title    = (data.get("title") or "").strip()
+    section  = (data.get("section") or "").lower()
+    if not title:
+        return jsonify({"error":"Title is required"}), 400
+
+    prefix   = SECTIONS.get(section, "")
+    base_id  = slugify(title)
+    unique   = prefix + base_id
+
+    # ensure uniqueness
+    existing = {n["id"] for n in NARRATIVES}
+    if unique in existing:
+        return jsonify({"error":"ID already exists"}), 409
+
+    new_item = {"id": unique, "title": title}
+    NARRATIVES.append(new_item)
+    save_narratives(NARRATIVES)
+    return jsonify(new_item), 201
+
+
 @app.route("/api/note")
 def get_note():
     nid = request.args.get("id")
@@ -248,34 +284,3 @@ def edit():
     if cur.rowcount == 0:
         return jsonify({"error":"id not found"}), 404
     return jsonify({"status":"edited"})
-
-@app.route("/api/narratives", methods=["GET", "POST"])
-def manage_narratives():
-    global NARRATIVES
-
-    if request.method == "GET":
-        return jsonify(NARRATIVES)
-
-    data  = request.get_json(force=True)
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error":"Title is required"}), 400
-
-    base_id      = slugify(title)
-    unique_id    = base_id
-    existing_ids = {n["id"] for n in NARRATIVES}
-    suffix       = 1
-    # bump the slug until it's not already taken
-    while unique_id in existing_ids:
-        unique_id = f"{base_id}-{suffix}"
-        suffix += 1
-
-    new_item = {"id": unique_id, "title": title}
-    NARRATIVES.append(new_item)
-
-    try:
-        save_narratives(NARRATIVES)
-    except Exception:
-        return jsonify({"error":"Could not persist narratives"}), 500
-
-    return jsonify(new_item), 201
