@@ -6,8 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     :root{--bg:#f5f5f5;--card:#ffffff;--accent:#4aa3ff;}
-    html,body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);}
-    /* top bar */
+    html,body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);}    /* top bar */
     nav{display:flex;align-items:center;gap:14px;padding:12px 20px;background:#222;color:#eee;font-size:14px}
     nav a{color:#9fd3ff;text-decoration:none;}
     nav select{margin-left:auto;padding:4px 6px;font-size:14px}
@@ -44,118 +43,59 @@
     const sel   = document.getElementById('narrativeSelect');
     const list  = document.getElementById('listContainer');
     const params= new URLSearchParams(location.search);
-    const PAGE  = params.get('page'); // category id, if present
 
     init();
 
     async function init(){
       const catsAll = await fetchJson('/api/narratives');
       const cats    = catsAll.filter(n => n.id.startsWith(PREFIX));
-      if(!cats.length){
-        list.innerHTML = '<div id="status">No Fantasia categories yet.</div>';
-        return;
-      }
+      if(!cats.length){list.innerHTML='<div id="status">No Fantasia narratives yet.</div>';return;}
 
-      if(!PAGE){
-        // ── Category overview ───────────────────────────────
-        sel.style.display = 'none';
-        renderCategories(cats);
-        return;
-      }
-
-      // ── Inside a category ────────────────────────────────
       populateSelect(cats);
-      sel.value = PAGE;
-      loadNarratives(PAGE);
+      const current = params.get('page') || cats[0].id;
+      sel.value = current;
+      loadNarratives(current);
     }
 
-    // ---------- Category cards (first screen) ----------
-    function renderCategories(arr){
-      list.innerHTML = '';
-      arr.forEach(cat=>{
-        const det  = document.createElement('details');
-        det.className = 'card';
-        const sum  = document.createElement('summary');
-
-        const title = document.createElement('span');
-        title.className = 'card-title';
-        title.textContent = cat.title;
-
-        const btn = document.createElement('a');
-        btn.className = 'enter-btn';
-        btn.textContent = 'Enter';
-        btn.href = `fantasia.html?page=${cat.id}`;
-
-        sum.append(title, btn);
-        det.append(sum);
-        list.appendChild(det);
-      });
-    }
-
-    // ---------- Category dropdown (inside) -------------
     function populateSelect(arr){
-      sel.innerHTML = '';
+      sel.innerHTML='';
       arr.forEach(n=>{
-        const o = document.createElement('option');
-        o.value = n.id;
-        o.textContent = n.title;
+        const o=document.createElement('option');
+        o.value=n.id;
+        o.textContent=n.title;
         sel.appendChild(o);
       });
-      sel.addEventListener('change', e=>{
-        params.set('page', e.target.value);
-        location.search = params;           // reload into new category
+      sel.addEventListener('change',e=>{
+        params.set('page',e.target.value);
+        history.replaceState(null,'',`${location.pathname}?${params}`);
+        loadNarratives(e.target.value);
       });
     }
 
-    // ---------- Narrative list (inside) -----------------
-    async function loadNarratives(id){
-      list.innerHTML = '<div id="status">Loading…</div>';
+    async function loadNarratives(narrId){
+      list.innerHTML='<div id="status">Loading…</div>';
       try{
-        const data = await fetchJson(`/api/history?narrative=${encodeURIComponent(id)}`);
+        const data = await fetchJson(`/api/history?narrative=${encodeURIComponent(narrId)}`);
         renderList(data);
-      }catch(err){
-        list.innerHTML = '<div id="status">Failed to load.</div>';
-        console.error(err);
-      }
-    }
+      }catch(err){list.innerHTML='<div id="status">Failed to load.</div>';console.error(err);} }
 
     function renderList(data){
-      const roots = data.filter(it => !it.parent);
-      list.innerHTML = '';
-      if(!roots.length){
-        list.innerHTML = '<div id="status">No entries in this category.</div>';
-        return;
-      }
+      const roots=data.filter(it=>!it.parent);
+      list.innerHTML='';
+      if(!roots.length){list.innerHTML='<div id="status">No entries in this narrative.</div>';return;}
       roots.forEach(item=>{
-        const det  = document.createElement('details');
-        det.className = 'card';
-        const sum  = document.createElement('summary');
-
-        const title = document.createElement('span');
-        title.className = 'card-title';
-        title.textContent = `🗨️ ${item.user?.slice(0,120) || '(system)'}`;
-
-        const btn = document.createElement('a');
-        btn.className = 'enter-btn';
-        btn.textContent = 'Enter';
-        btn.href = `entry.html?id=${item.id}`;
-
-        sum.append(title, btn);
-
-        const body = document.createElement('div');
-        body.className = 'card-body';
-        body.textContent = item.answer;
-
-        det.append(sum, body);
+        const det=document.createElement('details');det.className='card';
+        const sum=document.createElement('summary');
+        const title=document.createElement('span');title.className='card-title';title.textContent=`🗨️ ${item.user?.slice(0,120)||'(system)'}`;
+        const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`entry.html?id=${item.id}`;
+        sum.append(title,btn);
+        const body=document.createElement('div');body.className='card-body';body.textContent=item.answer;
+        det.append(sum,body);
         list.appendChild(det);
       });
     }
 
-    async function fetchJson(url){
-      const r = await fetch(url);
-      if(!r.ok) throw new Error(r.statusText);
-      return r.json();
-    }
+    async function fetchJson(url){const r=await fetch(url);if(!r.ok) throw new Error(r.statusText);return r.json();}
   </script>
 </body>
 </html>
