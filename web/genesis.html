@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Fantasiagenesis — Genesis</title>
+  <title>Fantasiagenesis — Genesis</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     :root{--bg:#f5f5f5;--card:#ffffff;--accent:#4aa3ff;}
@@ -13,17 +13,17 @@
 
     main{max-width:900px;margin:0 auto;padding:32px 20px 60px;}
 
-    details.note{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;box-shadow:0 2px 6px rgba(0,0,0,.06);overflow:hidden;transition:border-color .15s;}
-    details.note[open]{border-color:var(--accent);}
+    details.card{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;box-shadow:0 2px 6px rgba(0,0,0,.06);overflow:hidden;transition:border-color .15s;}
+    details.card[open]{border-color:var(--accent);}
 
     summary{cursor:pointer;padding:14px 20px;display:flex;align-items:center;gap:12px;font-weight:600;list-style:none;}
     summary::-webkit-details-marker{display:none;}
-    .note-title{flex:1;}
+    .card-title{flex:1;}
     .enter-btn{padding:4px 10px;font-size:13px;border:1px solid var(--accent);border-radius:6px;background:#fff;color:var(--accent);text-decoration:none;transition:.15s;white-space:nowrap;}
     .enter-btn:hover{background:var(--accent);color:#fff;}
 
-    .note-body{padding:16px 20px 24px;border-top:1px solid #eee;white-space:pre-wrap;line-height:1.4;font-size:15px;}
-    details.note[open] .note-body{animation:fadeIn .25s ease;}
+    .card-body{padding:16px 20px 24px;border-top:1px solid #eee;white-space:pre-wrap;line-height:1.4;font-size:15px;}
+    details.card[open] .card-body{animation:fadeIn .25s ease;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
 
     #status{text-align:center;font-size:1rem;color:#666;margin-top:60px;}
@@ -39,32 +39,51 @@
   <main id="listContainer"><div id="status">Loading…</div></main>
 
   <script type="module">
-    const PREFIX = 'genesis-';
-
+    const PREFIX='genesis-';
     const sel=document.getElementById('narrativeSelect');
     const list=document.getElementById('listContainer');
     const params=new URLSearchParams(location.search);
-    let CURRENT_PAGE;
+    const PAGE=params.get('page');
 
     init();
 
     async function init(){
-      const all = await fetchJson('/api/narratives');
-      const cats = all.filter(n=>n.id.startsWith(PREFIX));
-      if(!cats.length){list.innerHTML='<div id="status">No Genesis narratives yet.</div>';return;}
+      const all=await fetchJson('/api/narratives');
+      const cats=all.filter(n=>n.id.startsWith(PREFIX));
+      if(!cats.length){list.innerHTML='<div id="status">No Genesis categories yet.</div>';return;}
+
+      if(!PAGE){
+        sel.style.display='none';
+        renderCategories(cats);
+        return;
+      }
+
       populateSelect(cats);
-      CURRENT_PAGE=params.get('page')||cats[0].id;
-      sel.value=CURRENT_PAGE;
-      loadNarratives(CURRENT_PAGE);
+      sel.value=PAGE;
+      loadNarratives(PAGE);
+    }
+
+    function renderCategories(arr){
+      list.innerHTML='';
+      arr.forEach(cat=>{
+        const det=document.createElement('details');det.className='card';
+        const sum=document.createElement('summary');
+        const title=document.createElement('span');title.className='card-title';title.textContent=cat.title;
+        const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`genesis.html?page=${cat.id}`;
+        sum.append(title,btn);
+        det.append(sum);
+        list.appendChild(det);
+      });
     }
 
     function populateSelect(arr){
       sel.innerHTML='';
       arr.forEach(n=>{const o=document.createElement('option');o.value=n.id;o.textContent=n.title;sel.appendChild(o);});
-      sel.addEventListener('change',e=>{params.set('page',e.target.value);history.replaceState(null,'',`${location.pathname}?${params}`);list.innerHTML='<div id="status">Loading…</div>';loadNarratives(e.target.value);});
+      sel.addEventListener('change',e=>{params.set('page',e.target.value);location.search=params;});
     }
 
     async function loadNarratives(id){
+      list.innerHTML='<div id="status">Loading…</div>';
       try{const data=await fetchJson(`/api/history?narrative=${encodeURIComponent(id)}`);renderList(data);}catch(err){list.innerHTML='<div id="status">Failed to load.</div>';console.error(err);} }
 
     function renderList(data){
@@ -72,14 +91,14 @@
       list.innerHTML='';
       if(!roots.length){list.innerHTML='<div id="status">No entries in this category.</div>';return;}
       roots.forEach(item=>{
-        const details=document.createElement('details');details.className='note';
-        const summary=document.createElement('summary');
-        const titleSpan=document.createElement('span');titleSpan.className='note-title';titleSpan.textContent=`🗨️ ${item.user?.slice(0,120)||'(system)'}`;
+        const det=document.createElement('details');det.className='card';
+        const sum=document.createElement('summary');
+        const title=document.createElement('span');title.className='card-title';title.textContent=`🗨️ ${item.user?.slice(0,120)||'(system)'}`;
         const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`entry.html?id=${item.id}`;
-        summary.append(titleSpan,btn);
-        const body=document.createElement('div');body.className='note-body';body.textContent=item.answer;
-        details.append(summary,body);
-        list.appendChild(details);
+        sum.append(title,btn);
+        const body=document.createElement('div');body.className='card-body';body.textContent=item.answer;
+        det.append(sum,body);
+        list.appendChild(det);
       });
     }
 
