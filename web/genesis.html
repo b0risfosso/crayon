@@ -106,9 +106,9 @@
         const del = document.createElement('button');
         del.textContent = '🗑️';
         del.onclick = async ()=> {
-        if(!confirm('Delete this narrative and all its notes?')) return;
-        await fetch('/api/narratives/'+cat.id,{method:'DELETE'});
-        location.reload();
+        if(!confirm('Delete this note?')) return;
+        await fetch('/api/notes/'+item.id,{method:'DELETE'});
+        loadNarratives(sel.value);   // refresh current list
         };
         sum.append(title,btn);
         sum.appendChild(del);

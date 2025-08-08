@@ -179,6 +179,12 @@ def get_note():
     row = conn.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
     return (jsonify(dict(row)) if row else (jsonify({"error": "not found"}), 404))
 
+@app.route("/api/notes/<nid>", methods=["DELETE"])
+def delete_note(nid):
+    with conn:
+        cur = conn.execute("DELETE FROM notes WHERE id=? OR parent=? OR parent IN (SELECT id FROM notes WHERE parent=?", (nid,))
+    return ("", 204) if cur.rowcount else (jsonify({"error":"id not found"}),404)
+
 
 @app.route("/api/subnotes", methods=["GET", "POST"])
 def subnotes():
