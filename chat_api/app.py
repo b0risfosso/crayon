@@ -156,6 +156,23 @@ def manage_narratives():
     return jsonify(new_item), 201
 
 
+@app.route("/api/narratives/<nid>", methods=["DELETE"])
+def delete_category(nid):
+    # 1. remove from JSON list
+    global NARRATIVES
+    before = len(NARRATIVES)
+    NARRATIVES = [n for n in NARRATIVES if n["id"] != nid]
+    if len(NARRATIVES) == before:
+        return jsonify({"error": "id not found"}), 404
+    save_narratives(NARRATIVES)
+
+    # 2. purge (or re-assign) its notes
+    with conn:
+        conn.execute("DELETE FROM notes WHERE narrative = ?", (nid,))
+    return "", 204
+
+
+
 @app.route("/api/note")
 def get_note():
     nid = request.args.get("id")

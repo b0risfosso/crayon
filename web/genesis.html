@@ -70,7 +70,15 @@
         const sum=document.createElement('summary');
         const title=document.createElement('span');title.className='card-title';title.textContent=cat.title;
         const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`genesis.html?page=${cat.id}`;
+        const del = document.createElement('button');
+        del.textContent = '🗑️';
+        del.onclick = async ()=> {
+        if(!confirm('Delete this narrative and all its notes?')) return;
+        await fetch('/api/narratives/'+cat.id,{method:'DELETE'});
+        location.reload();
+        };
         sum.append(title,btn);
+        sum.appendChild(del);
         det.append(sum);
         list.appendChild(det);
       });
@@ -95,7 +103,15 @@
         const sum=document.createElement('summary');
         const title=document.createElement('span');title.className='card-title';title.textContent=`🗨️ ${item.user?.slice(0,120)||'(system)'}`;
         const btn=document.createElement('a');btn.className='enter-btn';btn.textContent='Enter';btn.href=`entry.html?id=${item.id}`;
+        const del = document.createElement('button');
+        del.textContent = '🗑️';
+        del.onclick = async ()=> {
+        if(!confirm('Delete this narrative and all its notes?')) return;
+        await fetch('/api/narratives/'+cat.id,{method:'DELETE'});
+        location.reload();
+        };
         sum.append(title,btn);
+        sum.appendChild(del);
         const body=document.createElement('div');body.className='card-body';body.textContent=item.answer;
         det.append(sum,body);
         list.appendChild(det);
