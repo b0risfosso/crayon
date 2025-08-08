@@ -16,12 +16,21 @@
 </head>
 <body>
   <nav>
-    <a href="history.html">Narratives</a>|
+    <a href="history.html">Narratives</a> |
     <a href="create.html">Create</a>
   </nav>
 
+  <!-- Template selector -->
+  <label for="tplSel">Template</label>
+  <select id="tplSel">
+    <option value="">— choose a template —</option>
+    <option value="narr">Scientific Narrative</option>
+    <option value="theory">Theory / Method</option>
+    <option value="hypo">Hypothesis List</option>
+  </select>
+
   <h2>System message</h2>
-  <textarea id="sys" rows="4">Imagine.</textarea>
+  <textarea id="sys" rows="4"></textarea>
 
   <h2>User message</h2>
   <textarea id="usr" rows="4"></textarea>
@@ -38,10 +47,67 @@
 
 <script type="module">
 (async ()=>{
-  // 1. Fetch narratives (prefixed IDs)
+
+  /* ---------- 0. templates ---------- */
+  const TEMPLATES = {
+    narr : {
+      sys : "Construct a comprehensive scientific narrative of the following topic.",
+      usr : "Construct a narrative of [topic]."
+    },
+    theory : {
+      sys : `You are a research assistant who combines rigorous scientific reasoning with speculative creativity.
+When the user asks for a theory/method to achieve a given outcome, always:
+State key assumptions (environment, available technology, time-scale).
+Provide a set of hypotheses.
+Describe a step-by-step pathway grounded in known physics, chemistry, and biology; where knowledge is missing, propose plausible advanced or hypothetical techniques, clearly marking them speculative.
+Quantify requirements (energy, catalysts, genetic templates, computational design, reaction conditions).
+Highlight major bottlenecks, risks, and ethical issues.
+Conclude with a feasibility score (0–10) and the breakthroughs needed to reach it.
+Write in clear, precise prose. Use numbered lists, short paragraphs, and cite real concepts or literature when relevant. Maintain a neutral, informative tone; do not role-play or add narrative flair unless explicitly requested.`,
+      usr : "Construct scientific theories/methods on [topic]."
+    },
+    hypo : {
+      sys : `You are a scientific reasoning engine. Your sole task is to output a compact list of high-quality, testable hypotheses—nothing else.
+When responding:
+1. Produce 3 – 7 numbered hypotheses (H1, H2 …).
+2. For each hypothesis include exactly three short clauses in parentheses, in this order:
+   • Mechanism – one sentence naming the causal process.
+   • Prediction – one falsifiable, quantitative statement.
+   • Test – the minimal experiment or measurement that would confirm or refute it.
+3. Mark ideas that rely on unproven physics or engineering with “(speculative)” at the end of the clause where speculation occurs.
+4. Do not write any introduction, explanation, headings, or concluding text. Only the hypotheses list.
+5. Keep each hypothesis ≤ 40 words (including the three clauses).
+6. Cite real concepts or literature inline when relevant—e.g. (via actomyosin ring, Rauzi 2008)—but do not add full references.
+7. Maintain clear, precise prose; avoid jargon when a simpler term suffices.
+8. If insufficient information is available to form a hypothesis, output “No testable hypothesis can be formed with the given information.” and nothing else.`,
+      usr : "Construct a set of hypotheses on [topic]."
+    }, 
+    ladder : {
+      sys : `You are a mastery-mapping assistant.
+Your task is to analyze any given topic and construct a structured framework describing the progressive levels of mastery in both:
+
+Understanding of the topic (what is grasped intellectually or intuitively), and
+Agency over the topic (what can be manipulated, created, or influenced using that understanding).
+For each level, describe:
+The cognitive grasp or perception at that level
+The scope and form of action available at that level
+Who typically operates at this level (optional)
+Use clear titles (e.g., "Level 3 – Strategic Manipulation"), and organize the levels from basic/naive to transcendent/inventive.
+Optionally include a final level titled "Level N – Pure Fantasiagenesis", where imagination fuses with reality to unlock full creative and transformative power in the domain.
+
+Your output should be rigorous, layered, and meaningful. Avoid generic or vague descriptions.
+
+Example topics: mathematics, music, rocks, oceans, memory, cities, time, microbes, democracy, narrative, emotion.`,
+      usr : `Map the levels of mastery in understanding of and agency over [insert topic here].
+Begin from raw or naive interaction, and proceed toward full integration and transformation. Include a final level of Pure Fantasiagenesis, where imagination fuses with reality in this domain.`
+    }
+
+  };
+
+  /* ---------- 1. fetch narratives ---------- */
   const NARRATIVES = await fetch('/api/narratives').then(r=>r.json());
 
-  // 2. Populate <select>
+  /* ---------- 2. populate narrative <select> ---------- */
   const sel   = document.getElementById('targetPage');
   const params= new URLSearchParams(location.search);
   const initial=params.get('page')||NARRATIVES[0]?.id;
@@ -49,44 +115,13 @@
   function rebuildSelect(){
     sel.innerHTML='';
     NARRATIVES.forEach(n=>{
-      const o=document.createElement('option');o.value=n.id;o.textContent=n.title;sel.appendChild(o);});
-    // divider + add new
-    sel.appendChild(Object.assign(document.createElement('option'),{disabled:true,textContent:'──────────'}));
-    sel.appendChild(Object.assign(document.createElement('option'),{value:'__new__',textContent:'➕ New narrative…'}));
+      sel.insertAdjacentHTML('beforeend',`<option value="${n.id}">${n.title}</option>`);}
+    );
+    sel.insertAdjacentHTML('beforeend',`<option disabled>──────────</option><option value="__new__">➕ New narrative…</option>`);
     sel.value=initial;
   }
   rebuildSelect();
 
-  sel.addEventListener('change',e=>{if(e.target.value==='__new__') newNarrativeFlow();});
-
-  // 3. Ask button
-  document.getElementById('send').addEventListener('click',async ()=>{
-    const btn=document.getElementById('send');const out=document.getElementById('out');
-    btn.disabled=true;out.textContent='Thinking…';
-    try{
-      const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-        system:document.getElementById('sys').value,
-        user  :document.getElementById('usr').value,
-        narrative:sel.value,
-        test  :document.getElementById('testMode').checked})});
-      const j=await res.json();out.textContent=j.answer||'(no answer)';
-    }catch(err){console.error(err);out.textContent='Error — see console';}
-    finally{btn.disabled=false;}
+  sel.addEventListener('change',e=>{
+    if(e.target.value==='__new__') newNarrativeFlow();
   });
-
-  // 4. New narrative flow with section choice
-  async function newNarrativeFlow(){
-    const title=prompt('Title for the new narrative category?');
-    if(!title){sel.value=initial;return;}
-    const section=prompt('Section? Type "fantasia" or "genesis" (default fantasia)').toLowerCase().trim()||'fantasia';
-    if(!['fantasia','genesis'].includes(section)){alert('Invalid section');sel.value=initial;return;}
-    try{
-      const res=await fetch('/api/narratives',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,section})});
-      if(!res.ok){const txt=await res.text();throw new Error(txt);}      
-      const obj=await res.json();NARRATIVES.push(obj);rebuildSelect();sel.value=obj.id;
-    }catch(err){console.error(err);alert('Failed to create narrative');sel.value=initial;}
-  }
-})();
-</script>
-</body>
-</html>
