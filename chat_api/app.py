@@ -182,8 +182,15 @@ def get_note():
 @app.route("/api/notes/<nid>", methods=["DELETE"])
 def delete_note(nid):
     with conn:
-        cur = conn.execute("DELETE FROM notes WHERE id=? OR parent=? OR parent IN (SELECT id FROM notes WHERE parent=?", (nid,))
-    return ("", 204) if cur.rowcount else (jsonify({"error":"id not found"}),404)
+        conn.execute("""
+        WITH RECURSIVE kids(id) AS (
+          SELECT ? UNION ALL
+          SELECT n.id FROM notes n JOIN kids k ON n.parent = k.id
+        )
+        DELETE FROM notes WHERE id IN kids
+        """, (nid,))
+    return "", 204
+
 
 
 @app.route("/api/subnotes", methods=["GET", "POST"])
