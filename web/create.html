@@ -126,3 +126,64 @@ Begin from raw or naive interaction, and proceed toward full integration and tra
   sel.addEventListener('change',e=>{
     if(e.target.value==='__new__') newNarrativeFlow();
   });
+
+  /* ---------- 3. template dropdown ---------- */
+  const tplSel = document.getElementById('tplSel');
+  tplSel.addEventListener('change', e=>{
+    const tpl=TEMPLATES[e.target.value]||{sys:'',usr:''};
+    document.getElementById('sys').value=tpl.sys;
+    document.getElementById('usr').value=tpl.usr;
+  });
+
+  /* ---------- 4. Ask button ---------- */
+  document.getElementById('send').addEventListener('click',async ()=>{
+    const btn=document.getElementById('send');
+    const out=document.getElementById('out');
+    btn.disabled=true; out.textContent='Thinking…';
+    try{
+      const res=await fetch('/api/ask',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          system   : document.getElementById('sys').value,
+          user     : document.getElementById('usr').value,
+          narrative: sel.value,
+          test     : document.getElementById('testMode').checked
+        })
+      });
+      const j=await res.json();
+      out.textContent=j.answer||'(no answer)';
+    }catch(err){
+      console.error(err);
+      out.textContent='Error — see console';
+    }finally{
+      btn.disabled=false;
+    }
+  });
+
+  /* ---------- 5. New narrative flow ---------- */
+  async function newNarrativeFlow(){
+    const title=prompt('Title for the new narrative category?');
+    if(!title){sel.value=initial;return;}
+    const section=prompt('Section? Type "fantasia" or "genesis" (default fantasia)').toLowerCase().trim()||'fantasia';
+    if(!['fantasia','genesis'].includes(section)){alert('Invalid section');sel.value=initial;return;}
+    try{
+      const res=await fetch('/api/narratives',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title,section})
+      });
+      if(!res.ok){throw new Error(await res.text());}
+      const obj=await res.json();
+      NARRATIVES.push(obj);
+      rebuildSelect();
+      sel.value=obj.id;
+    }catch(err){
+      console.error(err);
+      alert('Failed to create narrative');
+      sel.value=initial;
+    }
+  }
+
+})();
+</script>
+</body>
+</html>
