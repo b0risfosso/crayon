@@ -43,6 +43,12 @@
   </nav>
 
   <main>
+    <!-- Listing -->
+    <section id="listContainer" class="card">
+      <div class="head">Narratives</div>
+      <div class="body"><div id="status">Loading…</div></div>
+    </section>
+
     <!-- Create Category -->
     <section class="card">
       <div class="head">Create Category</div>
@@ -93,16 +99,11 @@
         <label for="usr">User message</label>
         <textarea id="usr"></textarea>
 
-        <button id="askBtn">Ask & Save</button>
+        <button id="askBtn">Create Narrative</button>
         <div id="askMsg" style="margin-top:8px;color:#444;"></div>
       </div>
     </section>
 
-    <!-- Listing -->
-    <section id="listContainer" class="card">
-      <div class="head">Fantasia Narratives</div>
-      <div class="body"><div id="status">Loading…</div></div>
-    </section>
   </main>
 
   <script type="module">
