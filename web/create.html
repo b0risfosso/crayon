@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Fantasiagenesis — Create</title>
+  <title>Fantasiagenesis — Fantasia</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     :root{--bg:#f5f5f5;--card:#ffffff;--accent:#4aa3ff;}
@@ -23,6 +23,7 @@
     textarea{min-height:100px}
     button{margin-top:10px;padding:8px 14px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
     button:disabled{opacity:.6;cursor:default}
+    pre.output{white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #ccc;background:#f7f7f7;border-radius:6px;padding:10px;margin-top:10px}
 
     /* narrative list */
     details.narr{background:var(--card);border:1px solid #ccc;border-radius:8px;margin-bottom:16px;box-shadow:0 2px 6px rgba(0,0,0,.06);overflow:hidden;transition:border-color .15s;}
@@ -43,27 +44,14 @@
   </nav>
 
   <main>
-    <!-- Listing -->
-    <section id="listContainer" class="card">
-      <div class="head">Narratives</div>
-      <div class="body"><div id="status">Loading…</div></div>
-    </section>
-
-    <!-- Create Category -->
+    <!-- Create Category (defaults to Fantasia) -->
     <section class="card">
-      <div class="head">Create Category</div>
+      <div class="head">Create Category (Fantasia)</div>
       <div class="body">
         <div class="row">
           <div>
             <label for="catTitle">Title</label>
             <input id="catTitle" type="text" placeholder="e.g., rocks">
-          </div>
-          <div>
-            <label for="catSection">Section</label>
-            <select id="catSection">
-              <option value="fantasia" selected>Fantasia</option>
-              <option value="genesis">Genesis</option>
-            </select>
           </div>
         </div>
         <button id="createCatBtn">Create Category</button>
@@ -99,15 +87,20 @@
         <label for="usr">User message</label>
         <textarea id="usr"></textarea>
 
-        <button id="askBtn">Create Narrative</button>
-        <div id="askMsg" style="margin-top:8px;color:#444;"></div>
+        <button id="askBtn">Ask & Save</button>
+        <pre id="llmOut" class="output" style="display:none;"></pre>
       </div>
     </section>
 
+    <!-- Listing -->
+    <section id="listContainer" class="card">
+      <div class="head">Fantasia Narratives</div>
+      <div class="body"><div id="status">Loading…</div></div>
+    </section>
   </main>
 
   <script type="module">
-    const PREFIX='fantasia-';
+    const PREFIX='fantasia-';  // default & only section here
 
     // Templates for LLM
     const TEMPLATES = {
@@ -147,18 +140,16 @@ When responding:
 
     // Elements
     const listCardBody = document.querySelector('#listContainer .body');
-    const statusDiv = document.getElementById('status');
-    const tplSel = document.getElementById('tplSel');
-    const sysEl = document.getElementById('sys');
-    const usrEl = document.getElementById('usr');
-    const targetSel = document.getElementById('targetPage');
-    const askBtn = document.getElementById('askBtn');
-    const askMsg = document.getElementById('askMsg');
-    const testMode = document.getElementById('testMode');
+    const tplSel   = document.getElementById('tplSel');
+    const sysEl    = document.getElementById('sys');
+    const usrEl    = document.getElementById('usr');
+    const targetSel= document.getElementById('targetPage');
+    const askBtn   = document.getElementById('askBtn');
+    const llmOut   = document.getElementById('llmOut');
     const catTitle = document.getElementById('catTitle');
-    const catSection = document.getElementById('catSection');
     const createCatBtn = document.getElementById('createCatBtn');
-    const catMsg = document.getElementById('catMsg');
+    const catMsg   = document.getElementById('catMsg');
+    const testMode = document.getElementById('testMode');
 
     let ALL_NARRATIVES = [];
 
@@ -167,14 +158,13 @@ When responding:
     async function init(){
       await loadNarrativesList();
       buildTargetSelect();
-      // template change -> fill fields
+
       tplSel.addEventListener('change', e=>{
         const t=TEMPLATES[e.target.value]||{sys:'',usr:''};
         sysEl.value=t.sys; usrEl.value=t.usr;
       });
-      // create category button
-      createCatBtn.addEventListener('click', createCategory);
-      // LLM generate/save
+
+      createCatBtn.addEventListener('click', createCategoryFantasia);
       askBtn.addEventListener('click', askAndSave);
     }
 
@@ -196,7 +186,6 @@ When responding:
         listCardBody.innerHTML = '<div id="status">No Fantasia narratives yet.</div>';
         return;
       }
-      // fetch all histories in parallel
       Promise.all(fantCats.map(cat=>fetchJson(`/api/history?narrative=${encodeURIComponent(cat.id)}`)))
         .then(sets=>{
           sets.forEach((rows,idx)=>renderNarrative(fantCats[idx], rows));
@@ -235,8 +224,8 @@ When responding:
 
     function buildTargetSelect(){
       targetSel.innerHTML = '';
-      // existing narratives + special add-new option
-      ALL_NARRATIVES.forEach(n=>{
+      const fantOnly = ALL_NARRATIVES.filter(n=>n.id.startsWith(PREFIX));
+      fantOnly.forEach(n=>{
         const o=document.createElement('option');
         o.value=n.id; o.textContent=n.title;
         targetSel.appendChild(o);
@@ -249,20 +238,19 @@ When responding:
 
       targetSel.addEventListener('change', async e=>{
         if(e.target.value==='__new__'){
-          // inline new cat, default to Fantasia
           const title = prompt('Title for the new category?');
-          if(!title){targetSel.value = ALL_NARRATIVES[0]?.id || ''; return;}
-          const section = (prompt('Section? Type "fantasia" or "genesis" (default fantasia)')||'fantasia').toLowerCase().trim();
-          if(!['fantasia','genesis'].includes(section)){ alert('Invalid section'); targetSel.value = ALL_NARRATIVES[0]?.id || ''; return; }
+          if(!title){targetSel.value = fantOnly[0]?.id || ''; return;}
           try{
-            const res = await fetch('/api/narratives',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,section})});
+            const res = await fetch('/api/narratives',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({title, section:'fantasia'})
+            });
             if(!res.ok) throw new Error(await res.text());
             const obj = await res.json();
             ALL_NARRATIVES.push(obj);
             buildTargetSelect();
             targetSel.value = obj.id;
-            // also refresh the fantasians list if it's fantasia
-            if(obj.id.startsWith(PREFIX)) await loadNarrativesList();
+            await loadNarrativesList();
           }catch(err){
             console.error(err);
             alert('Failed to create category');
@@ -272,16 +260,15 @@ When responding:
       });
     }
 
-    async function createCategory(){
+    async function createCategoryFantasia(){
       const title = catTitle.value.trim();
-      const section = catSection.value;
       catMsg.textContent = '';
       if(!title){ catMsg.textContent='Please enter a title.'; return; }
       const btn = createCatBtn; btn.disabled=true;
       try{
         const res = await fetch('/api/narratives',{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({title, section})
+          body:JSON.stringify({title, section:'fantasia'})
         });
         if(!res.ok) throw new Error(await res.text());
         const obj = await res.json();
@@ -289,7 +276,7 @@ When responding:
         catMsg.textContent = `Created: ${obj.title} (${obj.id})`;
         catTitle.value='';
         buildTargetSelect();
-        if(obj.id.startsWith(PREFIX)) await loadNarrativesList();
+        await loadNarrativesList();
       }catch(err){
         console.error(err);
         catMsg.textContent = 'Failed to create category.';
@@ -299,26 +286,31 @@ When responding:
     }
 
     async function askAndSave(){
-      askMsg.textContent='';
+      llmOut.style.display='block';
+      llmOut.textContent='Thinking…';
       const btn = askBtn; btn.disabled=true;
       try{
         const narrativeId = targetSel.value;
-        if(!narrativeId){ askMsg.textContent='Pick a narrative (or create one).'; return; }
+        if(!narrativeId){ llmOut.textContent='Pick a narrative (or create one).'; return; }
         const payload = {
-          system: sysEl.value,
-          user  : usrEl.value,
+          system   : sysEl.value,
+          user     : usrEl.value,
           narrative: narrativeId,
-          test  : document.getElementById('testMode').checked
+          test     : testMode.checked
         };
-        const res = await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const res = await fetch('/api/ask',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(payload)
+        });
         if(!res.ok) throw new Error(await res.text());
         const j = await res.json();
-        askMsg.textContent = 'Done.';
-        // If saved (not test), refresh the list when target narrative is in Fantasia
+        // show the model output instead of "Done."
+        llmOut.textContent = j.answer || '(no answer)';
+        // If saved (not test), refresh the list (Fantasia-only page)
         if(!payload.test && narrativeId.startsWith(PREFIX)) await loadNarrativesList();
       }catch(err){
         console.error(err);
-        askMsg.textContent = 'Failed.';
+        llmOut.textContent = 'Failed.';
       }finally{
         btn.disabled=false;
       }
