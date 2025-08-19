@@ -1,175 +1,120 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fantasiagenesis</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasiagenesis — Goals / Status</title>
   <style>
+    :root {
+      --bg: #f8fafc;        /* slate-50 */
+      --card: #ffffff;       /* white */
+      --text: #0f172a;       /* slate-900 */
+      --muted: #64748b;      /* slate-500/600 */
+      --line: #e2e8f0;       /* slate-200 */
+      --bar-bg: #f1f5f9;     /* slate-100 */
+      --bar: #0f172a;        /* slate-900 */
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
-      font-family: system-ui, sans-serif;
-      background: #f8fafc;
-      color: #0f172a;
-      margin: 0;
-      padding: 0;
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg); color: var(--text);
     }
     header {
-      position: sticky;
-      top: 0;
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(4px);
-      border-bottom: 1px solid #e2e8f0;
-      padding: 1rem;
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(6px);
+      background: rgba(255,255,255,0.8);
+      border-bottom: 1px solid var(--line);
     }
-    header h1 {
-      font-size: 1.5rem;
-      font-weight: bold;
-      margin: 0;
+    .wrap { max-width: 64rem; margin: 0 auto; padding: 1rem 1rem; }
+    h1 { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
+    main { padding: 2rem 1rem; }
+    .note { color: var(--muted); margin: 0 0 1rem; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+      padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
-    main {
-      max-width: 960px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-    }
-    ul.narratives {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1rem;
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    li.goal {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 1rem;
-      padding: 1rem;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    li.goal h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin: 0 0 0.25rem 0;
-    }
-    li.goal p {
-      font-size: 0.85rem;
-      color: #475569;
-      margin: 0 0 0.5rem 0;
-    }
-    .status {
-      display: flex;
-      align-items: baseline;
-      gap: 0.25rem;
-      font-size: 0.95rem;
-      margin-top: 0.5rem;
-    }
-    .status strong {
-      font-size: 1.25rem;
-    }
-    .unit {
-      font-size: 0.75rem;
-      background: #f1f5f9;
-      color: #475569;
-      padding: 0.1rem 0.5rem;
-      border-radius: 9999px;
-      margin-left: 0.5rem;
-    }
-    .progress {
-      margin-top: 0.5rem;
-    }
-    .bar {
-      height: 8px;
-      width: 100%;
-      background: #f1f5f9;
-      border-radius: 9999px;
-      overflow: hidden;
-    }
-    .bar-fill {
-      height: 100%;
-      width: 0%;
-      background: #0f172a;
-    }
-    footer {
-      font-size: 0.75rem;
-      color: #64748b;
-      text-align: center;
-      margin-top: 2rem;
-    }
+    .title { font-weight: 700; font-size: 1.05rem; margin: 0; }
+    .desc { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
+    .row { display: flex; align-items: baseline; gap: 0.5rem; margin-top: 0.75rem; }
+    .x { font-weight: 800; font-size: 1.25rem; }
+    .goal { color: var(--muted); font-size: 0.9rem; }
+    .badge { background: var(--bar-bg); color: #475569; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.75rem; margin-left: 0.25rem; }
+    .bar { height: 8px; width: 100%; background: var(--bar-bg); border-radius: 999px; overflow: hidden; margin-top: 0.5rem; }
+    .fill { height: 100%; background: var(--bar); width: 0%; transition: width 300ms ease; border-radius: 999px; }
+    .pct { margin-top: 0.25rem; font-size: 0.75rem; color: var(--muted); }
+    footer { color: var(--muted); font-size: 0.75rem; padding: 1rem 0 2rem; }
+    code.inline { background: var(--bar-bg); padding: 0.1rem 0.35rem; border-radius: 6px; font-size: 0.85em; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Fantasiagenesis — Narratives</h1>
+    <div class="wrap" style="display:flex; align-items:center; justify-content:space-between;">
+      <h1>Fantasiagenesis</h1>
+      <nav style="color:var(--muted); font-size:0.95rem;">Goals / Status</nav>
+    </div>
   </header>
 
-  <main>
-    <p>Status format is <strong>x / goal</strong>. All narratives start at zero and can be updated later.</p>
-
-    <ul class="narratives">
-      <li class="narrative">
-        <h2>1. Harness & Store the Sun's Energy</h2>
-        <p>Capture and buffer solar energy for reliable use.</p>
-        <div class="status"><strong>0</strong> / 1000 <span class="unit">MJ</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>2. Make Revenue</h2>
-        <p>Generate initial capital for scaling builds.</p>
-        <div class="status"><strong>0</strong> / 10000 <span class="unit">$</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>3. Produce Food</h2>
-        <p>Grow or manufacture food supply.</p>
-        <div class="status"><strong>0</strong> / 10000 <span class="unit">meals</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>4. Generate Drinkable Water</h2>
-        <p>Purify or condense potable water.</p>
-        <div class="status"><strong>0</strong> / 100000 <span class="unit">liters</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>5. Build Houses</h2>
-        <p>Design and construct dwellings.</p>
-        <div class="status"><strong>0</strong> / 100 <span class="unit">houses</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>6. Construct WiFi Router</h2>
-        <p>Connectivity for the local network.</p>
-        <div class="status"><strong>0</strong> / 1 <span class="unit">router</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>7. Build a Transportation System</h2>
-        <p>Move people and resources efficiently.</p>
-        <div class="status"><strong>0</strong> / 10 <span class="unit">vehicles</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>8. Create a Waste → Resource Loop</h2>
-        <p>Close material cycles (compost, biogas, recycle).</p>
-        <div class="status"><strong>0</strong> / 1 <span class="unit">system</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>9. Create a Bioelectronic Health Device</h2>
-        <p>Wearable patch for key biosignals.</p>
-        <div class="status"><strong>0</strong> / 1 <span class="unit">device</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-      <li class="goal">
-        <h2>10. Build a Learning & Communication Hub</h2>
-        <p>Mesh network + library + community space.</p>
-        <div class="status"><strong>0</strong> / 1 <span class="unit">hub</span></div>
-        <div class="progress"><div class="bar"><div class="bar-fill"></div></div></div>
-      </li>
-    </ul>
-
-    <footer>
-      © 2025 Fantasiagenesis. All narratives are illustrative and editable.
-    </footer>
+  <main class="wrap">
+    <p class="note">Status format is <span style="font-weight:600">x / goal</span>. All goals start at zero and can be updated later.</p>
+    <section id="grid" class="grid"></section>
+    <footer>© <span id="year"></span> Fantasiagenesis. All goals are illustrative and editable.</footer>
   </main>
+
+  <script>
+    const goals = [
+      { id: 1,  title: "Harness & Store the Sun's Energy",            description: "Capture and buffer solar energy for reliable use.", unit: "MJ",        current: 0, goal: 1000 },
+      { id: 2,  title: "Make Revenue",                                 description: "Generate initial capital for scaling builds.",       unit: "$",         current: 0, goal: 10000 },
+      { id: 3,  title: "Produce Food",                                 description: "Grow or manufacture food supply.",                  unit: "meals",     current: 0, goal: 10000 },
+      { id: 4,  title: "Generate Drinkable Water",                     description: "Purify or condense potable water.",                 unit: "liters",    current: 0, goal: 10000 },
+      { id: 5,  title: "Build Houses",                                 description: "Design and construct dwellings.",                    unit: "houses",    current: 0, goal: 100 },
+      { id: 6,  title: "Construct WiFi Router",                        description: "Connectivity for the local network.",                unit: "routers",   current: 0, goal: 1 },
+      { id: 7,  title: "Build a Transportation System",                description: "Move people and resources efficiently.",             unit: "vehicles",  current: 0, goal: 10 },
+      { id: 8,  title: "Create a Waste → Resource Loop",               description: "Close material cycles (compost, biogas, recycle).", unit: "systems",   current: 0, goal: 1 },
+      { id: 9,  title: "Attain Resting Heart Rate <50 bpm",            description: "Condition the body to achieve an athletic resting heart rate.", unit: "objective", current: 0, goal: 1 },
+      { id: 10, title: "Enhanced Body & Mind",                         description: "Attain 24 hours of continuous wakefulness with no cognitive decline.", unit: "objective", current: 0, goal: 1 }
+    ];
+
+    function percent(g) {
+      if (typeof g.goal === 'number' && g.goal > 0) return Math.min(100, Math.round((g.current / g.goal) * 100));
+      return 0;
+    }
+
+    function render() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      goals.forEach(g => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        const pct = percent(g);
+        card.innerHTML = `
+          <h2 class="title">${g.id}. ${g.title}</h2>
+          <p class="desc">${g.description}</p>
+          <div class="row">
+            <span class="x">${g.current}</span>
+            <span class="goal">/ ${g.goal}</span>
+            <span class="badge">${g.unit}</span>
+          </div>
+          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+          <div class="pct">${pct}% complete</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // Expose a simple helper for updates from the console (optional)
+    // Usage: updateGoal(3, 250) to set goal id=3 current=250
+    window.updateGoal = function(id, current) {
+      const g = goals.find(x => x.id === id);
+      if (!g) return console.warn('No goal with id', id);
+      g.current = Number(current) || 0;
+      render();
+    }
+
+    document.getElementById('year').textContent = new Date().getFullYear();
+    render();
+  </script>
 </body>
 </html>
