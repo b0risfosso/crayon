@@ -1,26 +1,149 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Fantasiagenesis</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-    :root{--bg:#f5f5f7;--accent:#4aa3ff;}
-    html,body{margin:0;height:100%;font-family:system-ui,sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;}
-    main{display:flex;flex-direction:column;gap:22px;align-items:center;}
-    h1{margin:0 0 30px 0;font-size:2rem;color:#333;}
-    a.btn{
-      min-width:220px;text-align:center;padding:14px 26px;font-size:1rem;font-weight:600;text-decoration:none;
-      color:#fff;background:var(--accent);border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,.1);
-      transition:background .15s,transform .15s;
+export default function FantasiagenesisSite() {
+  const goals = [
+    {
+      id: 1,
+      title: "Harness & Store the Sun's Energy",
+      description: "Capture and buffer solar energy for reliable use.",
+      unit: "MJ",
+      current: 0,
+      goal: 1000,
+    },
+    {
+      id: 2,
+      title: "Make Revenue",
+      description: "Generate initial capital for scaling builds.",
+      unit: "$",
+      current: 0,
+      goal: 10000,
+    },
+    {
+      id: 3,
+      title: "Produce Food",
+      description: "Grow or manufacture food supply.",
+      unit: "meals",
+      current: 0,
+      goal: 10000,
+    },
+    {
+      id: 4,
+      title: "Generate Drinkable Water",
+      description: "Purify or condense potable water.",
+      unit: "liters",
+      current: 0,
+      goal: 100000,
+    },
+    {
+      id: 5,
+      title: "Build Houses",
+      description: "Design and construct dwellings.",
+      unit: "houses",
+      current: 0,
+      goal: 100,
+    },
+    {
+      id: 6,
+      title: "Construct WiFi Router",
+      description: "Connectivity for the local network.",
+      unit: "routers",
+      current: 0,
+      goal: 1,
+    },
+    {
+      id: 7,
+      title: "Build a Transportation System",
+      description: "Move people and resources efficiently.",
+      unit: "vehicles",
+      current: 0,
+      goal: 10,
+    },
+    {
+      id: 8,
+      title: "Create a Waste → Resource Loop",
+      description: "Close material cycles (compost, biogas, recycle).",
+      unit: "systems",
+      current: 0,
+      goal: 1,
+    },
+    {
+      id: 9,
+      title: "Create a Bioelectronic Health Device",
+      description: "Wearable patch for key biosignals.",
+      unit: "devices",
+      current: 0,
+      goal: 1,
+    },
+    {
+      id: 10,
+      title: "Build a Learning & Communication Hub",
+      description: "Mesh network + library + community space.",
+      unit: "hubs",
+      current: 0,
+      goal: 1,
+    },
+  ];
+
+  function percent(g) {
+    if (typeof g.goal === "number" && g.goal > 0) {
+      return Math.min(100, Math.round((g.current / g.goal) * 100));
     }
-    a.btn:hover{background:#2f8cff;transform:translateY(-2px);}
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Fantasiagenesis</h1>
-    <a href="create.html" class="btn">Create</a>
-  </main>
-</body>
-</html>
+    return 0;
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-slate-200">
+        <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">Fantasiagenesis</h1>
+          <nav className="text-sm text-slate-600">Goals / Status</nav>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-4 py-8">
+        <p className="mb-6 text-slate-600">
+          Status format is <span className="font-semibold">x / goal</span>. All goals start at zero and can be updated later.
+        </p>
+
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {goals.map((g) => (
+            <li key={g.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold leading-tight">{g.id}. {g.title}</h2>
+                  <p className="mt-1 text-sm text-slate-600">{g.description}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-baseline gap-2">
+                <span className="text-xl font-bold">{g.current}</span>
+                <span className="text-sm text-slate-500">/ {typeof g.goal === "number" ? g.goal : g.goal}</span>
+                <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  {typeof g.goal === "number" ? g.unit : g.unit}
+                </span>
+              </div>
+
+              {typeof g.goal === "number" ? (
+                <div className="mt-3">
+                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-slate-800 transition-[width] duration-500"
+                      style={{ width: `${percent(g)}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-xs text-slate-600">{percent(g)}% complete</div>
+                </div>
+              ) : (
+                <div className="mt-3 text-xs text-slate-500">
+                  Goal is a placeholder (X/Y). Set a numeric target to enable progress.
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <footer className="mt-8 text-xs text-slate-500">
+          © {new Date().getFullYear()} Fantasiagenesis. All goals are illustrative and editable.
+        </footer>
+      </main>
+    </div>
+  );
+}

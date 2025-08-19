@@ -19,3 +19,5 @@ chat_api/__pycache__/
 
 chat_api/narratives_data.db
 chat_api/narratives.json
+
+new lib/
