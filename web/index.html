@@ -64,16 +64,16 @@
 
   <script>
     const goals = [
-      { id: 1,  title: "Harness & Store the Sun's Energy",            description: "Capture and buffer solar energy for reliable use.", unit: "MJ",        current: 0, goal: 1000 },
+      { id: 1,  title: "Harness Energy",                               description: "Capture energy for use.",                      unit: "MJ",        current: 0, goal: 1 },
       { id: 2,  title: "Make Revenue",                                 description: "Generate initial capital for scaling builds.",       unit: "$",         current: 0, goal: 10000 },
-      { id: 3,  title: "Produce Food",                                 description: "Grow or manufacture food supply.",                  unit: "meals",     current: 0, goal: 10000 },
+      { id: 3,  title: "Produce Food",                                 description: "Grow corn.",                  unit: "acre",     current: 0, goal: 1 },
       { id: 4,  title: "Generate Drinkable Water",                     description: "Purify or condense potable water.",                 unit: "liters",    current: 0, goal: 10000 },
       { id: 5,  title: "Build Houses",                                 description: "Design and construct dwellings.",                    unit: "houses",    current: 0, goal: 100 },
-      { id: 6,  title: "Construct WiFi Router",                        description: "Connectivity for the local network.",                unit: "routers",   current: 0, goal: 1 },
-      { id: 7,  title: "Build a Transportation System",                description: "Move people and resources efficiently.",             unit: "vehicles",  current: 0, goal: 10 },
-      { id: 8,  title: "Create a Waste → Resource Loop",               description: "Close material cycles (compost, biogas, recycle).", unit: "systems",   current: 0, goal: 1 },
+      { id: 6,  title: "Construct WiFi Router",                        description: "Connectivity to information",                      unit: "routers",   current: 0, goal: 100 },
+      { id: 7,  title: "Build a Transportation System",                description: "Moving people and resources.",                   unit: "vehicles",  current: 0, goal: 10 },
+      { id: 8,  title: "Create a Waste → Resource Loop",               description: "Convert waste streams into usable resources: recycled materials for reuse.", unit: "recycled_tons",   current: 0, goal: 1 },
       { id: 9,  title: "Attain Resting Heart Rate <50 bpm",            description: "Condition the body to achieve an athletic resting heart rate.", unit: "objective", current: 0, goal: 1 },
-      { id: 10, title: "Enhanced Body & Mind",                         description: "Attain 24 hours of continuous wakefulness with no cognitive decline.", unit: "objective", current: 0, goal: 1 }
+      { id: 10, title: "Brain",                         description: "Extend deep work sessions without distraction or fatigue.", unit: "hours/day", current: 0, goal: 12 }
     ];
 
     function percent(g) {
