@@ -102,11 +102,6 @@
       });
 
       // Wire buttons (all control the same global stopwatch on the server)
-      goals.forEach(g=>{
-        document.getElementById(`sw-start-${g.id}`).addEventListener('click', ()=> control('start'));
-        document.getElementById(`sw-stop-${g.id}`).addEventListener('click',  ()=> control('stop'));
-        document.getElementById(`sw-reset-${g.id}`).addEventListener('click', ()=> control('reset'));
-      });
     }
 
     // Shared controls: call Flask endpoints
