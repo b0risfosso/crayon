@@ -6,47 +6,36 @@
   <title>Fantasiagenesis — Narratives</title>
   <style>
     :root {
-      --bg: #f8fafc;        /* slate-50 */
-      --card: #ffffff;       /* white */
-      --text: #0f172a;       /* slate-900 */
-      --muted: #64748b;      /* slate-500/600 */
-      --line: #e2e8f0;       /* slate-200 */
-      --bar-bg: #f1f5f9;     /* slate-100 */
-      --bar: #0f172a;        /* slate-900 */
+      --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b;
+      --line:#e2e8f0; --bar-bg:#f1f5f9; --bar:#0f172a;
     }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-      background: var(--bg); color: var(--text);
-    }
-    header {
-      position: sticky; top: 0; z-index: 10;
-      backdrop-filter: blur(6px);
-      background: rgba(255,255,255,0.8);
-      border-bottom: 1px solid var(--line);
-    }
-    .wrap { max-width: 64rem; margin: 0 auto; padding: 1rem 1rem; }
-    h1 { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
-    main { padding: 2rem 1rem; }
-    .note { color: var(--muted); margin: 0 0 1rem; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-    @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
-    .card {
-      background: var(--card); border: 1px solid var(--line); border-radius: 16px;
-      padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-    }
-    .title { font-weight: 700; font-size: 1.05rem; margin: 0; }
-    .desc { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
-    .row { display: flex; align-items: baseline; gap: 0.5rem; margin-top: 0.75rem; }
-    .x { font-weight: 800; font-size: 1.25rem; }
-    .goal { color: var(--muted); font-size: 0.9rem; }
-    .badge { background: var(--bar-bg); color: #475569; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.75rem; margin-left: 0.25rem; }
-    .bar { height: 8px; width: 100%; background: var(--bar-bg); border-radius: 999px; overflow: hidden; margin-top: 0.5rem; }
-    .fill { height: 100%; background: var(--bar); width: 0%; transition: width 300ms ease; border-radius: 999px; }
-    .pct { margin-top: 0.25rem; font-size: 0.75rem; color: var(--muted); }
-    footer { color: var(--muted); font-size: 0.75rem; padding: 1rem 0 2rem; }
-    code.inline { background: var(--bar-bg); padding: 0.1rem 0.35rem; border-radius: 6px; font-size: 0.85em; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:rgba(255,255,255,.8);border-bottom:1px solid var(--line)}
+    .wrap{max-width:64rem;margin:0 auto;padding:1rem 1rem}
+    h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.01em}
+    main{padding:2rem 1rem}
+    .grid{display:grid;grid-template-columns:1fr;gap:1rem}
+    @media (min-width:640px){.grid{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1rem;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .title{font-weight:700;font-size:1.05rem;margin:0}
+    .desc{margin:.25rem 0 0;color:var(--muted);font-size:.9rem}
+    .row{display:flex;align-items:baseline;gap:.5rem;margin-top:.75rem}
+    .x{font-weight:800;font-size:1.25rem}
+    .goal{color:var(--muted);font-size:.9rem}
+    .badge{background:var(--bar-bg);color:#475569;border-radius:999px;padding:.15rem .5rem;font-size:.75rem;margin-left:.25rem}
+    .bar{height:8px;width:100%;background:var(--bar-bg);border-radius:999px;overflow:hidden;margin-top:.5rem}
+    .fill{height:100%;background:var(--bar);width:0%;transition:width 300ms ease;border-radius:999px}
+    .pct{margin-top:.25rem;font-size:.75rem;color:var(--muted)}
+    footer{color:var(--muted);font-size:.75rem;padding:1rem 0 2rem}
+    code.inline{background:var(--bar-bg);padding:.1rem .35rem;border-radius:6px;font-size:.85em}
+
+    /* Stopwatch UI inside each card (global state) */
+    .sw{display:flex;align-items:center;gap:.5rem;margin-top:.75rem;border:1px solid var(--line);border-radius:10px;padding:.5rem;background:var(--bg)}
+    .sw-time{font-weight:800;min-width:6.5ch;text-align:center}
+    .sw button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.25rem .6rem;cursor:pointer;font-size:.85rem}
+    .sw button:hover{background:var(--bar-bg)}
   </style>
 </head>
 <body>
@@ -62,33 +51,34 @@
     <footer>© <span id="year"></span> Fantasiagenesis. Executing narratives.</footer>
   </main>
 
+  <!-- Socket.IO client -->
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+
   <script>
     const goals = [
-      { id: 1,  title: "Harness Energy",                               description: "Capture energy for use.",                      unit: "MJ",        current: 0, goal: 1 },
-      { id: 2,  title: "Make Revenue",                                 description: "Generate initial capital for scaling builds.",       unit: "$",         current: 0, goal: 10000 },
-      { id: 3,  title: "Produce Food",                                 description: "Grow corn.",                  unit: "acre",     current: 0, goal: 1 },
-      { id: 4,  title: "Generate Drinkable Water",                     description: "Purify or condense potable water.",                 unit: "liters",    current: 0, goal: 10000 },
-      { id: 5,  title: "Build Houses",                                 description: "Design and construct dwellings.",                    unit: "houses",    current: 0, goal: 100 },
-      { id: 6,  title: "Construct WiFi Router",                        description: "Connectivity to information",                      unit: "routers",   current: 0, goal: 100 },
-      { id: 7,  title: "Build a Transportation System",                description: "Build 10 bikes.",                   unit: "bikes",  current: 0, goal: 10 },
-      { id: 8,  title: "Create a Waste → Resource Loop",               description: "Convert waste streams into usable resources: recycled materials for reuse.", unit: "recycled_tons",   current: 0, goal: 1 },
-      { id: 9,  title: "Attain Resting Heart Rate <50 bpm",            description: "Condition the body to achieve an athletic resting heart rate.", unit: "individuals", current: 0, goal: 10 },
-      { id: 10, title: "Meditation",                                   description: "Meditate for 1000 hours.", unit: "hours", current: 0, goal: 1000 },
-      { id: 11, title: "Train a Domain-Specific AI Model",             description: "Gather data and train a machine learning model specialized for one area (biology, energy, economics, etc.).", unit: "trained models", current: 0, goal: 10 }
+      { id: 1,  title: "Harness Energy",               description: "Capture energy for use.", unit: "MJ", current: 0, goal: 1 },
+      { id: 2,  title: "Make Revenue",                 description: "Generate initial capital for scaling builds.", unit: "$", current: 0, goal: 10000 },
+      { id: 3,  title: "Produce Food",                 description: "Grow corn.", unit: "acre", current: 0, goal: 1 },
+      { id: 4,  title: "Generate Drinkable Water",     description: "Purify or condense potable water.", unit: "liters", current: 0, goal: 10000 },
+      { id: 5,  title: "Build Houses",                 description: "Design and construct dwellings.", unit: "houses", current: 0, goal: 100 },
+      { id: 6,  title: "Construct WiFi Router",        description: "Connectivity to information", unit: "routers", current: 0, goal: 100 },
+      { id: 7,  title: "Build a Transportation System",description: "Build 10 bikes.", unit: "bikes", current: 0, goal: 10 },
+      { id: 8,  title: "Create a Waste → Resource Loop",description: "Convert waste streams into usable resources: recycled materials for reuse.", unit: "recycled_tons", current: 0, goal: 1 },
+      { id: 9,  title: "Attain Resting Heart Rate <50 bpm", description: "Condition the body to achieve an athletic resting heart rate.", unit: "individuals", current: 0, goal: 10 },
+      { id: 10, title: "Meditation",                   description: "Mediate for 1000 hours.", unit: "hours", current: 0, goal: 1000 },
+      { id: 11, title: "Train a Domain-Specific AI Model", description: "Train an area-specific ML model.", unit: "trained models", current: 0, goal: 10 }
     ];
 
-    function percent(g) {
-      if (typeof g.goal === 'number' && g.goal > 0) return Math.min(100, Math.round((g.current / g.goal) * 100));
-      return 0;
-    }
+    function percent(g){ return (g.goal>0)? Math.min(100, Math.round((g.current/g.goal)*100)) : 0; }
+    function fmt(sec){ const h=String(Math.floor(sec/3600)).padStart(2,'0'); const m=String(Math.floor((sec%3600)/60)).padStart(2,'0'); const s=String(sec%60).padStart(2,'0'); return `${h}:${m}:${s}`; }
 
-    function render() {
+    function render(){
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
-      goals.forEach(g => {
+      goals.forEach(g=>{
+        const pct = percent(g);
         const card = document.createElement('article');
         card.className = 'card';
-        const pct = percent(g);
         card.innerHTML = `
           <h2 class="title">${g.id}. ${g.title}</h2>
           <p class="desc">${g.description}</p>
@@ -99,20 +89,45 @@
           </div>
           <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
           <div class="pct">${pct}% complete</div>
+
+          <!-- Global stopwatch mirrored in each card -->
+          <div class="sw" data-goal="${g.id}">
+            <span class="sw-time" id="sw-time-${g.id}">00:00:00</span>
+            <button class="sw-start" id="sw-start-${g.id}">Start</button>
+            <button class="sw-stop"  id="sw-stop-${g.id}">Stop</button>
+            <button class="sw-reset" id="sw-reset-${g.id}">Reset</button>
+          </div>
         `;
         grid.appendChild(card);
       });
+
+      // Wire buttons (all control the same global stopwatch on the server)
+      goals.forEach(g=>{
+        document.getElementById(`sw-start-${g.id}`).addEventListener('click', ()=> control('start'));
+        document.getElementById(`sw-stop-${g.id}`).addEventListener('click',  ()=> control('stop'));
+        document.getElementById(`sw-reset-${g.id}`).addEventListener('click', ()=> control('reset'));
+      });
     }
 
-    // Expose a simple helper for updates from the console (optional)
-    // Usage: updateGoal(3, 250) to set goal id=3 current=250
-    window.updateGoal = function(id, current) {
-      const g = goals.find(x => x.id === id);
-      if (!g) return console.warn('No goal with id', id);
-      g.current = Number(current) || 0;
-      render();
+    // Shared controls: call Flask endpoints
+    function control(cmd){
+      fetch(`/api/stopwatch/${cmd}`, { method:'POST' }).catch(()=>{ /* ignore */ });
     }
 
+    // Live updates from server
+    const socket = io(); // same-origin websocket: /socket.io
+    socket.on('stopwatch', payload=>{
+      const secs = Math.max(0, Math.floor(payload.elapsed));
+      // Update every card's mirror display and start button label
+      goals.forEach(g=>{
+        const tEl = document.getElementById(`sw-time-${g.id}`);
+        const startEl = document.getElementById(`sw-start-${g.id}`);
+        if (tEl) tEl.textContent = fmt(secs);
+        if (startEl) startEl.textContent = payload.running ? 'Running' : 'Start';
+      });
+    });
+
+    // Boot
     document.getElementById('year').textContent = new Date().getFullYear();
     render();
   </script>
