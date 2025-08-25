@@ -5,83 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Fantasiagenesis — Narratives</title>
   <style>
-    :root {
-      --bg: #f9fafb;
-      --card: #fff;
-      --text: #111827;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --bar-bg: #e5e7eb;
-      --bar: #111827;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-    header {
-      position: sticky;
-      top: 0;
-      background: var(--card);
-      border-bottom: 1px solid var(--line);
-      padding: 0.75rem 1rem;
-    }
-    h1 {
-      font-size: 1.25rem;
-      font-weight: 700;
-    }
-    main {
-      max-width: 64rem;
-      margin: 0 auto;
-      padding: 1rem;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    @media (min-width: 640px) {
-      .grid { grid-template-columns: 1fr 1fr; }
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 0.75rem 1rem;
-    }
-    .title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 1rem;  /* tighter spacing below title */
-    }
-    .desc {
-      color: var(--muted);
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-    }
-    .progress {
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-    }
-    .bar {
-      height: 6px;
-      background: var(--bar-bg);
-      border-radius: 4px;
-      overflow: hidden;
-      margin-bottom: 1rem;
-    }
-    .fill {
-      height: 100%;
-      background: var(--bar);
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-    small {
-      color: var(--muted);
-      font-size: 0.8rem;
-    }
-  </style>
+  :root {
+    --bg: #f9fafb;
+    --card: #fff;
+    --text: #111827;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bar-bg: #e5e7eb;
+    --bar: #111827;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 0.75rem 1rem;
+  }
+  h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+  main {
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 640px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+  }
+  .title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;  /* more room under title */
+  }
+  .desc {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem; /* space before progress */
+  }
+  .progress {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  .bar {
+    height: 6px;
+    background: var(--bar-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.75rem; /* space before "Started" */
+  }
+  .fill {
+    height: 100%;
+    background: var(--bar);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+</style>
+
   
   
   
