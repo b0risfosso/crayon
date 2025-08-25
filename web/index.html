@@ -32,7 +32,7 @@
   <header>
     <div class="wrap" style="display:flex; align-items:center; justify-content:space-between;">
       <h1>fantasiagenesis</h1>
-      <nav style="color:var(--muted); font-size:0.95rem;">creating and executing narratives</nav>
+      <nav style="color:var(--muted); font-size:0.95rem;">creating and executing narratives.</nav>
     </div>
   </header>
 
@@ -43,90 +43,50 @@
 
   <!-- Put scripts AFTER the DOM so #year and #grid exist -->
   <script>
-    // --- Data (unchanged) ---
-    const goals = [
-      { id: 1,  title: "Harness Energy",               description: "Capture energy for use.", unit: "MJ", current: 0, goal: 1 },
-      { id: 2,  title: "Make Revenue",                 description: "Generate initial capital for scaling builds.", unit: "$", current: 0, goal: 10000 },
-      { id: 3,  title: "Produce Food",                 description: "Grow corn.", unit: "acre", current: 0, goal: 1 },
-      { id: 4,  title: "Generate Drinkable Water",     description: "Purify or condense potable water.", unit: "liters", current: 0, goal: 10000 },
-      { id: 5,  title: "Build Houses",                 description: "Design and construct dwellings.", unit: "houses", current: 0, goal: 100 },
-      { id: 6,  title: "Construct WiFi Router",        description: "Connectivity to information", unit: "routers", current: 0, goal: 100 },
-      { id: 7,  title: "Build a Transportation System",description: "Build 10 bikes.", unit: "bikes", current: 0, goal: 10 },
-      { id: 8,  title: "Create a Waste → Resource Loop",description: "Convert waste streams into usable resources: recycled materials for reuse.", unit: "recycled_tons", current: 0, goal: 1 },
-      { id: 9,  title: "Attain Resting Heart Rate <50 bpm", description: "Condition the body to achieve an athletic resting heart rate.", unit: "individuals", current: 0, goal: 10 },
-      { id: 10, title: "Meditation",                   description: "Meditate for 1000 hours.", unit: "hours", current: 0, goal: 1000 },
-      { id: 11, title: "Train a Domain-Specific AI Model", description: "Gather data and train a machine learning model specialized for one area.", unit: "trained models", current: 0, goal: 10 }
-    ];
-
-    // --- Helpers ---
-    const percent = g => g.goal > 0 ? Math.min(100, Math.round((g.current/g.goal)*100)) : 0;
-    const fmtLocal = iso => {
-      if (!iso) return "—";
-      const d = new Date(iso); if (isNaN(d)) return "—";
-      return d.toLocaleString(undefined,{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
-    };
-
-    async function fetchStartDates(){
-      try {
-        const r = await fetch("/api/start-dates");
-        if (!r.ok) throw new Error("fetch /api/start-dates failed");
-        return await r.json(); // { [id]: isoString }
-      } catch (e) {
-        console.warn(e); return {};
-      }
+    async function fetchNarratives(){
+      const r = await fetch("/api/narratives");
+      return r.json();
     }
 
-    async function setStartNow(id, force=false){
-      const r = await fetch(`/api/start/${id}`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ force })
-      });
-      return await r.json();
-    }
+    function percent(n){ return n.target>0 ? Math.min(100, Math.round((n.current/n.target)*100)) : 0; }
 
     async function render(){
-      const starts = await fetchStartDates();
+      const narratives = await fetchNarratives();
       const grid = document.getElementById("grid");
       grid.innerHTML = "";
-
-      goals.forEach(g=>{
-        const pct = percent(g);
-        const startedIso = starts[g.id] || null;
-
+      narratives.forEach(n=>{
+        const pct = percent(n);
         const card = document.createElement("article");
         card.className = "card";
         card.innerHTML = `
-          <h2 class="title">${g.id}. ${g.title}</h2>
-          <p class="desc">${g.description}</p>
+          <h2 class="title">${n.id}. ${n.title}</h2>
+          <p class="desc">${n.description}</p>
           <div class="row">
-            <span class="x">${g.current}</span>
-            <span class="goal">/ ${g.goal}</span>
-            <span class="badge">${g.unit}</span>
+            <span class="x">${n.current}</span>
+            <span class="goal">/ ${n.target}</span>
+            <span class="badge">${n.unit}</span>
           </div>
           <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
           <div class="pct">${pct}% complete</div>
-
-          <div class="row" style="margin-top:.5rem; align-items:center;">
+          <div class="row" style="margin-top:.5rem;">
             <span class="goal">Started:</span>
-            <span id="start-${g.id}" style="font-weight:600;">${fmtLocal(startedIso)}</span>
-            <span style="flex:1"></span>
-            <button id="startnow-${g.id}" class="btn">Start Now</button>
+            <span>${n.start_iso ? new Date(n.start_iso).toLocaleString() : "—"}</span>
+            <button onclick="startNarrative(${n.id})">Start Now</button>
           </div>
         `;
         grid.appendChild(card);
-
-        // Wire Start Now (idempotent: won't overwrite unless force=true)
-        document.getElementById(`startnow-${g.id}`).addEventListener("click", async ()=>{
-          const data = await setStartNow(g.id);     // default: force=false
-          document.getElementById(`start-${g.id}`).textContent = fmtLocal(data.start_iso);
-        });
       });
     }
 
-    // --- Kick ---
-    document.getElementById("year").textContent = new Date().getFullYear();
+    async function startNarrative(id){
+      const r = await fetch(`/api/start/${id}`, {method:"POST"});
+      const data = await r.json();
+      console.log("started narrative", data);
+      render(); // refresh
+    }
+
     render();
+
   </script>
 </body>
 </html>
