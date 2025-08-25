@@ -98,37 +98,112 @@
 
   <main class="wrap">
     <section id="grid" class="grid"></section>
+    <!-- Admin panel -->
+<section id="admin" style="max-width:64rem;margin:0 auto 1rem;padding:1rem;background:#fff;border:1px solid #e5e7eb;border-radius:12px;">
+  <h2 style="margin:0 0 .5rem;font-size:1rem;font-weight:700;">Add Narrative</h2>
+  <form id="addForm" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:.5rem;align-items:end;">
+    <label style="display:flex;flex-direction:column;gap:.25rem;">
+      <span style="font-size:.8rem;color:#6b7280;">Title</span>
+      <input name="title" required placeholder="e.g. Harness Energy">
+    </label>
+    <label style="display:flex;flex-direction:column;gap:.25rem;">
+      <span style="font-size:.8rem;color:#6b7280;">Unit</span>
+      <input name="unit" placeholder="e.g. MJ">
+    </label>
+    <label style="display:flex;flex-direction:column;gap:.25rem;">
+      <span style="font-size:.8rem;color:#6b7280;">Target</span>
+      <input name="target" type="number" min="0" step="1" placeholder="e.g. 1">
+    </label>
+    <label style="display:flex;flex-direction:column;gap:.25rem;">
+      <span style="font-size:.8rem;color:#6b7280;">Current</span>
+      <input name="current" type="number" min="0" step="1" value="0">
+    </label>
+    <button type="submit" style="padding:.55rem .9rem;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;">Add</button>
+
+    <label style="grid-column:1 / -1; display:flex;flex-direction:column;gap:.25rem;">
+      <span style="font-size:.8rem;color:#6b7280;">Description</span>
+      <textarea name="description" rows="2" placeholder="Short description..."></textarea>
+    </label>
+  </form>
+
+  <div id="adminMsg" style="margin-top:.5rem;font-size:.9rem;color:#6b7280;"></div>
+</section>
     <footer>© <span id="year"></span> fantasiagenesis.</footer>
   </main>
 
   <!-- Put scripts AFTER the DOM so #year and #grid exist -->
   <script>
-    async function fetchNarratives(){
-      const r = await fetch("/api/narratives");
-      return r.json();
-    }
-    function percent(n){ return n.target>0 ? Math.min(100, Math.round((n.current/n.target)*100)) : 0; }
-    function fmt(iso){ return iso ? new Date(iso).toLocaleString() : "—"; }
+    const api = {
+    list:   () => fetch('/api/narratives').then(r=>r.json()),
+    add:    (body) => fetch('/api/narratives', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r=>r.json()),
+    del:    (id) => fetch(`/api/narratives/${id}`, {method:'DELETE'}).then(r=>r.json()),
+    update: (id, body) => fetch(`/api/narratives/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r=>r.json()),
+  };
 
-    async function render(){
-      const data = await fetchNarratives();
-      const grid = document.getElementById("grid");
-      grid.innerHTML = "";
-      data.forEach(n=>{
-        const pct = percent(n);
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `
-          <h3>${n.id}. ${n.title}</h3>
-          <p class="muted">${n.description}</p>
-          <p><b>${n.current}</b> / ${n.target} ${n.unit}</p>
-          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-          <small class="muted">Started: ${fmt(n.start_iso_local)}</small>
-        `;
-        grid.appendChild(card);
-      });
+  // Hook up the Add form
+  const addForm = document.getElementById('addForm');
+  const adminMsg = document.getElementById('adminMsg');
+  addForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    adminMsg.textContent = 'Adding…';
+    const fd = new FormData(addForm);
+    const payload = {
+      title: fd.get('title')?.trim(),
+      description: fd.get('description')?.trim() || '',
+      unit: fd.get('unit')?.trim() || '',
+      target: Number(fd.get('target') || 0),
+      current: Number(fd.get('current') || 0),
+      // start_ts omitted on purpose → server sets to "now" (local)
+    };
+    if (!payload.title) { adminMsg.textContent = 'Title is required.'; return; }
+
+    try {
+      await api.add(payload);
+      addForm.reset();
+      adminMsg.textContent = 'Added ✔';
+      render(); // re-render grid
+    } catch (err) {
+      console.error(err);
+      adminMsg.textContent = 'Failed to add.';
     }
-    render();
+  });
+
+  // Render grid (uses your existing structure; adds a Delete button)
+  async function render(){
+    const data = await api.list();
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    data.forEach(n=>{
+      const pct = n.target>0 ? Math.min(100, Math.round((n.current/n.target)*100)) : 0;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">
+          <h2 class="title" style="margin:0">${n.id}. ${n.title}</h2>
+          <button data-del="${n.id}" title="Delete" style="border:1px solid #e5e7eb;background:#fff;border-radius:8px;padding:.25rem .6rem;cursor:pointer;">Delete</button>
+        </div>
+        <p class="desc">${n.description || ''}</p>
+        <p class="progress"><b>${n.current}</b> / ${n.target} ${n.unit || ''}</p>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+        <small>Started: ${n.start_iso_local ? new Date(n.start_iso_local).toLocaleString() : '—'}</small>
+      `;
+      grid.appendChild(card);
+    });
+
+    // Wire delete buttons
+    grid.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = Number(btn.getAttribute('data-del'));
+        if (!confirm(`Delete narrative #${id}?`)) return;
+        await api.del(id);
+        render();
+      });
+    });
+  }
+
+  // Boot
+  document.getElementById('year').textContent = new Date().getFullYear();
+  render();
   </script>
 
 </body>
