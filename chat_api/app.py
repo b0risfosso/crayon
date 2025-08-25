@@ -97,44 +97,6 @@ def delete_narrative(narrative_id: int):
     conn.close()
     return jsonify(ok=True)
 
-# --- Serve simple UI at "/" for dev/demo ---
-@app.get("/")
-def home():
-    html = """
-    <!doctype html>
-    <meta charset="utf-8"/>
-    <title>Narratives</title>
-    <div id="grid"></div>
-    <script>
-    async function fetchNarratives(){
-      const r = await fetch('/api/narratives');
-      return r.json();
-    }
-    function fmt(iso){ return iso ? new Date(iso).toLocaleString() : "—"; }
-    async function render(){
-      const data = await fetchNarratives();
-      const grid = document.getElementById("grid");
-      grid.innerHTML = "";
-      data.forEach(n=>{
-        const pct = n.target>0 ? Math.min(100, Math.round((n.current/n.target)*100)) : 0;
-        const card = document.createElement("div");
-        card.style.border="1px solid #ccc"; card.style.margin="1em"; card.style.padding="1em";
-        card.innerHTML = `
-          <h3>${n.id}. ${n.title}</h3>
-          <p>${n.description}</p>
-          <p>${n.current} / ${n.target} ${n.unit}</p>
-          <div style="background:#eee;width:100%;height:8px;border-radius:4px;overflow:hidden;">
-            <div style="background:#333;height:100%;width:${pct}%"></div>
-          </div>
-          <small>Started: ${fmt(n.start_iso_local)}</small>
-        `;
-        grid.appendChild(card);
-      });
-    }
-    render();
-    </script>
-    """
-    return Response(html, mimetype="text/html")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
