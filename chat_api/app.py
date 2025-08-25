@@ -157,6 +157,6 @@ def set_start(narrative_id):
     iso = dt.datetime.fromtimestamp(int(cur), tz=dt.timezone.utc).isoformat()
     return jsonify(narrative_id=narrative_id, start_ts=int(cur), start_iso=iso, forced=force)
 
-if __name__ == "__main__":
-    init_db()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+#if __name__ == "__main__":
+#    init_db()
+#    app.run(host="0.0.0.0", port=5000, debug=True)
