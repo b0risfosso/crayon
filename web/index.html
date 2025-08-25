@@ -5,27 +5,82 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Fantasiagenesis — Narratives</title>
   <style>
-    :root { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --line:#e2e8f0; --bar-bg:#f1f5f9; --bar:#0f172a; }
-    *{box-sizing:border-box} html,body{height:100%}
-    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:rgba(255,255,255,.8);border-bottom:1px solid var(--line)}
-    .wrap{max-width:64rem;margin:0 auto;padding:1rem}
-    h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.01em}
-    main{padding:2rem 1rem}
-    .grid{display:grid;grid-template-columns:1fr;gap:1rem}
-    @media(min-width:640px){.grid{grid-template-columns:1fr 1fr}}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1rem;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .title{font-weight:700;font-size:1.05rem;margin:0}
-    .desc{margin:.25rem 0 0;color:var(--muted);font-size:.9rem}
-    .row{display:flex;align-items:baseline;gap:.5rem;margin-top:.75rem}
-    .x{font-weight:800;font-size:1.25rem}
-    .goal{color:var(--muted);font-size:.9rem}
-    .badge{background:var(--bar-bg);color:#475569;border-radius:999px;padding:.15rem .5rem;font-size:.75rem;margin-left:.25rem}
-    .bar{height:8px;width:100%;background:var(--bar-bg);border-radius:999px;overflow:hidden;margin-top:.5rem}
-    .fill{height:100%;background:var(--bar);width:0%;transition:width 300ms ease;border-radius:999px}
-    .pct{margin-top:.25rem;font-size:.75rem;color:var(--muted)}
-    .btn{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.25rem .6rem;cursor:pointer;font-size:.85rem}
-    .btn:hover{background:var(--bar-bg)}
+    :root {
+      --bg: #f9fafb;
+      --card: #fff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --bar-bg: #e5e7eb;
+      --bar: #111827;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      padding: 0.75rem 1rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    main {
+      max-width: 64rem;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+    }
+    .desc {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 0.5rem;
+    }
+    .bar {
+      height: 6px;
+      background: var(--bar-bg);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .fill {
+      height: 100%;
+      background: var(--bar);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    small {
+      display: block;
+      margin-top: 0.5rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
   </style>
 </head>
 <body>
