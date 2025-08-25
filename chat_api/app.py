@@ -1,27 +1,23 @@
 # app.py
-# pip install flask
 import sqlite3, time, datetime as dt
 from pathlib import Path
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 
 DB_PATH = Path(__file__).with_name("state.db")
-
 app = Flask(__name__)
 
-# ---------- DB helpers ----------
+# --- DB helpers ---
 def db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-def row_to_narrative(r: sqlite3.Row):
+def row_to_narrative(r):
     ts = r["start_ts"]
     start_iso_local = start_iso_utc = None
     if ts is not None:
-        # Local ISO (based on server local timezone)
         start_iso_local = dt.datetime.fromtimestamp(int(ts)).isoformat(timespec="seconds")
-        # UTC ISO (explicit timezone)
-        start_iso_utc = dt.datetime.utcfromtimestamp(int(ts)).replace(tzinfo=dt.timezone.utc).isoformat()
+        start_iso_utc   = dt.datetime.utcfromtimestamp(int(ts)).replace(tzinfo=dt.timezone.utc).isoformat()
     return {
         "id": r["id"],
         "title": r["title"],
@@ -34,7 +30,7 @@ def row_to_narrative(r: sqlite3.Row):
         "start_iso_utc": start_iso_utc,
     }
 
-# ---------- CRUD ----------
+# --- API routes ---
 @app.get("/api/narratives")
 def get_narratives():
     conn = db()
@@ -45,13 +41,22 @@ def get_narratives():
 @app.post("/api/narratives")
 def add_narrative():
     p = request.get_json(force=True)
+    # if no start_ts provided, set automatically to now (local time)
+    ts = p.get("start_ts")
+    if isinstance(ts, str) and ts.isdigit():
+        ts = int(ts)
+    elif isinstance(ts, int):
+        ts = ts
+    else:
+        ts = int(time.time())
+
     values = (
         p.get("title"),
         p.get("description", ""),
         p.get("unit", ""),
         int(p.get("current", 0) or 0),
         int(p.get("target", 0) or 0),
-        int(p["start_ts"]) if str(p.get("start_ts", "")).isdigit() else None,
+        ts,
     )
     conn = db()
     cur = conn.execute(
@@ -67,10 +72,10 @@ def add_narrative():
 def update_narrative(narrative_id: int):
     p = request.get_json(force=True)
     fields, values = [], []
-    for col in ("title", "description", "unit", "current", "target", "start_ts"):
+    for col in ("title", "description", "unit", "current", "target"):
         if col in p:
             v = p[col]
-            if col in ("current", "target", "start_ts") and v is not None:
+            if col in ("current", "target") and v is not None:
                 v = int(v)
             fields.append(f"{col}=?")
             values.append(v)
@@ -92,60 +97,44 @@ def delete_narrative(narrative_id: int):
     conn.close()
     return jsonify(ok=True)
 
-# ---------- Start time (idempotent “set once”, local time baseline) ----------
-@app.get("/api/start/<int:narrative_id>")
-def get_start(narrative_id: int):
-    conn = db()
-    row = conn.execute("SELECT start_ts FROM narratives WHERE id=?", (narrative_id,)).fetchone()
-    conn.close()
-    if not row:
-        return jsonify(error="narrative not found"), 404
-    ts = row["start_ts"]
-    if ts is None:
-        return jsonify(start_ts=None, start_iso_local=None, start_iso_utc=None)
-    return jsonify(
-        start_ts=int(ts),
-        start_iso_local=dt.datetime.fromtimestamp(int(ts)).isoformat(timespec="seconds"),
-        start_iso_utc=dt.datetime.utcfromtimestamp(int(ts)).replace(tzinfo=dt.timezone.utc).isoformat(),
-    )
-
-@app.post("/api/start/<int:narrative_id>")
-def set_start(narrative_id: int):
+# --- Serve simple UI at "/" for dev/demo ---
+@app.get("/")
+def home():
+    html = """
+    <!doctype html>
+    <meta charset="utf-8"/>
+    <title>Narratives</title>
+    <div id="grid"></div>
+    <script>
+    async function fetchNarratives(){
+      const r = await fetch('/api/narratives');
+      return r.json();
+    }
+    function fmt(iso){ return iso ? new Date(iso).toLocaleString() : "—"; }
+    async function render(){
+      const data = await fetchNarratives();
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      data.forEach(n=>{
+        const pct = n.target>0 ? Math.min(100, Math.round((n.current/n.target)*100)) : 0;
+        const card = document.createElement("div");
+        card.style.border="1px solid #ccc"; card.style.margin="1em"; card.style.padding="1em";
+        card.innerHTML = `
+          <h3>${n.id}. ${n.title}</h3>
+          <p>${n.description}</p>
+          <p>${n.current} / ${n.target} ${n.unit}</p>
+          <div style="background:#eee;width:100%;height:8px;border-radius:4px;overflow:hidden;">
+            <div style="background:#333;height:100%;width:${pct}%"></div>
+          </div>
+          <small>Started: ${fmt(n.start_iso_local)}</small>
+        `;
+        grid.appendChild(card);
+      });
+    }
+    render();
+    </script>
     """
-    Set start_ts if not set. Will NOT overwrite unless {"force": true}.
-    If no timestamp provided, uses current local time (server clock).
-    Body JSON (optional): {"force": bool, "timestamp": <epoch_seconds>}
-    """
-    p = request.get_json(silent=True) or {}
-    force = bool(p.get("force", False))
-    ts = p.get("timestamp")
-    if isinstance(ts, str) and ts.isdigit():
-        ts = int(ts)
-    elif not isinstance(ts, int):
-        ts = int(time.time())  # local epoch seconds
+    return Response(html, mimetype="text/html")
 
-    conn = db()
-    row = conn.execute("SELECT start_ts FROM narratives WHERE id=?", (narrative_id,)).fetchone()
-    if not row:
-        conn.close()
-        return jsonify(error="narrative not found"), 404
-
-    current = row["start_ts"]
-    if current is None or force:
-        conn.execute("UPDATE narratives SET start_ts=? WHERE id=?", (ts, narrative_id))
-        conn.commit()
-        current = ts
-    conn.close()
-
-    return jsonify(
-        narrative_id=narrative_id,
-        start_ts=int(current),
-        start_iso_local=dt.datetime.fromtimestamp(int(current)).isoformat(timespec="seconds"),
-        start_iso_utc=dt.datetime.utcfromtimestamp(int(current)).replace(tzinfo=dt.timezone.utc).isoformat(),
-        forced=force,
-    )
-
-# ---------- Run ----------
 if __name__ == "__main__":
-    # DB already initialized with init_db.py; just run the API
     app.run(host="0.0.0.0", port=5000, debug=True)
