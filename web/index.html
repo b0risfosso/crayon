@@ -7,8 +7,12 @@
   <style>
     :root {
       --bg: #f9fafb;
+      --card: #fff;
       --text: #111827;
+      --muted: #6b7280;
       --line: #e5e7eb;
+      --bar-bg: #e5e7eb;
+      --bar: #111827;
     }
     * { box-sizing: border-box; }
     body {
@@ -20,11 +24,15 @@
     header {
       position: sticky;
       top: 0;
-      background: white;
+      background: var(--card);
       border-bottom: 1px solid var(--line);
       padding: 0.75rem 1rem;
     }
-    h1 { margin: 0; font-size: 1.25rem; }
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
     main {
       max-width: 64rem;
       margin: 0 auto;
@@ -39,12 +47,42 @@
       .grid { grid-template-columns: 1fr 1fr; }
     }
     .card {
+      background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 12px;
       padding: 1rem;
-      background: white;
+    }
+    .title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+    }
+    .desc {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 0.5rem;
+    }
+    .bar {
+      height: 6px;
+      background: var(--bar-bg);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .fill {
+      height: 100%;
+      background: var(--bar);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    small {
+      display: block;
+      margin-top: 0.5rem;
+      color: var(--muted);
+      font-size: 0.8rem;
     }
   </style>
+  
   
 </head>
 <body>
