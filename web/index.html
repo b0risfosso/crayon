@@ -1,97 +1,132 @@
-<script>
-  const goals = [
-    { id: 1,  title: "Harness Energy",               description: "Capture energy for use.", unit: "MJ", current: 0, goal: 1 },
-    { id: 2,  title: "Make Revenue",                 description: "Generate initial capital for scaling builds.", unit: "$", current: 0, goal: 10000 },
-    { id: 3,  title: "Produce Food",                 description: "Grow corn.", unit: "acre", current: 0, goal: 1 },
-    { id: 4,  title: "Generate Drinkable Water",     description: "Purify or condense potable water.", unit: "liters", current: 0, goal: 10000 },
-    { id: 5,  title: "Build Houses",                 description: "Design and construct dwellings.", unit: "houses", current: 0, goal: 100 },
-    { id: 6,  title: "Construct WiFi Router",        description: "Connectivity to information", unit: "routers", current: 0, goal: 100 },
-    { id: 7,  title: "Build a Transportation System",description: "Build 10 bikes.", unit: "bikes", current: 0, goal: 10 },
-    { id: 8,  title: "Create a Waste → Resource Loop",description: "Convert waste streams into usable resources: recycled materials for reuse.", unit: "recycled_tons", current: 0, goal: 1 },
-    { id: 9,  title: "Attain Resting Heart Rate <50 bpm", description: "Condition the body to achieve an athletic resting heart rate.", unit: "individuals", current: 0, goal: 10 },
-    { id: 10, title: "Meditation",                   description: "Meditate for 1000 hours.", unit: "hours", current: 0, goal: 1000 },
-    { id: 11, title: "Train a Domain-Specific AI Model", description: "Gather data and train a machine learning model specialized for one area.", unit: "trained models", current: 0, goal: 10 }
-  ];
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasiagenesis — Narratives</title>
+  <style>
+    :root { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --line:#e2e8f0; --bar-bg:#f1f5f9; --bar:#0f172a; }
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:rgba(255,255,255,.8);border-bottom:1px solid var(--line)}
+    .wrap{max-width:64rem;margin:0 auto;padding:1rem}
+    h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.01em}
+    main{padding:2rem 1rem}
+    .grid{display:grid;grid-template-columns:1fr;gap:1rem}
+    @media(min-width:640px){.grid{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1rem;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .title{font-weight:700;font-size:1.05rem;margin:0}
+    .desc{margin:.25rem 0 0;color:var(--muted);font-size:.9rem}
+    .row{display:flex;align-items:baseline;gap:.5rem;margin-top:.75rem}
+    .x{font-weight:800;font-size:1.25rem}
+    .goal{color:var(--muted);font-size:.9rem}
+    .badge{background:var(--bar-bg);color:#475569;border-radius:999px;padding:.15rem .5rem;font-size:.75rem;margin-left:.25rem}
+    .bar{height:8px;width:100%;background:var(--bar-bg);border-radius:999px;overflow:hidden;margin-top:.5rem}
+    .fill{height:100%;background:var(--bar);width:0%;transition:width 300ms ease;border-radius:999px}
+    .pct{margin-top:.25rem;font-size:.75rem;color:var(--muted)}
+    .btn{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.25rem .6rem;cursor:pointer;font-size:.85rem}
+    .btn:hover{background:var(--bar-bg)}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap" style="display:flex; align-items:center; justify-content:space-between;">
+      <h1>Fantasiagenesis</h1>
+      <nav style="color:var(--muted); font-size:0.95rem;">Narratives</nav>
+    </div>
+  </header>
 
-  function percent(g){ return (g.goal>0)? Math.min(100, Math.round((g.current/g.goal)*100)) : 0; }
+  <main class="wrap">
+    <section id="grid" class="grid"></section>
+    <footer>© <span id="year"></span> Fantasiagenesis. Executing narratives.</footer>
+  </main>
 
-  // format ISO to local readable (YYYY-MM-DD HH:MM local time)
-  function fmtLocal(iso){
-    if (!iso) return "—";
-    const d = new Date(iso);
-    if (isNaN(d)) return "—";
-    return d.toLocaleString(undefined, {
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit"
-    });
-  }
+  <!-- Put scripts AFTER the DOM so #year and #grid exist -->
+  <script>
+    // --- Data (unchanged) ---
+    const goals = [
+      { id: 1,  title: "Harness Energy",               description: "Capture energy for use.", unit: "MJ", current: 0, goal: 1 },
+      { id: 2,  title: "Make Revenue",                 description: "Generate initial capital for scaling builds.", unit: "$", current: 0, goal: 10000 },
+      { id: 3,  title: "Produce Food",                 description: "Grow corn.", unit: "acre", current: 0, goal: 1 },
+      { id: 4,  title: "Generate Drinkable Water",     description: "Purify or condense potable water.", unit: "liters", current: 0, goal: 10000 },
+      { id: 5,  title: "Build Houses",                 description: "Design and construct dwellings.", unit: "houses", current: 0, goal: 100 },
+      { id: 6,  title: "Construct WiFi Router",        description: "Connectivity to information", unit: "routers", current: 0, goal: 100 },
+      { id: 7,  title: "Build a Transportation System",description: "Build 10 bikes.", unit: "bikes", current: 0, goal: 10 },
+      { id: 8,  title: "Create a Waste → Resource Loop",description: "Convert waste streams into usable resources: recycled materials for reuse.", unit: "recycled_tons", current: 0, goal: 1 },
+      { id: 9,  title: "Attain Resting Heart Rate <50 bpm", description: "Condition the body to achieve an athletic resting heart rate.", unit: "individuals", current: 0, goal: 10 },
+      { id: 10, title: "Meditation",                   description: "Meditate for 1000 hours.", unit: "hours", current: 0, goal: 1000 },
+      { id: 11, title: "Train a Domain-Specific AI Model", description: "Gather data and train a machine learning model specialized for one area.", unit: "trained models", current: 0, goal: 10 }
+    ];
 
-  async function fetchStartDates(){
-    try{
-      const res = await fetch("/api/start-dates");
-      if (!res.ok) throw new Error("fetch failed");
-      return await res.json(); // { [id]: isoString }
-    } catch(e){
-      console.warn("start-dates error", e);
-      return {};
+    // --- Helpers ---
+    const percent = g => g.goal > 0 ? Math.min(100, Math.round((g.current/g.goal)*100)) : 0;
+    const fmtLocal = iso => {
+      if (!iso) return "—";
+      const d = new Date(iso); if (isNaN(d)) return "—";
+      return d.toLocaleString(undefined,{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+    };
+
+    async function fetchStartDates(){
+      try {
+        const r = await fetch("/api/start-dates");
+        if (!r.ok) throw new Error("fetch /api/start-dates failed");
+        return await r.json(); // { [id]: isoString }
+      } catch (e) {
+        console.warn(e); return {};
+      }
     }
-  }
 
-  async function setStartNow(id, {force=false} = {}){
-    const res = await fetch(`/api/start/${id}`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ force })
-    });
-    return await res.json();
-  }
-
-  async function render(){
-    const starts = await fetchStartDates();
-
-    const grid = document.getElementById('grid');
-    grid.innerHTML = '';
-    goals.forEach(g=>{
-      const pct = percent(g);
-      const startedIso = starts[g.id] || null;
-
-      const card = document.createElement('article');
-      card.className = 'card';
-      card.innerHTML = `
-        <h2 class="title">${g.id}. ${g.title}</h2>
-        <p class="desc">${g.description}</p>
-        <div class="row">
-          <span class="x">${g.current}</span>
-          <span class="goal">/ ${g.goal}</span>
-          <span class="badge">${g.unit}</span>
-        </div>
-        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-        <div class="pct">${pct}% complete</div>
-
-        <div class="row" style="margin-top:.5rem; align-items:center;">
-          <span class="goal">Started:</span>
-          <span id="start-${g.id}" style="font-weight:600;">${fmtLocal(startedIso)}</span>
-          <span style="flex:1"></span>
-          <button id="startnow-${g.id}" class="btn" style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.25rem .6rem;cursor:pointer;">Start Now</button>
-        </div>
-      `;
-      grid.appendChild(card);
-
-      // Wire "Start Now" (idempotent: won't overwrite unless force=true)
-      document.getElementById(`startnow-${g.id}`).addEventListener('click', async ()=>{
-        const data = await setStartNow(g.id); // default force=false
-        const el = document.getElementById(`start-${g.id}`);
-        el.textContent = fmtLocal(data.start_iso);
+    async function setStartNow(id, force=false){
+      const r = await fetch(`/api/start/${id}`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ force })
       });
-    });
-  }
+      return await r.json();
+    }
 
-  // expose for console use if helpful
-  window.startDate = {
-    getAll: fetchStartDates,
-    startNow: (id, force=false)=>setStartNow(id,{force})
-  };
+    async function render(){
+      const starts = await fetchStartDates();
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
 
-  document.getElementById('year').textContent = new Date().getFullYear();
-  render();
-</script>
+      goals.forEach(g=>{
+        const pct = percent(g);
+        const startedIso = starts[g.id] || null;
+
+        const card = document.createElement("article");
+        card.className = "card";
+        card.innerHTML = `
+          <h2 class="title">${g.id}. ${g.title}</h2>
+          <p class="desc">${g.description}</p>
+          <div class="row">
+            <span class="x">${g.current}</span>
+            <span class="goal">/ ${g.goal}</span>
+            <span class="badge">${g.unit}</span>
+          </div>
+          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+          <div class="pct">${pct}% complete</div>
+
+          <div class="row" style="margin-top:.5rem; align-items:center;">
+            <span class="goal">Started:</span>
+            <span id="start-${g.id}" style="font-weight:600;">${fmtLocal(startedIso)}</span>
+            <span style="flex:1"></span>
+            <button id="startnow-${g.id}" class="btn">Start Now</button>
+          </div>
+        `;
+        grid.appendChild(card);
+
+        // Wire Start Now (idempotent: won't overwrite unless force=true)
+        document.getElementById(`startnow-${g.id}`).addEventListener("click", async ()=>{
+          const data = await setStartNow(g.id);     // default: force=false
+          document.getElementById(`start-${g.id}`).textContent = fmtLocal(data.start_iso);
+        });
+      });
+    }
+
+    // --- Kick ---
+    document.getElementById("year").textContent = new Date().getFullYear();
+    render();
+  </script>
+</body>
+</html>
