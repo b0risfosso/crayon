@@ -131,6 +131,38 @@ async def gleif_find_lei(client: httpx.AsyncClient, legal_name: str) -> Optional
     if not data: return None
     return (data[0].get("attributes") or {}).get("lei")
 
+# Add near the top
+def canonical_site(url: Optional[str]) -> Optional[str]:
+    if not url: return None
+    m = re.match(r"^https?://([^/]+)", url.strip(), re.I)
+    if not m: return None
+    host = m.group(1).lower()
+    # collapse regional subpaths like apple.com/at → apple.com
+    base = host.split(":")[0]
+    return f"https://{base}/"
+
+def norm_name(s: str) -> str:
+    s = _norm(s).upper()
+    s = re.sub(r"[.,'&]", "", s)
+    s = re.sub(r"\b(INC|INCORPORATED|CORP|CORPORATION|PLC|LTD|LIMITED|N\.V|S\.A|AG)\b", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+# below sec_load_maps(...)
+def sec_find_cik_by_name(tmap: Dict[str, Any], legal_name: str) -> Optional[tuple[str,str]]:
+    """Return (cik, ticker) by fuzzy title match from SEC map."""
+    target = norm_name(legal_name)
+    best, best_row = 0.0, None
+    for sym, row in tmap.items():
+        title = norm_name(row.get("title",""))
+        # simple similarity; good enough for big caps
+        score = 1.0 if target == title else (0.8 if target in title or title in target else 0.0)
+        if score > best:
+            best, best_row = score, (row.get("cik"), sym)
+    return best_row if best >= 0.8 else None
+
+
+
 # ---- Main: build backbone
 async def build_backbone(query: str) -> CompanyBackbone:
     async with httpx.AsyncClient(headers={"User-Agent":"BackboneAgent/1.0"}) as client:
@@ -157,18 +189,25 @@ async def build_backbone(query: str) -> CompanyBackbone:
                 if entity: break
 
         wiki_facts = build_from_wikidata(entity) if entity else {}
-        official_site = wiki_facts.get("website")
+        official_site = canonical_site(wiki_facts.get("website")) or canonical_site(llm.get("wikipedia_url"))
         domain = _domain_from_url(official_site)
         tickers: List[Ticker] = wiki_facts.get("tickers") or []
 
         # 3) SEC CIK (if any US listing)
-        cik=None
+        cik = None
+        tmap = await sec_load_maps(client)
         if tickers:
-            tmap = await sec_load_maps(client)
             for t in tickers:
                 cik = sec_find_cik_by_ticker(tmap, t.symbol)
                 if cik: break
-
+        if not cik:
+            # fallback: match by name (e.g., “Apple Inc” → CIK 0000320193 + AAPL)
+            by_name = sec_find_cik_by_name(tmap, llm.get("canonical_name") or wiki_facts.get("label") or query)
+            if by_name:
+                cik, sym = by_name
+                if not tickers:
+                    tickers = [Ticker(symbol=sym)]
+                    
         # 4) LEI (try LLM name, then wiki label)
         lei = await gleif_find_lei(client, llm.get("canonical_name")) or \
               (await gleif_find_lei(client, wiki_facts.get("label")) if wiki_facts.get("label") else None)
