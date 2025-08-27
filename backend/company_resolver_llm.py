@@ -14,15 +14,15 @@ from openai import OpenAI
 
 # --- TOP OF FILE: imports (ADD THIS) ---
 from fastapi import APIRouter
-from backbone_api import router as backbone_router  # NEW: backbone endpoint router
 import os
 
 # --- OPTIONAL: tighten CORS (replace your existing CORSMiddleware block) ---
 from fastapi.middleware.cors import CORSMiddleware
 
-from adapters_sec import router as sec_router
-from adapters_prices import router as prices_router
-from valuation_api import router as valuation_router
+from backend.backbone_api import router as backbone_router
+from backend.adapters_sec import router as sec_router
+from backend.adapters_prices import router as prices_router
+from backend.valuation_api import router as valuation_router
 
 # (optional) let the model be configured via env
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-2024-08-06")  # replace your hardcoded MODEL var
