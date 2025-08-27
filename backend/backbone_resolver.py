@@ -4,7 +4,7 @@ import os, re, asyncio, json
 from typing import Optional, Dict, Any, List
 import httpx
 
-from .backbone_models import CompanyBackbone, Ticker
+from backbone_models import CompanyBackbone, Ticker
 
 # --- config
 LLM_ENDPOINT = os.environ.get("LLM_ENDPOINT", "http://127.0.0.1:8000/resolve_company_llm")
