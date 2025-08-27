@@ -13,6 +13,7 @@ USER_AGENT = os.environ.get("SEC_USER_AGENT", "CompanyEvalBot/1.0 (email@example
 WIKI_API = "https://www.wikidata.org/w/api.php"
 WIKIDATA_ENTITY = "https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
 
+# --- SEC helpers (replace your existing ones) ---
 SEC_TICKERS_JSON = "https://www.sec.gov/files/company_tickers.json"
 SEC_TICKERS_EX_JSON = "https://www.sec.gov/files/company_tickers_exchange.json"
 
@@ -99,29 +100,65 @@ def build_from_wikidata(entity: Dict[str,Any]) -> Dict[str,Any]:
 
 # ---- SEC helpers
 async def sec_load_maps(client: httpx.AsyncClient) -> Dict[str, Any]:
-    # file is small; cache in memory per process
-    headers={"User-Agent": USER_AGENT}
-    r1 = await client.get(SEC_TICKERS_JSON, headers=headers, timeout=30)
-    r1.raise_for_status()
-    base = r1.json()  # {0:{cik, ticker, title}, ...}
+    headers = {"User-Agent": USER_AGENT}
+    async def fetch(url: str):
+        r = await client.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        return r.json()
 
-    r2 = await client.get(SEC_TICKERS_EX_JSON, headers=headers, timeout=30)
-    r2.raise_for_status()
-    ex = r2.json()   # similar shape; includes exchange
-    # flatten
-    tmap = {}
-    for _,row in base.items():
-        tmap[row["ticker"].upper()] = {"cik": f'{int(row["cik"]):010d}', "title": row["title"]}
-    # enrich with exchange
-    for _,row in ex.items():
-        k=row["ticker"].upper()
-        tmap.setdefault(k, {"cik": f'{int(row["cik"]):010d}', "title": row["title"]})
-        tmap[k]["exchange"] = row.get("exchange")
+    base = await fetch(SEC_TICKERS_JSON)      # keys: "0","1",... with cik_str,ticker,title
+    ex   = await fetch(SEC_TICKERS_EX_JSON)   # may include exchange
+
+    tmap: Dict[str, Dict[str, Any]] = {}
+
+    def ingest(obj):
+        # Accept dict-of-dicts or list-of-dicts
+        if isinstance(obj, dict):
+            rows = obj.values()
+        elif isinstance(obj, list):
+            rows = obj
+        else:
+            return
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ticker = (row.get("ticker") or row.get("symbol") or "").upper()
+            if not ticker:
+                continue
+            cik_raw = row.get("cik") or row.get("cik_str") or row.get("cikStr")
+            title   = row.get("title") or row.get("name") or row.get("entityName")
+            exch    = row.get("exchange") or row.get("exchangeShortName") or row.get("primaryExchange")
+
+            cik_fmt = None
+            if cik_raw is not None:
+                try:
+                    cik_fmt = f"{int(cik_raw):010d}"
+                except Exception:
+                    pass
+
+            rec = tmap.setdefault(ticker, {})
+            if cik_fmt: rec["cik"] = cik_fmt
+            if title:   rec["title"] = title
+            if exch:    rec["exchange"] = exch
+
+    ingest(base)
+    ingest(ex)
     return tmap
 
-def sec_find_cik_by_ticker(tmap: Dict[str,Any], symbol: str) -> Optional[str]:
+def sec_find_cik_by_ticker(tmap: Dict[str, Any], symbol: str) -> Optional[str]:
     row = tmap.get(symbol.upper())
-    return row.get("cik") if row else None
+    return (row or {}).get("cik")
+
+def sec_find_cik_by_name(tmap: Dict[str, Any], legal_name: str) -> Optional[tuple[str, str]]:
+    target = norm_name(legal_name)
+    best, best_row = 0.0, None
+    for sym, row in tmap.items():
+        title = norm_name((row or {}).get("title", ""))
+        score = 1.0 if target == title else (0.85 if target in title or title in target else 0.0)
+        if score > best and row.get("cik"):
+            best, best_row = score, (row["cik"], sym)
+    return best_row if best >= 0.85 else None
+    
 
 # ---- GLEIF LEI
 async def gleif_find_lei(client: httpx.AsyncClient, legal_name: str) -> Optional[str]:
@@ -148,18 +185,6 @@ def norm_name(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-# below sec_load_maps(...)
-def sec_find_cik_by_name(tmap: Dict[str, Any], legal_name: str) -> Optional[tuple[str,str]]:
-    """Return (cik, ticker) by fuzzy title match from SEC map."""
-    target = norm_name(legal_name)
-    best, best_row = 0.0, None
-    for sym, row in tmap.items():
-        title = norm_name(row.get("title",""))
-        # simple similarity; good enough for big caps
-        score = 1.0 if target == title else (0.8 if target in title or title in target else 0.0)
-        if score > best:
-            best, best_row = score, (row.get("cik"), sym)
-    return best_row if best >= 0.8 else None
 
 
 
