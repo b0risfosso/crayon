@@ -335,16 +335,27 @@
   }
 
   // ===== Evaluation triggers
-  function onRun(){
+  async function onRun() {
     const name = companyEl.value.trim();
     const asof = asofEl.value || new Date().toISOString().slice(0,10);
     const scope = scopeEl.value;
-    if(!name){ alert('Enter a company name.'); return; }
+    if (!name) { alert('Enter a company name.'); return; }
 
-    // Placeholder agent call: replace with your backend fetch
-    const evalData = makeMockEvaluation(name, asof, scope, state.logoUrl);
-    renderEvaluation(evalData);
-  }
+    const res = await fetch(`http://localhost:8000/resolve_company?company_name=${encodeURIComponent(name)}&scope=${scope}&as_of=${asof}`);
+    if (!res.ok) { alert('Company not found.'); return; }
+    const data = await res.json();
+
+    // Use this to prefill the UI (title, logo, etc.) before running full evaluation
+    coTitleEl.textContent = data.company.canonical_name || name;
+    coSubEl.textContent = `${(scope||'standard').toUpperCase()} · As of ${asof}`;
+    if (data.company.thumbnail) {
+        state.logoUrl = data.company.thumbnail;
+        renderLogo();
+    }
+
+    // Optionally, keep your full eval behind another button once this check passes.
+    }
+
 
   function onMock(){
     const sample = ["NVIDIA","ASML","Unilever","Apple","Siemens","LVMH","Shell","ARM"];
