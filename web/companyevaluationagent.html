@@ -150,7 +150,7 @@
       </div>
 
       <div class="btnrow">
-        <button class="btn primary" id="runBtn">Run evaluation</button>
+        <button class="btn primary" id="runBtn">Resolve &amp; evaluate</button>
         <button class="btn" id="mockBtn" type="button" title="Populate with deterministic mock data for UI dev">Use mock data</button>
         <button class="btn ghost" id="resetBtn" type="button">Reset</button>
       </div>
@@ -333,29 +333,83 @@
     if(state.logoUrl){ const img = new Image(); img.src = state.logoUrl; img.alt = 'Company logo'; logoBoxEl.appendChild(img); }
     else { logoBoxEl.innerHTML = '<span style="color:var(--muted)">No logo</span>'; }
   }
+  // Helper: API resolver (tries same-origin /api first, then localhost fallback)
+  const API_CANDIDATES = [
+    '/api/resolve_company_llm',
+    'http://localhost:8000/resolve_company_llm'
+  ];
+  async function resolveCompanyAPI(name, scope, asof){
+    const qs = `?company_name=${encodeURIComponent(name)}&scope=${encodeURIComponent(scope||'')}&as_of=${encodeURIComponent(asof||'')}`;
+    for(const base of API_CANDIDATES){
+      try{
+        const res = await fetch(base + qs, { headers:{ 'Accept':'application/json' } });
+        if(res.ok){ return await res.json(); }
+      }catch(e){ /* try next */ }
+    }
+    throw new Error('Resolver endpoint unreachable. Confirm backend is running.');
+  }
 
   // ===== Evaluation triggers
-  async function onRun() {
+  function onRun(){
     const name = companyEl.value.trim();
     const asof = asofEl.value || new Date().toISOString().slice(0,10);
     const scope = scopeEl.value;
-    if (!name) { alert('Enter a company name.'); return; }
+    if(!name){ alert('Enter a company name.'); return; }
 
-    const res = await fetch(`http://localhost:8000/resolve_company?company_name=${encodeURIComponent(name)}&scope=${scope}&as_of=${asof}`);
-    if (!res.ok) { alert('Company not found.'); return; }
-    const data = await res.json();
+    // UI loading state
+    runBtn.disabled = true; const prevLabel = runBtn.textContent; runBtn.textContent = 'Resolving…';
 
-    // Use this to prefill the UI (title, logo, etc.) before running full evaluation
-    coTitleEl.textContent = data.company.canonical_name || name;
-    coSubEl.textContent = `${(scope||'standard').toUpperCase()} · As of ${asof}`;
-    if (data.company.thumbnail) {
-        state.logoUrl = data.company.thumbnail;
-        renderLogo();
-    }
+    (async()=>{
+      try{
+        // 1) Resolve via LLM + Wikidata backend
+        const res = await resolveCompanyAPI(name, scope, asof);
+        if(!res || !res.company){
+          alert('Could not confidently resolve that company.');
+          return;
+        }
+        const co = res.company || {};
 
-    // Optionally, keep your full eval behind another button once this check passes.
-    }
+        // 2) Build a temporary evaluation (keep mock numbers for now)
+        const evalData = makeMockEvaluation(co.canonical_name || name, asof, scope, state.logoUrl);
+        evalData.notes = evalData.notes || [];
+        evalData.citations = evalData.citations || [];
 
+        // Add resolver notes/citations
+        evalData.notes.unshift(
+          `Resolver: ${co.canonical_name||name}` + (co.short_description? ` — ${co.short_description}`: '')
+        );
+        if(co.disambiguation_note){ evalData.notes.unshift(`Note: ${co.disambiguation_note}`); }
+        if(co.wikipedia_url){ evalData.citations.push({ title: `Wikipedia: ${co.canonical_name||name}`, url: co.wikipedia_url }); }
+        if(res.meta && typeof res.meta.verified === 'boolean'){
+          evalData.notes.unshift(`Verified: ${res.meta.verified? 'Wikidata company match' : 'Not verified by Wikidata'}`);
+        }
+
+        // 3) Render
+        renderEvaluation(evalData);
+
+        // 4) Post-render badges (won't be overwritten by renderEvaluation)
+        if(res.meta && typeof res.meta.verified === 'boolean'){
+          quickstatsEl.appendChild(makePill(res.meta.verified ? 'Verified (Wikidata)' : 'Unverified'));
+        }
+        if(Array.isArray(co.primary_tickers)){
+          co.primary_tickers.slice(0,3).forEach(t=>{
+            const label = `Ticker: ${t.symbol}${t.exchange? ' @'+t.exchange:''}`;
+            quickstatsEl.appendChild(makePill(label));
+          });
+        }
+
+        // Update header explicitly (resolver canonical name)
+        coTitleEl.textContent = co.canonical_name || name;
+        coSubEl.textContent = `${(scope||'standard').toUpperCase()} · As of ${asof}`;
+
+      }catch(err){
+        console.error(err);
+        alert('Resolver error: ' + (err?.message || err));
+      }finally{
+        runBtn.disabled = false; runBtn.textContent = prevLabel;
+      }
+    })();
+  }
 
   function onMock(){
     const sample = ["NVIDIA","ASML","Unilever","Apple","Siemens","LVMH","Shell","ARM"];
