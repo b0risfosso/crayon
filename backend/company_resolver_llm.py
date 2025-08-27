@@ -95,24 +95,23 @@ USER_PROMPT_TEMPLATE = """Query: {q}
 Return a JSON that strictly matches the provided schema. 
 If you suspect confusion with non-company pages (TV shows, songs, etc.), resolve to the company and explain briefly in disambiguation_note."""
 
-def call_llm(query: str) -> Dict[str, Any]:
+# in company_resolver_llm.py
+def call_llm(query: str) -> dict:
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY not set")
-    # OpenAI Responses API with JSON schema
+
     resp = client.responses.create(
-        model="gpt-4.1-mini",  # light; use a larger model if you want
+        model="gpt-4o-mini",          # or a bigger model if you want
         temperature=0.1,
-        system=SYSTEM_PROMPT,
-        input=USER_PROMPT_TEMPLATE.format(q=query),
-        response_format={
+        instructions=SYSTEM_PROMPT,   # <-- replace system= with instructions=
+        input=USER_PROMPT_TEMPLATE.format(q=query),  # <-- user content goes here
+        response_format={             # structured JSON output
             "type": "json_schema",
             "json_schema": JSON_SCHEMA,
             "strict": True
         },
     )
-    # The result JSON is in resp.output_text when using response_format=json_schema
-    data = json.loads(resp.output_text)
-    return data
+    return json.loads(resp.output_text)
 
 # tiny in-memory cache (helps when users try a few times)
 _CACHE: dict[str, tuple[float, Dict[str, Any]]] = {}
