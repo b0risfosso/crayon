@@ -11,6 +11,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from openai import OpenAI
 
+
+# --- TOP OF FILE: imports (ADD THIS) ---
+from fastapi import APIRouter
+from backbone_api import router as backbone_router  # NEW: backbone endpoint router
+import os
+
+# --- OPTIONAL: tighten CORS (replace your existing CORSMiddleware block) ---
+from fastapi.middleware.cors import CORSMiddleware
+
+# (optional) let the model be configured via env
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-2024-08-06")  # replace your hardcoded MODEL var
+
+
 # ---------------- Pydantic schema ----------------
 
 class Ticker(BaseModel):
@@ -38,6 +51,26 @@ app = FastAPI(title="Company Resolver (LLM + Wikidata verify)", version="3.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
+)
+
+app.include_router(backbone_router, prefix="/api")
+
+
+# Health endpoint for nginx/systemd probes
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
+
+
+
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "https://fantasiagenesis.com").split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 client = OpenAI()  # reads OPENAI_API_KEY
