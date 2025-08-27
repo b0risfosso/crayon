@@ -1,8 +1,8 @@
 # backend/backbone_api.py
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
-from .backbone_resolver import build_backbone
-from .backbone_models import CompanyBackbone
+from backbone_resolver import build_backbone
+from backbone_models import CompanyBackbone
 
 router = APIRouter()
 
