@@ -40,15 +40,7 @@ def keep_leadership_phrases(texts: list[str]) -> list[str]:
             seen.add(k); filt.append(t)
     return filt[:5]
 
-# add near the top
-STOCK_INDEX_BADWORDS = [
-    "stock market", "market capitalization", "market cap", "index", "index weight",
-    "s&p", "nasdaq", "dow jones", "ftse", "tsx", "cac 40", "dax", "msci"
-]
 
-def _is_stock_index_table(cols: list[str], caption: str) -> bool:
-    hay = " ".join([caption] + [str(c) for c in cols]).lower()
-    return any(b in hay for b in STOCK_INDEX_BADWORDS)
 
 
 def pad_cik(cik: str) -> str:
@@ -122,30 +114,6 @@ async def wikidata_industries(company_name: str) -> list[str]:
         if s not in seen:
             seen.add(s); clean.append(s)
     return clean[:6]
-
-
-def pick_best_market_table(url: str, region_hint: Optional[str]) -> Optional[Tuple[pd.DataFrame, str, Dict[str,int]]]:
-    candidates = _read_tables_with_captions(url)
-    best = None
-    best_score = 0.0
-    best_cols = {}
-    for df, cap in candidates:
-        cols = [str(c) for c in df.columns]
-        if _is_stock_index_table(cols, cap):
-            continue  # NEW: skip stock/index/market-cap tables
-        v = _find_col_idx(cols, VENDOR_COLS)
-        s = _find_col_idx(cols, SHARE_COLS)
-        u = _find_col_idx(cols, UNITS_COLS)
-        if v is None or (s is None and u is None):
-            continue
-        sc = _score_table(df, cap, region_hint)
-        if sc > best_score:
-            best = (df, cap)
-            best_score = sc
-            best_cols = {"v": v, "s": s, "u": u}
-    if not best:
-        return None
-    return (best[0], best[1], best_cols)
 
 
 def extract_competition_section(html: str) -> str:
@@ -244,13 +212,16 @@ async def moat_market_leadership(
 
     section = extract_competition_section(html)
 
-    resp = client.responses.parse(
-        model=os.environ.get("OPENAI_MODEL","gpt-4o-2024-08-06"),
-        input=[{"role":"system","content":SYSTEM},{"role":"user","content":section}],
-        text_format=MarketLeadershipExtraction,
-        temperature=0.1,
-    )
-    parsed: MarketLeadershipExtraction = resp.output_parsed
+    try:
+        resp = client.responses.parse(
+            model=os.environ.get("OPENAI_MODEL","gpt-4o-2024-08-06"),
+            input=[{"role":"system","content":SYSTEM},{"role":"user","content":section}],
+            text_format=MarketLeadershipExtraction,
+            temperature=0.1,
+        )
+        parsed: MarketLeadershipExtraction = resp.output_parsed
+    except Exception:
+        parsed = MarketLeadershipExtraction(items=[], phrases=[], notes=None)
 
     # AFTER: parsed = resp.output_parsed
     parsed.phrases = keep_leadership_phrases(parsed.phrases)
@@ -268,6 +239,7 @@ async def moat_market_leadership(
 
     # If the filing didn’t yield any numeric share/rank and user allows wiki, try generalized wiki fallback
     # inside your endpoint, replacing the current wiki block:
+    wiki = None
     computed_hhi = None
 
     if use_wiki and not any(it.share_pct is not None for it in parsed.items):
