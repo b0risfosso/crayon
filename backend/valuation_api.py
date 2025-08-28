@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from typing import Dict, Any, List, Optional
 import httpx, datetime as dt, os
+from backend.consensus_adapter import get_consensus_eps
 
 import yfinance as yf
 
@@ -161,29 +162,46 @@ def forward_eps_from_yoy(cf: Dict[str, Any], years: int) -> Optional[float]:
 
 @router.get("/valuation/pe_forward_1y")
 async def pe_forward_1y(symbol: str = Query(...), cik: str = Query(...)):
-    """
-    Forward-1Y P/E using model fallback:
-    EPS_FY+1 ≈ TTM_EPS_now * (1 + YoY_TTM_EPS_growth).
-    """
+    p = latest_price(symbol)
+    cons = get_consensus_eps(symbol)
+    if cons:
+        eps_fy1, _, meta = cons
+        pe = (p["price"]/eps_fy1) if eps_fy1 and abs(eps_fy1) > 1e-9 else None
+        return {
+            "symbol": symbol.upper(), "cik": pad_cik(cik), "as_of": today_iso(),
+            "price": p["price"], "currency": p["currency"],
+            "eps_forward_1y": eps_fy1, "pe_forward_1y": pe,
+            "method": "consensus", "confidence": 0.9,
+            "source": meta
+        }
+    # fallback to model
     cik10 = pad_cik(cik)
     cf = await fetch_companyfacts(cik10)
     eps_fwd = forward_eps_from_yoy(cf, 1)
-    p = latest_price(symbol)
     return {
         "symbol": symbol.upper(), "cik": cik10, "as_of": today_iso(),
         "price": p["price"], "currency": p["currency"],
-        "eps_forward_1y": eps_fwd, "pe_forward_1y": (p["price"]/eps_fwd) if (eps_fwd and abs(eps_fwd) > 1e-9) else None,
-        "method": "model_yoy_roll_forward", "confidence": 0.35,
-        "notes": "Consensus not integrated; using YoY TTM EPS growth as proxy.",
-        "citations":[SEC_CF_URL.format(cik=cik10)]
+        "eps_forward_1y": eps_fwd, "pe_forward_1y": (p["price"]/eps_fwd) if eps_fwd else None,
+        "method": "model_yoy_roll_forward", "confidence": 0.35
     }
 
 @router.get("/valuation/pe_forward_2y")
 async def pe_forward_2y(symbol: str = Query(...), cik: str = Query(...)):
+    p = latest_price(symbol)
+    cons = get_consensus_eps(symbol)
+    if cons:
+        _, eps_fy2, meta = cons
+        pe = (p["price"]/eps_fy2) if eps_fy2 and abs(eps_fy2) > 1e-9 else None
+        return {
+            "symbol": symbol.upper(), "cik": pad_cik(cik), "as_of": today_iso(),
+            "price": p["price"], "currency": p["currency"],
+            "eps_forward_2y": eps_fy2, "pe_forward_2y": pe,
+            "method": "consensus", "confidence": 0.85,
+            "source": meta
+        }
     cik10 = pad_cik(cik)
     cf = await fetch_companyfacts(cik10)
     eps_fwd = forward_eps_from_yoy(cf, 2)
-    p = latest_price(symbol)
     return {
         "symbol": symbol.upper(), "cik": cik10, "as_of": today_iso(),
         "price": p["price"], "currency": p["currency"],
