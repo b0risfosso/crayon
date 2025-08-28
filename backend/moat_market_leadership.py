@@ -9,6 +9,7 @@ from openai import OpenAI
 from datetime import datetime
 from backend.wiki_market_generalized import wiki_market_share_generalized
 from backend.backbone_resolver import build_backbone
+import anyio
 
 router = APIRouter()
 SEC_UA = os.environ.get("SEC_USER_AGENT", "CompanyEval/1.0 (b@fantasiagenesis.com)")
@@ -22,6 +23,32 @@ PHRASE_PATTERNS = [
     r"\bleading\b",
     r"\bdominant\b",
 ]
+
+# add near PHRASE_PATTERNS
+PHRASE_ALLOW = [re.compile(p, re.I) for p in PHRASE_PATTERNS]
+
+def keep_leadership_phrases(texts: list[str]) -> list[str]:
+    out = []
+    for t in texts or []:
+        if any(rx.search(t or "") for rx in PHRASE_ALLOW):
+            out.append(t)
+    # de-dupe, keep up to 5
+    seen, filt = set(), []
+    for t in out:
+        k = t.lower()
+        if k not in seen:
+            seen.add(k); filt.append(t)
+    return filt[:5]
+
+# add near the top
+STOCK_INDEX_BADWORDS = [
+    "stock market", "market capitalization", "market cap", "index", "index weight",
+    "s&p", "nasdaq", "dow jones", "ftse", "tsx", "cac 40", "dax", "msci"
+]
+
+def _is_stock_index_table(cols: list[str], caption: str) -> bool:
+    hay = " ".join([caption] + [str(c) for c in cols]).lower()
+    return any(b in hay for b in STOCK_INDEX_BADWORDS)
 
 
 def pad_cik(cik: str) -> str:
@@ -50,6 +77,76 @@ async def latest_annual_filing_url(cik10: str) -> Optional[str]:
         except Exception:
             continue
     return None
+
+# add near the top (imports already have httpx/os/re)
+async def wikidata_industries(company_name: str) -> list[str]:
+    """Best-effort industry hint list from Wikidata (P452)."""
+    # try via your backbone first (gives QID if available)
+    qid = None
+    try:
+        bb = await build_backbone(company_name)
+        qid = bb.wikidata_id if getattr(bb, "wikidata_id", None) else None
+    except Exception:
+        pass
+    if not qid:
+        return []
+    url = f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
+    try:
+        async with httpx.AsyncClient(timeout=20) as h:
+            r = await h.get(url)
+            r.raise_for_status()
+            ent = r.json().get("entities",{}).get(qid,{})
+    except Exception:
+        return []
+    out = []
+    for c in (ent.get("claims",{}) or {}).get("P452", []):  # industry
+        dv = (c.get("mainsnak") or {}).get("datavalue") or {}
+        if dv.get("type") == "wikibase-entityid":
+            iqid = (dv.get("value") or {}).get("id")
+            if not iqid: continue
+            lbl = (ent.get("entities",{}) or {}).get(iqid,{}).get("labels",{}).get("en",{}).get("value")
+            # fallback: we may not have the nested entity; quick fetch would be overkill here.
+        # simpler: just use aliases from sitelinks/labels
+    # Simpler robust approach: use the item's English description as an industry hint
+    desc = (ent.get("descriptions") or {}).get("en",{}).get("value")
+    if desc:
+        out.extend([w.strip() for w in re.split(r"[,;/]", desc) if len(w.strip()) >= 3])
+    # add label fragments
+    label = (ent.get("labels") or {}).get("en",{}).get("value")
+    if label:
+        out.append(label)
+    # de-dupe and trim
+    seen, clean = set(), []
+    for s in out:
+        s = s.lower()
+        if s not in seen:
+            seen.add(s); clean.append(s)
+    return clean[:6]
+
+
+def pick_best_market_table(url: str, region_hint: Optional[str]) -> Optional[Tuple[pd.DataFrame, str, Dict[str,int]]]:
+    candidates = _read_tables_with_captions(url)
+    best = None
+    best_score = 0.0
+    best_cols = {}
+    for df, cap in candidates:
+        cols = [str(c) for c in df.columns]
+        if _is_stock_index_table(cols, cap):
+            continue  # NEW: skip stock/index/market-cap tables
+        v = _find_col_idx(cols, VENDOR_COLS)
+        s = _find_col_idx(cols, SHARE_COLS)
+        u = _find_col_idx(cols, UNITS_COLS)
+        if v is None or (s is None and u is None):
+            continue
+        sc = _score_table(df, cap, region_hint)
+        if sc > best_score:
+            best = (df, cap)
+            best_score = sc
+            best_cols = {"v": v, "s": s, "u": u}
+    if not best:
+        return None
+    return (best[0], best[1], best_cols)
+
 
 def extract_competition_section(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
@@ -155,38 +252,48 @@ async def moat_market_leadership(
     )
     parsed: MarketLeadershipExtraction = resp.output_parsed
 
-    # After parsed = resp.output_parsed
+    # AFTER: parsed = resp.output_parsed
+    parsed.phrases = keep_leadership_phrases(parsed.phrases)
+
+    # If still empty, regex-scan the section as fallback
     if not parsed.phrases:
         found = []
         for pat in PHRASE_PATTERNS:
             if re.search(pat, section, re.I):
-                found.append(pat.strip(r"\b").replace(r"(?:player|provider|vendor)","player/provider/vendor"))
-        parsed.phrases = found[:5]
+                found.append(re.sub(r"\\b", "", pat).replace(r"(?:player|provider|vendor)", "player/provider/vendor"))
+        parsed.phrases = keep_leadership_phrases(found)
 
     # Make sure we have a citations list started with the filing URL
     citations = [url]
 
     # If the filing didn’t yield any numeric share/rank and user allows wiki, try generalized wiki fallback
+    # inside your endpoint, replacing the current wiki block:
     computed_hhi = None
 
     if use_wiki and not any(it.share_pct is not None for it in parsed.items):
-        # get a few aliases to improve vendor matching (best-effort; ignore errors)
+        # aliases via backbone (already have this in your code)
         aliases: list[str] = []
         try:
             bb = await build_backbone(company_name)
             if bb and bb.aliases:
                 aliases = [a for a in bb.aliases if isinstance(a, str)]
-            # also toss in the canonical name variant
             if bb and bb.canonical_name:
                 aliases.append(bb.canonical_name)
         except Exception:
             pass
 
-        wiki = wiki_market_share_generalized(
-            company_name=company_name,
-            aliases=aliases,
-            industry_hints=[],        # you can feed Wikidata industries later; empty is fine
-            region_hint=region_hint,  # e.g., "United States" or None for global/unspecified
+        # NEW: light industry hints from Wikidata
+        industry_hints = await wikidata_industries(company_name)
+
+        # run the (sync) wiki parser off the event loop
+        wiki = await anyio.to_thread.run_sync(
+            wiki_market_share_generalized,
+            company_name,
+            aliases,
+            industry_hints,
+            region_hint,
+            None,   # extra_queries
+            6       # search_limit
         )
 
         if wiki and (wiki.get("company_share") is not None or wiki.get("company_rank") is not None):
@@ -217,8 +324,12 @@ async def moat_market_leadership(
         rationale_bits.append(f"{it.category}: " + ", ".join(bits))
 
     if (all(it.share_pct is None for it in parsed.items)) and parsed.phrases:
-        base = min(2.0, 0.8 + 0.4*len(parsed.phrases))  # cap at 2/5
+        base = min(1.5, 0.6 + 0.3*len(parsed.phrases))  # 0.6..1.5 cap
         scored["score"] = round(base, 2)
+
+    if wiki and wiki.get("company_share") is not None:
+        rationale_bits.insert(0, f"Wiki {wiki.get('region') or 'global'}: {wiki['company_share']:.1f}%"
+                                + (f', rank {wiki.get("company_rank")}' if wiki.get("company_rank") else ""))
 
 
     return {
