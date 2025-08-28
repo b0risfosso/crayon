@@ -7,10 +7,22 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from openai import OpenAI
 from datetime import datetime
+from backend.wiki_market_generalized import wiki_market_share_generalized
+from backend.backbone_resolver import build_backbone
 
 router = APIRouter()
 SEC_UA = os.environ.get("SEC_USER_AGENT", "CompanyEval/1.0 (b@fantasiagenesis.com)")
 SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik}.json"
+
+# TOP: extend phrase detection targets
+PHRASE_PATTERNS = [
+    r"\bmarket leader\b",
+    r"\blargest\b",
+    r"\btop (?:player|provider|vendor)\b",
+    r"\bleading\b",
+    r"\bdominant\b",
+]
+
 
 def pad_cik(cik: str) -> str:
     d = "".join(ch for ch in cik if ch.isdigit())
@@ -41,19 +53,28 @@ async def latest_annual_filing_url(cik10: str) -> Optional[str]:
 
 def extract_competition_section(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
+    # Keep a text with newlines for easier heading heuristics
     text = soup.get_text("\n", strip=True)
-    # crude section split around common headers
-    patterns = [r"\bCOMPETITION\b", r"\bMARKET\b", r"\bINDUSTR(Y|IES)\b"]
-    start = None
-    for p in patterns:
-        m = re.search(p, text, re.I)
-        if m: start = m.start(); break
-    if start is None:
-        return text[:4000]  # fallback small chunk
-    chunk = text[start:start+18000]  # take ~18k chars after header
-    # stop at next all-caps header-ish line
-    m2 = re.search(r"\n[A-Z ]{6,}\n", chunk[2000:], re.M)
-    if m2: chunk = chunk[:2000+m2.start()]
+
+    # Try to find “Item 1. Business” or “Competition” headings and grab a bigger window
+    candidates = [
+        r"ITEM\s+1\.\s+BUSINESS",
+        r"\bCOMPETITION\b",
+        r"\bMARKET\b",
+        r"\bINDUSTR(?:Y|IES)\b",
+    ]
+    starts = [m.start() for pat in candidates for m in [re.search(pat, text, re.I)] if m]
+    if not starts:
+        return text[:20000]  # last resort: big slice
+
+    start = min(starts)
+    chunk = text[start:start+40000]  # take a generous window
+
+    # Stop at next all-caps header-ish line after a minimum length
+    m2 = re.search(r"\n[A-Z0-9 .,&/-]{8,}\n", chunk[3000:], re.M)
+    if m2:
+        chunk = chunk[:3000+m2.start()]
+
     return chunk
 
 # ---------- LLM struct parse ----------
@@ -75,8 +96,9 @@ class MarketLeadershipExtraction(BaseModel):
 
 SYSTEM = (
     "Extract structured market share/rank evidence for the issuer from the provided filing text. "
-    "Capture the category (product-market), region if present, numerical share %, and rank if stated. "
-    "Keep text_span to a short quote (<200 chars) supporting the claim. If multiple categories appear, include multiple items."
+    "If numeric shares or ranks are present, capture them. "
+    "Additionally, always capture any leadership phrases (e.g., 'market leader', 'largest', 'top', 'leading', 'dominant') "
+    "with a short text_span quote even if no numbers are present."
 )
 
 def hhi_from_shares(shares: List[float]) -> Optional[float]:
@@ -107,7 +129,12 @@ def score_market_leadership(items: List[SharePoint]) -> Dict[str, Any]:
     return {"score": round(score_0_5, 2), "HHI": hhi}
 
 @router.get("/moat/market_leadership")
-async def moat_market_leadership(cik: str = Query(...), company_name: str = Query(...)):
+async def moat_market_leadership(
+    cik: str = Query(...),
+    company_name: str = Query(...),
+    use_wiki: bool = Query(False, description="Enable Wikipedia fallback if filings lack numeric share"),
+    region_hint: str | None = Query(None, description="Optional region focus, e.g., 'United States'")
+):
     cik10 = pad_cik(cik)
     url = await latest_annual_filing_url(cik10)
     if not url:
@@ -128,7 +155,59 @@ async def moat_market_leadership(cik: str = Query(...), company_name: str = Quer
     )
     parsed: MarketLeadershipExtraction = resp.output_parsed
 
+    # After parsed = resp.output_parsed
+    if not parsed.phrases:
+        found = []
+        for pat in PHRASE_PATTERNS:
+            if re.search(pat, section, re.I):
+                found.append(pat.strip(r"\b").replace(r"(?:player|provider|vendor)","player/provider/vendor"))
+        parsed.phrases = found[:5]
+
+    # Make sure we have a citations list started with the filing URL
+    citations = [url]
+
+    # If the filing didn’t yield any numeric share/rank and user allows wiki, try generalized wiki fallback
+    computed_hhi = None
+
+    if use_wiki and not any(it.share_pct is not None for it in parsed.items):
+        # get a few aliases to improve vendor matching (best-effort; ignore errors)
+        aliases: list[str] = []
+        try:
+            bb = await build_backbone(company_name)
+            if bb and bb.aliases:
+                aliases = [a for a in bb.aliases if isinstance(a, str)]
+            # also toss in the canonical name variant
+            if bb and bb.canonical_name:
+                aliases.append(bb.canonical_name)
+        except Exception:
+            pass
+
+        wiki = wiki_market_share_generalized(
+            company_name=company_name,
+            aliases=aliases,
+            industry_hints=[],        # you can feed Wikidata industries later; empty is fine
+            region_hint=region_hint,  # e.g., "United States" or None for global/unspecified
+        )
+
+        if wiki and (wiki.get("company_share") is not None or wiki.get("company_rank") is not None):
+            parsed.items.append(SharePoint(
+                category=f"market share ({wiki.get('period_hint') or 'recent'})",
+                region=wiki.get("region") or (region_hint or "unspecified"),
+                share_pct=wiki.get("company_share"),
+                rank=wiki.get("company_rank"),
+                text_span=None,
+                source_hint="Wikipedia"
+            ))
+            computed_hhi = wiki.get("hhi")
+            if wiki.get("url"):
+                citations.append(wiki["url"])
+
     scored = score_market_leadership(parsed.items)
+
+    # If wiki computed an HHI, prefer that
+    if computed_hhi is not None:
+        scored["HHI"] = computed_hhi
+
     rationale_bits = []
     for it in parsed.items[:3]:
         bits = []
@@ -136,6 +215,11 @@ async def moat_market_leadership(cik: str = Query(...), company_name: str = Quer
         if it.rank is not None: bits.append(f"rank {it.rank}")
         if it.region: bits.append(it.region)
         rationale_bits.append(f"{it.category}: " + ", ".join(bits))
+
+    if (all(it.share_pct is None for it in parsed.items)) and parsed.phrases:
+        base = min(2.0, 0.8 + 0.4*len(parsed.phrases))  # cap at 2/5
+        scored["score"] = round(base, 2)
+
 
     return {
         "key": "moat.market_leadership",
@@ -147,6 +231,6 @@ async def moat_market_leadership(cik: str = Query(...), company_name: str = Quer
             "phrases": parsed.phrases,
         },
         "rationale": "; ".join(rationale_bits)[:320],
-        "citations": [url],
+        "citations": citations,  # <— use this
         "as_of": datetime.utcnow().date().isoformat()
     }
