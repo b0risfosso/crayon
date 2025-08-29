@@ -4,6 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>1 MJ • Mode Select</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; }
+    #solar { display: none; max-width: 900px; margin: 12px 0 0; }
+    #solar.show { display: block; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 8px 0; background: #fff; color: #111; }
+    .card h3 { margin: 0 0 6px 0; font-size: 1rem; }
+    .card p { margin: 0; }
+    .card ul, .card ol { margin: 0; padding-left: 18px; }
+  </style>
 </head>
 <body>
   <section id="narrative" style="margin-top:16px; max-width:900px">
@@ -44,5 +53,38 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
     <option value="biological">Biological (ATP turnover equivalence)</option>
     <option value="human">Human power (bike-gen)</option>
   </select>
+  <section id="solar" aria-live="polite">
+    <div class="card">
+      <h3>Success metric</h3>
+      <p>0.278 kWh delivered to a meter (DC or AC).</p>
+    </div>
+    <div class="card">
+      <h3>Materials</h3>
+      <p>Use a single 100–200 W panel, small MPPT, 12 V battery, and a watt-hour meter.</p>
+    </div>
+    <div class="card">
+      <h3>Methods</h3>
+      <ol>
+        <li>Pick a day with good sun.</li>
+        <li>Aim panel at the sun (tilt ≈ your latitude).</li>
+        <li>Log Wh until ≥ 0.278 kWh.</li>
+        <li>Note: STC is 1000 W/m².</li>
+      </ol>
+    </div>
+  </section>
+
+  <script>
+    (function(){
+      const select = document.getElementById('dimension');
+      const solar = document.getElementById('solar');
+      function toggle(){
+        if(select && select.value === 'solar') { solar.classList.add('show'); }
+        else { solar.classList.remove('show'); }
+      }
+      if(select){ select.addEventListener('change', toggle); }
+      // initial render
+      toggle();
+    })();
+  </script>
 </body>
 </html>
