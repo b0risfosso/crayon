@@ -53,7 +53,7 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
     <option value="biological">Biological (ATP turnover equivalence)</option>
     <option value="human">Human power (bike-gen)</option>
   </select>
-  <section id="solar" aria-live="polite">
+    <section id="solar" aria-live="polite">
     <div class="card">
       <h3>Success metric</h3>
       <p>0.278 kWh delivered to a meter (DC or AC).</p>
@@ -71,9 +71,20 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
         <li>Note: STC is 1000 W/m².</li>
       </ol>
     </div>
+
+    <div class="card">
+      <h3>Area needed</h3>
+      <p>You need area A such that <em>E<sub>out</sub> = A · G<sub>daily</sub> · η<sub>sys</sub> ≥ 0.278 kWh</em>, where G<sub>daily</sub> is daily irradiance (kWh/m²/day, i.e., peak sun hours), and η<sub>sys</sub> ≈ module·MPPT·wiring·inverter (often 0.12–0.18 net). <span class="small">NREL docs</span></p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
+        <label>G<sub>daily</sub> (kWh/m²/day)<br><input id="Gdaily" type="number" step="any" value="3" /></label>
+        <label>η<sub>sys</sub> (0–1)<br><input id="etaSys" type="number" step="any" value="0.15" /></label>
+      </div>
+      <p id="areaOut" style="margin-top:6px; font-weight:600">A ≈ 0.62 m² (for G=3, η=0.15)</p>
+      <p class="small">Example: G=3, η=0.15 → A ≈ 0.278 / (3 · 0.15) = 0.62 m² (roughly one 120–150 W panel).</p>
+    </div>
   </section>
 
-  <script>
+    <script>
     (function(){
       const select = document.getElementById('dimension');
       const solar = document.getElementById('solar');
@@ -82,8 +93,31 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
         else { solar.classList.remove('show'); }
       }
       if(select){ select.addEventListener('change', toggle); }
+
+      function calcArea(){
+        const need = 0.278; // kWh target
+        const Gel = document.getElementById('Gdaily');
+        const etaEl = document.getElementById('etaSys');
+        const out = document.getElementById('areaOut');
+        if(!Gel || !etaEl || !out){ return; }
+        const G = Number(Gel.value) || 0;
+        const eta = Math.max(0, Math.min(1, Number(etaEl.value) || 0));
+        if(G > 0 && eta > 0){
+          const A = need / (G * eta);
+          out.textContent = `A ≈ ${A.toFixed(2)} m² (for G=${G}, η=${eta})`;
+        } else {
+          out.textContent = 'A —';
+        }
+      }
+
+      ['Gdaily','etaSys'].forEach(id=>{
+        const el = document.getElementById(id);
+        if(el){ el.addEventListener('input', calcArea); }
+      });
+
       // initial render
       toggle();
+      calcArea();
     })();
   </script>
 </body>
