@@ -12,6 +12,47 @@
     .card h3 { margin: 0 0 6px 0; font-size: 1rem; }
     .card p { margin: 0; }
     .card ul, .card ol { margin: 0; padding-left: 18px; }
+    .small { font-size: 12px; color: #555; }
+    fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 12px 0; }
+    legend { padding: 0 6px; color: #333; }
+    label { display: block; margin: 6px 0; }
+    input, select, textarea, button { font: inherit; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 6px; text-align: left; }
+  </style>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; }
+    #solar { display: none; max-width: 900px; margin: 12px 0 0; }
+    #solar.show { display: block; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 8px 0; background: #fff; color: #111; }
+    .card h3 { margin: 0 0 6px 0; font-size: 1rem; }
+    .card p { margin: 0; }
+    .card ul, .card ol { margin: 0; padding-left: 18px; }
+    .small { font-size: 12px; color: #555; }
+    fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 12px 0; }
+    legend { padding: 0 6px; color: #333; }
+    label { display: block; margin: 6px 0; }
+    input, select, textarea, button { font: inherit; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 6px; text-align: left; }
+  </style>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; }
+    #solar { display: none; max-width: 900px; margin: 12px 0 0; }
+    #solar.show { display: block; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 8px 0; background: #fff; color: #111; }
+    .card h3 { margin: 0 0 6px 0; font-size: 1rem; }
+    .card p { margin: 0; }
+    .card ul, .card ol { margin: 0; padding-left: 18px; }
+    .small { font-size: 12px; color: #555; }
+  </style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; }
+    #solar { display: none; max-width: 900px; margin: 12px 0 0; }
+    #solar.show { display: block; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 8px 0; background: #fff; color: #111; }
+    .card h3 { margin: 0 0 6px 0; font-size: 1rem; }
+    .card p { margin: 0; }
+    .card ul, .card ol { margin: 0; padding-left: 18px; }
   </style>
 </head>
 <body>
@@ -46,6 +87,248 @@ Data stored and accessible for future scaling toward 100 MJ and 1000 MJ goals.
 Protocol replicable by others, with defined BOM (bill of materials) and instrumentation.</pre>
   </section>
   <select id="dimension">
+    <option value="solar">Solar (PV)</option>
+    <option value="mechanical">Mechanical (lift a mass)</option>
+    <option value="thermal">Thermal (heat water)</option>
+    <option value="chemical">Chemical (combust a fuel)</option>
+    <option value="biological">Biological (ATP turnover equivalence)</option>
+    <option value="human">Human power (bike-gen)</option>
+  </select>
+
+  <section id="solar" aria-live="polite">
+    <div class="card">
+      <h3>Success metric</h3>
+      <p>0.278 kWh delivered to a meter (DC or AC).</p>
+    </div>
+    <div class="card">
+      <h3>Bill of Materials</h3>
+      <div style="overflow:auto">
+        <table style="border-collapse:collapse; width:100%">
+          <thead>
+            <tr>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Line</th>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Item (spec)</th>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Why / key spec</th>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px">1</td>
+              <td style="padding:8px"><strong>150 W monocrystalline PV module</strong>, MC4 leads; Vmp ~18 V, Imp ~8–9 A; Voc ~22 V</td>
+              <td style="padding:8px">One panel comfortably produces ≥ 0.278 kWh on a decent-sun day; module nameplates are at <strong>STC 1000 W/m², 25 °C</strong>.</td>
+              <td style="padding:8px">1 <span class="small">(DOE Energy.gov, NREL docs)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">2</td>
+              <td style="padding:8px"><strong>MPPT charge controller</strong>, 12 V output, <strong>20 A</strong> max; PV input ≥ 60 V allowed (but fine with 1× 22 V Voc panel)</td>
+              <td style="padding:8px">10–20 A class MPPT efficiently down-converts panel to battery; 20 A gives headroom.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">3</td>
+              <td style="padding:8px"><strong>12.8 V 24 Ah LiFePO₄ battery</strong> with BMS (≥30 A continuous)</td>
+              <td style="padding:8px">~0.31 kWh nominal (12.8 V×24 Ah ≈ 307 Wh), enough buffer to accumulate/dispatch the target 0.278 kWh.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">4</td>
+              <td style="padding:8px"><strong>DC watt-hour meter</strong> (shunt type), 0–60 V DC, 50–100 A shunt</td>
+              <td style="padding:8px">Ground truth for “energy delivered”; install on the load or battery-output side (define your test point).</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">5</td>
+              <td style="padding:8px"><strong>Battery fuse</strong> (MIDI/ANL) <strong>30–40 A</strong>, holder</td>
+              <td style="padding:8px">Size ≥ 125% of continuous current (20 A MPPT → 25 A; use next standard size 30–40 A). Mount <strong>as close to battery + as practical</strong>.</td>
+              <td style="padding:8px">1 <span class="small">(Mike Holt, IAEI)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">6</td>
+              <td style="padding:8px"><strong>DC disconnect switch</strong> (≥ 60 V DC, ≥ 32 A) for battery side</td>
+              <td style="padding:8px">Service safety / lockout.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">7</td>
+              <td style="padding:8px"><strong>MC4 extension leads</strong>, UV-resistant, <strong>10 AWG (~6 mm²)</strong>, length to suit</td>
+              <td style="padding:8px">Low drop on PV run; outdoor-rated.</td>
+              <td style="padding:8px">1 pair <span class="small">(Victron)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">8</td>
+              <td style="padding:8px"><strong>Controller↔Battery cables</strong>, <strong>6–10 mm²</strong> (10–8 AWG) with ring lugs</td>
+              <td style="padding:8px">Keep voltage drop &lt; 2% at up to 20 A; follow controller manual if stricter.</td>
+              <td style="padding:8px">1 set <span class="small">(Victron)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">9</td>
+              <td style="padding:8px"><strong>Equipment grounding</strong>: 6 mm² Cu (green/yellow), lug + ground rod (if used outdoors)</td>
+              <td style="padding:8px">Bond module frame/rack; follow local code.</td>
+              <td style="padding:8px">1 set</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">10</td>
+              <td style="padding:8px"><strong>Mounting</strong>: rail/clamps or adjustable tilt bracket; stainless hardware</td>
+              <td style="padding:8px">Aim ≈ latitude tilt; keep it rigid & ventilated.</td>
+              <td style="padding:8px">1 set</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">11</td>
+              <td style="padding:8px"><strong>Weather-safe enclosure</strong> (IP-rated) for fuse, shunt, and terminations</td>
+              <td style="padding:8px">Protects terminations and meter.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">12</td>
+              <td style="padding:8px"><strong>Labels &amp; PPE</strong>: PV DC labels, gloves, safety glasses; MC4 tool &amp; crimper, cable glands, ties, grommets</td>
+              <td style="padding:8px">Make it safe &amp; serviceable.</td>
+              <td style="padding:8px">as needed</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Protocol — 1 MJ (0.278 kWh) via 1× PV + MPPT + 12 V LFP</h3>
+      <ol>
+        <li><strong>Site &amp; Setup (Day-before)</strong>
+          <ul>
+            <li><strong>Choose site:</strong> Open sky with no shade from ~10:00–14:00 solar time; this is when irradiance is strongest and losses are smallest. Face modules due south in the N. Hemisphere (due north in the S. Hemisphere) for max annual energy.</li>
+            <li><strong>Tilt:</strong> Set fixed tilt ≈ local latitude (± a few degrees is fine). If you need winter bias, tilt slightly steeper; for summer bias, slightly flatter.</li>
+            <li><strong>Mounting &amp; wiring:</strong> Rigid mount; verify torque on lugs. Battery-side fuse (30–40 A) within 15–20 cm of battery +; controller set to LiFePO₄ profile per battery spec. (Fuse placement/oversizing follows PV/DC best-practice O&amp;M guidance.)</li>
+            <li><strong>Meter placement:</strong> Install the DC watt-hour meter (shunt) on the battery output/load side if you want “energy delivered from storage,” or on the PV→controller side if you want “energy harvested.” (Pick one and keep it consistent for the run.) For reproducibility/benchmarking later, you can compute performance metrics like IEC 61724 performance ratio from your energy + STC rating.</li>
+          </ul>
+        </li>
+        <li><strong>Battery State of Charge (Start-of-Test)</strong>
+          <ul>
+            <li><strong>Synchronize SoC:</strong> Use a shunt-based monitor (e.g., Victron SmartShunt) or your LFP pack’s BMS. Shunt monitors measure V &amp; I and integrate Ah to estimate SoC; configure battery capacity/charged-voltage so the SoC won’t drift.</li>
+            <li><strong>Target start SoC:</strong> 30–60% SoC gives room to accept charge and later deliver energy through the meter. Record start SoC (%) and open-circuit voltage after a short rest (if practical).</li>
+          </ul>
+        </li>
+        <li><strong>Test Day — Sequence &amp; Logging</strong>
+          <ul>
+            <li><strong>T-0 (pre-sun):</strong> Zero the Wh meter. Record: date, site, weather, start SoC, start time.</li>
+            <li><strong>Solar-noon window (10:00–14:00):</strong> Aim: module faces true south (or local optimum), remains fixed. Operate: Let PV charge the battery via MPPT; simultaneously run a modest DC load so energy flows through the meter (e.g., 60–120 W resistive/lighting load).</li>
+            <li><strong>Logging interval:</strong> Record time-stamped Wh and SoC at 1‑min granularity if you can; ≤5‑min is acceptable.</li>
+            <li><strong>Shading vigilance:</strong> Watch for moving shadows from poles, branches, people, or cables. Even small partial shade on a cell can trigger the bypass diode, collapsing a substring and cutting module power disproportionately; note any events and their times.</li>
+            <li><strong>Post‑noon → late afternoon:</strong> Keep running until the Wh meter ≥ 278 Wh. If irradiance drops, you can discharge the battery through the same metered path to finish the tally (still valid if your success criterion is “delivered to meter”).</li>
+            <li><strong>T‑end:</strong> Record end time, end SoC, Wh delivered, ambient temperature, and any anomalies (clouds, gusts, shade events).</li>
+          </ul>
+        </li>
+        <li><strong>Shading Notes (what to document)</strong>
+          <ul>
+            <li><strong>Type &amp; duration:</strong> e.g., “tree limb, 4–6 cells shaded, 3 min at 12:41.”</li>
+            <li><strong>Effect:</strong> drop in W/Wh slope (describe magnitude).</li>
+            <li><strong>Mitigation:</strong> reposition array; for permanent sites, maintain 10:00–14:00 no‑shade window by trimming or relocating. (Partial shade can force bypass activation and disproportionately reduce output.)</li>
+          </ul>
+        </li>
+        <li><strong>Acceptance / Success Criteria</strong>
+          <ul>
+            <li><strong>Primary:</strong> Wh delivered ≥ 278 Wh on the selected meter point within one test day.</li>
+            <li><strong>Health checks:</strong> Peak production aligned with solar noon window (site‑appropriate). No unexplained long plateaus/drops in the Wh‑vs‑time trace. SoC accounting consistent: ΔSoC (Ah) ≈ metered Wh / ~12.8 V avg (rough check; shunt‑based SoC is the reference).</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <div class="card" id="pv-1mj-datasheet">
+      <h2>Data Sheet — 1 MJ PV Delivery</h2>
+      <form>
+        <fieldset><legend>A) Site &amp; Conditions</legend>
+          <label>Date <input type="date" name="date"></label>
+          <label>Operator <input type="text" name="operator"></label>
+          <label>Lat <input type="number" step="0.0001" name="lat"></label>
+          <label>Lon <input type="number" step="0.0001" name="lon"></label>
+          <label>Weather <input type="text" name="weather"></label>
+          <label>Ambient Temp Start/End (°C) <input type="number" name="t_start"> / <input type="number" name="t_end"></label>
+          <label>Solar Noon <input type="time" name="solar_noon"></label>
+        </fieldset>
+
+        <fieldset><legend>B) Equipment</legend>
+          <label>PV Module <input type="text" name="pv_model" placeholder="model, STC W, Vmp/Imp/Voc"></label>
+          <label>MPPT <input type="text" name="mppt_model" placeholder="model, max A, profile"></label>
+          <label>Battery <input type="text" name="battery_model" placeholder="model, 12.8V, 24Ah"></label>
+          <label>Wh Meter <input type="text" name="meter_model" placeholder="model, shunt rating"></label>
+        </fieldset>
+
+        <fieldset><legend>C) Mount &amp; Orientation</legend>
+          <label>Azimuth (° from N) <input type="number" name="azimuth"></label>
+          <label>Tilt (°) <input type="number" name="tilt"></label>
+          <label>Shading 10–14h <select name="shade_clear"><option>Yes</option><option>No</option></select></label>
+        </fieldset>
+
+        <fieldset><legend>D) Electrical</legend>
+          <label>PV Cable (mm²/m) <input type="text" name="pv_cable"></label>
+          <label>Battery Cable (mm²/m) <input type="text" name="bat_cable"></label>
+          <label>Battery Fuse (A / cm) <input type="text" name="fuse"></label>
+          <label>Disconnect <select name="disconnect"><option>Yes</option><option>No</option></select></label>
+          <label>Ground Bonded <select name="ground"><option>Yes</option><option>No</option></select></label>
+          <label>Meter Placement
+            <select name="meter_place"><option>pv_side</option><option>battery_side</option></select>
+          </label>
+        </fieldset>
+
+        <fieldset><legend>E) Start State</legend>
+          <label>Start Time <input type="time" name="t_start"></label>
+          <label>Start SoC (%) <input type="number" name="soc_start"></label>
+          <label>Battery V (V) <input type="number" step="0.01" name="v_start"></label>
+          <label>Wh Reset <input type="checkbox" name="wh_reset"></label>
+        </fieldset>
+
+        <fieldset><legend>F) Run Log</legend>
+          <table id="run-log">
+            <thead><tr>
+              <th>Time</th><th>Cum Wh</th><th>ΔWh</th><th>SoC %</th><th>V (V)</th><th>PV I (A)</th><th>Load P (W)</th><th>Notes</th>
+            </tr></thead>
+            <tbody>
+              <tr><td><input type="time"></td><td><input type="number"></td><td><input type="number"></td>
+                  <td><input type="number"></td><td><input type="number" step="0.01"></td>
+                  <td><input type="number" step="0.1"></td><td><input type="number"></td><td><input type="text"></td></tr>
+            </tbody>
+          </table>
+          <button type="button" onclick="
+            const row = document.querySelector('#run-log tbody tr').cloneNode(true);
+            row.querySelectorAll('input').forEach(i=>i.value=''); 
+            document.querySelector('#run-log tbody').appendChild(row);
+          ">+ Row</button>
+        </fieldset>
+
+        <fieldset><legend>G) Shading Incidents</legend>
+          <textarea name="shade_notes" rows="3" placeholder="time, cause, cells affected, duration, effect"></textarea>
+        </fieldset>
+
+        <fieldset><legend>H) End State &amp; Acceptance</legend>
+          <label>End Time <input type="time" name="t_end"></label>
+          <label>End SoC (%) <input type="number" name="soc_end"></label>
+          <label>Battery V (V) <input type="number" step="0.01" name="v_end"></label>
+          <label>Wh Delivered <input type="number" name="wh_total"></label>
+          <label>Outcome
+            <select name="outcome"><option>Pass</option><option>Fail</option></select>
+          </label>
+        </fieldset>
+      </form>
+    </div>
+
+    <p id="areaOut" style="margin-top:6px; font-weight:600">A ≈ 0.62 m² (for G=3, η=0.15)</p>
+      <p class="small">Example: G=3, η=0.15 → A ≈ 0.278 / (3 · 0.15) = 0.62 m² (roughly one 120–150 W panel).</p>
+    </div>
+  </section>
+
+    <script>
+    (function(){
+      const select = document.getElementById('dimension');
+      const solar = document.getElementById('solar');
+      function toggle(){
+        if(select && select.value === 'solar') { solar.classList.add('show'); }
+        else { solar.classList.remove('show'); }
+      }
+      if(select){ select.addEventListener('change', toggle); }
+      // initial render
+      toggle();
+    })();
+  </script>
     <option value="solar">Solar (PV)</option>
     <option value="mechanical">Mechanical (lift a mass)</option>
     <option value="thermal">Thermal (heat water)</option>
@@ -147,13 +430,46 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
         </table>
       </div>
     </div>
-    <div class="card">
-      <h3>Methods</h3>
+        <div class="card">
+      <h3>Protocol — 1 MJ (0.278 kWh) via 1× PV + MPPT + 12 V LFP</h3>
       <ol>
-        <li>Pick a day with good sun.</li>
-        <li>Aim panel at the sun (tilt ≈ your latitude).</li>
-        <li>Log Wh until ≥ 0.278 kWh.</li>
-        <li>Note: STC is 1000 W/m².</li>
+        <li><strong>Site &amp; Setup (Day-before)</strong>
+          <ul>
+            <li><strong>Choose site:</strong> Open sky with no shade from ~10:00–14:00 solar time; this is when irradiance is strongest and losses are smallest. Face modules due south in the N. Hemisphere (due north in the S. Hemisphere) for max annual energy.</li>
+            <li><strong>Tilt:</strong> Set fixed tilt ≈ local latitude (± a few degrees is fine). If you need winter bias, tilt slightly steeper; for summer bias, slightly flatter.</li>
+            <li><strong>Mounting &amp; wiring:</strong> Rigid mount; verify torque on lugs. Battery-side fuse (30–40 A) within 15–20 cm of battery +; controller set to LiFePO₄ profile per battery spec. (Fuse placement/oversizing follows PV/DC best-practice O&amp;M guidance.)</li>
+            <li><strong>Meter placement:</strong> Install the DC watt-hour meter (shunt) on the battery output/load side if you want “energy delivered from storage,” or on the PV→controller side if you want “energy harvested.” (Pick one and keep it consistent for the run.) For reproducibility/benchmarking later, you can compute performance metrics like IEC 61724 performance ratio from your energy + STC rating.</li>
+          </ul>
+        </li>
+        <li><strong>Battery State of Charge (Start-of-Test)</strong>
+          <ul>
+            <li><strong>Synchronize SoC:</strong> Use a shunt-based monitor (e.g., Victron SmartShunt) or your LFP pack’s BMS. Shunt monitors measure V &amp; I and integrate Ah to estimate SoC; configure battery capacity/charged-voltage so the SoC won’t drift.</li>
+            <li><strong>Target start SoC:</strong> 30–60% SoC gives room to accept charge and later deliver energy through the meter. Record start SoC (%) and open-circuit voltage after a short rest (if practical).</li>
+          </ul>
+        </li>
+        <li><strong>Test Day — Sequence &amp; Logging</strong>
+          <ul>
+            <li><strong>T-0 (pre-sun):</strong> Zero the Wh meter. Record: date, site, weather, start SoC, start time.</li>
+            <li><strong>Solar-noon window (10:00–14:00):</strong> Aim: module faces true south (or local optimum), remains fixed. Operate: Let PV charge the battery via MPPT; simultaneously run a modest DC load so energy flows through the meter (e.g., 60–120 W resistive/lighting load).</li>
+            <li><strong>Logging interval:</strong> Record time-stamped Wh and SoC at 1‑min granularity if you can; ≤5‑min is acceptable.</li>
+            <li><strong>Shading vigilance:</strong> Watch for moving shadows from poles, branches, people, or cables. Even small partial shade on a cell can trigger the bypass diode, collapsing a substring and cutting module power disproportionately; note any events and their times.</li>
+            <li><strong>Post‑noon → late afternoon:</strong> Keep running until the Wh meter ≥ 278 Wh. If irradiance drops, you can discharge the battery through the same metered path to finish the tally (still valid if your success criterion is “delivered to meter”).</li>
+            <li><strong>T‑end:</strong> Record end time, end SoC, Wh delivered, ambient temperature, and any anomalies (clouds, gusts, shade events).</li>
+          </ul>
+        </li>
+        <li><strong>Shading Notes (what to document)</strong>
+          <ul>
+            <li><strong>Type &amp; duration:</strong> e.g., “tree limb, 4–6 cells shaded, 3 min at 12:41.”</li>
+            <li><strong>Effect:</strong> drop in W/Wh slope (describe magnitude).</li>
+            <li><strong>Mitigation:</strong> reposition array; for permanent sites, maintain 10:00–14:00 no‑shade window by trimming or relocating. (Partial shade can force bypass activation and disproportionately reduce output.)</li>
+          </ul>
+        </li>
+        <li><strong>Acceptance / Success Criteria</strong>
+          <ul>
+            <li><strong>Primary:</strong> Wh delivered ≥ 278 Wh on the selected meter point within one test day.</li>
+            <li><strong>Health checks:</strong> Peak production aligned with solar noon window (site‑appropriate). No unexplained long plateaus/drops in the Wh‑vs‑time trace. SoC accounting consistent: ΔSoC (Ah) ≈ metered Wh / ~12.8 V avg (rough check; shunt‑based SoC is the reference).</li>
+          </ul>
+        </li>
       </ol>
     </div>
 
