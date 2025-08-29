@@ -58,9 +58,94 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
       <h3>Success metric</h3>
       <p>0.278 kWh delivered to a meter (DC or AC).</p>
     </div>
-    <div class="card">
-      <h3>Materials</h3>
-      <p>Use a single 100–200 W panel, small MPPT, 12 V battery, and a watt-hour meter.</p>
+        <div class="card">
+      <h3>Bill of Materials</h3>
+      <div style="overflow:auto">
+        <table style="border-collapse:collapse; width:100%">
+          <thead>
+            <tr>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Line</th>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Item (spec)</th>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Why / key spec</th>
+              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px">1</td>
+              <td style="padding:8px"><strong>150 W monocrystalline PV module</strong>, MC4 leads; Vmp ~18 V, Imp ~8–9 A; Voc ~22 V</td>
+              <td style="padding:8px">One panel comfortably produces ≥ 0.278 kWh on a decent-sun day; module nameplates are at <strong>STC 1000 W/m², 25 °C</strong>.</td>
+              <td style="padding:8px">1 <span class="small">(DOE Energy.gov, NREL docs)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">2</td>
+              <td style="padding:8px"><strong>MPPT charge controller</strong>, 12 V output, <strong>20 A</strong> max; PV input ≥ 60 V allowed (but fine with 1× 22 V Voc panel)</td>
+              <td style="padding:8px">10–20 A class MPPT efficiently down-converts panel to battery; 20 A gives headroom.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">3</td>
+              <td style="padding:8px"><strong>12.8 V 24 Ah LiFePO₄ battery</strong> with BMS (≥30 A continuous)</td>
+              <td style="padding:8px">~0.31 kWh nominal (12.8 V×24 Ah ≈ 307 Wh), enough buffer to accumulate/dispatch the target 0.278 kWh.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">4</td>
+              <td style="padding:8px"><strong>DC watt-hour meter</strong> (shunt type), 0–60 V DC, 50–100 A shunt</td>
+              <td style="padding:8px">Ground truth for “energy delivered”; install on the load or battery-output side (define your test point).</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">5</td>
+              <td style="padding:8px"><strong>Battery fuse</strong> (MIDI/ANL) <strong>30–40 A</strong>, holder</td>
+              <td style="padding:8px">Size ≥ 125% of continuous current (20 A MPPT → 25 A; use next standard size 30–40 A). Mount <strong>as close to battery + as practical</strong>.</td>
+              <td style="padding:8px">1 <span class="small">(Mike Holt, IAEI)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">6</td>
+              <td style="padding:8px"><strong>DC disconnect switch</strong> (≥ 60 V DC, ≥ 32 A) for battery side</td>
+              <td style="padding:8px">Service safety / lockout.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">7</td>
+              <td style="padding:8px"><strong>MC4 extension leads</strong>, UV-resistant, <strong>10 AWG (~6 mm²)</strong>, length to suit</td>
+              <td style="padding:8px">Low drop on PV run; outdoor-rated.</td>
+              <td style="padding:8px">1 pair <span class="small">(Victron)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">8</td>
+              <td style="padding:8px"><strong>Controller↔Battery cables</strong>, <strong>6–10 mm²</strong> (10–8 AWG) with ring lugs</td>
+              <td style="padding:8px">Keep voltage drop &lt; 2% at up to 20 A; follow controller manual if stricter.</td>
+              <td style="padding:8px">1 set <span class="small">(Victron)</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px">9</td>
+              <td style="padding:8px"><strong>Equipment grounding</strong>: 6 mm² Cu (green/yellow), lug + ground rod (if used outdoors)</td>
+              <td style="padding:8px">Bond module frame/rack; follow local code.</td>
+              <td style="padding:8px">1 set</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">10</td>
+              <td style="padding:8px"><strong>Mounting</strong>: rail/clamps or adjustable tilt bracket; stainless hardware</td>
+              <td style="padding:8px">Aim ≈ latitude tilt; keep it rigid & ventilated.</td>
+              <td style="padding:8px">1 set</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">11</td>
+              <td style="padding:8px"><strong>Weather-safe enclosure</strong> (IP-rated) for fuse, shunt, and terminations</td>
+              <td style="padding:8px">Protects terminations and meter.</td>
+              <td style="padding:8px">1</td>
+            </tr>
+            <tr>
+              <td style="padding:8px">12</td>
+              <td style="padding:8px"><strong>Labels & PPE</strong>: PV DC labels, gloves, safety glasses; MC4 tool & crimper, cable glands, ties, grommets</td>
+              <td style="padding:8px">Make it safe & serviceable.</td>
+              <td style="padding:8px">as needed</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <div class="card">
       <h3>Methods</h3>
