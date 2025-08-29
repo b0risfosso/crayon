@@ -61,6 +61,111 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
     <option value="human">Human power (bike-gen)</option>
   </select>
 
+<section id="mechanical" aria-live="polite" style="display:none; max-width:900px; margin:12px 0 0">
+  <div class="card">
+    <h3>System Sketch — 1 MJ via m·g·h (with optional electrical recovery)</h3>
+    <ol>
+      <li><strong>Architecture (block view)</strong>
+        <div>
+          <p>Mass pack (in cage, on guide rails) ⇄ Lift rig (tripod/gantry, chain/worm winch + pulley block, slings) ⇄ Anchor/lifting point</p>
+          <p>↓ (controlled descent)</p>
+          <p>Speed-up stage (contact wheel or belt on the fast line of the tackle) → PM generator (e-bike hub/BLDC in regen) → DC watt-hour meter → dump/load (adjustable current sink)</p>
+          <p>Parallel: Mechanical brake/ratchet for fail-safe holding and emergency stop.</p>
+          <p class="small">Pulley MA = number of supporting rope segments on the moving block. Put the generator contact on the fast line so its linear speed = MA × mass speed.</p>
+        </div>
+      </li>
+      <li><strong>Subsystems & key requirements</strong>
+        <ol type="A">
+          <li><strong>Lift rig &amp; tackle</strong>
+            <ul>
+              <li><strong>Structure:</strong> Rated tripod or gantry with certified lifting eye.</li>
+              <li><strong>Hoist:</strong> Manual geared chain hoist or worm-gear winch, WLL ≥ planned static load; avoid shock loading. Follow WLL markings and do not exceed them.</li>
+              <li><strong>Block &amp; tackle:</strong> Choose MA=2–6 based on available line pull and cycle time. MA reduces line tension but increases rope travel. (MA = count of supporting lines.)</li>
+              <li><strong>Slings/rigging:</strong> Rated chain/wire-rope/strap slings; use manufacturer tags; inspect each shift; no makeshift hooks/links.</li>
+              <li><strong>Standards touchpoint:</strong> Hoists/under-hung gear fall under ASME B30.16 (design, stresses, construction). Use compliant equipment.</li>
+            </ul>
+          </li>
+          <li><strong>Mass pack &amp; guides</strong>
+            <ul>
+              <li><strong>Mass:</strong> Sand/steel bricks in a welded cage with lifting lugs.</li>
+              <li><strong>Guidance:</strong> Twin rails (e.g., Unistrut) with low-friction sliders/rollers to prevent swing and binding.</li>
+              <li><strong>Travel:</strong> Define h (e.g., 10 m) with hard upper/lower stops and over-travel catch.</li>
+            </ul>
+          </li>
+          <li><strong>Energy tally (primary, mechanical)</strong>
+            <ul>
+              <li>Per lift: <em>E<sub>i</sub> = m g h</em>. Maintain a ledger (m, h, count). Stop when <em>∑ m g h ≥ 1,000,000 J</em>.</li>
+              <li>Use a laser distance or encoder on the cage for h; scale for m at rig-up.</li>
+            </ul>
+          </li>
+          <li><strong>Optional electrical recovery (descent)</strong>
+            <ul>
+              <li><strong>Generator:</strong> Permanent-magnet machine (e-bike hub / BLDC). Use an e-bike controller with regen to set braking torque/current.</li>
+              <li><strong>Speed-up stage:</strong> Contact/flywheel or belt/timing pulley on the fast line; target generator 600–1,800 rpm operating band.</li>
+              <li><strong>Load &amp; metering:</strong> Route to a DC watt-hour meter and adjustable electronic load (current-limited sink). Log Wh during descent.</li>
+            </ul>
+          </li>
+          <li><strong>Safety envelope</strong>
+            <ul>
+              <li>Comply with rigging provisions: rated gear only, visible ID tags, no knots in wire-rope, no personnel under suspended load, tag-out defective items.</li>
+              <li>Provide: exclusion zone, secondary mechanical brake/ratchet, over-speed trip, hard stops, and daily inspection checklist. Prefer ASME-listed hoists; heed manufacturer limits.</li>
+            </ul>
+          </li>
+        </ol>
+      </li>
+      <li><strong>Interfaces &amp; calculations (design targets)</strong>
+        <ol type="A">
+          <li><strong>Line loads &amp; winch torque (example)</strong>
+            <p>Example mass m = 250 kg; weight <em>W = m g = 250 × 9.81 ≈ 2,452.5 N</em>. With MA = 4, ideal line tension <em>T ≈ W/4 ≈ 613 N</em> (plus pulley friction). Drum radius <em>r<sub>d</sub> = 0.05 m</em> → drum torque <em>τ<sub>d</sub> ≈ T r<sub>d</sub> ≈ 30.7 N·m</em>. Size hoist accordingly.</p>
+          </li>
+          <li><strong>Generator speed from descent</strong>
+            <p>Use the fast line speed: <em>rpm<sub>gen</sub> = (MA · v<sub>mass</sub> / (2π r<sub>c</sub>)) · G · 60</em>, where <em>r<sub>c</sub></em> is contact radius and <em>G</em> is belt/gear ratio.</p>
+            <p>Target 100 W electrical with controlled descent. With <em>m = 250 kg</em>: <em>P = m g v ⇒ v<sub>mass</sub> = P/(m g) ≈ 100/2452.5 ≈ 0.0408 m/s</em>. Pick <em>MA=4, r<sub>c</sub>=0.02 m, G=20</em> → <em>rpm<sub>gen</sub> ≈ 1,530 rpm</em>. Generator shaft torque <em>τ ≈ 0.63 N·m</em>. To prevent slip on a friction wheel: <em>F<sub>n</sub> ≥ τ/(μ r<sub>c</sub>)</em>; with <em>μ≈0.5</em> and <em>r<sub>c</sub>=0.02 m</em>, <em>F<sub>n</sub> ≳ 63 N</em>.</p>
+          </li>
+          <li><strong>m·g·h accounting</strong>
+            <p>Per cycle with <em>m=250 kg</em>, <em>h=10 m</em>: <em>E<sub>i</sub> ≈ 24.5 kJ</em> → ~41 lifts to reach 1 MJ. Use the mechanical ledger as the primary energy proof.</p>
+          </li>
+        </ol>
+      </li>
+      <li><strong>Instrumentation &amp; controls</strong>
+        <ul>
+          <li>Position/height: incremental encoder on cage or drum; limit switches at top/bottom.</li>
+          <li>Speed/overspeed: tach on generator or contact wheel; brake trips at set rpm.</li>
+          <li>Electrical: DC Wh meter on generator output; adjustable electronic load or regen controller setpoint to modulate descent torque.</li>
+          <li>Inspection log: hooks, latches, chain/rope, slings, anchor, hoist function—every shift.</li>
+        </ul>
+      </li>
+      <li><strong>Operating notes (efficiency &amp; practicality)</strong>
+        <ul>
+          <li>Expect modest round‑trip efficiency (rigging friction + speed-up + generator + electronics). Friction rollers add losses vs belt/chain—fine for a demo, not for kWh production.</li>
+          <li>For higher electrical yield: low‑friction pulleys, belt/timing drive to generator, and a regen controller that lets you dial braking torque smoothly.</li>
+        </ul>
+      </li>
+      <li><strong>Safety checklist (minimum)</strong>
+        <ul>
+          <li>Rated equipment only; never exceed WLL; no knots for wire‑rope; no improvised hooks; no one under load.</li>
+          <li>Secondary brake/ratchet engaged when stationary; overspeed interlock; hard stops; barricade/exclusion zone.</li>
+          <li>Prefer ASME‑listed hoists; service per ASME B30.16 recommendations.</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+</section>
+<script>
+  (function(){
+    const select = document.getElementById('dimension');
+    const solar = document.getElementById('solar');
+    const mech = document.getElementById('mechanical');
+    function toggle(){
+      const v = select ? select.value : '';
+      if(solar){ solar.classList.toggle('show', v==='solar'); }
+      if(mech){ mech.style.display = (v==='mechanical') ? 'block' : 'none'; }
+    }
+    if(select){ select.addEventListener('change', toggle); }
+    toggle();
+  })();
+</script>
+
   <section id="solar" aria-live="polite">
     <div class="card">
       <h3>Success metric</h3>
@@ -276,11 +381,10 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
         </fieldset>
       </form>
     </div>
-    
-    </div>
+
   </section>
 
-    <script>
+  <script>
     (function(){
       const select = document.getElementById('dimension');
       const solar = document.getElementById('solar');
@@ -289,169 +393,6 @@ Protocol replicable by others, with defined BOM (bill of materials) and instrume
         else { solar.classList.remove('show'); }
       }
       if(select){ select.addEventListener('change', toggle); }
-      // initial render
-      toggle();
-    })();
-  </script>
-    <option value="solar">Solar (PV)</option>
-    <option value="mechanical">Mechanical (lift a mass)</option>
-    <option value="thermal">Thermal (heat water)</option>
-    <option value="chemical">Chemical (combust a fuel)</option>
-    <option value="biological">Biological (ATP turnover equivalence)</option>
-    <option value="human">Human power (bike-gen)</option>
-  </select>
-    <section id="solar" aria-live="polite">
-    <div class="card">
-      <h3>Success metric</h3>
-      <p>0.278 kWh delivered to a meter (DC or AC).</p>
-    </div>
-        <div class="card">
-      <h3>Bill of Materials</h3>
-      <div style="overflow:auto">
-        <table style="border-collapse:collapse; width:100%">
-          <thead>
-            <tr>
-              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Line</th>
-              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Item (spec)</th>
-              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Why / key spec</th>
-              <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px">Qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding:8px">1</td>
-              <td style="padding:8px"><strong>150 W monocrystalline PV module</strong>, MC4 leads; Vmp ~18 V, Imp ~8–9 A; Voc ~22 V</td>
-              <td style="padding:8px">One panel comfortably produces ≥ 0.278 kWh on a decent-sun day; module nameplates are at <strong>STC 1000 W/m², 25 °C</strong>.</td>
-              <td style="padding:8px">1 <span class="small">(DOE Energy.gov, NREL docs)</span></td>
-            </tr>
-            <tr>
-              <td style="padding:8px">2</td>
-              <td style="padding:8px"><strong>MPPT charge controller</strong>, 12 V output, <strong>20 A</strong> max; PV input ≥ 60 V allowed (but fine with 1× 22 V Voc panel)</td>
-              <td style="padding:8px">10–20 A class MPPT efficiently down-converts panel to battery; 20 A gives headroom.</td>
-              <td style="padding:8px">1</td>
-            </tr>
-            <tr>
-              <td style="padding:8px">3</td>
-              <td style="padding:8px"><strong>12.8 V 24 Ah LiFePO₄ battery</strong> with BMS (≥30 A continuous)</td>
-              <td style="padding:8px">~0.31 kWh nominal (12.8 V×24 Ah ≈ 307 Wh), enough buffer to accumulate/dispatch the target 0.278 kWh.</td>
-              <td style="padding:8px">1</td>
-            </tr>
-            <tr>
-              <td style="padding:8px">4</td>
-              <td style="padding:8px"><strong>DC watt-hour meter</strong> (shunt type), 0–60 V DC, 50–100 A shunt</td>
-              <td style="padding:8px">Ground truth for “energy delivered”; install on the load or battery-output side (define your test point).</td>
-              <td style="padding:8px">1</td>
-            </tr>
-            <tr>
-              <td style="padding:8px">5</td>
-              <td style="padding:8px"><strong>Battery fuse</strong> (MIDI/ANL) <strong>30–40 A</strong>, holder</td>
-              <td style="padding:8px">Size ≥ 125% of continuous current (20 A MPPT → 25 A; use next standard size 30–40 A). Mount <strong>as close to battery + as practical</strong>.</td>
-              <td style="padding:8px">1 <span class="small">(Mike Holt, IAEI)</span></td>
-            </tr>
-            <tr>
-              <td style="padding:8px">6</td>
-              <td style="padding:8px"><strong>DC disconnect switch</strong> (≥ 60 V DC, ≥ 32 A) for battery side</td>
-              <td style="padding:8px">Service safety / lockout.</td>
-              <td style="padding:8px">1</td>
-            </tr>
-            <tr>
-              <td style="padding:8px">7</td>
-              <td style="padding:8px"><strong>MC4 extension leads</strong>, UV-resistant, <strong>10 AWG (~6 mm²)</strong>, length to suit</td>
-              <td style="padding:8px">Low drop on PV run; outdoor-rated.</td>
-              <td style="padding:8px">1 pair <span class="small">(Victron)</span></td>
-            </tr>
-            <tr>
-              <td style="padding:8px">8</td>
-              <td style="padding:8px"><strong>Controller↔Battery cables</strong>, <strong>6–10 mm²</strong> (10–8 AWG) with ring lugs</td>
-              <td style="padding:8px">Keep voltage drop &lt; 2% at up to 20 A; follow controller manual if stricter.</td>
-              <td style="padding:8px">1 set <span class="small">(Victron)</span></td>
-            </tr>
-            <tr>
-              <td style="padding:8px">9</td>
-              <td style="padding:8px"><strong>Equipment grounding</strong>: 6 mm² Cu (green/yellow), lug + ground rod (if used outdoors)</td>
-              <td style="padding:8px">Bond module frame/rack; follow local code.</td>
-              <td style="padding:8px">1 set</td>
-            </tr>
-            <tr>
-              <td style="padding:8px">10</td>
-              <td style="padding:8px"><strong>Mounting</strong>: rail/clamps or adjustable tilt bracket; stainless hardware</td>
-              <td style="padding:8px">Aim ≈ latitude tilt; keep it rigid & ventilated.</td>
-              <td style="padding:8px">1 set</td>
-            </tr>
-            <tr>
-              <td style="padding:8px">11</td>
-              <td style="padding:8px"><strong>Weather-safe enclosure</strong> (IP-rated) for fuse, shunt, and terminations</td>
-              <td style="padding:8px">Protects terminations and meter.</td>
-              <td style="padding:8px">1</td>
-            </tr>
-            <tr>
-              <td style="padding:8px">12</td>
-              <td style="padding:8px"><strong>Labels & PPE</strong>: PV DC labels, gloves, safety glasses; MC4 tool & crimper, cable glands, ties, grommets</td>
-              <td style="padding:8px">Make it safe & serviceable.</td>
-              <td style="padding:8px">as needed</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-        <div class="card">
-      <h3>Protocol — 1 MJ (0.278 kWh) via 1× PV + MPPT + 12 V LFP</h3>
-      <ol>
-        <li><strong>Site &amp; Setup (Day-before)</strong>
-          <ul>
-            <li><strong>Choose site:</strong> Open sky with no shade from ~10:00–14:00 solar time; this is when irradiance is strongest and losses are smallest. Face modules due south in the N. Hemisphere (due north in the S. Hemisphere) for max annual energy.</li>
-            <li><strong>Tilt:</strong> Set fixed tilt ≈ local latitude (± a few degrees is fine). If you need winter bias, tilt slightly steeper; for summer bias, slightly flatter.</li>
-            <li><strong>Mounting &amp; wiring:</strong> Rigid mount; verify torque on lugs. Battery-side fuse (30–40 A) within 15–20 cm of battery +; controller set to LiFePO₄ profile per battery spec. (Fuse placement/oversizing follows PV/DC best-practice O&amp;M guidance.)</li>
-            <li><strong>Meter placement:</strong> Install the DC watt-hour meter (shunt) on the battery output/load side if you want “energy delivered from storage,” or on the PV→controller side if you want “energy harvested.” (Pick one and keep it consistent for the run.) For reproducibility/benchmarking later, you can compute performance metrics like IEC 61724 performance ratio from your energy + STC rating.</li>
-          </ul>
-        </li>
-        <li><strong>Battery State of Charge (Start-of-Test)</strong>
-          <ul>
-            <li><strong>Synchronize SoC:</strong> Use a shunt-based monitor (e.g., Victron SmartShunt) or your LFP pack’s BMS. Shunt monitors measure V &amp; I and integrate Ah to estimate SoC; configure battery capacity/charged-voltage so the SoC won’t drift.</li>
-            <li><strong>Target start SoC:</strong> 30–60% SoC gives room to accept charge and later deliver energy through the meter. Record start SoC (%) and open-circuit voltage after a short rest (if practical).</li>
-          </ul>
-        </li>
-        <li><strong>Test Day — Sequence &amp; Logging</strong>
-          <ul>
-            <li><strong>T-0 (pre-sun):</strong> Zero the Wh meter. Record: date, site, weather, start SoC, start time.</li>
-            <li><strong>Solar-noon window (10:00–14:00):</strong> Aim: module faces true south (or local optimum), remains fixed. Operate: Let PV charge the battery via MPPT; simultaneously run a modest DC load so energy flows through the meter (e.g., 60–120 W resistive/lighting load).</li>
-            <li><strong>Logging interval:</strong> Record time-stamped Wh and SoC at 1‑min granularity if you can; ≤5‑min is acceptable.</li>
-            <li><strong>Shading vigilance:</strong> Watch for moving shadows from poles, branches, people, or cables. Even small partial shade on a cell can trigger the bypass diode, collapsing a substring and cutting module power disproportionately; note any events and their times.</li>
-            <li><strong>Post‑noon → late afternoon:</strong> Keep running until the Wh meter ≥ 278 Wh. If irradiance drops, you can discharge the battery through the same metered path to finish the tally (still valid if your success criterion is “delivered to meter”).</li>
-            <li><strong>T‑end:</strong> Record end time, end SoC, Wh delivered, ambient temperature, and any anomalies (clouds, gusts, shade events).</li>
-          </ul>
-        </li>
-        <li><strong>Shading Notes (what to document)</strong>
-          <ul>
-            <li><strong>Type &amp; duration:</strong> e.g., “tree limb, 4–6 cells shaded, 3 min at 12:41.”</li>
-            <li><strong>Effect:</strong> drop in W/Wh slope (describe magnitude).</li>
-            <li><strong>Mitigation:</strong> reposition array; for permanent sites, maintain 10:00–14:00 no‑shade window by trimming or relocating. (Partial shade can force bypass activation and disproportionately reduce output.)</li>
-          </ul>
-        </li>
-        <li><strong>Acceptance / Success Criteria</strong>
-          <ul>
-            <li><strong>Primary:</strong> Wh delivered ≥ 278 Wh on the selected meter point within one test day.</li>
-            <li><strong>Health checks:</strong> Peak production aligned with solar noon window (site‑appropriate). No unexplained long plateaus/drops in the Wh‑vs‑time trace. SoC accounting consistent: ΔSoC (Ah) ≈ metered Wh / ~12.8 V avg (rough check; shunt‑based SoC is the reference).</li>
-          </ul>
-        </li>
-      </ol>
-    </div>
-  </section>
-
-    <script>
-    (function(){
-      const select = document.getElementById('dimension');
-      const solar = document.getElementById('solar');
-      function toggle(){
-        if(select && select.value === 'solar') { solar.classList.add('show'); }
-        else { solar.classList.remove('show'); }
-      }
-      if(select){ select.addEventListener('change', toggle); }
-
-      ['Gdaily','etaSys'].forEach(id=>{
-        const el = document.getElementById(id);
-        if(el){ el.addEventListener('input', calcArea); }
-      });
 
       // initial render
       toggle();
