@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Backbone Lookup</title>
+<title>Company Evaluation Agent</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
@@ -11,8 +11,13 @@
   form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .5rem; }
   input[type="text"] { padding: .6rem .7rem; min-width: 18rem; border: 1px solid #ccc; border-radius: .5rem; }
   button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
-  #status { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; opacity: .85; }
-  pre { margin-top: .75rem; padding: .75rem; background: rgba(0,0,0,.05); border-radius: .5rem; overflow: auto; }
+  button[disabled] { opacity: .6; cursor: not-allowed; }
+  #status, #llmStatus { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; opacity: .85; }
+  pre, textarea { margin-top: .75rem; padding: .75rem; background: rgba(0,0,0,.05); border-radius: .5rem; overflow: auto; width: 100%; }
+  textarea { min-height: 200px; }
+  .row { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+  @media (min-width: 900px) { .row { grid-template-columns: 1fr 1fr; } }
+  details { margin-top: .75rem; }
 </style>
 </head>
 <body>
@@ -26,10 +31,27 @@
   <div id="status"></div>
   <pre id="out">{}</pre>
 
+  <hr style="margin:1.25rem 0" />
+  <h1>Moat LLM (Slack-in-Salesforce example — moat_evaluation_api.py)</h1>
+  <div class="row">
+    <div>
+      <button id="runLLM" disabled>Run Moat LLM</button>
+      <div id="llmStatus"></div>
+      <pre id="llmOut"><!-- LLM JSON will appear here --></pre>
+    </div>
+    <div>
+      <details>
+        <summary>Show generated prompt (copy/paste for Python)</summary>
+        <textarea id="promptBox" readonly></textarea>
+      </details>
+    </div>
+  </div>
+
 <script>
 (() => {
   const $ = s => document.querySelector(s);
   const form = $("#f"), input = $("#q"), out = $("#out"), status = $("#status");
+  const runBtn = $("#runLLM"), llmOut = $("#llmOut"), llmStatus = $("#llmStatus"), promptBox = $("#promptBox");
 
   const api = (path, params) => {
     const u = new URL(path, window.location.origin);
@@ -38,22 +60,37 @@
   };
   const pretty = obj => JSON.stringify(obj, null, 2);
 
-  async function fetchJson(url, {signal} = {}) {
-    const res = await fetch(url, { credentials: "include", signal });
+  async function fetchJson(url, {signal, method = 'GET', body} = {}) {
+    const res = await fetch(url, { credentials: "include", signal, method, headers: { 'Content-Type': 'application/json' }, body });
     const text = await res.text();
     try {
       const data = JSON.parse(text);
       if (!res.ok) throw Object.assign(new Error(data?.detail || res.statusText), { status: res.status, data });
       return data;
     } catch {
-      throw Object.assign(new Error("Non-JSON response"), { status: res.status, raw: text });
+      if (!res.ok) throw Object.assign(new Error("Non-JSON response"), { status: res.status, raw: text });
+      return { raw: text };
     }
+  }
+
+  let companyJson = null;
+
+  function buildPrompt(companyJson) {
+    // The prompt string replicates your Python sample, embedding the JSON payload.
+    const prompt = `\nYou are an equity research assistant. Use web search to verify all claims and provide citations.\nCompany input (JSON):\n${pretty(companyJson)}\n\nTask: Produce a Moat Score for the company referenced in the JSON (focus on the Slack product/business within Salesforce),\nscored on nine criteria (0–10 each), with 1–3 sentences of rationale per criterion and reputable citations (“receipts”).\nThen provide a short synthesis explaining the overall moat. Where appropriate, distinguish between Slack-specific dynamics\nand Salesforce corporate-level dynamics.\n\nScoring criteria (each 0–10):\n1) Market leadership & sustainable share\n2) Network effects & switching costs\n3) Valuable IP & patents\n4) Brand strength & customer loyalty\n5) Durable cost advantages (scale, proprietary tech)\n6) Regulatory barriers & exclusive licenses\n7) Distribution network (direct, partners, enterprise channel)\n8) Pricing power (sustained ability to raise price/mix)\n9) Consistent, impactful innovation & R&D\n\nOutput format (JSON only):\n{\n  "moat_score": <0-100 integer, average of the 9 criteria × 10, round to nearest whole>,\n  "criteria": [\n    {\n      "name": "Market leadership & sustainable share",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>", "<source 2>"]\n    },\n    {\n      "name": "Network effects & switching costs",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>", "<source 2>"]\n    },\n    {\n      "name": "Valuable IP & patents",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Brand strength & customer loyalty",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Durable cost advantages",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Regulatory barriers & exclusive licenses",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Distribution network",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Pricing power",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Innovation & R&D",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    }\n  ],\n  "summary": "<3–5 sentence synthesis tying together Slack’s defensibility, key risks, and watch items>",\n  "notes": {\n    "what_is_slack_vs_salesforce": "<1–2 sentences clarifying scope>",\n    "data_as_of": "<today’s date in YYYY-MM-DD>",\n    "method": "Each criterion scored 0–10 using public sources; average × 10 → Moat Score."\n  }\n}\n\nInstructions & constraints:\n- Treat the JSON as the resolved identity (Slack product inside Salesforce, ticker CRM).\n- ALWAYS use web_search to confirm market share, DAU/MAU, retention, pricing changes, competition (e.g., Microsoft Teams, Google Chat),\n  distribution/partner motions, and any regulatory issues (e.g., EU/antitrust around Teams bundling).\n- Prefer primary/authoritative sources: Salesforce investor materials, earnings call transcripts, official blogs, reputable industry analysts\n  (Gartner, IDC, Forrester), financial press (WSJ, FT, Bloomberg), regulatory documents (EU/EC press releases).\n- Provide at least 1 citation per criterion (2+ for market share and network effects). Use direct, specific URLs.\n- Be precise about *Slack vs. Teams* share where available; if figures differ by source, note the range in the rationale.\n- Keep each rationale crisp (<= 60 words). Avoid marketing language. Do not output anything except the JSON block defined above.`;
+    return prompt;
+  }
+
+  function enableLLM(companyJson) {
+    const prompt = buildPrompt(companyJson);
+    promptBox.value = prompt;
+    runBtn.disabled = false;
   }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = input.value.trim(); if (!name) return;
-    status.textContent = "Fetching…"; out.textContent = "{}";
+    status.textContent = "Fetching…"; out.textContent = "{}"; llmOut.textContent = ""; llmStatus.textContent = ""; runBtn.disabled = true;
 
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 20000);
@@ -61,11 +98,49 @@
     try {
       const url = api("/api/backbone", { company_name: name });
       const data = await fetchJson(url, { signal: ctl.signal });
-      out.textContent = pretty({ query: name, backbone: data });
+      companyJson = { query: name, backbone: data };
+      out.textContent = pretty(companyJson);
       status.textContent = "Done.";
+      enableLLM(companyJson);
     } catch (err) {
       out.textContent = pretty({ error: err?.message || "Request failed", detail: err?.data?.detail ?? err?.raw ?? null });
       status.textContent = "Failed.";
+    } finally {
+      clearTimeout(t);
+    }
+  });
+
+  runBtn.addEventListener('click', async () => {
+    if (!companyJson) return;
+    const prompt = buildPrompt(companyJson);
+
+    // NOTE: Frontend does not call OpenAI directly (to avoid exposing API keys).
+    // This POST expects a backend endpoint that runs the Python shown below:
+    // from openai import OpenAI
+    // client = OpenAI()
+    // response = client.responses.create(
+    //   model="gpt-5",
+    //   tools=[{"type":"web_search"}],
+    //   reasoning={"effort":"medium"},
+    //   input=prompt
+    // )
+    // print(response.output_text)
+
+    llmStatus.textContent = 'Running LLM…';
+    llmOut.textContent = '';
+
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 60000);
+
+    try {
+      const data = await fetchJson('/api/moat_evaluation', { method: 'POST', signal: ctl.signal, body: JSON.stringify({ prompt }) });
+      // Accept either { output_text: "..." } or raw text JSON.
+      const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
+      llmOut.textContent = text;
+      llmStatus.textContent = 'LLM complete.';
+    } catch (err) {
+      llmOut.textContent = pretty({ error: err?.message || 'LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
+      llmStatus.textContent = 'LLM failed.';
     } finally {
       clearTimeout(t);
     }
