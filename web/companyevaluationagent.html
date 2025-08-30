@@ -2,625 +2,128 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Company Evaluation Agent</title>
-  <meta name="description" content="Single‑file HTML UI to collect inputs and visualize company evaluation metrics." />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Company Evaluation Agent — Minimal</title>
   <style>
-    :root{
-      --bg:#0b0c10;
-      --panel:#111318;
-      --panel-2:#151822;
-      --text:#e7e9ee;
-      --muted:#a9b0bf;
-      --accent:#6ea8fe;
-      --accent-2:#7ef7c9;
-      --danger:#ff6b6b;
-      --ok:#19d27c;
-      --warn:#ffd166;
-      --border:rgba(255,255,255,0.08);
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius: 16px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; background:linear-gradient(180deg, #0b0c10 0%, #0f1117 100%);
-      color:var(--text); font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    header{
-      position:sticky; top:0; z-index:10; backdrop-filter:saturate(160%) blur(10px);
-      background:linear-gradient(180deg, rgba(15,17,23,.85), rgba(15,17,23,.6));
-      border-bottom:1px solid var(--border);
-    }
-    .wrap{max-width:1200px; margin:0 auto; padding:14px 18px;}
-    .brand{display:flex; gap:12px; align-items:center}
-    .brand .logo{width:32px; height:32px; border-radius:8px; display:grid; place-items:center; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:var(--shadow)}
-    .brand h1{font-size:18px; margin:0}
-    
-    main.container{max-width:1200px; margin:18px auto; padding:0 18px; display:grid; grid-template-columns: 340px 1fr; gap:18px}
-    @media (max-width: 980px){ main.container{grid-template-columns:1fr} }
-
-    .panel{background:linear-gradient(180deg, var(--panel), var(--panel-2)); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
-    .controls{padding:16px}
-    .controls h2{margin:8px 0 16px; font-size:16px; color:var(--muted)}
-    .field{display:flex; flex-direction:column; gap:8px; margin-bottom:14px}
-    label{font-size:13px; color:var(--muted)}
-    input[type="text"], input[type="date"], select, textarea{
-      width:100%; padding:12px 12px; border-radius:12px; border:1px solid var(--border); background:#0e1117; color:var(--text);
-      outline:none; transition:border .2s ease, box-shadow .2s ease;
-    }
-    input::file-selector-button{background:transparent; border:none; color:var(--muted)}
-    input:focus, select:focus, textarea:focus{border-color:rgba(126,247,201,.65); box-shadow:0 0 0 3px rgba(126,247,201,.15)}
-
-    .drop{
-      border:1px dashed rgba(255,255,255,.18); border-radius:12px; padding:14px; text-align:center; color:var(--muted);
-      background: repeating-linear-gradient(135deg, rgba(255,255,255,.02), rgba(255,255,255,.02) 12px, rgba(255,255,255,.03) 12px, rgba(255,255,255,.03) 24px);
-    }
-    .drop.dragover{border-color: var(--accent-2); color:#c9fff0}
-
-    .btnrow{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
-    .btn{
-      appearance:none; border:1px solid var(--border); background:#0f1420; padding:10px 14px; border-radius:12px; color:var(--text); cursor:pointer;
-      transition:transform .06s ease, background .2s ease, border .2s ease; user-select:none;
-    }
-    .btn:hover{background:#131a27}
-    .btn:active{transform:translateY(1px)}
-    .btn.primary{background:linear-gradient(135deg, var(--accent), var(--accent-2)); color:#0b0c10; border:0}
-    .btn.ghost{background:transparent}
-
-    /* RESULT SIDE */
-    .results{padding:16px; display:grid; gap:16px}
-    .summary{display:grid; grid-template-columns: 72px 1fr 1fr; gap:16px; align-items:center}
-    @media (max-width:700px){ .summary{grid-template-columns: 56px 1fr} .summary .meta{grid-column: span 2} }
-    .logoBox{width:72px; height:72px; border-radius:16px; background:#0e121a; border:1px solid var(--border); display:grid; place-items:center; overflow:hidden}
-    .logoBox img{max-width:100%; max-height:100%}
-    .meta h3{margin:0 0 4px; font-size:20px}
-    .meta .sub{color:var(--muted); font-size:13px}
-    .quickstats{display:flex; gap:12px; flex-wrap:wrap}
-    .pill{font-size:12px; color:#0b0c10; background:linear-gradient(135deg, var(--accent), var(--accent-2)); padding:8px 10px; border-radius:999px}
-
-    .grid{display:grid; grid-template-columns: repeat(12, 1fr); gap:16px}
-    .card{grid-column: span 12; padding:16px; border:1px solid var(--border); border-radius:var(--radius); background:#0f1117}
-    .card h4{margin:0 0 10px; font-size:15px; color:#d6d9e0}
-    .card .muted{color:var(--muted); font-size:13px}
-
-    .moat-list{display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center}
-    .moat-item{padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.02); border:1px solid var(--border)}
-    .status{font-size:12px; padding:6px 10px; border-radius:999px; justify-self:end}
-    .status.unknown{background:#202532; color:#c8cfdd}
-    .status.weak{background: rgba(255,107,107,.15); color:#ffc9c9; border:1px solid rgba(255,107,107,.35)}
-    .status.moderate{background: rgba(255,209,102,.15); color:#ffe6a1; border:1px solid rgba(255,209,102,.35)}
-    .status.strong{background: rgba(25,210,124,.18); color:#aaffde; border:1px solid rgba(25,210,124,.35)}
-
-    table.vals{width:100%; border-collapse:collapse;}
-    table.vals th, table.vals td{padding:10px 8px; border-bottom:1px dashed rgba(255,255,255,.08); font-size:14px; text-align:left}
-    table.vals th{color:var(--muted); font-weight:600}
-    table.vals td:last-child{font-variant-numeric: tabular-nums}
-
-    .chart-wrap{position:relative; height:260px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid var(--border); display:grid; place-items:center; overflow:hidden}
-    svg{width:100%; height:100%}
-    .legend{display:flex; gap:8px; align-items:center; color:var(--muted); font-size:12px; margin-top:8px}
-    .legend .dot{width:10px; height:10px; border-radius:50%; background:var(--accent)}
-    .legend .dot.proj{background:var(--warn)}
-
-    .notes{display:grid; gap:8px}
-    .note{padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.02); border:1px solid var(--border); color:var(--muted)}
-
-    .footer{color:var(--muted); font-size:12px; text-align:center; padding:20px}
-    .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:#111827; padding:2px 6px; border-radius:6px; border:1px solid var(--border)}
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+    form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .75rem; }
+    input[type="text"] { padding: .6rem .7rem; min-width: 18rem; border: 1px solid #ccc; border-radius: .5rem; }
+    button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; }
+    button.primary { background: #0b5cff; color: white; }
+    label { font-size: .9rem; opacity: .85; }
+    #status { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; }
+    pre { margin-top: .75rem; padding: .75rem; background: rgba(0,0,0,.05); border-radius: .5rem; max-width: 100%; overflow: auto; }
+    .row { display: flex; gap: .5rem; align-items: center; }
+    .muted { opacity: .8; font-size: .85rem; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="wrap brand">
-      <div class="logo" aria-hidden="true">⚡️</div>
-      <h1>Company Evaluation Agent</h1>
-    </div>
-  </header>
+  <h1>Company Resolver (minimal)</h1>
 
-  <main class="container">
-    <!-- LEFT: Inputs -->
-    <section class="panel controls" aria-label="Inputs">
-      <h2>Inputs</h2>
-      <div class="field">
-        <label for="company">Company name</label>
-        <input id="company" type="text" placeholder="e.g., NVIDIA, ASML, Unilever" autocomplete="organization" />
-      </div>
+  <form id="resolver-form">
+    <input id="company" type="text" placeholder="e.g., Apple, Meta, Spotify" required autofocus />
+    <button id="go" class="primary" type="submit">Resolve</button>
+    <label class="row"><input id="with-backbone" type="checkbox" /> also fetch /api/backbone</label>
+  </form>
 
-      <div class="field">
-        <label>Logo image (optional)</label>
-        <div id="drop" class="drop" tabindex="0" aria-label="Logo dropzone">
-          <div>Drag & drop logo here or <span class="kbd">click</span> to browse</div>
-          <input id="logo" type="file" accept="image/png,image/jpeg,image/svg+xml" hidden />
-        </div>
-      </div>
+  <div id="status" class="muted"></div>
 
-      <div class="field">
-        <label for="scope">Scope</label>
-        <select id="scope">
-          <option value="quick">Quick</option>
-          <option value="standard" selected>Standard</option>
-          <option value="deep">Deep</option>
-        </select>
-      </div>
+  <div class="row">
+    <button id="copy">Copy JSON</button>
+    <span class="muted">Calls are same-origin: <code>/api/resolve_company_llm</code> (+ optional <code>/api/backbone</code>).</span>
+  </div>
 
-      <div class="field">
-        <label for="asof">As of (date)</label>
-        <input id="asof" type="date" />
-      </div>
+  <pre id="out">{}</pre>
 
-      <div class="btnrow">
-        <button class="btn primary" id="runBtn">Resolve &amp; evaluate</button>
-        <button class="btn" id="mockBtn" type="button" title="Populate with deterministic mock data for UI dev">Use mock data</button>
-        <button class="btn ghost" id="resetBtn" type="button">Reset</button>
-      </div>
+<script>
+(function () {
+  const $ = (sel) => document.querySelector(sel);
+  const form = $("#resolver-form");
+  const input = $("#company");
+  const withBackbone = $("#with-backbone");
+  const out = $("#out");
+  const status = $("#status");
+  const btn = $("#go");
+  const copyBtn = $("#copy");
 
-      <hr style="border:0; border-top:1px solid var(--border); margin:14px 0" />
-
-      <div class="field">
-        <label>Import / Export</label>
-        <div class="btnrow">
-          <button class="btn" id="importBtn" type="button">Import JSON</button>
-          <button class="btn" id="exportBtn" type="button">Export JSON</button>
-          <input id="importFile" type="file" accept="application/json" hidden />
-        </div>
-        <div class="muted" style="margin-top:8px">Schema documented in code (<span class="kbd">evaluationSchema</span>).</div>
-      </div>
-    </section>
-
-    <!-- RIGHT: Results -->
-    <section class="panel results" aria-live="polite">
-      <!-- Summary header -->
-      <div class="summary">
-        <div class="logoBox" id="logoBox" aria-label="Company logo preview"> <span style="color:var(--muted)">No logo</span> </div>
-        <div class="meta">
-          <h3 id="coTitle">No company selected</h3>
-          <div class="sub" id="coSub">Set inputs and run evaluation.</div>
-        </div>
-        <div class="quickstats" id="quickstats"></div>
-      </div>
-
-      <div class="grid">
-        <!-- Moat & Strategy checklist -->
-        <section class="card" id="moatCard">
-          <h4>Moat & Strategy</h4>
-          <div class="muted" style="margin-bottom:8px">Qualitative pillars scored 0–3 by the agent, with notes.</div>
-          <div class="moat-list" id="moatList"></div>
-        </section>
-
-        <!-- Valuation ratios -->
-        <section class="card" id="valCard">
-          <h4>Valuation (P/E)</h4>
-          <table class="vals" id="peTable">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </section>
-
-        <!-- Revenue chart -->
-        <section class="card" id="revCard">
-          <h4>Revenue (TTM + 17 historical quarters & next 4 projected)</h4>
-          <div class="chart-wrap"><svg id="revChart" role="img" aria-label="Revenue chart"></svg></div>
-          <div class="legend"><span class="dot"></span> Actual <span class="dot proj"></span> Projected</div>
-          <div class="muted" id="revSummary" style="margin-top:8px"></div>
-        </section>
-
-        <!-- Notes / Citations -->
-        <section class="card" id="notesCard">
-          <h4>Notes & Citations</h4>
-          <div class="notes" id="notes"></div>
-          <div class="field" style="margin-top:12px">
-            <textarea id="noteInput" rows="3" placeholder="Add a quick note… (source, assumption, risk) "></textarea>
-            <div class="btnrow"><button class="btn" id="addNoteBtn" type="button">Add note</button></div>
-          </div>
-        </section>
-      </div>
-
-      <div class="footer">
-        Tip: You can paste a logo from your clipboard directly into the dropzone. For keyboard users, focus the dropzone and press <span class="kbd">Enter</span>.
-      </div>
-    </section>
-  </main>
-
-  <script>
-  // ===== Utility: small deterministic PRNG for stable mock data (seeded by company name)
-  function mulberry32(a){return function(){let t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15, t|1); t^=t+Math.imul(t^t>>>7, t|61); return ((t^t>>>14)>>>0)/4294967296;}};
-  function seededRand(seed){let h=0; for(let i=0;i<seed.length;i++){h=((h<<5)-h)+seed.charCodeAt(i); h|=0;} return mulberry32(h>>>0);} 
-
-  // ===== Schema (documentation)
-  const evaluationSchema = {
-    company: { name:"string", as_of:"YYYY-MM-DD", scope:"quick|standard|deep", logoUrl:"dataURL|http(s)" },
-    moat: [ { key:"market_leadership", label:"Market leadership & sustainable share", score:0, note:"" }, /* ... */ ],
-    valuation: { pe: { twoYrsAgo:null, oneYrAgo:null, trailing:null, fwd1y:null, fwd2y:null } },
-    revenue: { ttm:null, quarters: [ /* 17 historical + 4 projected */ ] },
-    citations: [ {title:"", url:""} ],
-    notes: ["text"]
+  // Build absolute API URL on same origin
+  const api = (path, params) => {
+    const u = new URL(path, window.location.origin);
+    if (params) Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
+    return u.toString();
   };
 
-  // ===== DOM refs
-  const companyEl = document.getElementById('company');
-  const scopeEl = document.getElementById('scope');
-  const asofEl = document.getElementById('asof');
-  const dropEl = document.getElementById('drop');
-  const fileEl = document.getElementById('logo');
-  const logoBoxEl = document.getElementById('logoBox');
-  const runBtn = document.getElementById('runBtn');
-  const mockBtn = document.getElementById('mockBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const importBtn = document.getElementById('importBtn');
-  const exportBtn = document.getElementById('exportBtn');
-  const importFileEl = document.getElementById('importFile');
+  const pretty = (obj) => JSON.stringify(obj, null, 2);
 
-  const coTitleEl = document.getElementById('coTitle');
-  const coSubEl = document.getElementById('coSub');
-  const quickstatsEl = document.getElementById('quickstats');
-  const moatListEl = document.getElementById('moatList');
-  const peTableBody = document.querySelector('#peTable tbody');
-  const revChartEl = document.getElementById('revChart');
-  const revSummaryEl = document.getElementById('revSummary');
-  const notesEl = document.getElementById('notes');
-  const noteInputEl = document.getElementById('noteInput');
-  const addNoteBtn = document.getElementById('addNoteBtn');
-
-  // ===== State
-  let state = {
-    logoUrl: null,
-    evaluation: null
-  };
-
-  // ===== Init
-  (function init(){
-    // default date = today in user's locale
-    asofEl.valueAsDate = new Date();
-
-    // Dropzone interactions
-    dropEl.addEventListener('click', ()=> fileEl.click());
-    dropEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fileEl.click(); }});
-    ;['dragenter','dragover'].forEach(evt=> dropEl.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); dropEl.classList.add('dragover'); }));
-    ;['dragleave','drop'].forEach(evt=> dropEl.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); dropEl.classList.remove('dragover'); }));
-    dropEl.addEventListener('drop', (e)=> handleFiles(e.dataTransfer.files));
-    fileEl.addEventListener('change', (e)=> handleFiles(e.target.files));
-
-    // Paste support for logo
-    window.addEventListener('paste', (e)=>{
-      const items = e.clipboardData?.items || [];
-      for(const it of items){ if(it.type.startsWith('image/')){ handleFiles([it.getAsFile()]); break; } }
-    });
-
-    runBtn.addEventListener('click', onRun);
-    mockBtn.addEventListener('click', onMock);
-    resetBtn.addEventListener('click', onReset);
-
-    importBtn.addEventListener('click', ()=> importFileEl.click());
-    importFileEl.addEventListener('change', async (e)=>{
-      const file = e.target.files?.[0]; if(!file) return;
-      try{ const json = JSON.parse(await file.text()); renderEvaluation(json); } catch(err){ alert('Invalid JSON file.'); }
-      importFileEl.value = '';
-    });
-
-    exportBtn.addEventListener('click', ()=>{
-      if(!state.evaluation){ alert('Nothing to export yet. Run an evaluation or load mock data.'); return; }
-      const blob = new Blob([JSON.stringify(state.evaluation, null, 2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = Object.assign(document.createElement('a'), { href:url, download:`evaluation-${(state.evaluation.company?.name||'company').replace(/\s+/g,'_')}.json`});
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    });
-
-    addNoteBtn.addEventListener('click', ()=>{
-      const t = noteInputEl.value.trim(); if(!t) return;
-      const li = document.createElement('div'); li.className='note'; li.textContent=t; notesEl.prepend(li); noteInputEl.value='';
-      if(state.evaluation){ state.evaluation.notes = state.evaluation.notes || []; state.evaluation.notes.unshift(t); }
-    });
-
-    // Render empty moat list structure
-    renderMoatPlaceholders();
-  })();
-
-  function handleFiles(files){
-    const f = files?.[0]; if(!f) return;
-    const reader = new FileReader();
-    reader.onload = () => { state.logoUrl = reader.result; renderLogo(); };
-    reader.readAsDataURL(f);
-  }
-
-  function renderLogo(){
-    logoBoxEl.innerHTML = '';
-    if(state.logoUrl){ const img = new Image(); img.src = state.logoUrl; img.alt = 'Company logo'; logoBoxEl.appendChild(img); }
-    else { logoBoxEl.innerHTML = '<span style="color:var(--muted)">No logo</span>'; }
-  }
-  // Helper: API resolver (tries same-origin /api first, then localhost fallback)
-  const API_CANDIDATES = [
-    '/api/resolve_company_llm',
-    'http://localhost:8000/resolve_company_llm'
-  ];
-  async function resolveCompanyAPI(name, scope, asof){
-    const qs = `?company_name=${encodeURIComponent(name)}&scope=${encodeURIComponent(scope||'')}&as_of=${encodeURIComponent(asof||'')}`;
-    for(const base of API_CANDIDATES){
-      try{
-        const res = await fetch(base + qs, { headers:{ 'Accept':'application/json' } });
-        if(res.ok){ return await res.json(); }
-      }catch(e){ /* try next */ }
+  async function fetchJson(url, {signal} = {}) {
+    const res = await fetch(url, { credentials: "include", signal });
+    const text = await res.text();
+    try {
+      const data = JSON.parse(text);
+      if (!res.ok) throw Object.assign(new Error(data?.detail || res.statusText), {status: res.status, data});
+      return data;
+    } catch {
+      // Not JSON — surface raw text so you can see the error body
+      throw Object.assign(new Error("Non-JSON response"), { status: res.status, raw: text });
     }
-    throw new Error('Resolver endpoint unreachable. Confirm backend is running.');
   }
 
-  // ===== Evaluation triggers
-  function onRun(){
-    const name = companyEl.value.trim();
-    const asof = asofEl.value || new Date().toISOString().slice(0,10);
-    const scope = scopeEl.value;
-    if(!name){ alert('Enter a company name.'); return; }
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = input.value.trim();
+    if (!name) return;
 
-    // UI loading state
-    runBtn.disabled = true; const prevLabel = runBtn.textContent; runBtn.textContent = 'Resolving…';
+    // UI state
+    btn.disabled = true;
+    status.textContent = "Resolving…";
+    out.textContent = "{}";
 
-    (async()=>{
-      try{
-        // 1) Resolve via LLM + Wikidata backend
-        const res = await resolveCompanyAPI(name, scope, asof);
-        if(!res || !res.company){
-          alert('Could not confidently resolve that company.');
-          return;
-        }
-        const co = res.company || {};
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 30000); // 30s safety timeout
 
-        // 2) Build a temporary evaluation (keep mock numbers for now)
-        const evalData = makeMockEvaluation(co.canonical_name || name, asof, scope, state.logoUrl);
-        evalData.notes = evalData.notes || [];
-        evalData.citations = evalData.citations || [];
+    try {
+      // 1) Primary LLM resolve
+      const resolveUrl = api("/api/resolve_company_llm", { company_name: name });
+      const resolved = await fetchJson(resolveUrl, { signal: ctl.signal });
 
-        // Add resolver notes/citations
-        evalData.notes.unshift(
-          `Resolver: ${co.canonical_name||name}` + (co.short_description? ` — ${co.short_description}`: '')
-        );
-        if(co.disambiguation_note){ evalData.notes.unshift(`Note: ${co.disambiguation_note}`); }
-        if(co.wikipedia_url){ evalData.citations.push({ title: `Wikipedia: ${co.canonical_name||name}`, url: co.wikipedia_url }); }
-        if(res.meta && typeof res.meta.verified === 'boolean'){
-          evalData.notes.unshift(`Verified: ${res.meta.verified? 'Wikidata company match' : 'Not verified by Wikidata'}`);
-        }
-
-        // 3) Render
-        renderEvaluation(evalData);
-
-        // 4) Post-render badges (won't be overwritten by renderEvaluation)
-        if(res.meta && typeof res.meta.verified === 'boolean'){
-          quickstatsEl.appendChild(makePill(res.meta.verified ? 'Verified (Wikidata)' : 'Unverified'));
-        }
-        if(Array.isArray(co.primary_tickers)){
-          co.primary_tickers.slice(0,3).forEach(t=>{
-            const label = `Ticker: ${t.symbol}${t.exchange? ' @'+t.exchange:''}`;
-            quickstatsEl.appendChild(makePill(label));
-          });
-        }
-
-        // Update header explicitly (resolver canonical name)
-        coTitleEl.textContent = co.canonical_name || name;
-        coSubEl.textContent = `${(scope||'standard').toUpperCase()} · As of ${asof}`;
-
-      }catch(err){
-        console.error(err);
-        alert('Resolver error: ' + (err?.message || err));
-      }finally{
-        runBtn.disabled = false; runBtn.textContent = prevLabel;
+      // 2) Optional backbone IDs
+      let backbone = null;
+      if (withBackbone.checked) {
+        const bbUrl = api("/api/backbone", { company_name: name });
+        try { backbone = await fetchJson(bbUrl, { signal: ctl.signal }); }
+        catch (err) { backbone = { error: String(err.message || err), detail: err.data?.detail ?? err.raw ?? null }; }
       }
-    })();
-  }
 
-  function onMock(){
-    const sample = ["NVIDIA","ASML","Unilever","Apple","Siemens","LVMH","Shell","ARM"];
-    const name = sample[Math.floor(Math.random()*sample.length)];
-    companyEl.value = name;
-    onRun();
-  }
-
-  function onReset(){
-    companyEl.value = '';
-    asofEl.valueAsDate = new Date();
-    scopeEl.value = 'standard';
-    state.logoUrl = null; renderLogo();
-    state.evaluation = null;
-
-    coTitleEl.textContent = 'No company selected';
-    coSubEl.textContent = 'Set inputs and run evaluation.';
-    quickstatsEl.innerHTML = '';
-    renderMoatPlaceholders();
-    peTableBody.innerHTML = '';
-    drawRevenue([], 0);
-    revSummaryEl.textContent = '';
-    notesEl.innerHTML = '';
-  }
-
-  // ===== Renderers
-  function renderEvaluation(data){
-    state.evaluation = data;
-    const { company, moat, valuation, revenue, citations, notes } = data;
-
-    // Summary
-    coTitleEl.textContent = company?.name || '—';
-    coSubEl.textContent = `${company?.scope?.toUpperCase?.()||'—'} · As of ${company?.as_of||'—'}`;
-    if(company?.logoUrl){ state.logoUrl = company.logoUrl; renderLogo(); }
-
-    // Quickstats
-    quickstatsEl.innerHTML = '';
-    const ttm = revenue?.ttm != null ? formatMoney(revenue.ttm) : '—';
-    const pe = valuation?.pe?.trailing != null ? (valuation.pe.trailing.toFixed?.(2) ?? valuation.pe.trailing) : '—';
-    quickstatsEl.appendChild(makePill(`TTM Revenue: ${ttm}`));
-    quickstatsEl.appendChild(makePill(`Trailing P/E: ${pe}`));
-
-    // Moat
-    moatListEl.innerHTML = '';
-    (moat||[]).forEach(m => {
-      const row = document.createElement('div'); row.className='moat-item'; row.innerHTML = `<strong>${m.label}</strong><div class="muted" style="margin-top:4px">${m.note||''}</div>`;
-      const status = document.createElement('div'); status.className = 'status '+ scoreClass(m.score); status.textContent = scoreLabel(m.score);
-      moatListEl.append(row, status);
-    });
-
-    // Valuation
-    peTableBody.innerHTML = '';
-    const peMap = [
-      ['P/E 2 years ago', valuation?.pe?.twoYrsAgo],
-      ['P/E 1 year ago', valuation?.pe?.oneYrAgo],
-      ['Trailing P/E (current)', valuation?.pe?.trailing],
-      ['Forward P/E (next year)', valuation?.pe?.fwd1y],
-      ['2-Year Forward P/E', valuation?.pe?.fwd2y]
-    ];
-    for(const [k,v] of peMap){ const tr=document.createElement('tr'); tr.innerHTML = `<td>${k}</td><td>${num(v)}</td>`; peTableBody.appendChild(tr); }
-
-    // Revenue
-    const series = revenue?.quarters || [];
-    drawRevenue(series, 17);
-    const actuals = series.filter(s=>!s.projected).map(s=>s.value);
-    const growth = actuals.length>4 ? (actuals.at(-1)/actuals.at(-5)-1) : null; // YoY from quarter
-    revSummaryEl.textContent = `TTM: ${ttm} · ${growth!=null?`YoY (last quarter): ${(growth*100).toFixed(1)}%`:''}`;
-
-    // Notes & citations
-    notesEl.innerHTML = '';
-    (notes||[]).forEach(n => { const d=document.createElement('div'); d.className='note'; d.textContent=n; notesEl.appendChild(d); });
-    (citations||[]).forEach(c => { const d=document.createElement('div'); d.className='note'; d.innerHTML = `Source: <a href="${c.url}" target="_blank" rel="noopener">${c.title||c.url}</a>`; notesEl.appendChild(d); });
-  }
-
-  function renderMoatPlaceholders(){
-    moatListEl.innerHTML = '';
-    const items = defaultMoatPillars();
-    for(const it of items){
-      const row = document.createElement('div'); row.className='moat-item'; row.innerHTML = `<strong>${it.label}</strong><div class="muted" style="margin-top:4px">—</div>`;
-      const status = document.createElement('div'); status.className='status unknown'; status.textContent='Unknown';
-      moatListEl.append(row,status);
+      const payload = { query: name, resolver: resolved, backbone };
+      out.textContent = pretty(payload);
+      status.textContent = "Done.";
+    } catch (err) {
+      const msg = err?.message || "Request failed";
+      const detail = err?.data?.detail ?? err?.raw ?? null;
+      out.textContent = pretty({ error: msg, detail });
+      status.textContent = "Failed.";
+    } finally {
+      clearTimeout(timer);
+      btn.disabled = false;
     }
-  }
+  });
 
-  function makePill(text){ const s=document.createElement('div'); s.className='pill'; s.textContent=text; return s; }
-  function scoreLabel(s){ return ['Unknown','Weak','Moderate','Strong'][Math.max(0,Math.min(3, s|0))]; }
-  function scoreClass(s){ return ['unknown','weak','moderate','strong'][Math.max(0,Math.min(3, s|0))]; }
-  function num(v){ return (v==null||Number.isNaN(v)) ? '—' : (typeof v==='number' ? v.toFixed(2) : v); }
-  function formatMoney(n){ if(n==null || Number.isNaN(n)) return '—'; const abs = Math.abs(n);
-    const suffix = abs>=1e12? 'T' : abs>=1e9? 'B' : abs>=1e6? 'M' : abs>=1e3? 'K' : '';
-    const scaled = abs>=1e12? n/1e12 : abs>=1e9? n/1e9 : abs>=1e6? n/1e6 : abs>=1e3? n/1e3 : n;
-    return (scaled).toFixed(suffix?2:0) + suffix; }
-
-  function defaultMoatPillars(){
-    return [
-      {key:'market_leadership', label:'Market leadership & sustainable market share'},
-      {key:'network_effects', label:'Network effects & switching costs'},
-      {key:'ip_patents', label:'Valuable IP & patents'},
-      {key:'brand_loyalty', label:'Brand strength & loyalty'},
-      {key:'cost_advantage', label:'Durable cost advantages'},
-      {key:'reg_barriers', label:'Regulatory barriers & licenses'},
-      {key:'distribution', label:'Superior distribution network'},
-      {key:'pricing_power', label:'Sustainable pricing power'},
-      {key:'rnd_innovation', label:'Consistent innovation & R&D'},
-    ];
-  }
-
-  // ===== Minimal SVG line chart for revenue
-  function drawRevenue(series, splitIndex){
-    const svg = revChartEl; while(svg.firstChild) svg.removeChild(svg.firstChild);
-    const w = svg.clientWidth || svg.parentElement.clientWidth || 600; const h = svg.clientHeight || 260;
-    const pad = {l:40, r:10, t:10, b:26};
-    if(!series || series.length===0){
-      const t = document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('x', w/2); t.setAttribute('y', h/2); t.setAttribute('text-anchor','middle'); t.textContent = 'No data'; t.setAttribute('fill', '#9aa3b2'); svg.appendChild(t); return;
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(out.textContent);
+      status.textContent = "Copied JSON to clipboard.";
+    } catch {
+      status.textContent = "Copy failed (clipboard unavailable).";
     }
-    const xs = series.map((_,i)=>i);
-    const ys = series.map(d=>d.value);
-    const minY = Math.min(...ys); const maxY = Math.max(...ys);
-    const x = i => pad.l + (i/(series.length-1))*(w-pad.l-pad.r);
-    const y = v => pad.t + (1 - (v-minY)/(Math.max(1e-9, maxY-minY))) * (h-pad.t-pad.b);
+  });
 
-    // Axes
-    const axis = document.createElementNS('http://www.w3.org/2000/svg','path');
-    axis.setAttribute('d', `M ${pad.l} ${pad.t} V ${h-pad.b} H ${w-pad.r}`);
-    axis.setAttribute('stroke','rgba(200,210,230,.35)'); axis.setAttribute('fill','none'); svg.appendChild(axis);
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
-    let d = '';
-    ys.forEach((v,i)=>{ d += (i? ' L ':'M ') + x(i) + ' ' + y(v); });
-    path.setAttribute('d', d);
-    path.setAttribute('stroke','var(--accent)'); path.setAttribute('fill','none'); path.setAttribute('stroke-width','2'); svg.appendChild(path);
-
-    // Dots
-    ys.forEach((v,i)=>{
-      const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('cx', x(i)); c.setAttribute('cy', y(v)); c.setAttribute('r','3');
-      c.setAttribute('fill', i>=splitIndex? 'var(--warn)':'var(--accent)'); svg.appendChild(c);
-    });
-
-    // X labels (sparse)
-    const step = Math.ceil(series.length/6);
-    series.forEach((d,i)=>{
-      if(i%step===0 || i===series.length-1){
-        const tx=document.createElementNS('http://www.w3.org/2000/svg','text'); tx.setAttribute('x', x(i)); tx.setAttribute('y', h-8); tx.setAttribute('text-anchor','middle'); tx.setAttribute('fill','#9aa3b2'); tx.setAttribute('font-size','11'); tx.textContent = d.label || `Q${(i%4)+1}`; svg.appendChild(tx);
-      }
-    });
-
-    // Y labels (min/max)
-    [minY, maxY].forEach((v,idx)=>{
-      const ty=document.createElementNS('http://www.w3.org/2000/svg','text'); ty.setAttribute('x', 4); ty.setAttribute('y', idx? pad.t+10 : h-pad.b-4); ty.setAttribute('fill','#9aa3b2'); ty.setAttribute('font-size','11'); ty.textContent = formatMoney(v); svg.appendChild(ty);
-    });
-  }
-
-  // ===== Mock evaluation generator (replace with real backend later)
-  function makeMockEvaluation(name, as_of, scope, logoUrl){
-    const rng = seededRand(name + '|' + scope + '|' + as_of);
-    const moat = defaultMoatPillars().map(p=>({ ...p, score: 1 + Math.floor(rng()*3), note: mockNote(p.key, rng) }));
-
-    // Valuation
-    const basePE = 15 + rng()*40; // 15–55
-    const pe = {
-      twoYrsAgo: +(basePE * (0.8 + rng()*0.4)).toFixed(2),
-      oneYrAgo: +(basePE * (0.9 + rng()*0.4)).toFixed(2),
-      trailing: +(basePE * (0.9 + rng()*0.5)).toFixed(2),
-      fwd1y: +(basePE * (0.8 + rng()*0.5)).toFixed(2),
-      fwd2y: +(basePE * (0.7 + rng()*0.5)).toFixed(2)
-    };
-
-    // Revenue quarters: 17 actual + 4 projected
-    const quarters = [];
-    let qVal = 2000 + rng()*8000; // base in millions
-    for(let i=0;i<17;i++){
-      const growth = (rng()*0.12) - 0.02; // -2%..+10%
-      qVal = Math.max(500, qVal * (1 + growth));
-      quarters.push({ label: `Q${(i%4)+1}`, value: Math.round(qVal) });
-    }
-    let last = qVal;
-    for(let i=0;i<4;i++){
-      const growth = (rng()*0.10); // 0..10% projections
-      last = Math.max(500, last * (1 + growth));
-      quarters.push({ label:`Qp${i+1}`, value: Math.round(last), projected:true });
-    }
-    const ttm = quarters.slice(13,17).reduce((a,b)=>a+b.value,0);
-
-    return {
-      company: { name, as_of, scope, logoUrl: logoUrl || null },
-      moat,
-      valuation: { pe },
-      revenue: { ttm, quarters },
-      citations: [],
-      notes: [
-        'Mock data for UI development. Replace with live fetch + citations.',
-        'Design note: All numbers are in “millions” for chart scaling.'
-      ]
-    };
-  }
-
-  function mockNote(key, rng){
-    const snippets = {
-      market_leadership: ['Share gains in core SKU','Top-3 in TAM','Regional dominance emerging'],
-      network_effects: ['User data flywheel','Two-sided marketplace dynamics','Switching costs in tooling'],
-      ip_patents: ['Key patents expiring >5y','Trade secrets in process','Active continuation filings'],
-      brand_loyalty: ['High NPS in B2B','Premium positioning holds','Declining churn QoQ'],
-      cost_advantage: ['Scale in fab capacity','Learning-curve cost declines','Vendor consolidation'],
-      reg_barriers: ['Licenses restrict entrants','Lengthy approvals','Compliance as moat'],
-      distribution: ['Exclusive channels','OEM bundling','Strong channel partner incentives'],
-      pricing_power: ['Hold price in downturn','Value-based pricing','Mix shift to high-margin'],
-      rnd_innovation: ['Strong cadence of launches','R&D intensity >12% sales','Talent density high']
-    };
-    const arr = snippets[key] || ['—'];
-    return arr[Math.floor(rng()*arr.length)];
-  }
-  </script>
+  // Allow Enter to submit immediately
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") form.requestSubmit();
+  });
+})();
+</script>
 </body>
 </html>
