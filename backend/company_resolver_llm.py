@@ -357,5 +357,5 @@ async def resolve_company_llm(
     return payload
 
 @app.get("/api/resolve_company_llm", include_in_schema=False)
-def resolve_company_llm_alias(company_name: str, scope: str | None = None, as_of: str | None = None):
+async def resolve_company_llm_alias(company_name: str, scope: str | None = None, as_of: str | None = None):
     return await resolve_company_llm(company_name=company_name, scope=scope, as_of=as_of)
