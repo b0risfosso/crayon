@@ -10,7 +10,7 @@ class MoatEvalRequest(BaseModel):
     prompt: str
 
 @router.post("/moat_evaluation")
-def run_moat_evaluation(req: MoatEvalRequest):
+async def run_moat_evaluation(req: MoatEvalRequest):
     try:
         resp = client.responses.create(
             model="gpt-5",

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Company Evaluation Agent</title>
+<title>Backbone Lookup + Moat LLM</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
@@ -32,7 +32,7 @@
   <pre id="out">{}</pre>
 
   <hr style="margin:1.25rem 0" />
-  <h1>Moat LLM (Slack-in-Salesforce example — moat_evaluation_api.py)</h1>
+  <h1>Moat LLM</h1>
   <div class="row">
     <div>
       <button id="runLLM" disabled>Run Moat LLM</button>
@@ -133,7 +133,18 @@
     const t = setTimeout(() => ctl.abort(), 60000);
 
     try {
-      const data = await fetchJson('/api/moat_evaluation', { method: 'POST', signal: ctl.signal, body: JSON.stringify({ prompt }) });
+      async function postMoat(prompt){
+      const endpoints = ['/api/moat_evaluation','/moat_evaluation'];
+      let lastErr = null;
+      for (const ep of endpoints){
+        try {
+          return await fetchJson(ep, { method: 'POST', signal: ctl.signal, body: JSON.stringify({ prompt }) });
+        } catch (e){ lastErr = e; }
+      }
+      throw lastErr || new Error('No moat endpoint reachable');
+    }
+
+    const data = await postMoat(prompt);
       // Accept either { output_text: "..." } or raw text JSON.
       const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
       llmOut.textContent = text;
