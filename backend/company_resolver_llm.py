@@ -50,10 +50,6 @@ class CompanyResolution(BaseModel):
 # ---------------- FastAPI app ----------------
 
 app = FastAPI(title="Company Resolver (LLM + Wikidata verify)", version="3.0.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
-)
 
 app.include_router(backbone_router, prefix="/api")
 app.include_router(moat_router, prefix="/api")
@@ -92,7 +88,6 @@ USER_TMPL = (
     "Return ONLY the object matching the provided schema. If ambiguous with non-company entities "
     "(songs/films/TV/etc.), resolve to the company and explain briefly in disambiguation_note."
 )
-MODEL = "gpt-4o-2024-08-06"
 
 # ---------------- Wikidata helpers ----------------
 
