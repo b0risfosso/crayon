@@ -20,7 +20,7 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.backbone_api import router as backbone_router
-from moat_evaluation_api import router as moat_router
+from backend.moat_evaluation_api import router as moat_router
 
 # (optional) let the model be configured via env
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-2024-08-06")  # replace your hardcoded MODEL var
