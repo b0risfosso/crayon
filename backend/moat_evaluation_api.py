@@ -9,7 +9,7 @@ client = OpenAI()
 class MoatEvalRequest(BaseModel):
     prompt: str
 
-@router.post("/api/moat_evaluation")
+@router.post("/moat_evaluation")
 def run_moat_evaluation(req: MoatEvalRequest):
     try:
         resp = client.responses.create(
