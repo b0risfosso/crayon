@@ -20,12 +20,6 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.backbone_api import router as backbone_router
-from backend.adapters_sec import router as sec_router
-from backend.adapters_prices import router as prices_router
-from backend.valuation_api import router as valuation_router
-from backend.finance_api import router as finance_router
-from backend.moat_market_leadership import router as moat_ml_router
-from backend.evaluate_api import router as evaluate_router
 
 # (optional) let the model be configured via env
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-2024-08-06")  # replace your hardcoded MODEL var
@@ -61,12 +55,6 @@ app.add_middleware(
 )
 
 app.include_router(backbone_router, prefix="/api")
-app.include_router(sec_router, prefix="/api")
-app.include_router(prices_router, prefix="/api")
-app.include_router(valuation_router, prefix="/api")
-app.include_router(finance_router, prefix="/api")
-app.include_router(moat_ml_router, prefix="/api")
-app.include_router(evaluate_router, prefix="/api")
 
 # Health endpoint for nginx/systemd probes
 @app.get("/healthz")
