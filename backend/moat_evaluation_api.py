@@ -15,7 +15,7 @@ async def run_moat_evaluation(req: MoatEvalRequest):
         resp = client.responses.create(
             model="gpt-5",
             tools=[{"type": "web_search"}],
-            reasoning={"effort": "medium"},
+            reasoning={"effort": "low"},
             input=req.prompt,
         )
         # Frontend expects {"output_text": "..."} where the value is the JSON block string.
