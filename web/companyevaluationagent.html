@@ -76,8 +76,112 @@
   let companyJson = null;
 
   function buildPrompt(companyJson) {
-    // The prompt string replicates your Python sample, embedding the JSON payload.
-    const prompt = `\nYou are an equity research assistant. Use web search to verify all claims and provide citations.\nCompany input (JSON):\n${pretty(companyJson)}\n\nTask: Produce a Moat Score for the company referenced in the JSON (focus on the Slack product/business within Salesforce),\nscored on nine criteria (0–10 each), with 1–3 sentences of rationale per criterion and reputable citations (“receipts”).\nThen provide a short synthesis explaining the overall moat. Where appropriate, distinguish between Slack-specific dynamics\nand Salesforce corporate-level dynamics.\n\nScoring criteria (each 0–10):\n1) Market leadership & sustainable share\n2) Network effects & switching costs\n3) Valuable IP & patents\n4) Brand strength & customer loyalty\n5) Durable cost advantages (scale, proprietary tech)\n6) Regulatory barriers & exclusive licenses\n7) Distribution network (direct, partners, enterprise channel)\n8) Pricing power (sustained ability to raise price/mix)\n9) Consistent, impactful innovation & R&D\n\nOutput format (JSON only):\n{\n  "moat_score": <0-100 integer, average of the 9 criteria × 10, round to nearest whole>,\n  "criteria": [\n    {\n      "name": "Market leadership & sustainable share",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>", "<source 2>"]\n    },\n    {\n      "name": "Network effects & switching costs",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>", "<source 2>"]\n    },\n    {\n      "name": "Valuable IP & patents",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Brand strength & customer loyalty",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Durable cost advantages",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Regulatory barriers & exclusive licenses",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Distribution network",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Pricing power",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    },\n    {\n      "name": "Innovation & R&D",\n      "score": <0-10>,\n      "rationale": "<concise reasoning>",\n      "citations": ["<source 1>"]\n    }\n  ],\n  "summary": "<3–5 sentence synthesis tying together Slack’s defensibility, key risks, and watch items>",\n  "notes": {\n    "what_is_slack_vs_salesforce": "<1–2 sentences clarifying scope>",\n    "data_as_of": "<today’s date in YYYY-MM-DD>",\n    "method": "Each criterion scored 0–10 using public sources; average × 10 → Moat Score."\n  }\n}\n\nInstructions & constraints:\n- Treat the JSON as the resolved identity (Slack product inside Salesforce, ticker CRM).\n- ALWAYS use web_search to confirm market share, DAU/MAU, retention, pricing changes, competition (e.g., Microsoft Teams, Google Chat),\n  distribution/partner motions, and any regulatory issues (e.g., EU/antitrust around Teams bundling).\n- Prefer primary/authoritative sources: Salesforce investor materials, earnings call transcripts, official blogs, reputable industry analysts\n  (Gartner, IDC, Forrester), financial press (WSJ, FT, Bloomberg), regulatory documents (EU/EC press releases).\n- Provide at least 1 citation per criterion (2+ for market share and network effects). Use direct, specific URLs.\n- Be precise about *Slack vs. Teams* share where available; if figures differ by source, note the range in the rationale.\n- Keep each rationale crisp (<= 60 words). Avoid marketing language. Do not output anything except the JSON block defined above.`;
+    const bb = companyJson?.backbone || {};
+    const name = bb.canonical_name || companyJson?.query || "<unknown>";
+    const aliases = Array.isArray(bb.aliases) ? bb.aliases : [];
+    const domain = bb.domain || "";
+
+    // Decide scope text dynamically (avoid hard-coding Slack)
+    let scopeLine = `Task: Produce a Moat Score for the company referenced in the JSON (focus on ${name}).`;
+    // Special case: Slack (product) living inside Salesforce (parent)
+    const looksLikeSlack = /slack/i.test(domain) || aliases.some(a => /slack/i.test(a));
+    const looksLikeSalesforce = /salesforce/i.test(name);
+    if (looksLikeSlack && looksLikeSalesforce) {
+      scopeLine = `Task: Produce a Moat Score focusing on the Slack product/business within Salesforce (CRM). Where appropriate, distinguish Slack-specific vs. Salesforce corporate-level dynamics.`;
+    }
+
+    const prompt = `
+You are an equity research assistant. Use web search to verify all claims and provide citations.
+Company input (JSON):
+${pretty(companyJson)}
+
+${scopeLine}
+Score nine criteria (0–10 each), with 1–3 sentences of rationale per criterion and reputable citations (\"receipts\"). Then provide a short synthesis explaining the overall moat.
+
+Scoring criteria (each 0–10):
+1) Market leadership & sustainable share
+2) Network effects & switching costs
+3) Valuable IP & patents
+4) Brand strength & customer loyalty
+5) Durable cost advantages (scale, proprietary tech)
+6) Regulatory barriers & exclusive licenses
+7) Distribution network (direct, partners, enterprise channel)
+8) Pricing power (sustained ability to raise price/mix)
+9) Consistent, impactful innovation & R&D
+
+Output format (JSON only):
+{
+  \"moat_score\": <0-100 integer, average of the 9 criteria × 10, round to nearest whole>,
+  \"criteria\": [
+    {
+      \"name\": \"Market leadership & sustainable share\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\", \"<source 2>\"]
+    },
+    {
+      \"name\": \"Network effects & switching costs\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\", \"<source 2>\"]
+    },
+    {
+      \"name\": \"Valuable IP & patents\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\"]
+    },
+    {
+      \"name\": \"Brand strength & customer loyalty\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\"]
+    },
+    {
+      \"name\": \"Durable cost advantages\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\"]
+    },
+    {
+      \"name\": \"Regulatory barriers & exclusive licenses\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\"]
+    },
+    {
+      \"name\": \"Distribution network\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\"]
+    },
+    {
+      \"name\": \"Pricing power\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\"]
+    },
+    {
+      \"name\": \"Innovation & R&D\",
+      \"score\": <0-10>,
+      \"rationale\": \"<concise reasoning>\",
+      \"citations\": [\"<source 1>\"]
+    }
+  ],
+  \"summary\": \"<3–5 sentence synthesis tying together defensibility, key risks, and watch items>\",
+  \"notes\": {
+    \"what_is_scope\": \"${looksLikeSlack && looksLikeSalesforce ? 'Slack within Salesforce' : name}\",
+    \"data_as_of\": \"<today’s date in YYYY-MM-DD>\",
+    \"method\": \"Each criterion scored 0–10 using public sources; average × 10 → Moat Score.\"
+  }
+}
+
+Instructions & constraints:
+- Treat the JSON as the resolved identity.
+- ALWAYS use web_search to confirm market share, DAU/MAU, retention, pricing, competition, distribution/partners, and regulatory issues.
+- Prefer primary/authoritative sources (investor materials, regulatory docs, Gartner/IDC/Forrester, WSJ/FT/Bloomberg).
+- Provide ≥1 citation per criterion (≥2 for market share & network effects).
+- Keep each rationale crisp (≤60 words). Avoid marketing language. Do not output anything except the JSON block.`;
     return prompt;
   }
 
@@ -114,38 +218,26 @@
     if (!companyJson) return;
     const prompt = buildPrompt(companyJson);
 
-    // NOTE: Frontend does not call OpenAI directly (to avoid exposing API keys).
-    // This POST expects a backend endpoint that runs the Python shown below:
-    // from openai import OpenAI
-    // client = OpenAI()
-    // response = client.responses.create(
-    //   model="gpt-5",
-    //   tools=[{"type":"web_search"}],
-    //   reasoning={"effort":"medium"},
-    //   input=prompt
-    // )
-    // print(response.output_text)
-
     llmStatus.textContent = 'Running LLM…';
     llmOut.textContent = '';
 
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 600000);
+    // Increased timeout from 60s to 180s (3 minutes)
+    const t = setTimeout(() => ctl.abort(), 180000);
 
     try {
       async function postMoat(prompt){
-      const endpoints = ['/api/moat_evaluation','/moat_evaluation'];
-      let lastErr = null;
-      for (const ep of endpoints){
-        try {
-          return await fetchJson(ep, { method: 'POST', signal: ctl.signal, body: JSON.stringify({ prompt }) });
-        } catch (e){ lastErr = e; }
+        const endpoints = ['/api/moat_evaluation','/moat_evaluation'];
+        let lastErr = null;
+        for (const ep of endpoints){
+          try {
+            return await fetchJson(ep, { method: 'POST', signal: ctl.signal, body: JSON.stringify({ prompt }) });
+          } catch (e){ lastErr = e; }
+        }
+        throw lastErr || new Error('No moat endpoint reachable');
       }
-      throw lastErr || new Error('No moat endpoint reachable');
-    }
 
-    const data = await postMoat(prompt);
-      // Accept either { output_text: "..." } or raw text JSON.
+      const data = await postMoat(prompt);
       const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
       llmOut.textContent = text;
       llmStatus.textContent = 'LLM complete.';
