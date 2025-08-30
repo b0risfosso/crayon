@@ -1,128 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Company Evaluation Agent — Minimal</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
-    h1 { font-size: 1.25rem; margin: 0 0 1rem; }
-    form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .75rem; }
-    input[type="text"] { padding: .6rem .7rem; min-width: 18rem; border: 1px solid #ccc; border-radius: .5rem; }
-    button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; }
-    button.primary { background: #0b5cff; color: white; }
-    label { font-size: .9rem; opacity: .85; }
-    #status { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; }
-    pre { margin-top: .75rem; padding: .75rem; background: rgba(0,0,0,.05); border-radius: .5rem; max-width: 100%; overflow: auto; }
-    .row { display: flex; gap: .5rem; align-items: center; }
-    .muted { opacity: .8; font-size: .85rem; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Backbone Lookup</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
+  h1 { font-size: 1.1rem; margin: 0 0 1rem; }
+  form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .5rem; }
+  input[type="text"] { padding: .6rem .7rem; min-width: 18rem; border: 1px solid #ccc; border-radius: .5rem; }
+  button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
+  #status { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; opacity: .85; }
+  pre { margin-top: .75rem; padding: .75rem; background: rgba(0,0,0,.05); border-radius: .5rem; overflow: auto; }
+</style>
 </head>
 <body>
-  <h1>Company Resolver (minimal)</h1>
+  <h1>Backbone Lookup</h1>
 
-  <form id="resolver-form">
-    <input id="company" type="text" placeholder="e.g., Apple, Meta, Spotify" required autofocus />
-    <button id="go" class="primary" type="submit">Resolve</button>
-    <label class="row"><input id="with-backbone" type="checkbox" /> also fetch /api/backbone</label>
+  <form id="f">
+    <input id="q" type="text" placeholder="e.g., Apple, Meta, Spotify" required autofocus />
+    <button type="submit">Fetch Backbone</button>
   </form>
 
-  <div id="status" class="muted"></div>
-
-  <div class="row">
-    <button id="copy">Copy JSON</button>
-    <span class="muted">Calls are same-origin: <code>/api/resolve_company_llm</code> (+ optional <code>/api/backbone</code>).</span>
-  </div>
-
+  <div id="status"></div>
   <pre id="out">{}</pre>
 
 <script>
-(function () {
-  const $ = (sel) => document.querySelector(sel);
-  const form = $("#resolver-form");
-  const input = $("#company");
-  const withBackbone = $("#with-backbone");
-  const out = $("#out");
-  const status = $("#status");
-  const btn = $("#go");
-  const copyBtn = $("#copy");
+(() => {
+  const $ = s => document.querySelector(s);
+  const form = $("#f"), input = $("#q"), out = $("#out"), status = $("#status");
 
-  // Build absolute API URL on same origin
   const api = (path, params) => {
     const u = new URL(path, window.location.origin);
-    if (params) Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
+    Object.entries(params || {}).forEach(([k,v]) => u.searchParams.set(k, v));
     return u.toString();
   };
-
-  const pretty = (obj) => JSON.stringify(obj, null, 2);
+  const pretty = obj => JSON.stringify(obj, null, 2);
 
   async function fetchJson(url, {signal} = {}) {
     const res = await fetch(url, { credentials: "include", signal });
     const text = await res.text();
     try {
       const data = JSON.parse(text);
-      if (!res.ok) throw Object.assign(new Error(data?.detail || res.statusText), {status: res.status, data});
+      if (!res.ok) throw Object.assign(new Error(data?.detail || res.statusText), { status: res.status, data });
       return data;
     } catch {
-      // Not JSON — surface raw text so you can see the error body
       throw Object.assign(new Error("Non-JSON response"), { status: res.status, raw: text });
     }
   }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = input.value.trim();
-    if (!name) return;
-
-    // UI state
-    btn.disabled = true;
-    status.textContent = "Resolving…";
-    out.textContent = "{}";
+    const name = input.value.trim(); if (!name) return;
+    status.textContent = "Fetching…"; out.textContent = "{}";
 
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 30000); // 30s safety timeout
+    const t = setTimeout(() => ctl.abort(), 20000);
 
     try {
-      // 1) Primary LLM resolve
-      const resolveUrl = api("/api/resolve_company_llm", { company_name: name });
-      const resolved = await fetchJson(resolveUrl, { signal: ctl.signal });
-
-      // 2) Optional backbone IDs
-      let backbone = null;
-      if (withBackbone.checked) {
-        const bbUrl = api("/api/backbone", { company_name: name });
-        try { backbone = await fetchJson(bbUrl, { signal: ctl.signal }); }
-        catch (err) { backbone = { error: String(err.message || err), detail: err.data?.detail ?? err.raw ?? null }; }
-      }
-
-      const payload = { query: name, resolver: resolved, backbone };
-      out.textContent = pretty(payload);
+      const url = api("/api/backbone", { company_name: name });
+      const data = await fetchJson(url, { signal: ctl.signal });
+      out.textContent = pretty({ query: name, backbone: data });
       status.textContent = "Done.";
     } catch (err) {
-      const msg = err?.message || "Request failed";
-      const detail = err?.data?.detail ?? err?.raw ?? null;
-      out.textContent = pretty({ error: msg, detail });
+      out.textContent = pretty({ error: err?.message || "Request failed", detail: err?.data?.detail ?? err?.raw ?? null });
       status.textContent = "Failed.";
     } finally {
-      clearTimeout(timer);
-      btn.disabled = false;
+      clearTimeout(t);
     }
   });
 
-  copyBtn.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(out.textContent);
-      status.textContent = "Copied JSON to clipboard.";
-    } catch {
-      status.textContent = "Copy failed (clipboard unavailable).";
-    }
-  });
-
-  // Allow Enter to submit immediately
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") form.requestSubmit();
-  });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") form.requestSubmit(); });
 })();
 </script>
 </body>
