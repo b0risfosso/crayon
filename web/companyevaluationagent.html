@@ -12,7 +12,7 @@
   input[type="text"] { padding: .6rem .7rem; min-width: 18rem; border: 1px solid #ccc; border-radius: .5rem; }
   button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
   button[disabled] { opacity: .6; cursor: not-allowed; }
-  #status, #llmStatus, #peStatus, #revStatus { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; opacity: .85; }
+  #status, #llmStatus, #peStatus, #revStatus, #fragStatus { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; opacity: .85; }
   pre, textarea { margin-top: .75rem; padding: .75rem; background: rgba(0,0,0,.05); border-radius: .5rem; overflow: auto; width: 100%; }
   textarea { min-height: 200px; }
   .row { display: grid; grid-template-columns: 1fr; gap: 1rem; }
@@ -79,6 +79,22 @@
     </div>
   </div>
 
+  <hr style="margin:1.25rem 0" />
+    <h1>Fragility LLM</h1>
+    <div class="row">
+    <div>
+        <button id="runFRAG" disabled>Run Fragility LLM</button>
+        <div id="fragStatus"></div>
+        <pre id="fragOut"><!-- Fragility JSON will appear here --></pre>
+    </div>
+    <div>
+        <details>
+        <summary>Show generated Fragility prompt (copy/paste for Python)</summary>
+        <textarea id="fragPromptBox" readonly></textarea>
+        </details>
+    </div>
+    </div>
+
 <script>
 (() => {
   const $ = s => document.querySelector(s);
@@ -86,6 +102,8 @@
   const runBtn = $("#runLLM"), llmOut = $("#llmOut"), llmStatus = $("#llmStatus"), promptBox = $("#promptBox");
   const runPEBtn = $("#runPE"), peOut = $("#peOut"), peStatus = $("#peStatus"), pePromptBox = $("#pePromptBox");
   const runREVBtn = $("#runREV"), revOut = $("#revOut"), revStatus = $("#revStatus"), revPromptBox = $("#revPromptBox");
+  const runFRAGBtn = $("#runFRAG"), fragOut = $("#fragOut"), fragStatus = $("#fragStatus"), fragPromptBox = $("#fragPromptBox");
+
 
   const api = (path, params) => {
     const u = new URL(path, window.location.origin);
@@ -192,6 +210,98 @@
     return prompt;
   }
 
+  // -------- Fragility prompt builder --------
+function buildFragilityPrompt(companyJson){
+  const bb = companyJson?.backbone || {};
+  const pyJson = JSON.stringify({ query: companyJson.query, backbone: bb }, null, 2);
+  return `
+You are a forensic-equity and credit risk analyst. Use web_search to verify all claims and provide citations.
+Your task: compute a **Fragility Rating** for the resolved entity in the JSON below. If the input refers to a product/brand,
+map to the public parent issuer for financials. If the company is private and lacks disclosures, return N/A for
+quantitative fields and provide a qualitative read with sources.
+
+Company input (JSON):
+${pyJson}
+
+## Definition — Fragility Rating (0–100; higher = more fragile)
+Aggregate nine sub-scores (0–10 each), then scale: Fragility Rating = round( average(subscores) * 10 ).
+Also report a **Confidence (0–100)** reflecting data quality/coverage.
+
+### Sub-score dimensions (0–10 each)
+1) **Leverage & Coverage Risk** — Net debt / EBITDA, interest coverage (EBIT/Interest), debt maturity wall ≤ 36 months.
+   - Scoring guide: 0–2 (net cash, IC > 8×), 3–5 (ND/EBITDA 0–1.5×, IC 4–8×), 6–8 (1.5–3×, IC 2–4×), 9–10 (>3×, IC < 2× or maturities bunching).
+2) **Liquidity & Cash Burn** — Cash runway (cash + undrawn RCF vs. FCF burn), working-cap volatility, revolver usage.
+3) **Revenue Concentration** — Top customer % of revenue; top-3 product or geo concentration; dependency on single platform/distributor.
+4) **Margin Volatility & Operating Leverage** — Gross/EBIT margin variance (5y), fixed/variable cost mix, cyclicality.
+5) **Regulatory/Legal Exposure** — Active investigations, fines, licensing risk, DSA/DMA/antitrust, sector-specific caps.
+6) **Supply Chain & Key-Supplier Dependence** — Single-source inputs, commodity exposure, logistics/geopolitical chokepoints.
+7) **Key-Man/Talent & Org Fragility** — Founder/CEO dependence, attrition spikes, union actions, immigration dependencies.
+8) **Competitive Moat Erosion Risk** — Switching costs, network effects pressure, disruptive entrants, pricing power erosion.
+9) **Non-GAAP/Quality-of-Earnings Risk** — Aggressive adjustments, capitalized costs, stock-comp reliance, working-cap driven FCF.
+
+### Data requirements & methods
+- **Primary sources first**: 10-K/20-F/10-Q, earnings PRs, IR decks, audited financials; then EDGAR; then top-tier press/industry (FT, WSJ, Bloomberg, Reuters), then reputable aggregators (MarketScreener, Macrotrends, Yahoo/Nasdaq for consensus).
+- Compute most recent **TTM** metrics for leverage, coverage, margins; disclose formulas and values used.
+- For concentration, cite disclosed customer % (or state “not disclosed” and infer *qualitatively* from contracts/management commentary).
+- Flag **binary red flags**: covenant breaches, going-concern language, auditor emphasis, material weaknesses in ICFR, credit downgrades, covenant-lite term loans with ticking maturities, large legal contingencies.
+- If numbers differ across sources, pick the most authoritative and mention the range.
+
+### Output format (JSON only)
+{
+  "entity": {
+    "name": "<resolved entity name>",
+    "ticker": "<ticker or 'N/A'>",
+    "is_public": <true|false>,
+    "reporting_currency": "<e.g., USD>"
+  },
+  "as_of": "<YYYY-MM-DD HH:MM TZ>",
+  "inputs_used": {
+    "periods": ["<TTM end date>", "<prior periods if used>"],
+    "source_docs": ["<primary filing/url>", "<supporting urls>"]
+  },
+  "metrics": {
+    "net_debt_to_ebitda": <float or "N/A">,
+    "interest_coverage": <float or "N/A">,
+    "debt_maturities_0_36m": "<brief text or 'N/A'>",
+    "cash_and_rcf_liquidity": "<value + brief method or 'N/A'>",
+    "cash_runway_months": <float or "N/A">,
+    "top_customer_revenue_pct": <float or "N/A">,
+    "top_geo_revenue_pct": <float or "N/A">,
+    "gross_margin_ttm": <float or "N/A">,
+    "ebit_margin_ttm": <float or "N/A">,
+    "margin_volatility_5y_std": <float or "N/A">
+  },
+  "subscores": [
+    {"name":"Leverage & Coverage Risk","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>","<url2>"]}},
+    {"name":"Liquidity & Cash Burn","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}},
+    {"name":"Revenue Concentration","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}},
+    {"name":"Margin Volatility & Op. Leverage","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}},
+    {"name":"Regulatory/Legal Exposure","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}},
+    {"name":"Supply Chain & Supplier Dependence","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}},
+    {"name":"Key-Man/Talent & Org Fragility","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}},
+    {"name":"Moat Erosion Risk","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}},
+    {"name":"Non-GAAP/Quality-of-Earnings Risk","score":<0-10>,"rationale":"<≤60 words>","citations":["<url1>"]}}
+  ],
+  "fragility_rating": <0-100>,
+  "confidence": <0-100>,
+  "red_flags": [
+    "<e.g., going-concern language>",
+    "<e.g., auditor emphasis paragraph>",
+    "<e.g., covenant breach disclosure>"
+  ],
+  "summary": "<3–6 sentence synthesis: where fragility concentrates, catalysts in next 12–18 months, what could de-risk the profile>"
+}
+
+### Strict constraints
+- ALWAYS use web_search to retrieve/confirm figures and link to exact filings/articles.
+- Do NOT fabricate undisclosed customer percentages or debt schedules—state 'not disclosed' and assess qualitatively.
+- Keep every rationale concise (≤60 words). Provide at least one citation per subscore.
+- Output **only** the JSON block. No prose outside JSON.
+
+Return only the JSON.`;
+}
+
+
   function enableLLM(companyJson) {
     // Build all prompts and enable all buttons
     const moatPrompt = buildMoatPrompt(companyJson);
@@ -205,13 +315,17 @@
     const revPrompt = buildRevenuePrompt(companyJson);
     revPromptBox.value = revPrompt;
     runREVBtn.disabled = false;
+
+    const fragPrompt = buildFragilityPrompt(companyJson);
+    fragPromptBox.value = fragPrompt;
+    runFRAGBtn.disabled = false;
   }
 
   // -------- Backbone fetch --------
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = input.value.trim(); if (!name) return;
-    status.textContent = "Fetching…"; out.textContent = "{}"; llmOut.textContent = ""; peOut.textContent = ""; revOut.textContent = ""; llmStatus.textContent = ""; peStatus.textContent = ""; revStatus.textContent = ""; runBtn.disabled = true; runPEBtn.disabled = true; runREVBtn.disabled = true;
+    status.textContent = "Fetching…"; out.textContent = "{}"; llmOut.textContent = ""; peOut.textContent = ""; revOut.textContent = ""; llmStatus.textContent = ""; peStatus.textContent = ""; revStatus.textContent = ""; runBtn.disabled = true; runPEBtn.disabled = true; runREVBtn.disabled = true; fragOut.textContent = ""; fragStatus.textContent = ""; runFRAGBtn.disabled = true;
 
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 20000);
@@ -308,6 +422,31 @@
       clearTimeout(t);
     }
   });
+
+  // -------- Fragility button --------
+  runFRAGBtn.addEventListener('click', async () => {
+    if (!companyJson) return;
+    const prompt = buildFragilityPrompt(companyJson);
+    fragPromptBox.value = prompt;
+
+    fragOut.textContent = '';
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
+    const interval = startTimer(fragStatus, 'Running Fragility LLM');
+
+    try {
+        const data = await postPrompt(prompt, ctl.signal);
+        const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
+        fragOut.textContent = text;
+        stopTimer(interval, fragStatus, 'Fragility LLM complete.');
+    } catch (err) {
+        fragOut.textContent = pretty({ error: err?.message || 'Fragility LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
+        stopTimer(interval, fragStatus, 'Fragility LLM failed.');
+    } finally {
+        clearTimeout(t);
+    }
+    });
+
 
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") form.requestSubmit(); });
 })();
