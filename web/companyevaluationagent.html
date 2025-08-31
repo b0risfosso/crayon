@@ -357,35 +357,29 @@ function enableLLM(companyJson) {
   // All-in-one click handler
 runAllBtn.addEventListener('click', async () => {
   if (!companyJson) return;
-
-  // Prepare prompts (and ensure textareas are populated)
-  const moatPrompt = buildMoatPrompt(companyJson);
-
-  const pePrompt = buildPEPrompt(companyJson);
-
-  const revPrompt = buildRevenuePrompt(companyJson);
-
-  const fragPrompt = buildFragilityPrompt(companyJson);
-
-  // High-level status + disable button
-  allStatus.textContent = "Running all analyses…";
+  allStatus.textContent = "Running all analyses in parallel…";
   runAllBtn.disabled = true;
 
-  try {
-    // Sequential runs — clearer UX + friendlier to rate limits
-    await runOne({ label: 'Moat Score™', prompt: moatPrompt, statusEl: llmStatus, outEl: llmOut });
-    await runOne({ label: 'Performance Pulse™ – Valuation', prompt: pePrompt, statusEl: peStatus, outEl: peOut });
-    await runOne({ label: 'Performance Pulse™ – Revenue', prompt: revPrompt, statusEl: revStatus, outEl: revOut });
-    await runOne({ label: 'Fragility Rating™', prompt: fragPrompt, statusEl: fragStatus, outEl: fragOut });
+  // Build prompts once
+  const moatPrompt = buildMoatPrompt(companyJson);
+  const pePrompt   = buildPEPrompt(companyJson);
+  const revPrompt  = buildRevenuePrompt(companyJson);
+  const fragPrompt = buildFragilityPrompt(companyJson);
 
-    allStatus.textContent = "All analyses complete.";
-  } catch (e) {
-    // Should be rare, as runOne handles its own errors
-    allStatus.textContent = "Finished with errors.";
-  } finally {
-    runAllBtn.disabled = false;
-  }
+  // Kick them off simultaneously
+  const tasks = [
+    runOne({ label: 'Moat Score™',                    prompt: moatPrompt, statusEl: llmStatus,  outEl: llmOut }),
+    runOne({ label: 'Performance Pulse™ – Valuation', prompt: pePrompt,   statusEl: peStatus,   outEl: peOut }),
+    runOne({ label: 'Performance Pulse™ – Revenue',   prompt: revPrompt,  statusEl: revStatus,  outEl: revOut }),
+    runOne({ label: 'Fragility Rating™',              prompt: fragPrompt, statusEl: fragStatus, outEl: fragOut }),
+  ];
+
+  const results = await Promise.allSettled(tasks);
+  const anyRejected = results.some(r => r.status === 'rejected');
+  allStatus.textContent = anyRejected ? "Finished with errors." : "All analyses complete.";
+  runAllBtn.disabled = false;
 });
+
 
 
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") form.requestSubmit(); });
