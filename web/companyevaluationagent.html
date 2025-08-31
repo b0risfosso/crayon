@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Backbone Lookup + LLMs (Moat • P/E • TTM Revenue)</title>
+<title>Company Evaluation Agent</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
@@ -220,7 +220,7 @@
     llmOut.textContent = '';
 
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 180000); // 3 minutes
+    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
 
     try {
       const data = await postPrompt(prompt, ctl.signal);
@@ -244,7 +244,7 @@
     peOut.textContent = '';
 
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 180000); // 3 minutes
+    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
 
     try {
       const data = await postPrompt(prompt, ctl.signal);
@@ -268,7 +268,7 @@
     revOut.textContent = '';
 
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 180000); // 3 minutes
+    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
 
     try {
       const data = await postPrompt(prompt, ctl.signal);
