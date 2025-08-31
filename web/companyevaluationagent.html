@@ -45,12 +45,6 @@
       <div id="llmStatus"></div>
       <pre id="llmOut"><!-- LLM JSON will appear here --></pre>
     </div>
-    <div>
-      <details>
-        <summary>Show generated Moat Score™ prompt (copy/paste for Python)</summary>
-        <textarea id="promptBox" readonly></textarea>
-      </details>
-    </div>
   </div>
   
   <hr style="margin:1.25rem 0" />
@@ -61,10 +55,6 @@
     <!-- (removed per-tool button) -->
     <div id="peStatus"></div>
     <pre id="peOut"><!-- P/E JSON will appear here --></pre>
-    <details>
-      <summary>Show generated Performance Pulse™ – Valuation prompt</summary>
-      <textarea id="pePromptBox" readonly></textarea>
-    </details>
   </div>
   
   <!-- Revenue block (stacked below) -->
@@ -72,10 +62,6 @@
     <!-- (removed per-tool button) -->
     <div id="revStatus"></div>
     <pre id="revOut"><!-- Revenue JSON will appear here --></pre>
-    <details>
-      <summary>Show generated Performance Pulse™ – Revenue prompt</summary>
-      <textarea id="revPromptBox" readonly></textarea>
-    </details>
   </div>
   
   <hr style="margin:1.25rem 0" />
@@ -86,12 +72,6 @@
       <div id="fragStatus"></div>
       <pre id="fragOut"><!-- Fragility JSON will appear here --></pre>
     </div>
-    <div>
-      <details>
-        <summary>Show generated Fragility Rating™ prompt (copy/paste for Python)</summary>
-        <textarea id="fragPromptBox" readonly></textarea>
-      </details>
-    </div>
   </div>
   
 
@@ -100,10 +80,10 @@
   const $ = s => document.querySelector(s);
   const form = $("#f"), input = $("#q"), out = $("#out"), status = $("#status");
   const runAllBtn = $("#runALL"), allStatus = $("#allStatus");
-  // const runBtn = $("#runLLM"), llmOut = $("#llmOut"), llmStatus = $("#llmStatus"), promptBox = $("#promptBox");
-  // const runPEBtn = $("#runPE"), peOut = $("#peOut"), peStatus = $("#peStatus"), pePromptBox = $("#pePromptBox");
-  // const runREVBtn = $("#runREV"), revOut = $("#revOut"), revStatus = $("#revStatus"), revPromptBox = $("#revPromptBox");
-  // const runFRAGBtn = $("#runFRAG"), fragOut = $("#fragOut"), fragStatus = $("#fragStatus"), fragPromptBox = $("#fragPromptBox");
+  const llmOut = $("#llmOut"), llmStatus = $("#llmStatus")
+  const peOut = $("#peOut"), peStatus = $("#peStatus")
+  const revOut = $("#revOut"), revStatus = $("#revStatus")
+  const fragOut = $("#fragOut"), fragStatus = $("#fragStatus")
 
 
   const api = (path, params) => {
@@ -333,16 +313,12 @@ Return only the JSON.`;
 function enableLLM(companyJson) {
   // Build & show prompts in their textareas (for copy/paste)
   const moatPrompt = buildMoatPrompt(companyJson);
-  promptBox.value = moatPrompt;
 
   const pePrompt = buildPEPrompt(companyJson);
-  pePromptBox.value = pePrompt;
 
   const revPrompt = buildRevenuePrompt(companyJson);
-  revPromptBox.value = revPrompt;
 
   const fragPrompt = buildFragilityPrompt(companyJson);
-  fragPromptBox.value = fragPrompt;
 
   runAllBtn.disabled = false;
 }
@@ -351,7 +327,14 @@ function enableLLM(companyJson) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = input.value.trim(); if (!name) return;
-    status.textContent = "Fetching…"; out.textContent = "{}"; llmOut.textContent = ""; peOut.textContent = ""; revOut.textContent = ""; llmStatus.textContent = ""; peStatus.textContent = ""; revStatus.textContent = ""; runBtn.disabled = true; runPEBtn.disabled = true; runREVBtn.disabled = true; fragOut.textContent = ""; fragStatus.textContent = ""; runFRAGBtn.disabled = true;
+    
+    status.textContent = "Fetching…";
+    out.textContent = "{}";
+    llmOut.textContent = ""; peOut.textContent = ""; revOut.textContent = ""; fragOut.textContent = "";
+    llmStatus.textContent = ""; peStatus.textContent = ""; revStatus.textContent = ""; fragStatus.textContent = "";
+    allStatus.textContent = "";
+    runAllBtn.disabled = true;
+
 
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 20000);
@@ -377,16 +360,12 @@ runAllBtn.addEventListener('click', async () => {
 
   // Prepare prompts (and ensure textareas are populated)
   const moatPrompt = buildMoatPrompt(companyJson);
-  promptBox.value = moatPrompt;
 
   const pePrompt = buildPEPrompt(companyJson);
-  pePromptBox.value = pePrompt;
 
   const revPrompt = buildRevenuePrompt(companyJson);
-  revPromptBox.value = revPrompt;
 
   const fragPrompt = buildFragilityPrompt(companyJson);
-  fragPromptBox.value = fragPrompt;
 
   // High-level status + disable button
   allStatus.textContent = "Running all analyses…";
