@@ -107,6 +107,26 @@
     }
   }
 
+  // Timer utility: shows "Thinking… <secs>s" and updates every second
+    function makeTimer(el, label = 'Thinking/Searching'){
+    let startTs = 0, id = null;
+    const fmt = (s)=> `${label}… ${s}s`;
+    return {
+        start(){
+        startTs = Date.now();
+        el.textContent = fmt(0);
+        id = setInterval(()=>{
+            const secs = Math.floor((Date.now()-startTs)/1000);
+            el.textContent = fmt(secs);
+        }, 1000);
+        },
+        stop(doneText){
+        if (id) clearInterval(id);
+        if (doneText) el.textContent = doneText;
+        }
+    };
+    }
+
   // Helper to POST prompts to backend (tries both API paths)
   async function postPrompt(prompt, signal){
     const endpoints = ['/api/moat_evaluation','/moat_evaluation'];
@@ -216,8 +236,10 @@
     if (!companyJson) return;
     const prompt = buildMoatPrompt(companyJson);
 
-    llmStatus.textContent = 'Running LLM…';
+    const llmTimer = makeTimer(llmStatus, 'Thinking/Searching');
     llmOut.textContent = '';
+    llmTimer.start();
+
 
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
@@ -226,10 +248,10 @@
       const data = await postPrompt(prompt, ctl.signal);
       const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
       llmOut.textContent = text;
-      llmStatus.textContent = 'LLM complete.';
+      llmTimer.stop('Done.');
     } catch (err) {
       llmOut.textContent = pretty({ error: err?.message || 'LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-      llmStatus.textContent = 'LLM failed.';
+      llmTimer.stop('Failed.');
     } finally {
       clearTimeout(t);
     }
@@ -240,8 +262,10 @@
     if (!companyJson) return;
     const prompt = buildPEPrompt(companyJson);
 
-    peStatus.textContent = 'Running P/E LLM…';
+    const peTimer = makeTimer(peStatus, 'Thinking/Searching');
     peOut.textContent = '';
+    peTimer.start();
+
 
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
@@ -250,10 +274,10 @@
       const data = await postPrompt(prompt, ctl.signal);
       const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
       peOut.textContent = text;
-      peStatus.textContent = 'P/E LLM complete.';
+      peTimer.stop('Done.');
     } catch (err) {
       peOut.textContent = pretty({ error: err?.message || 'P/E LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-      peStatus.textContent = 'P/E LLM failed.';
+      peTimer.stop('Failed.');
     } finally {
       clearTimeout(t);
     }
@@ -264,8 +288,10 @@
     if (!companyJson) return;
     const prompt = buildRevenuePrompt(companyJson);
 
-    revStatus.textContent = 'Running Revenue LLM…';
+    const revTimer = makeTimer(revStatus, 'Thinking/Searching');
     revOut.textContent = '';
+    revTimer.start();
+
 
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
@@ -274,10 +300,10 @@
       const data = await postPrompt(prompt, ctl.signal);
       const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
       revOut.textContent = text;
-      revStatus.textContent = 'Revenue LLM complete.';
+      revTimer.stop('Done.');
     } catch (err) {
       revOut.textContent = pretty({ error: err?.message || 'Revenue LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-      revStatus.textContent = 'Revenue LLM failed.';
+      revTimer.stop('Failed.');
     } finally {
       clearTimeout(t);
     }
