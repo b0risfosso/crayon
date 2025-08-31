@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Backbone Lookup + Moat LLM</title>
+<title>Backbone Lookup + LLMs (Moat & P/E)</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
@@ -12,7 +12,7 @@
   input[type="text"] { padding: .6rem .7rem; min-width: 18rem; border: 1px solid #ccc; border-radius: .5rem; }
   button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
   button[disabled] { opacity: .6; cursor: not-allowed; }
-  #status, #llmStatus { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; opacity: .85; }
+  #status, #llmStatus, #peStatus { font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; opacity: .85; }
   pre, textarea { margin-top: .75rem; padding: .75rem; background: rgba(0,0,0,.05); border-radius: .5rem; overflow: auto; width: 100%; }
   textarea { min-height: 200px; }
   .row { display: grid; grid-template-columns: 1fr; gap: 1rem; }
@@ -24,7 +24,7 @@
   <h1>Backbone Lookup</h1>
 
   <form id="f">
-    <input id="q" type="text" placeholder="e.g., Apple, Meta, Spotify" required autofocus />
+    <input id="q" type="text" placeholder="e.g., Apple, Salesforce, Spotify" required autofocus />
     <button type="submit">Fetch Backbone</button>
   </form>
 
@@ -41,8 +41,24 @@
     </div>
     <div>
       <details>
-        <summary>Show generated prompt (copy/paste for Python)</summary>
+        <summary>Show generated Moat prompt (copy/paste for Python)</summary>
         <textarea id="promptBox" readonly></textarea>
+      </details>
+    </div>
+  </div>
+
+  <hr style="margin:1.25rem 0" />
+  <h1>P/E LLM</h1>
+  <div class="row">
+    <div>
+      <button id="runPE" disabled>Run P/E LLM</button>
+      <div id="peStatus"></div>
+      <pre id="peOut"><!-- P/E JSON will appear here --></pre>
+    </div>
+    <div>
+      <details>
+        <summary>Show generated P/E prompt (copy/paste for Python)</summary>
+        <textarea id="pePromptBox" readonly></textarea>
       </details>
     </div>
   </div>
@@ -52,6 +68,7 @@
   const $ = s => document.querySelector(s);
   const form = $("#f"), input = $("#q"), out = $("#out"), status = $("#status");
   const runBtn = $("#runLLM"), llmOut = $("#llmOut"), llmStatus = $("#llmStatus"), promptBox = $("#promptBox");
+  const runPEBtn = $("#runPE"), peOut = $("#peOut"), peStatus = $("#peStatus"), pePromptBox = $("#pePromptBox");
 
   const api = (path, params) => {
     const u = new URL(path, window.location.origin);
@@ -73,128 +90,78 @@
     }
   }
 
+  // Helper to POST prompts to backend (tries both API paths)
+  async function postPrompt(prompt, signal){
+    const endpoints = ['/api/moat_evaluation','/moat_evaluation'];
+    let lastErr = null;
+    for (const ep of endpoints){
+      try { return await fetchJson(ep, { method: 'POST', signal, body: JSON.stringify({ prompt }) }); }
+      catch (e){ lastErr = e; }
+    }
+    throw lastErr || new Error('No LLM endpoint reachable');
+  }
+
   let companyJson = null;
 
-  function buildPrompt(companyJson) {
+  // -------- Moat prompt (dynamic scope) --------
+  function buildMoatPrompt(companyJson) {
     const bb = companyJson?.backbone || {};
     const name = bb.canonical_name || companyJson?.query || "<unknown>";
     const aliases = Array.isArray(bb.aliases) ? bb.aliases : [];
     const domain = bb.domain || "";
 
-    // Decide scope text dynamically (avoid hard-coding Slack)
     let scopeLine = `Task: Produce a Moat Score for the company referenced in the JSON (focus on ${name}).`;
-    // Special case: Slack (product) living inside Salesforce (parent)
     const looksLikeSlack = /slack/i.test(domain) || aliases.some(a => /slack/i.test(a));
     const looksLikeSalesforce = /salesforce/i.test(name);
     if (looksLikeSlack && looksLikeSalesforce) {
       scopeLine = `Task: Produce a Moat Score focusing on the Slack product/business within Salesforce (CRM). Where appropriate, distinguish Slack-specific vs. Salesforce corporate-level dynamics.`;
     }
 
-    const prompt = `
-You are an equity research assistant. Use web search to verify all claims and provide citations.
-Company input (JSON):
-${pretty(companyJson)}
-
-${scopeLine}
-Score nine criteria (0–10 each), with 1–3 sentences of rationale per criterion and reputable citations (\"receipts\"). Then provide a short synthesis explaining the overall moat.
-
-Scoring criteria (each 0–10):
-1) Market leadership & sustainable share
-2) Network effects & switching costs
-3) Valuable IP & patents
-4) Brand strength & customer loyalty
-5) Durable cost advantages (scale, proprietary tech)
-6) Regulatory barriers & exclusive licenses
-7) Distribution network (direct, partners, enterprise channel)
-8) Pricing power (sustained ability to raise price/mix)
-9) Consistent, impactful innovation & R&D
-
-Output format (JSON only):
-{
-  \"moat_score\": <0-100 integer, average of the 9 criteria × 10, round to nearest whole>,
-  \"criteria\": [
-    {
-      \"name\": \"Market leadership & sustainable share\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\", \"<source 2>\"]
-    },
-    {
-      \"name\": \"Network effects & switching costs\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\", \"<source 2>\"]
-    },
-    {
-      \"name\": \"Valuable IP & patents\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\"]
-    },
-    {
-      \"name\": \"Brand strength & customer loyalty\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\"]
-    },
-    {
-      \"name\": \"Durable cost advantages\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\"]
-    },
-    {
-      \"name\": \"Regulatory barriers & exclusive licenses\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\"]
-    },
-    {
-      \"name\": \"Distribution network\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\"]
-    },
-    {
-      \"name\": \"Pricing power\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\"]
-    },
-    {
-      \"name\": \"Innovation & R&D\",
-      \"score\": <0-10>,
-      \"rationale\": \"<concise reasoning>\",
-      \"citations\": [\"<source 1>\"]
-    }
-  ],
-  \"summary\": \"<3–5 sentence synthesis tying together defensibility, key risks, and watch items>\",
-  \"notes\": {
-    \"what_is_scope\": \"${looksLikeSlack && looksLikeSalesforce ? 'Slack within Salesforce' : name}\",
-    \"data_as_of\": \"<today’s date in YYYY-MM-DD>\",
-    \"method\": \"Each criterion scored 0–10 using public sources; average × 10 → Moat Score.\"
+    const prompt = `\nYou are an equity research assistant. Use web search to verify all claims and provide citations.\nCompany input (JSON):\n${pretty(companyJson)}\n\n${scopeLine}\nScore nine criteria (0–10 each), with 1–3 sentences of rationale per criterion and reputable citations (\"receipts\"). Then provide a short synthesis explaining the overall moat.\n\nScoring criteria (each 0–10):\n1) Market leadership & sustainable share\n2) Network effects & switching costs\n3) Valuable IP & patents\n4) Brand strength & customer loyalty\n5) Durable cost advantages (scale, proprietary tech)\n6) Regulatory barriers & exclusive licenses\n7) Distribution network (direct, partners, enterprise channel)\n8) Pricing power (sustained ability to raise price/mix)\n9) Consistent, impactful innovation & R&D\n\nOutput format (JSON only):\n{\n  \"moat_score\": <0-100 integer, average of the 9 criteria × 10, round to nearest whole>,\n  \"criteria\": [ ... ],\n  \"summary\": \"<3–5 sentence synthesis>\",\n  \"notes\": {\n    \"what_is_scope\": \"${looksLikeSlack && looksLikeSalesforce ? 'Slack within Salesforce' : name}\",\n    \"data_as_of\": \"<today’s date in YYYY-MM-DD>\",\n    \"method\": \"Each criterion scored 0–10 using public sources; average × 10 → Moat Score.\"\n  }\n}\n\nInstructions & constraints:\n- Treat the JSON as the resolved identity.\n- ALWAYS use web_search to confirm market share, DAU/MAU, retention, pricing, competition, distribution/partners, and regulatory issues.\n- Prefer primary/authoritative sources (investor materials, regulatory docs, Gartner/IDC/Forrester, WSJ/FT/Bloomberg).\n- Provide ≥1 citation per criterion (≥2 for market share & network effects).\n- Keep each rationale crisp (≤60 words). Avoid marketing language. Do not output anything except the JSON block.`;
+    return prompt;
   }
-}
 
-Instructions & constraints:
-- Treat the JSON as the resolved identity.
-- ALWAYS use web_search to confirm market share, DAU/MAU, retention, pricing, competition, distribution/partners, and regulatory issues.
-- Prefer primary/authoritative sources (investor materials, regulatory docs, Gartner/IDC/Forrester, WSJ/FT/Bloomberg).
-- Provide ≥1 citation per criterion (≥2 for market share & network effects).
-- Keep each rationale crisp (≤60 words). Avoid marketing language. Do not output anything except the JSON block.`;
+  // -------- P/E prompt (exact structure you supplied) --------
+  function pickTicker(bb){
+    const arr = Array.isArray(bb?.tickers) ? bb.tickers : [];
+    if (arr.length && arr[0]?.symbol) return arr[0].symbol.toUpperCase();
+    return null;
+  }
+
+  function buildPEPrompt(companyJson){
+    const bb = companyJson?.backbone || {};
+    const ticker = pickTicker(bb);
+    const isSlackInsideSalesforce = (/slack/i.test(bb?.domain||"") || (bb?.aliases||[]).some(a=>/slack/i.test(a))) && /salesforce/i.test(bb?.canonical_name||"");
+    const parentTicker = isSlackInsideSalesforce ? 'CRM' : (ticker || 'N/A');
+
+    const skeleton = {
+      query: companyJson.query,
+      backbone: bb
+    };
+
+    const pyLikeJSON = pretty(skeleton); // embed resolved company JSON
+
+    const prompt = `\nYou are a capital-markets analyst. Use web search to retrieve fresh figures and cite your sources.\n\nCompany input (JSON):\n${pyLikeJSON}\n\nTask: Return **Price/Earnings (P/E) ratios** for the *public parent issuer* that owns the company in scope. If applicable, use the parent's ticker. Detected ticker for this request: **${parentTicker}**. Report:\n- PE 2 Years Ago (trailing P/E as of the closest quarter-end two years prior to today)\n- PE 1 Year Ago (trailing P/E as of the closest quarter-end one year prior to today)\n- Trailing P/E (Current) (TTM, GAAP if available)\n- Forward P/E (Next Year) (Price ÷ FY+1 EPS consensus)\n- 2-Year Forward P/E (Price ÷ FY+2 EPS consensus)\n\n**Requirements**\n1) **Identity**: If the input company is a product/brand inside a public parent, compute on the parent's ticker. If the entity is private, return fields as \"N/A\" with an explanation.\n2) **Sources**: Prefer authoritative sources: Macrotrends (historical P/E), Yahoo Finance or Nasdaq (forward EPS consensus & TTM P/E), company filings, or major financial press. Provide **direct URLs**.\n3) **Method**:\n   - Use the **latest real-time price** from the same source you use for TTM P/E (or Yahoo) and state the **timestamp**.\n   - For “PE 1Y/2Y Ago,” anchor to the **nearest quarter-end dates** and pull/derive the **TTM P/E** for those anchors.\n   - For Forward P/Es, compute using **the same current price** divided by **FY+1 / FY+2** EPS consensus. Show the EPS you used.\n   - If multiple sources disagree, choose the **most reputable** and note any range briefly.\n\n**Output format (JSON only)**:\n{\n  \"ticker\": \"${parentTicker}\",\n  \"as_of\": \"<YYYY-MM-DD HH:MM TZ>\",\n  \"price_used\": {\n    \"value\": <float>,\n    \"source\": \"<url>\"\n  },\n  \"pes\": {\n    \"pe_2_years_ago\": {\n      \"value\": <float or \"N/A\">,\n      \"anchor_date\": \"<YYYY-MM-DD>\",\n      \"source\": \"<url>\"\n    },\n    \"pe_1_year_ago\": {\n      \"value\": <float or \"N/A\">,\n      \"anchor_date\": \"<YYYY-MM-DD>\",\n      \"source\": \"<url>\"\n    },\n    \"trailing_pe_current\": {\n      \"value\": <float or \"N/A\">,\n      \"ttm_eps_basis\": \"GAAP|Non-GAAP|Unspecified\",\n      \"source\": \"<url>\"\n    },\n    \"forward_pe_next_year\": {\n      \"value\": <float or \"N/A\">,\n      \"eps_fy_plus_1\": <float or \"N/A\">,\n      \"source\": \"<url>\"\n    },\n    \"two_year_forward_pe\": {\n      \"value\": <float or \"N/A\">,\n      \"eps_fy_plus_2\": <float or \"N/A\">,\n      \"source\": \"<url>\"\n    }\n  },\n  \"notes\": {\n    \"identity_resolution\": \"${isSlackInsideSalesforce ? 'Slack is a product of Salesforce; P/E computed on CRM.' : 'Computed on resolved public parent if available; otherwise N/A.'}\",\n    \"calculation_details\": \"Forward P/E = current price / EPS consensus; historical P/Es anchored to nearest quarter-end.\",\n    \"caveats\": \"Figures move with price and estimate revisions; sources may differ slightly.\"\n  }\n}\n\nConstraints:\n- Output **only** the JSON block.\n- Do not include commentary outside JSON.`;
+
     return prompt;
   }
 
   function enableLLM(companyJson) {
-    const prompt = buildPrompt(companyJson);
-    promptBox.value = prompt;
+    // Build both prompts and enable both buttons
+    const moatPrompt = buildMoatPrompt(companyJson);
+    promptBox.value = moatPrompt;
     runBtn.disabled = false;
+
+    const pePrompt = buildPEPrompt(companyJson);
+    pePromptBox.value = pePrompt;
+    runPEBtn.disabled = false;
   }
 
+  // -------- Backbone fetch --------
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = input.value.trim(); if (!name) return;
-    status.textContent = "Fetching…"; out.textContent = "{}"; llmOut.textContent = ""; llmStatus.textContent = ""; runBtn.disabled = true;
+    status.textContent = "Fetching…"; out.textContent = "{}"; llmOut.textContent = ""; peOut.textContent = ""; llmStatus.textContent = ""; peStatus.textContent = ""; runBtn.disabled = true; runPEBtn.disabled = true;
 
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 20000);
@@ -214,36 +181,49 @@ Instructions & constraints:
     }
   });
 
+  // -------- Moat button --------
   runBtn.addEventListener('click', async () => {
     if (!companyJson) return;
-    const prompt = buildPrompt(companyJson);
+    const prompt = buildMoatPrompt(companyJson);
 
     llmStatus.textContent = 'Running LLM…';
     llmOut.textContent = '';
 
     const ctl = new AbortController();
-    // Increased timeout from 60s to 180s (3 minutes)
-    const t = setTimeout(() => ctl.abort(), 180000);
+    const t = setTimeout(() => ctl.abort(), 180000); // 3 minutes
 
     try {
-      async function postMoat(prompt){
-        const endpoints = ['/api/moat_evaluation','/moat_evaluation'];
-        let lastErr = null;
-        for (const ep of endpoints){
-          try {
-            return await fetchJson(ep, { method: 'POST', signal: ctl.signal, body: JSON.stringify({ prompt }) });
-          } catch (e){ lastErr = e; }
-        }
-        throw lastErr || new Error('No moat endpoint reachable');
-      }
-
-      const data = await postMoat(prompt);
+      const data = await postPrompt(prompt, ctl.signal);
       const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
       llmOut.textContent = text;
       llmStatus.textContent = 'LLM complete.';
     } catch (err) {
       llmOut.textContent = pretty({ error: err?.message || 'LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
       llmStatus.textContent = 'LLM failed.';
+    } finally {
+      clearTimeout(t);
+    }
+  });
+
+  // -------- P/E button --------
+  runPEBtn.addEventListener('click', async () => {
+    if (!companyJson) return;
+    const prompt = buildPEPrompt(companyJson);
+
+    peStatus.textContent = 'Running P/E LLM…';
+    peOut.textContent = '';
+
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 180000); // 3 minutes
+
+    try {
+      const data = await postPrompt(prompt, ctl.signal);
+      const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
+      peOut.textContent = text;
+      peStatus.textContent = 'P/E LLM complete.';
+    } catch (err) {
+      peOut.textContent = pretty({ error: err?.message || 'P/E LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
+      peStatus.textContent = 'P/E LLM failed.';
     } finally {
       clearTimeout(t);
     }
