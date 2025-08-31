@@ -31,69 +31,79 @@
   <div id="status"></div>
   <pre id="out">{}</pre>
 
+  <!-- Add this under the Backbone Lookup form -->
+<div style="margin:.75rem 0 1.25rem">
+    <button id="runALL" disabled>Run All Analyses</button>
+    <div id="allStatus" style="font-size:.9rem; margin-top:.4rem; opacity:.85; min-height:1.2em;"></div>
+  </div>
+  
   <hr style="margin:1.25rem 0" />
   <h1>Moat Score™</h1>
   <div class="row">
     <div>
-      <button id="runLLM" disabled>Run Moat LLM</button>
+      <!-- (removed per-tool button) -->
       <div id="llmStatus"></div>
       <pre id="llmOut"><!-- LLM JSON will appear here --></pre>
     </div>
     <div>
       <details>
-        <summary>Show generated Moat prompt (copy/paste for Python)</summary>
+        <summary>Show generated Moat Score™ prompt (copy/paste for Python)</summary>
         <textarea id="promptBox" readonly></textarea>
       </details>
     </div>
   </div>
-
+  
   <hr style="margin:1.25rem 0" />
-    <h1>Performance Pulse™</h1>
-    <div class="row">
-    <div>
-        <button id="runPE" disabled>Run Performance Pulse™ – Valuation</button>
-        <div id="peStatus"></div>
-        <pre id="peOut"><!-- P/E JSON will appear here --></pre>
-        <details>
-        <summary>Show generated Performance Pulse™ – Valuation prompt</summary>
-        <textarea id="pePromptBox" readonly></textarea>
-        </details>
-    </div>
-    <div>
-        <button id="runREV" disabled>Run Performance Pulse™ – Revenue</button>
-        <div id="revStatus"></div>
-        <pre id="revOut"><!-- Revenue JSON will appear here --></pre>
-        <details>
-        <summary>Show generated Performance Pulse™ – Revenue prompt</summary>
-        <textarea id="revPromptBox" readonly></textarea>
-        </details>
-    </div>
-    </div>
-
+  <h1>Performance Pulse™</h1>
+  
+  <!-- Valuation block (stacked vertically) -->
+  <div>
+    <!-- (removed per-tool button) -->
+    <div id="peStatus"></div>
+    <pre id="peOut"><!-- P/E JSON will appear here --></pre>
+    <details>
+      <summary>Show generated Performance Pulse™ – Valuation prompt</summary>
+      <textarea id="pePromptBox" readonly></textarea>
+    </details>
+  </div>
+  
+  <!-- Revenue block (stacked below) -->
+  <div style="margin-top:1.5rem">
+    <!-- (removed per-tool button) -->
+    <div id="revStatus"></div>
+    <pre id="revOut"><!-- Revenue JSON will appear here --></pre>
+    <details>
+      <summary>Show generated Performance Pulse™ – Revenue prompt</summary>
+      <textarea id="revPromptBox" readonly></textarea>
+    </details>
+  </div>
+  
   <hr style="margin:1.25rem 0" />
-    <h1>Fragility Rating™</h1>
-    <div class="row">
+  <h1>Fragility Rating™</h1>
+  <div class="row">
     <div>
-        <button id="runFRAG" disabled>Run Fragility LLM</button>
-        <div id="fragStatus"></div>
-        <pre id="fragOut"><!-- Fragility JSON will appear here --></pre>
+      <!-- (removed per-tool button) -->
+      <div id="fragStatus"></div>
+      <pre id="fragOut"><!-- Fragility JSON will appear here --></pre>
     </div>
     <div>
-        <details>
-        <summary>Show generated Fragility prompt (copy/paste for Python)</summary>
+      <details>
+        <summary>Show generated Fragility Rating™ prompt (copy/paste for Python)</summary>
         <textarea id="fragPromptBox" readonly></textarea>
-        </details>
+      </details>
     </div>
-    </div>
+  </div>
+  
 
 <script>
 (() => {
   const $ = s => document.querySelector(s);
   const form = $("#f"), input = $("#q"), out = $("#out"), status = $("#status");
-  const runBtn = $("#runLLM"), llmOut = $("#llmOut"), llmStatus = $("#llmStatus"), promptBox = $("#promptBox");
-  const runPEBtn = $("#runPE"), peOut = $("#peOut"), peStatus = $("#peStatus"), pePromptBox = $("#pePromptBox");
-  const runREVBtn = $("#runREV"), revOut = $("#revOut"), revStatus = $("#revStatus"), revPromptBox = $("#revPromptBox");
-  const runFRAGBtn = $("#runFRAG"), fragOut = $("#fragOut"), fragStatus = $("#fragStatus"), fragPromptBox = $("#fragPromptBox");
+  const runAllBtn = $("#runALL"), allStatus = $("#allStatus");
+  // const runBtn = $("#runLLM"), llmOut = $("#llmOut"), llmStatus = $("#llmStatus"), promptBox = $("#promptBox");
+  // const runPEBtn = $("#runPE"), peOut = $("#peOut"), peStatus = $("#peStatus"), pePromptBox = $("#pePromptBox");
+  // const runREVBtn = $("#runREV"), revOut = $("#revOut"), revStatus = $("#revStatus"), revPromptBox = $("#revPromptBox");
+  // const runFRAGBtn = $("#runFRAG"), fragOut = $("#fragOut"), fragStatus = $("#fragStatus"), fragPromptBox = $("#fragPromptBox");
 
 
   const api = (path, params) => {
@@ -102,6 +112,33 @@
     return u.toString();
   };
   const pretty = obj => JSON.stringify(obj, null, 2);
+
+  // Small helper: run one LLM call with timer + timeout
+async function runOne({label, prompt, statusEl, outEl}) {
+  const timer = makeTimer(statusEl, label);
+  outEl.textContent = '';
+  timer.start();
+
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
+
+  try {
+    const data = await postPrompt(prompt, ctl.signal);
+    const text = typeof data?.output_text === 'string'
+      ? data.output_text
+      : (data.raw || JSON.stringify(data));
+    outEl.textContent = text;
+    timer.stop('Done.');
+  } catch (err) {
+    outEl.textContent = pretty({
+      error: err?.message || `${label} failed`,
+      detail: err?.data?.detail ?? err?.raw ?? null
+    });
+    timer.stop('Failed.');
+  } finally {
+    clearTimeout(t);
+  }
+}
 
   async function fetchJson(url, {signal, method = 'GET', body} = {}) {
     const res = await fetch(url, { credentials: "include", signal, method, headers: { 'Content-Type': 'application/json' }, body });
@@ -293,24 +330,22 @@ Return only the JSON.`;
 }
 
 
-  function enableLLM(companyJson) {
-    // Build all prompts and enable all buttons
-    const moatPrompt = buildMoatPrompt(companyJson);
-    promptBox.value = moatPrompt;
-    runBtn.disabled = false;
+function enableLLM(companyJson) {
+  // Build & show prompts in their textareas (for copy/paste)
+  const moatPrompt = buildMoatPrompt(companyJson);
+  promptBox.value = moatPrompt;
 
-    const pePrompt = buildPEPrompt(companyJson);
-    pePromptBox.value = pePrompt;
-    runPEBtn.disabled = false;
+  const pePrompt = buildPEPrompt(companyJson);
+  pePromptBox.value = pePrompt;
 
-    const revPrompt = buildRevenuePrompt(companyJson);
-    revPromptBox.value = revPrompt;
-    runREVBtn.disabled = false;
+  const revPrompt = buildRevenuePrompt(companyJson);
+  revPromptBox.value = revPrompt;
 
-    const fragPrompt = buildFragilityPrompt(companyJson);
-    fragPromptBox.value = fragPrompt;
-    runFRAGBtn.disabled = false;
-  }
+  const fragPrompt = buildFragilityPrompt(companyJson);
+  fragPromptBox.value = fragPrompt;
+
+  runAllBtn.disabled = false;
+}
 
   // -------- Backbone fetch --------
   form.addEventListener("submit", async (e) => {
@@ -336,108 +371,42 @@ Return only the JSON.`;
     }
   });
 
-  // -------- Moat button --------
-  runBtn.addEventListener('click', async () => {
-    if (!companyJson) return;
-    const prompt = buildMoatPrompt(companyJson);
+  // All-in-one click handler
+runAllBtn.addEventListener('click', async () => {
+  if (!companyJson) return;
 
-    const llmTimer = makeTimer(llmStatus, 'Thinking/Searching');
-    llmOut.textContent = '';
-    llmTimer.start();
+  // Prepare prompts (and ensure textareas are populated)
+  const moatPrompt = buildMoatPrompt(companyJson);
+  promptBox.value = moatPrompt;
 
+  const pePrompt = buildPEPrompt(companyJson);
+  pePromptBox.value = pePrompt;
 
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
+  const revPrompt = buildRevenuePrompt(companyJson);
+  revPromptBox.value = revPrompt;
 
-    try {
-      const data = await postPrompt(prompt, ctl.signal);
-      const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
-      llmOut.textContent = text;
-      llmTimer.stop('Done.');
-    } catch (err) {
-      llmOut.textContent = pretty({ error: err?.message || 'LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-      llmTimer.stop('Failed.');
-    } finally {
-      clearTimeout(t);
-    }
-  });
+  const fragPrompt = buildFragilityPrompt(companyJson);
+  fragPromptBox.value = fragPrompt;
 
-  // -------- P/E button --------
-  runPEBtn.addEventListener('click', async () => {
-    if (!companyJson) return;
-    const prompt = buildPEPrompt(companyJson);
+  // High-level status + disable button
+  allStatus.textContent = "Running all analyses…";
+  runAllBtn.disabled = true;
 
-    const peTimer = makeTimer(peStatus, 'Thinking/Searching');
-    peOut.textContent = '';
-    peTimer.start();
+  try {
+    // Sequential runs — clearer UX + friendlier to rate limits
+    await runOne({ label: 'Moat Score™', prompt: moatPrompt, statusEl: llmStatus, outEl: llmOut });
+    await runOne({ label: 'Performance Pulse™ – Valuation', prompt: pePrompt, statusEl: peStatus, outEl: peOut });
+    await runOne({ label: 'Performance Pulse™ – Revenue', prompt: revPrompt, statusEl: revStatus, outEl: revOut });
+    await runOne({ label: 'Fragility Rating™', prompt: fragPrompt, statusEl: fragStatus, outEl: fragOut });
 
-
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
-
-    try {
-      const data = await postPrompt(prompt, ctl.signal);
-      const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
-      peOut.textContent = text;
-      peTimer.stop('Done.');
-    } catch (err) {
-      peOut.textContent = pretty({ error: err?.message || 'P/E LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-      peTimer.stop('Failed.');
-    } finally {
-      clearTimeout(t);
-    }
-  });
-
-  // -------- TTM Revenue button --------
-  runREVBtn.addEventListener('click', async () => {
-    if (!companyJson) return;
-    const prompt = buildRevenuePrompt(companyJson);
-
-    const revTimer = makeTimer(revStatus, 'Thinking/Searching');
-    revOut.textContent = '';
-    revTimer.start();
-
-
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
-
-    try {
-      const data = await postPrompt(prompt, ctl.signal);
-      const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
-      revOut.textContent = text;
-      revTimer.stop('Done.');
-    } catch (err) {
-      revOut.textContent = pretty({ error: err?.message || 'Revenue LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-      revTimer.stop('Failed.');
-    } finally {
-      clearTimeout(t);
-    }
-  });
-
-  // -------- Fragility button --------
-  runFRAGBtn.addEventListener('click', async () => {
-    if (!companyJson) return;
-    const prompt = buildFragilityPrompt(companyJson);
-
-    const fragTimer = makeTimer(fragStatus, 'Thinking/Searching');
-    fragOut.textContent = '';
-    fragTimer.start();
-
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
-
-    try {
-        const data = await postPrompt(prompt, ctl.signal);
-        const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
-        fragOut.textContent = text;
-        fragTimer.stop('Done.');
-    } catch (err) {
-        fragOut.textContent = pretty({ error: err?.message || 'Fragility LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-        fragTimer.stop('Failed.');
-    } finally {
-        clearTimeout(t);
-    }
-    });
+    allStatus.textContent = "All analyses complete.";
+  } catch (e) {
+    // Should be rare, as runOne handles its own errors
+    allStatus.textContent = "Finished with errors.";
+  } finally {
+    runAllBtn.disabled = false;
+  }
+});
 
 
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") form.requestSubmit(); });
