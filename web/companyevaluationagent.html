@@ -21,7 +21,7 @@
 </style>
 </head>
 <body>
-  <h1>Backbone Lookup</h1>
+  <h1>Company Backbone Lookup</h1>
 
   <form id="f">
     <input id="q" type="text" placeholder="e.g., Apple, Salesforce, Spotify" required autofocus />
@@ -32,7 +32,7 @@
   <pre id="out">{}</pre>
 
   <hr style="margin:1.25rem 0" />
-  <h1>Moat LLM</h1>
+  <h1>Moat Score™</h1>
   <div class="row">
     <div>
       <button id="runLLM" disabled>Run Moat LLM</button>
@@ -48,39 +48,30 @@
   </div>
 
   <hr style="margin:1.25rem 0" />
-  <h1>P/E LLM</h1>
-  <div class="row">
+    <h1>Performance Pulse™</h1>
+    <div class="row">
     <div>
-      <button id="runPE" disabled>Run P/E LLM</button>
-      <div id="peStatus"></div>
-      <pre id="peOut"><!-- P/E JSON will appear here --></pre>
-    </div>
-    <div>
-      <details>
-        <summary>Show generated P/E prompt (copy/paste for Python)</summary>
+        <button id="runPE" disabled>Run Performance Pulse™ – Valuation</button>
+        <div id="peStatus"></div>
+        <pre id="peOut"><!-- P/E JSON will appear here --></pre>
+        <details>
+        <summary>Show generated Performance Pulse™ – Valuation prompt</summary>
         <textarea id="pePromptBox" readonly></textarea>
-      </details>
-    </div>
-  </div>
-
-  <hr style="margin:1.25rem 0" />
-  <h1>TTM Revenue LLM</h1>
-  <div class="row">
-    <div>
-      <button id="runREV" disabled>Run TTM Revenue LLM</button>
-      <div id="revStatus"></div>
-      <pre id="revOut"><!-- Revenue JSON will appear here --></pre>
+        </details>
     </div>
     <div>
-      <details>
-        <summary>Show generated Revenue prompt (copy/paste for Python)</summary>
+        <button id="runREV" disabled>Run Performance Pulse™ – Revenue</button>
+        <div id="revStatus"></div>
+        <pre id="revOut"><!-- Revenue JSON will appear here --></pre>
+        <details>
+        <summary>Show generated Performance Pulse™ – Revenue prompt</summary>
         <textarea id="revPromptBox" readonly></textarea>
-      </details>
+        </details>
     </div>
-  </div>
+    </div>
 
   <hr style="margin:1.25rem 0" />
-    <h1>Fragility LLM</h1>
+    <h1>Fragility Rating™</h1>
     <div class="row">
     <div>
         <button id="runFRAG" disabled>Run Fragility LLM</button>
