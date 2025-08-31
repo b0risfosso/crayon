@@ -427,21 +427,22 @@ Return only the JSON.`;
   runFRAGBtn.addEventListener('click', async () => {
     if (!companyJson) return;
     const prompt = buildFragilityPrompt(companyJson);
-    fragPromptBox.value = prompt;
 
+    const fragTimer = makeTimer(fragStatus, 'Thinking/Searching');
     fragOut.textContent = '';
+    fragTimer.start();
+
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
-    const interval = startTimer(fragStatus, 'Running Fragility LLM');
 
     try {
         const data = await postPrompt(prompt, ctl.signal);
         const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
         fragOut.textContent = text;
-        stopTimer(interval, fragStatus, 'Fragility LLM complete.');
+        fragTimer.stop('Done.');
     } catch (err) {
         fragOut.textContent = pretty({ error: err?.message || 'Fragility LLM request failed', detail: err?.data?.detail ?? err?.raw ?? null });
-        stopTimer(interval, fragStatus, 'Fragility LLM failed.');
+        fragTimer.stop('Failed.');
     } finally {
         clearTimeout(t);
     }
