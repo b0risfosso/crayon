@@ -14,7 +14,7 @@
       --bg:#0b1020;          /* deep slate */
       --card:#111834;        /* card bg */
       --muted:#94a3b8;       /* slate-400 */
-      --text:#e2e8f0;        /* slate-200 */
+      --text:#ffffff;        /* changed to white */
       --accent:#7dd3fc;      /* sky-300 */
       --accent-2:#38bdf8;    /* sky-400 */
       --ok:#34d399;          /* emerald */
@@ -31,41 +31,41 @@
     .brand{display:flex;align-items:center;gap:12px;color:var(--text);text-decoration:none}
     .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--ok));box-shadow:var(--shadow)}
     .brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
-    .cta{display:inline-block; padding:12px 18px; border-radius:999px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#00101a; text-decoration:none; font-weight:700; box-shadow:var(--shadow); transition:transform .08s ease, filter .2s ease}
+    .cta{display:inline-block; padding:12px 18px; border-radius:999px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#ffffff; text-decoration:none; font-weight:700; box-shadow:var(--shadow); transition:transform .08s ease, filter .2s ease}
     .cta:hover{transform:translateY(-1px)}
 
     .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;margin:40px 0 10px}
     @media (max-width:900px){.hero{grid-template-columns:1fr}}
     .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.005));border:1px solid rgba(148,163,184,.18); border-radius:var(--radius); padding:24px; color:var(--text); box-shadow:var(--shadow)}
-    h2{margin:0 0 10px;font-size:28px;line-height:1.2}
-    p.lead{color:#cbd5e1;margin:8px 0 18px;font-size:18px}
-    ul{margin:10px 0 0 20px;color:var(--muted)}
+    h2{margin:0 0 10px;font-size:28px;line-height:1.2;color:var(--text)}
+    p.lead{color:#f1f5f9;margin:8px 0 18px;font-size:18px}
+    ul{margin:10px 0 0 20px;color:var(--text)}
     li{margin:6px 0}
     .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
-    .kpis .mini{background:rgba(56,189,248,.08); border:1px solid rgba(56,189,248,.25); border-radius:12px; padding:14px}
-    .mini small{display:block;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+    .kpis .mini{background:rgba(56,189,248,.08); border:1px solid rgba(56,189,248,.25); border-radius:12px; padding:14px;color:var(--text)}
+    .mini small{display:block;color:#e2e8f0;text-transform:uppercase;letter-spacing:.12em}
     .mini strong{display:block;font-size:18px;color:var(--text)}
 
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:24px}
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
 
     .section{margin:38px 0}
-    .section h3{color:#dbeafe;margin:0 0 8px;font-size:20px}
+    .section h3{color:#ffffff;margin:0 0 8px;font-size:20px}
 
     .how{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
     @media (max-width:900px){.how{grid-template-columns:1fr 1fr}}
-    .step{background:rgba(255,255,255,.02);border:1px dashed rgba(148,163,184,.25);border-radius:14px;padding:16px}
-    .step b{display:inline-block;background:rgba(125,211,252,.16);border:1px solid rgba(125,211,252,.35); padding:2px 8px; border-radius:999px; font-size:12px; color:#e0f2fe; margin-bottom:6px}
+    .step{background:rgba(255,255,255,.02);border:1px dashed rgba(148,163,184,.25);border-radius:14px;padding:16px;color:var(--text)}
+    .step b{display:inline-block;background:rgba(125,211,252,.16);border:1px solid rgba(125,211,252,.35); padding:2px 8px; border-radius:999px; font-size:12px; color:#ffffff; margin-bottom:6px}
 
     .price{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-    .price .tag{font-weight:800;font-size:22px;color:#e0f2fe}
-    .price .hint{color:var(--muted)}
+    .price .tag{font-weight:800;font-size:22px;color:#ffffff}
+    .price .hint{color:#e2e8f0}
 
-    .faq details{background:rgba(255,255,255,.02);border:1px solid rgba(148,163,184,.2);border-radius:12px;padding:14px}
-    .faq summary{cursor:pointer;font-weight:600;color:#e2e8f0}
+    .faq details{background:rgba(255,255,255,.02);border:1px solid rgba(148,163,184,.2);border-radius:12px;padding:14px;color:var(--text)}
+    .faq summary{cursor:pointer;font-weight:600;color:#ffffff}
 
-    footer{margin:60px 0 20px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-    code.badge{font:12px ui-monospace, SFMono-Regular, Menlo, monospace; background:rgba(148,163,184,.15); color:#cbd5e1; padding:2px 6px; border-radius:7px}
+    footer{margin:60px 0 20px;color:#ffffff;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    code.badge{font:12px ui-monospace, SFMono-Regular, Menlo, monospace; background:rgba(148,163,184,.15); color:#ffffff; padding:2px 6px; border-radius:7px}
   </style>
   <script type="application/ld+json">
   {
@@ -132,7 +132,7 @@
     </section>
 
     <section class="section">
-      <h3 style="color:#dbeafe;margin-bottom:8px">How it works</h3>
+      <h3 style="color:#ffffff;margin-bottom:8px">How it works</h3>
       <div class="how">
         <div class="step"><b>1</b> Book a 30‑minute intro to align on scope.</div>
         <div class="step"><b>2</b> 2‑week audit: mapping + analysis.</div>
@@ -186,7 +186,7 @@
     </section>
 
     <footer>
-      <div>Boris Fosso • <a href="mailto:boris@example.com">bfosso@uchicago.edu</a></div>
+      <div>Boris Fosso • <a href="mailto:boris@fantasiagenesis.com">boris@fantasiagenesis.com</a></div>
       <div>
         <code class="badge">2‑week diagnostic</code>
         <code class="badge">Fixed‑fee</code>
