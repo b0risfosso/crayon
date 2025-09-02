@@ -1,10 +1,13 @@
 # app.py
+import os
 import sqlite3, time, datetime as dt
 from pathlib import Path
 from flask import Flask, request, jsonify, Response
 
-DB_PATH = Path(__file__).with_name("state.db")
+
+DB_PATH = Path(os.getenv("NARRATIVES_DB", Path(__file__).with_name("state.db")))
 app = Flask(__name__)
+
 
 # --- DB helpers ---
 def db():
