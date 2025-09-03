@@ -9,7 +9,7 @@ try:
 except Exception as e:
     requests = None
 
-CSV_FILE = os.environ.get("TICKERS_CSV", "/mnt/data/tickers_100.csv")
+CSV_FILE = os.environ.get("TICKERS_CSV", "/var/www/site/current/test_backbone_api/tickers_100.csv")
 BACKBONE_ENDPOINT = os.environ.get("BACKBONE_ENDPOINT", "http://localhost:5000/api/backbone")
 
 def normalize(s: str) -> str:
