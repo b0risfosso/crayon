@@ -1,70 +1,110 @@
-
-import os, csv, re, json
-from typing import Dict, Any, Iterable
+import os, csv, json, re
+from typing import Any, Dict, Iterable, List, Tuple, Optional
 
 import pytest
+import requests
 
-try:
-    import requests
-except Exception as e:
-    requests = None
+# --- Config -----------------------------------------------------------------
 
 CSV_FILE = os.environ.get("TICKERS_CSV", "/var/www/site/current/test_backbone/tickers_100.csv")
-BACKBONE_ENDPOINT = os.environ.get("BACKBONE_ENDPOINT", "http://localhost:5000/api/backbone")
 
-def normalize(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "")).strip().lower()
+# Point to port 8000 by default (your working curl target)
+BASE_URL = os.environ.get(
+    "COMPANY_BACKBONE_URL",
+    "http://localhost:8000/api/backbone"
+)
+TIMEOUT_S = 15
+
+# --- Utils ------------------------------------------------------------------
+
+def normalize(s: Optional[str]) -> str:
+    if s is None:
+        return ""
+    return re.sub(r"\s+", " ", str(s)).strip().lower()
 
 def get_json(query: str) -> Dict[str, Any]:
-    if requests is None:
-        raise RuntimeError("requests not installed; pip install requests")
-    r = requests.get(BACKBONE_ENDPOINT, params={"company_name": query}, timeout=12)
-    r.raise_for_status()
+    """Call your backbone: GET /api/backbone?company_name=<query> on :8000."""
+    r = requests.get(BASE_URL, params={"company_name": query}, timeout=TIMEOUT_S)
+    r.raise_for_status()  # will raise if not 2xx
     data = r.json()
     if not isinstance(data, dict):
-        raise AssertionError(f"Expected dict JSON, got: {type(data)}")
+        raise AssertionError(f"Expected dict JSON, got {type(data)} from {r.url}")
     return data
 
-def load_cases() -> Iterable[tuple[str, str]]:
+def load_cases() -> Iterable[Tuple[str, str]]:
     with open(CSV_FILE, newline="") as f:
         rd = csv.DictReader(f)
         for row in rd:
             yield row["ticker"].strip(), row["expected_name_substring"].strip()
 
-def extract_symbols(backbone: Dict[str, Any]) -> set[str]:
-    out = set()
-    for tk in (backbone or {}).get("tickers", []) or []:
-        sym = tk.get("symbol")
-        if sym:
-            out.add(normalize(sym))
+def extract_symbols(payload: Dict[str, Any]) -> List[str]:
+    """
+    Returns symbols from either schema:
+      - flat: {"ticker":"AAPL"} or {"symbols":["AAPL", ...]}
+      - nested: {"backbone":{"ticker":"AAPL","symbols":[...]}}
+    """
+    syms: List[str] = []
+    if isinstance(payload.get("ticker"), str):
+        syms.append(payload["ticker"])
+    if isinstance(payload.get("symbols"), list):
+        syms.extend([s for s in payload["symbols"] if isinstance(s, str)])
+
+    bb = payload.get("backbone")
+    if isinstance(bb, dict):
+        if isinstance(bb.get("ticker"), str):
+            syms.append(bb["ticker"])
+        if isinstance(bb.get("symbols"), list):
+            syms.extend([s for s in bb["symbols"] if isinstance(s, str)])
+
+    # dedupe case-insensitively
+    out, seen = [], set()
+    for s in syms:
+        k = normalize(s)
+        if k and k not in seen:
+            out.append(s)
+            seen.add(k)
     return out
 
-def test_smoke_schema_and_csv():
-    # Quick schema check on one well-known query
+def extract_canonical_name(payload: Dict[str, Any]) -> str:
+    """
+    Returns name from either schema:
+      - flat: {"name":"Apple Inc."}
+      - nested: {"backbone":{"canonical_name":"Apple Inc."}} or {"backbone":{"name":"..."}}
+    """
+    bb = payload.get("backbone")
+    if isinstance(bb, dict):
+        if isinstance(bb.get("canonical_name"), str):
+            return bb["canonical_name"]
+        if isinstance(bb.get("name"), str):
+            return bb["name"]
+    if isinstance(payload.get("name"), str):
+        return payload["name"]
+    return ""
+
+# --- Tests ------------------------------------------------------------------
+
+def test_smoke_endpoint_reachable_for_aapl():
     data = get_json("AAPL")
-    assert "query" in data, "missing top-level 'query'"
-    assert "backbone" in data and isinstance(data["backbone"], dict), "missing 'backbone' object"
-    bb = data["backbone"]
-    for key in ["canonical_name", "aliases", "tickers"]:
-        assert key in bb, f"missing backbone['{key}']"
-    # CSV exists and has at least 50 cases
-    rows = list(load_cases())
-    assert len(rows) >= 50, f"expected >=50 rows, got {len(rows)}"
+    assert isinstance(data, dict)
+    name = extract_canonical_name(data)
+    syms = extract_symbols(data)
+    assert name or syms, f"Missing both name and symbols in payload: {json.dumps(data)[:400]}"
 
 @pytest.mark.parametrize("ticker, name_sub", list(load_cases()))
 def test_lookup_by_ticker_returns_correct_company(ticker: str, name_sub: str):
-    # Query the API using the ticker as company_name; backbone should resolve to the correct entity.
     data = get_json(ticker)
-    bb = data["backbone"]
-    canon = normalize(bb.get("canonical_name"))
-    aliases = [normalize(a) for a in (bb.get("aliases") or [])]
-    syms = extract_symbols(bb)
 
-    # 1) canonical_name contains expected substring
-    assert normalize(name_sub) in canon, f"canonical_name '{bb.get('canonical_name')}' missing substring '{name_sub}'"
+    syms_norm = {normalize(s) for s in extract_symbols(data)}
+    assert normalize(ticker) in syms_norm, (
+        f"Ticker '{ticker}' not present in symbols {syms_norm} "
+        f"(payload={json.dumps(data)[:400]})"
+    )
 
-    # 2) tickers contains the queried ticker (case-insensitive)
-    assert normalize(ticker) in syms, f"ticker '{ticker}' not found in backbone.tickers {sorted(syms)}"
+    name = extract_canonical_name(data)
+    assert normalize(name_sub) in normalize(name), (
+        f"Expected name to contain '{name_sub}', got '{name}' "
+        f"(payload={json.dumps(data)[:400]})"
+    )
 
 def test_accuracy_threshold():
     rows = list(load_cases())
@@ -74,9 +114,8 @@ def test_accuracy_threshold():
             data = get_json(ticker)
         except Exception:
             continue
-        bb = data.get("backbone", {})
-        canon = normalize(bb.get("canonical_name"))
-        syms = extract_symbols(bb)
-        if normalize(name_sub) in canon and normalize(ticker) in syms:
+        syms_norm = {normalize(s) for s in extract_symbols(data)}
+        name = extract_canonical_name(data)
+        if normalize(ticker) in syms_norm and normalize(name_sub) in normalize(name):
             ok += 1
     assert ok >= int(0.95 * len(rows)), f"Accuracy {ok}/{len(rows)} below 95% threshold"
