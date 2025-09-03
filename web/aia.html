@@ -10,7 +10,14 @@
       color: #111827;
       margin: 2rem;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    h1 { font-size: 1.5rem; margin: 0; }
+    .tagline { color: #6b7280; font-size: 0.95rem; }
     ul { list-style: none; padding: 0; }
     li {
       background: #fff;
@@ -21,29 +28,33 @@
       transition: box-shadow .1s ease;
     }
     li:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-    a { text-decoration: none; color: inherit; }
+    a { text-decoration: none; color: inherit; display: block; }
     .title { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.25rem; }
     .desc { color: #6b7280; font-size: 0.9rem; }
   </style>
 </head>
 <body>
-  <h1>AI Agents</h1>
-  <ul>
-    <li>
-      <a href="companyevaluationagent.html">
-        <div class="title">Company Evaluation Agent</div>
-        <div class="desc">Analyzes company data and produces structured evaluations.</div>
-      </a>
-    </li>
-    <!-- Add more agents like this -->
-    <!--
-    <li>
-      <a href="secondagent.html">
-        <div class="title">Second Agent</div>
-        <div class="desc">Short description of what the agent does.</div>
-      </a>
-    </li>
-    -->
-  </ul>
+  <header>
+    <h1>fantasiagenesis</h1>
+    <span class="tagline">creating and executing narratives</span>
+  </header>
+
+  <main>
+    <h2>AI Agents</h2>
+    <ul>
+      <li>
+        <a href="companyevaluationagent.html">
+          <div class="title">Company Evaluation Agent</div>
+          <div class="desc">Analyzes company data and produces structured evaluations.</div>
+        </a>
+      </li>
+      <li>
+        <a href="saba.html">
+          <div class="title">Small Business Agent</div>
+          <div class="desc">Helps entrepreneurs and small teams with planning, strategy, and operations.</div>
+        </a>
+      </li>
+    </ul>
+  </main>
 </body>
 </html>
