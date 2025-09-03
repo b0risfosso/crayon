@@ -116,20 +116,31 @@ def create_narrative():
 @app.put("/api/narratives/<int:nid>")
 def update_narrative(nid):
     data = request.get_json(force=True, silent=True) or {}
-    fields = []
-    vals = []
+    fields, vals = [], []
     for key in ("title","description","webpage"):
         if key in data:
             fields.append(f"{key}=?")
             vals.append((data.get(key) or "").strip())
-    if not fields:
-        return jsonify({"error":"no fields to update"}), 400
-    vals.append(nid)
+
+    # Recalculate start_iso_local if start_ts exists but iso is null
     con = db()
+    cur = con.execute("SELECT start_ts, start_iso_local FROM narratives WHERE id=?", (nid,))
+    row = cur.fetchone()
+    if row and row["start_ts"] and not row["start_iso_local"]:
+        iso = dt.datetime.fromtimestamp(int(row["start_ts"])).isoformat(timespec="seconds")
+        fields.append("start_iso_local=?")
+        vals.append(iso)
+
+    if not fields:
+        con.close()
+        return jsonify({"error":"no fields to update"}), 400
+
+    vals.append(nid)
     con.execute(f"UPDATE narratives SET {', '.join(fields)} WHERE id=?", vals)
     con.commit()
     con.close()
     return jsonify({"ok": True})
+
 
 @app.delete("/api/narratives/<int:nid>")
 def delete_narrative(nid):
