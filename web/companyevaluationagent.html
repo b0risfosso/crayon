@@ -395,7 +395,7 @@ Return only the JSON.`;
 
     // Backbone lookup (keep your existing /api/backbone code)
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 20000);
+    const t = setTimeout(() => ctl.abort(), 180000);
     try {
       const u = new URL("/api/backbone", window.location.origin);
       u.searchParams.set("company_name", name);
