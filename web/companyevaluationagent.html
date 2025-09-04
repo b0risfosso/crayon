@@ -73,79 +73,106 @@
   const revOut = $("#revOut"), revStatus = $("#revStatus");
   const fragOut = $("#fragOut"), fragStatus = $("#fragStatus");
 
-  const api = (path, params) => {
-    const u = new URL(path, window.location.origin);
-    Object.entries(params || {}).forEach(([k,v]) => u.searchParams.set(k, v));
-    return u.toString();
-  };
-  const pretty = obj => JSON.stringify(obj, null, 2);
+  const pretty = o => JSON.stringify(o, null, 2);
 
   async function fetchJson(url, {signal, method = 'GET', body} = {}) {
-    const res = await fetch(url, { credentials: "include", signal, method, headers: { 'Content-Type': 'application/json' }, body });
+    const res = await fetch(url, {
+      credentials: "include",
+      signal, method,
+      headers: { 'Content-Type': 'application/json' },
+      body
+    });
     const text = await res.text();
+    const info = { url, status: res.status, ok: res.ok, raw: text };
     try {
       const data = JSON.parse(text);
-      if (!res.ok) throw Object.assign(new Error(data?.detail || res.statusText), { status: res.status, data });
+      if (!res.ok) throw Object.assign(new Error(data?.detail || res.statusText), { ...info, data });
       return data;
     } catch {
-      if (!res.ok) throw Object.assign(new Error("Non-JSON response"), { status: res.status, raw: text });
+      if (!res.ok) throw Object.assign(new Error("Non-JSON response"), info);
+      // Successful but non-JSON
       return { raw: text };
     }
   }
 
-  function makeTimer(el, label = 'Thinking/Searching') {
-    let startTs = 0, id = null;
-    const fmt = (s)=> `${label}… ${s}s`;
+
+  const LLM_ENDPOINT = '/api/moat_evaluation';
+
+  async function postPrompt(prompt, {signal} = {}) {
+    return await fetchJson(LLM_ENDPOINT, {
+      method: 'POST',
+      signal,
+      body: JSON.stringify({ prompt })
+    });
+  }
+
+  function makeTimer(el, label='Thinking/Searching'){
+    let start=0, id=null;
+    const fmt = s => `${label}… ${s}s`;
     return {
-      start() {
-        startTs = Date.now();
-        el.textContent = fmt(0);
-        id = setInterval(()=>{
-          const secs = Math.floor((Date.now()-startTs)/1000);
-          el.textContent = fmt(secs);
-        }, 1000);
+      start(){ start=Date.now(); el.textContent = fmt(0);
+        id=setInterval(()=>{ el.textContent = fmt(Math.floor((Date.now()-start)/1000)); },1000);
       },
-      stop(doneText) {
-        if (id) clearInterval(id);
-        if (doneText) el.textContent = doneText;
-      }
+      stop(msg){ if(id) clearInterval(id); if(msg) el.textContent = msg; }
     };
   }
 
-  async function postPrompt(prompt, signal){
-    const endpoints = ['/api/moat_evaluation','/moat_evaluation'];
-    let lastErr = null;
-    for (const ep of endpoints){
-      try { return await fetchJson(ep, { method: 'POST', signal, body: JSON.stringify({ prompt }) }); }
-      catch (e){ lastErr = e; }
-    }
-    throw lastErr || new Error('No LLM endpoint reachable');
-  }
-
+  
   async function runOne({label, prompt, statusEl, outEl}) {
     const timer = makeTimer(statusEl, label);
     outEl.textContent = '';
     timer.start();
 
+    // 10m client abort protection
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 600000); // 10 minutes
+    const t = setTimeout(() => ctl.abort(), 600000);
 
+    // simple retry: one retry on 429/5xx/aborts with 500–900ms jitter
+    const tryOnce = () => postPrompt(prompt, {signal: ctl.signal});
     try {
-      const data = await postPrompt(prompt, ctl.signal);
-      const text = typeof data?.output_text === 'string'
-        ? data.output_text
-        : (data.raw || JSON.stringify(data));
-      outEl.textContent = text;
-      timer.stop('Done.');
+      try {
+        const data = await tryOnce();
+        const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
+        outEl.textContent = text;
+        timer.stop('Done.');
+      } catch (e1) {
+        if (e1.status && (e1.status === 429 || e1.status >= 500)) {
+          await new Promise(r => setTimeout(r, 500 + Math.random()*400));
+          const data = await tryOnce();
+          const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
+          outEl.textContent = text;
+          timer.stop('Done (after retry).');
+        } else {
+          throw e1;
+        }
+      }
     } catch (err) {
       outEl.textContent = pretty({
         error: err?.message || `${label} failed`,
-        detail: err?.data?.detail ?? err?.raw ?? null
+        url: err?.url || LLM_ENDPOINT,
+        status: err?.status ?? null,
+        raw: err?.raw ?? null
       });
       timer.stop('Failed.');
     } finally {
       clearTimeout(t);
     }
+  }
+
+  // ---- Concurrency limiter (2 at a time) ----
+  async function runWithLimit(tasks, limit=2){
+    const results = new Array(tasks.length);
+    let i = 0;
+    async function worker(){
+      while (i < tasks.length){
+        const idx = i++;
+        try { results[idx] = await tasks[idx](); }
+        catch (e){ results[idx] = e; }
+      }
+    }
+    const workers = Array.from({length: Math.min(limit, tasks.length)}, worker);
+    await Promise.all(workers);
+    return results;
   }
 
   function pickTicker(bb){
@@ -285,53 +312,52 @@ Return only the JSON.`;
 
   async function runPipeline() {
     const name = input.value.trim();
-    if (!name) {
-      input.focus();
-      return;
-    }
+    if (!name) { input.focus(); return; }
 
     // Reset UI
     status.textContent = "Fetching backbone…";
     allStatus.textContent = "";
+    [llmOut, peOut, revOut, fragOut].forEach(el => el.textContent = "");
+    [llmStatus, peStatus, revStatus, fragStatus].forEach(el => el.textContent = "");
     out.textContent = "{}";
-    llmOut.textContent = ""; peOut.textContent = ""; revOut.textContent = ""; fragOut.textContent = "";
-    llmStatus.textContent = ""; peStatus.textContent = ""; revStatus.textContent = ""; fragStatus.textContent = "";
-
     goBtn.disabled = true;
 
+    // Backbone lookup (keep your existing /api/backbone code)
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 20000); // 20s for backbone
-
-    let companyJson = null;
-
+    const t = setTimeout(() => ctl.abort(), 20000);
     try {
-      const url = api("/api/backbone", { company_name: name });
-      const data = await fetchJson(url, { signal: ctl.signal });
-      companyJson = { query: name, backbone: data };
+      const u = new URL("/api/backbone", window.location.origin);
+      u.searchParams.set("company_name", name);
+      const bb = await fetchJson(u.toString(), { signal: ctl.signal });
+      const companyJson = { query: name, backbone: bb };
       out.textContent = pretty(companyJson);
       status.textContent = "Backbone: Done.";
 
-      // Build prompts once
+      // Build prompts
       const moatPrompt = buildMoatPrompt(companyJson);
       const pePrompt   = buildPEPrompt(companyJson);
       const revPrompt  = buildRevenuePrompt(companyJson);
       const fragPrompt = buildFragilityPrompt(companyJson);
 
-      allStatus.textContent = "Running all analyses in parallel…";
-
-      // Fire all analyses
+      allStatus.textContent = "Running all analyses… (2 at a time)";
+      // Prepare tasks but do NOT start yet
       const tasks = [
-        runOne({ label: 'Moat Score™',                    prompt: moatPrompt, statusEl: llmStatus,  outEl: llmOut }),
-        runOne({ label: 'Performance Pulse™ – Valuation', prompt: pePrompt,   statusEl: peStatus,   outEl: peOut }),
-        runOne({ label: 'Performance Pulse™ – Revenue',   prompt: revPrompt,  statusEl: revStatus,  outEl: revOut }),
-        runOne({ label: 'Fragility Rating™',              prompt: fragPrompt, statusEl: fragStatus, outEl: fragOut }),
+        () => runOne({ label: 'Moat Score™',                    prompt: moatPrompt, statusEl: llmStatus,  outEl: llmOut }),
+        () => runOne({ label: 'Performance Pulse™ – Valuation', prompt: pePrompt,   statusEl: peStatus,   outEl: peOut }),
+        () => runOne({ label: 'Performance Pulse™ – Revenue',   prompt: revPrompt,  statusEl: revStatus,  outEl: revOut }),
+        () => runOne({ label: 'Fragility Rating™',              prompt: fragPrompt, statusEl: fragStatus, outEl: fragOut }),
       ];
 
-      const results = await Promise.allSettled(tasks);
-      const anyRejected = results.some(r => r.status === 'rejected');
-      allStatus.textContent = anyRejected ? "Finished with errors." : "All analyses complete.";
+      const results = await runWithLimit(tasks, 2);
+      const anyError = results.some(r => r instanceof Error);
+      allStatus.textContent = anyError ? "Finished with errors." : "All analyses complete.";
     } catch (err) {
-      out.textContent = pretty({ error: err?.message || "Backbone request failed", detail: err?.data?.detail ?? err?.raw ?? null });
+      out.textContent = pretty({
+        error: err?.message || "Backbone request failed",
+        url: err?.url || "/api/backbone",
+        status: err?.status ?? null,
+        raw: err?.raw ?? null
+      });
       status.textContent = "Backbone: Failed.";
     } finally {
       clearTimeout(t);
