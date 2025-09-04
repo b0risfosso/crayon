@@ -1,23 +1,17 @@
 # company_resolver_llm.py
 from __future__ import annotations
 
-import os, re, time
 from typing import Optional, List, Dict, Any, Tuple
 from difflib import SequenceMatcher
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+import  os, re, asyncio, uuid, time, logging
+from fastapi import FastAPI, Request, HTTPException, Query, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from pydantic import BaseModel, Field
 from openai import OpenAI
-
-
-# --- TOP OF FILE: imports (ADD THIS) ---
-from fastapi import APIRouter
-import os
-
-# --- OPTIONAL: tighten CORS (replace your existing CORSMiddleware block) ---
-from fastapi.middleware.cors import CORSMiddleware
 
 from backend.backbone_api import router as backbone_router
 from backend.moat_evaluation_api import router as moat_router
@@ -47,12 +41,29 @@ class Company(BaseModel):
 class CompanyResolution(BaseModel):
     company: Optional[Company]
 
+
+class EvalBody(BaseModel):
+    prompt: str
+    rid: str | None = None
+    tool: str | None = None
+
+
 # ---------------- FastAPI app ----------------
 
-app = FastAPI(title="Company Resolver (LLM + Wikidata verify)", version="3.0.0")
+# ---------- App + logging ----------
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s :: %(message)s",
+)
+log = logging.getLogger("company_resolver")
+
+app = FastAPI(title="Company Resolver LLM")
+
+# Track in-flight tasks by request id (rid)
+TASKS: Dict[str, asyncio.Task] = {}
 
 app.include_router(backbone_router, prefix="/api")
-app.include_router(moat_router, prefix="/api")
+#app.include_router(moat_router, prefix="/api")
 
 
 # Health endpoint for nginx/systemd probes
@@ -60,6 +71,24 @@ app.include_router(moat_router, prefix="/api")
 def healthz():
     return {"ok": True}
 
+
+@app.middleware("http")
+async def json_errors(request: Request, call_next):
+    rid = request.headers.get("X-Request-Id") or str(uuid.uuid4())[:8]
+    request.state.rid = rid
+    t0 = time.time()
+    try:
+        resp = await call_next(request)
+        log.info("RID %s %s %s -> %s in %.1fs",
+                 rid, request.method, request.url.path,
+                 getattr(resp, "status_code", "?"), time.time() - t0)
+        return resp
+    except Exception:
+        log.exception("RID %s crashed after %.1fs", rid, time.time() - t0)
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "server_error", "rid": rid, "detail": "see server logs"},
+        )
 
 
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "https://fantasiagenesis.com").split(",")
@@ -117,6 +146,37 @@ COMPANY_P31 = {
     "Q11663",     # technology company
     "Q783794",    # organization (kept as a weak match)
 }
+
+# ---------- LLM runner (replace with your real call) ----------
+async def run_llm(prompt: str, rid: str) -> dict:
+    try:
+        resp = client.responses.create(
+            model="gpt-5",
+            tools=[{"type": "web_search"}],
+            reasoning={"effort": "low"},
+            input=req.prompt,
+        )
+        # Frontend expects {"output_text": "..."} where the value is the JSON block string.
+        return {"output_text": resp.output_text}
+    except Exception as e:
+        # Keep surface simple for the frontend; log full details server-side.
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---------- Helper: cancel if client disconnects ----------
+async def cancel_on_disconnect(request: Request, rid: str):
+    try:
+        while True:
+            if await request.is_disconnected():
+                log.info("RID %s: client disconnected -> cancelling", rid)
+                task = TASKS.get(rid)
+                if task and not task.done():
+                    task.cancel()
+                return
+            await asyncio.sleep(0.5)
+    except Exception:
+        # Don't propagate watcher errors
+        return
+
 
 def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s or "").strip().lower()
@@ -370,3 +430,56 @@ async def resolve_company_llm(
 @app.get("/api/resolve_company_llm", include_in_schema=False)
 async def resolve_company_llm_alias(company_name: str, scope: str | None = None, as_of: str | None = None):
     return await resolve_company_llm(company_name=company_name, scope=scope, as_of=as_of)
+
+
+# ---------- Routes ----------
+@app.get("/api/ping")
+async def ping():
+    return {"ok": True, "ts": time.time()}
+
+
+@app.post("/api/moat_evaluation")
+async def moat_evaluation(request: Request, body: EvalBody):
+    rid = body.rid or request.headers.get("X-Request-Id") or uuid.uuid4().hex
+    if rid in TASKS and not TASKS[rid].done():
+        raise HTTPException(status_code=409, detail=f"rid {rid} already running")
+
+    async def job():
+        # Put any per-request setup here
+        return await run_llm(body.prompt, rid)
+
+    task = asyncio.create_task(job(), name=f"llm-{rid}")
+    TASKS[rid] = task
+
+    # Start watcher to cancel if client disconnects
+    asyncio.create_task(cancel_on_disconnect(request, rid))
+
+    try:
+        result = await task
+        # Always return JSON; your frontend expects {output_text: "..."} or similar
+        return JSONResponse(result)
+    except asyncio.CancelledError:
+        log.info("RID %s: cancelled", rid)
+        # 499 mimics nginx "client closed request"
+        return JSONResponse({"ok": False, "error": "cancelled", "rid": rid}, status_code=499)
+    finally:
+        TASKS.pop(rid, None)
+
+
+@app.post("/api/cancel/{rid}")
+async def cancel_rid(rid: str):
+    task = TASKS.get(rid)
+    if task and not task.done():
+        task.cancel()
+        return {"ok": True, "rid": rid, "action": "cancelled"}
+    return {"ok": False, "rid": rid, "detail": "not_found_or_already_done"}
+
+
+# ---------- Shutdown: clean up tasks ----------
+@app.on_event("shutdown")
+async def _shutdown():
+    for rid, task in list(TASKS.items()):
+        if not task.done():
+            task.cancel()
+    # Allow tasks to observe cancellation
+    await asyncio.sleep(0.1)

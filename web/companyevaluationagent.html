@@ -97,6 +97,11 @@
 
 
   const LLM_ENDPOINT = '/api/moat_evaluation';
+  const CANCEL_ENDPOINT = (rid) => `/api/cancel/${encodeURIComponent(rid)}`;
+
+
+  const inflight = new Map(); // rid -> { controller, label }
+
 
   async function postPrompt(prompt, {signal} = {}) {
     return await fetchJson(LLM_ENDPOINT, {
@@ -105,6 +110,76 @@
       body: JSON.stringify({ prompt })
     });
   }
+
+  function newRid() {
+  return (crypto && crypto.randomUUID) ? crypto.randomUUID() :
+         'rid_' + Math.random().toString(36).slice(2);
+  }
+
+
+  function registerInflight(rid, controller, label) {
+    inflight.set(rid, { controller, label });
+  }
+
+  function dropInflight(rid) {
+    inflight.delete(rid);
+  }
+
+  // Send best-effort cancel to server even during unload
+  function beaconCancel(rid) {
+    try {
+      const blob = new Blob([JSON.stringify({ rid })], { type: 'application/json' });
+      navigator.sendBeacon(CANCEL_ENDPOINT(rid), blob);
+    } catch {}
+  }
+
+  // Abort + beacon for all
+  function cancelAllInflight() {
+    for (const [rid, { controller }] of inflight.entries()) {
+      try { controller.abort(); } catch {}
+      beaconCancel(rid);
+      inflight.delete(rid);
+    }
+  }
+
+  // Auto-cancel on navigation/reload/close (covers bfcache too)
+  window.addEventListener('pagehide', cancelAllInflight, { capture: true });
+  window.addEventListener('beforeunload', cancelAllInflight, { capture: true });
+
+
+  // ---- Wrapped LLM poster that supports cancel ----
+  async function postPromptCancellable({ prompt, label }) {
+    const rid = newRid();
+    const controller = new AbortController();
+    registerInflight(rid, controller, label);
+
+    try {
+      const res = await fetch(LLM_ENDPOINT, {
+        method: 'POST',
+        credentials: 'include',
+        signal: controller.signal,
+        // keepalive allows long POSTs in the unload phase (fallback; beacon is primary)
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', 'X-Request-Id': rid },
+        body: JSON.stringify({ prompt, rid, tool: label })
+      });
+
+      const txt = await res.text();
+      // attempt JSON, show detailed error otherwise
+      let data;
+      try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
+      if (!res.ok) {
+        const err = new Error(data?.detail || res.statusText);
+        err.status = res.status; err.data = data; err.url = LLM_ENDPOINT;
+        throw err;
+      }
+      return data;
+    } finally {
+      dropInflight(rid);
+    }
+  }
+
+
 
   function makeTimer(el, label='Thinking/Searching'){
     let start=0, id=null;
@@ -123,41 +198,24 @@
     outEl.textContent = '';
     timer.start();
 
-    // 10m client abort protection
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 600000);
-
-    // simple retry: one retry on 429/5xx/aborts with 500–900ms jitter
-    const tryOnce = () => postPrompt(prompt, {signal: ctl.signal});
     try {
-      try {
-        const data = await tryOnce();
-        const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
-        outEl.textContent = text;
-        timer.stop('Done.');
-      } catch (e1) {
-        if (e1.status && (e1.status === 429 || e1.status >= 500)) {
-          await new Promise(r => setTimeout(r, 500 + Math.random()*400));
-          const data = await tryOnce();
-          const text = typeof data?.output_text === 'string' ? data.output_text : (data.raw || JSON.stringify(data));
-          outEl.textContent = text;
-          timer.stop('Done (after retry).');
-        } else {
-          throw e1;
-        }
-      }
+      const data = await postPromptCancellable({ prompt, label });
+      const text = typeof data?.output_text === 'string'
+        ? data.output_text
+        : (data.raw || JSON.stringify(data));
+      outEl.textContent = text;
+      timer.stop('Done.');
     } catch (err) {
-      outEl.textContent = pretty({
+      outEl.textContent = JSON.stringify({
         error: err?.message || `${label} failed`,
-        url: err?.url || LLM_ENDPOINT,
         status: err?.status ?? null,
-        raw: err?.raw ?? null
-      });
+        url: err?.url ?? null,
+        data: err?.data ?? null
+      }, null, 2);
       timer.stop('Failed.');
-    } finally {
-      clearTimeout(t);
     }
   }
+
 
   // ---- Concurrency limiter (2 at a time) ----
   async function runWithLimit(tasks, limit=2){
