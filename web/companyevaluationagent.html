@@ -161,6 +161,7 @@
   // Abort + beacon for all
   function cancelAllInflight() {
     for (const [rid, { controller }] of inflight.entries()) {
+      console.log('[LLM CANCEL] rid=', rid, 'label=', label);
       try { controller.abort(); } catch {}
       beaconCancel(rid);
       inflight.delete(rid);
@@ -198,6 +199,7 @@
     const rid = newRid();
     const controller = new AbortController();
     registerInflight(rid, controller, label);
+    console.log('[LLM START]', label, 'rid=', rid);
 
     try {
       const res = await fetch(LLM_ENDPOINT, {

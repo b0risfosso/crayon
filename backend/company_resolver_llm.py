@@ -441,6 +441,7 @@ async def ping():
 @app.post("/api/moat_evaluation")
 async def moat_evaluation(request: Request, body: EvalBody):
     rid = body.rid or request.headers.get("X-Request-Id") or uuid.uuid4().hex
+    log.info("START rid=%s tool=%s", rid, body.tool)
     if rid in TASKS and not TASKS[rid].done():
         raise HTTPException(status_code=409, detail=f"rid {rid} already running")
 
@@ -466,13 +467,12 @@ async def moat_evaluation(request: Request, body: EvalBody):
         TASKS.pop(rid, None)
 
 
-@app.post("/api/cancel/{rid}")
-@app.get("/api/cancel/{rid}")
+@app.api_route("/api/cancel/{rid}", methods=["GET", "POST"])
 async def cancel_rid(rid: str):
     task = TASKS.get(rid)
+    log.info("CANCEL rid=%s found=%s done=%s", rid, bool(task), getattr(task, "done", lambda: True)())
     if task and not task.done():
         task.cancel()
-    # Always return 204 (no body). If you prefer JSON: return {"ok": True}
     return Response(status_code=204)
 
 
