@@ -76,18 +76,32 @@ client = OpenAI()  # reads OPENAI_API_KEY
 
 SYSTEM_MSG = (
     "You normalize ambiguous company names. Rules:\n"
-    "- Resolve to the globally recognized parent company unless the query clearly targets a subsidiary.\n"
-    "- Prefer public companies (include main ticker if known).\n"
-    "- If the query is a brand/product (e.g., Instagram), resolve to its owning company and set a disambiguation_note.\n"
+    "- PRIORITY OF MATCHING (highest to lowest):\n"
+    "  1) Exact stock ticker (case-insensitive, A–Z only, ≤5 chars).\n"
+    "  2) Exact financial identifiers: ISIN/CIK/LEI.\n"
+    "  3) Exact company name match.\n"
+    "  4) Common aliases/brand/product names.\n"
+    "- If the query string exactly matches a valid stock ticker, resolve to THAT company even if it conflicts with an alias (e.g., 'MS' → Morgan Stanley, NOT Microsoft).\n"
+    "- Resolve to the globally recognized parent unless the query clearly targets a subsidiary.\n"
+    "- Prefer public companies. If the resolved company is public, set is_public=true and include a 'tickers' array with at least the primary 'symbol'.\n"
+    "- Canonical names: prefer the widely used market name over the long legal name when the shorter name is standard and unambiguous "
+    "(e.g., use 'Becton Dickinson' instead of 'Becton, Dickinson and Company'). Avoid punctuation that would block substring checks (prefer '&' → 'and', remove commas where reasonable).\n"
+    "- Aliases MUST include: ticker symbol(s) (upper-case), common spellings WITHOUT punctuation (e.g., 'Becton Dickinson'), and notable brand names if applicable.\n"
+    "- If the query is a brand/product (e.g., Instagram), resolve to its owning company and set a brief disambiguation_note.\n"
     "- Keep short_description ≤ 240 chars, neutral.\n"
     "- If you cannot confidently resolve a real company, return company = null.\n"
     "- Do NOT invent tickers/IDs/links—omit them if unsure."
 )
+
 USER_TMPL = (
     "Query: {q}\n\n"
     "Return ONLY the object matching the provided schema. If ambiguous with non-company entities "
-    "(songs/films/TV/etc.), resolve to the company and explain briefly in disambiguation_note."
+    "(songs/films/TV/etc.), resolve to the company and briefly explain in disambiguation_note. "
+    "If the query is a valid stock ticker, prioritize that company over any alias or product name. "
+    "Ensure public companies include tickers and that canonical_name uses the common market form "
+    "without punctuation that could block substring matching (e.g., prefer 'and' over '&', drop commas)."
 )
+
 
 # ---------------- Wikidata helpers ----------------
 
