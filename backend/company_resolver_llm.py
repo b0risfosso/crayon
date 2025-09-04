@@ -154,7 +154,7 @@ async def run_llm(prompt: str, rid: str) -> dict:
             model="gpt-5",
             tools=[{"type": "web_search"}],
             reasoning={"effort": "low"},
-            input=request.prompt,
+            input=prompt,
         )
         # Frontend expects {"output_text": "..."} where the value is the JSON block string.
         return {"output_text": resp.output_text}
