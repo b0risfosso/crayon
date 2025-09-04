@@ -127,11 +127,24 @@
 
   // Send best-effort cancel to server even during unload
   function beaconCancel(rid) {
+    const url = `/api/cancel/${encodeURIComponent(rid)}`;
+
     try {
-      const blob = new Blob([JSON.stringify({ rid })], { type: 'application/json' });
-      navigator.sendBeacon(CANCEL_ENDPOINT(rid), blob);
-    } catch {}
+      // Minimal payload to satisfy some servers; MIME type shouldn't matter
+      const ok = navigator.sendBeacon(url, new Blob([], { type: 'text/plain' }));
+      if (!ok) throw new Error('beacon refused');
+    } catch {
+      // Fallback for Safari/edge cases: keepalive POST with cookies
+      fetch(url, {
+        method: 'POST',
+        credentials: 'include',   // send session cookies
+        keepalive: true,          // allows request to complete during unload
+        headers: { 'Content-Type': 'text/plain' },
+        body: ''                  // no JSON required
+      }).catch(() => {/* ignore */});
+    }
   }
+
 
   // Abort + beacon for all
   function cancelAllInflight() {

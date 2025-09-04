@@ -467,12 +467,13 @@ async def moat_evaluation(request: Request, body: EvalBody):
 
 
 @app.post("/api/cancel/{rid}")
+@app.get("/api/cancel/{rid}")
 async def cancel_rid(rid: str):
     task = TASKS.get(rid)
     if task and not task.done():
         task.cancel()
-        return {"ok": True, "rid": rid, "action": "cancelled"}
-    return {"ok": False, "rid": rid, "detail": "not_found_or_already_done"}
+    # Always return 204 (no body). If you prefer JSON: return {"ok": True}
+    return Response(status_code=204)
 
 
 # ---------- Shutdown: clean up tasks ----------
