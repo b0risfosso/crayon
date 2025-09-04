@@ -28,6 +28,7 @@
   <div class="controls">
     <input id="q" type="text" placeholder="e.g., Apple, Salesforce, Spotify" required autofocus />
     <button id="go">Run Backbone & Analyses</button>
+    <button id="cancel" disabled>Cancel</button>
   </div>
 
   <div id="status"></div>
@@ -74,6 +75,7 @@
   const peOut = $("#peOut"), peStatus = $("#peStatus");
   const revOut = $("#revOut"), revStatus = $("#revStatus");
   const fragOut = $("#fragOut"), fragStatus = $("#fragStatus");
+  const cancelBtn = document.querySelector('#cancel');
 
   const pretty = o => JSON.stringify(o, null, 2);
 
@@ -104,6 +106,12 @@
 
   const inflight = new Map(); // rid -> { controller, label }
 
+  // keep the button enabled only when there are in-flight tasks
+  function updateCancelBtn() {
+    try { cancelBtn.disabled = (inflight.size === 0); }
+    catch { cancelBtn.disabled = true; } // if inflight isn't defined yet
+  }
+
 
   async function postPrompt(prompt, {signal} = {}) {
     return await fetchJson(LLM_ENDPOINT, {
@@ -121,10 +129,12 @@
 
   function registerInflight(rid, controller, label) {
     inflight.set(rid, { controller, label });
+    updateCancelBtn(); // <-- add this
   }
 
   function dropInflight(rid) {
     inflight.delete(rid);
+    updateCancelBtn(); // <-- add this
   }
 
   // Send best-effort cancel to server even during unload
@@ -155,7 +165,28 @@
       beaconCancel(rid);
       inflight.delete(rid);
     }
+    updateCancelBtn(); // <-- add this
   }
+
+  cancelBtn.addEventListener('click', () => {
+    // Optional: reflect cancelling in the UI immediately
+    const sEls = [document.querySelector('#llmStatus'),
+                  document.querySelector('#peStatus'),
+                  document.querySelector('#revStatus'),
+                  document.querySelector('#fragStatus'),
+                  document.querySelector('#allStatus')].filter(Boolean);
+    sEls.forEach(el => { if (el && el.textContent) el.textContent = 'Cancelling…'; });
+    
+
+    // Abort on the client and notify server
+    try { cancelAllInflight(); } catch {}
+
+    // Disable button now; it'll stay disabled until new tasks are started
+    updateCancelBtn();
+  });
+
+  updateCancelBtn();
+
 
   // Auto-cancel on navigation/reload/close (covers bfcache too)
   window.addEventListener('pagehide', cancelAllInflight, { capture: true });
