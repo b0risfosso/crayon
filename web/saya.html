@@ -100,18 +100,8 @@
   }
 
 
-  const LLM_ENDPOINT = '/api/moat_evaluation';
-  const CANCEL_ENDPOINT = (rid) => `/api/cancel/${encodeURIComponent(rid)}`;
-
-
-  const inflight = new Map(); // rid -> { controller, label }
-
-  // keep the button enabled only when there are in-flight tasks
-  function updateCancelBtn() {
-    try { cancelBtn.disabled = (inflight.size === 0); }
-    catch { cancelBtn.disabled = true; } // if inflight isn't defined yet
-  }
-
+  const LLM_STREAM_ENDPOINT = '/api/moat_evaluation_stream';
+  const CANCEL_ENDPOINT = (rid) => `/api/cancel/${encodeURIComponent(rid)}`; 
 
   async function postPrompt(prompt, {signal} = {}) {
     return await fetchJson(LLM_ENDPOINT, {
@@ -122,52 +112,93 @@
   }
 
   function newRid() {
-  return (crypto && crypto.randomUUID) ? crypto.randomUUID() :
-         'rid_' + Math.random().toString(36).slice(2);
+    return (crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : 'rid_' + Math.random().toString(36).slice(2);
   }
 
+  const inflight = new Map(); // rid -> { controller, label }
+  function updateCancelBtn(){ try { cancelBtn.disabled = (inflight.size === 0); } catch { cancelBtn.disabled = true; } }
+  function registerInflight(rid, controller, label){ inflight.set(rid, { controller, label }); updateCancelBtn(); }
+  function dropInflight(rid){ inflight.delete(rid); updateCancelBtn(); }
 
-  function registerInflight(rid, controller, label) {
-    inflight.set(rid, { controller, label });
-    updateCancelBtn(); // <-- add this
-  }
-
-  function dropInflight(rid) {
-    inflight.delete(rid);
-    updateCancelBtn(); // <-- add this
-  }
-
-  // Send best-effort cancel to server even during unload
-  function beaconCancel(rid) {
-    const url = `/api/cancel/${encodeURIComponent(rid)}`;
-
+  function beaconCancel(rid){
+    const url = CANCEL_ENDPOINT(rid);
     try {
-      // Minimal payload to satisfy some servers; MIME type shouldn't matter
       const ok = navigator.sendBeacon(url, new Blob([], { type: 'text/plain' }));
       if (!ok) throw new Error('beacon refused');
     } catch {
-      // Fallback for Safari/edge cases: keepalive POST with cookies
-      fetch(url, {
-        method: 'POST',
-        credentials: 'include',   // send session cookie
-        keepalive: true,          // allows request to complete during unload
-        headers: { 'Content-Type': 'text/plain' },
-        body: ''                  // no JSON required
-      }).catch(() => {/* ignore */});
+      fetch(url, { method:'POST', credentials:'include', keepalive:true, headers:{'Content-Type':'text/plain'}, body:'' }).catch(()=>{});
     }
   }
 
-
-  // Abort + beacon for all
-  function cancelAllInflight() {
-    for (const [rid, { controller }] of inflight.entries()) {
-      console.log('[LLM CANCEL] rid=', rid, 'label=', label);
-      try { controller.abort(); } catch {}
+  function cancelAllInflight(){
+    for (const [rid, meta] of inflight.entries()) {
+      try { meta.controller.abort(); } catch {}
       beaconCancel(rid);
       inflight.delete(rid);
     }
-    updateCancelBtn(); // <-- add this
+    updateCancelBtn();
   }
+
+  function* parseSSE(buffer) {
+    // yields {event, data} for complete frames
+    const frames = buffer.split("\n\n");
+    const trailing = frames.pop(); // may be incomplete; return to caller
+    for (const f of frames) {
+      let event = "message", data = "";
+      for (const ln of f.split("\n")) {
+        if (ln.startsWith("event:")) event = ln.slice(6).trim();
+        else if (ln.startsWith("data:")) data += ln.slice(5).trim();
+      }
+      yield { event, data };
+    }
+    return trailing ?? "";
+  }
+
+  async function postStreamedPrompt({ prompt, label, onEvent }) {
+    const rid = newRid();
+    const controller = new AbortController();
+    registerInflight(rid, controller, label);
+
+    try {
+      const res = await fetch(LLM_STREAM_ENDPOINT, {
+        method: 'POST',
+        credentials: 'include',
+        signal: controller.signal,
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', 'X-Request-Id': rid },
+        body: JSON.stringify({ prompt, rid, tool: label })
+      });
+
+      // We expect text/event-stream; read as a stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        // parse complete SSE frames
+        const iter = parseSSE(buf);
+        let leftover = "";
+        for (const frame of iter) {
+          if (frame && frame.event) {
+            let payload = {};
+            try { payload = frame.data ? JSON.parse(frame.data) : {}; } catch {}
+            await onEvent(frame.event, payload, rid);
+          }
+        }
+        leftover = iter.return?.() ?? "";
+        buf = leftover;
+      }
+    } finally {
+      dropInflight(rid);
+    }
+  }
+
+
 
   cancelBtn.addEventListener('click', () => {
     // Optional: reflect cancelling in the UI immediately
@@ -230,39 +261,70 @@
 
 
   function makeTimer(el, label='Thinking/Searching'){
-    let start=0, id=null;
-    const fmt = s => `${label}… ${s}s`;
-    return {
-      start(){ start=Date.now(); el.textContent = fmt(0);
-        id=setInterval(()=>{ el.textContent = fmt(Math.floor((Date.now()-start)/1000)); },1000);
-      },
-      stop(msg){ if(id) clearInterval(id); if(msg) el.textContent = msg; }
-    };
-  }
+  let start=0, id=null;
+  const fmt = s => `${label}… ${s}s`;
+  return {
+    start(){ start=Date.now(); el.textContent = fmt(0);
+      id=setInterval(()=>{ el.textContent = fmt(Math.floor((Date.now()-start)/1000)); },1000);
+    },
+    set(text){ el.textContent = text; },
+    stop(msg){ if(id) clearInterval(id); if(msg) el.textContent = msg; }
+  };
+}
 
-  
-  async function runOne({label, prompt, statusEl, outEl}) {
-    const timer = makeTimer(statusEl, label);
-    outEl.textContent = '';
-    timer.start();
+async function runOne({label, prompt, statusEl, outEl}) {
+  const timer = makeTimer(statusEl, label);
+  outEl.textContent = '';
+  timer.start();
 
-    try {
-      const data = await postPromptCancellable({ prompt, label });
-      const text = typeof data?.output_text === 'string'
-        ? data.output_text
-        : (data.raw || JSON.stringify(data));
-      outEl.textContent = text;
-      timer.stop('Done.');
-    } catch (err) {
-      outEl.textContent = JSON.stringify({
-        error: err?.message || `${label} failed`,
-        status: err?.status ?? null,
-        url: err?.url ?? null,
-        data: err?.data ?? null
-      }, null, 2);
-      timer.stop('Failed.');
-    }
+  let running = false;
+  let finalText = ""; // in case your backend sends token events; otherwise we'll fill on "done"
+
+  try {
+    await postStreamedPrompt({
+      prompt, label,
+      onEvent: async (event, payload) => {
+        if (event === "queued_position") {
+          timer.set(`${label}: In queue (position ${payload?.position ?? "?"})…`);
+          statusEl.style.opacity = 0.9;
+        } else if (event === "heartbeat") {
+          // keep-alive; you can show spinner or subtle dot
+          // timer.set(`${label}: waiting…`);
+        } else if (event === "started") {
+          running = true;
+          timer.set(`${label}: Running…`);
+        } else if (event === "token") {
+          // Optional: append streaming partials if you emit them server-side
+          if (typeof payload?.delta === "string") {
+            finalText += payload.delta;
+            outEl.textContent = finalText;
+          }
+        } else if (event === "done") {
+          // Server returns the whole object in payload.result
+          const data = payload?.result ?? {};
+          const text = typeof data?.output_text === 'string'
+            ? data.output_text
+            : (typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+          outEl.textContent = text;
+          timer.stop('Done.');
+        } else if (event === "cancelled") {
+          timer.stop('Cancelled.');
+          outEl.textContent = JSON.stringify({ ok:false, error:'cancelled' }, null, 2);
+        } else if (event === "error") {
+          timer.stop('Failed.');
+          outEl.textContent = JSON.stringify({ ok:false, error: payload?.error || 'error' }, null, 2);
+        }
+      }
+    });
+  } catch (err) {
+    timer.stop('Failed.');
+    outEl.textContent = JSON.stringify({
+      error: err?.message || `${label} failed`,
+      status: err?.status ?? null
+    }, null, 2);
   }
+}
+
 
 
   // ---- Concurrency limiter (2 at a time) ----
