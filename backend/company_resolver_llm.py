@@ -16,8 +16,30 @@ from openai import OpenAI
 from backend.backbone_api import router as backbone_router
 from backend.moat_evaluation_api import router as moat_router
 
+from dataclasses import dataclass, field
+from fastapi.responses import StreamingResponse
+
 # (optional) let the model be configured via env
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-2024-08-06")  # replace your hardcoded MODEL var
+
+# ---- Queue / Concurrency ----
+MAX_CONCURRENT = int(os.environ.get("LLM_MAX_CONCURRENT", "2"))
+QUEUE_HEARTBEAT_SEC = 5
+
+@dataclass
+class Job:
+    rid: str
+    prompt: str
+    created_at: float = field(default_factory=time.time)
+    status: str = "queued"          # queued | running | done | error | cancelled
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    updates: "asyncio.Queue[str]" = field(default_factory=asyncio.Queue)
+    cancelled: bool = False
+    tool: Optional[str] = None
+
+JOB_QUEUE: "asyncio.Queue[Job]" = asyncio.Queue()
+RUNNING: Dict[str, Job] = {}        # rid -> Job
 
 
 # ---------------- Pydantic schema ----------------
@@ -61,6 +83,28 @@ app = FastAPI(title="Company Resolver LLM")
 
 # Track in-flight tasks by request id (rid)
 TASKS: Dict[str, asyncio.Task] = {}
+
+def _sse(event: str, data: Any) -> str:
+    payload = data if isinstance(data, str) else json.dumps(data)
+    return f"event: {event}\ndata: {payload}\n\n"
+
+async def _stream_job(job: Job):
+    # initial notice
+    await job.updates.put(_sse("queued", {"rid": job.rid}))
+    last_hb = time.time()
+    while True:
+        try:
+            msg = await asyncio.wait_for(job.updates.get(), timeout=QUEUE_HEARTBEAT_SEC)
+            yield msg
+            if job.status in ("done", "error", "cancelled"):
+                return
+        except asyncio.TimeoutError:
+            # heartbeat while waiting/running to keep proxies happy
+            now = time.time()
+            if now - last_hb >= QUEUE_HEARTBEAT_SEC:
+                yield _sse("heartbeat", {"rid": job.rid, "status": job.status})
+                last_hb = now
+
 
 app.include_router(backbone_router, prefix="/api")
 #app.include_router(moat_router, prefix="/api")
@@ -151,7 +195,7 @@ COMPANY_P31 = {
 async def run_llm(prompt: str, rid: str) -> dict:
     try:
         resp = client.responses.create(
-            model="gpt-5",
+            model="gpt-4.1-2025-04-14",
             tools=[{"type": "web_search"}],
             reasoning={"effort": "low"},
             input=prompt,
@@ -161,6 +205,43 @@ async def run_llm(prompt: str, rid: str) -> dict:
     except Exception as e:
         # Keep surface simple for the frontend; log full details server-side.
         raise HTTPException(status_code=500, detail=str(e))
+
+async def _worker_loop(idx: int):
+    while True:
+        job: Job = await JOB_QUEUE.get()
+        try:
+            if job.cancelled:
+                job.status = "cancelled"
+                await job.updates.put(_sse("cancelled", {"rid": job.rid}))
+                continue
+
+            job.status = "running"
+            RUNNING[job.rid] = job
+            await job.updates.put(_sse("started", {"rid": job.rid, "worker": idx}))
+
+            try:
+                result = await run_llm(job.prompt, job.rid)
+                if job.cancelled:
+                    job.status = "cancelled"
+                    await job.updates.put(_sse("cancelled", {"rid": job.rid}))
+                else:
+                    job.status = "done"
+                    job.result = result
+                    await job.updates.put(_sse("done", {"rid": job.rid, "result": result}))
+            except Exception as e:
+                job.status = "error"
+                job.error = str(e)
+                await job.updates.put(_sse("error", {"rid": job.rid, "error": job.error}))
+            finally:
+                RUNNING.pop(job.rid, None)
+        finally:
+            JOB_QUEUE.task_done()
+
+@app.on_event("startup")
+async def _start_workers():
+    for i in range(MAX_CONCURRENT):
+        asyncio.create_task(_worker_loop(i))
+
 
 # ---------- Helper: cancel if client disconnects ----------
 async def cancel_on_disconnect(request: Request, rid: str):
@@ -438,42 +519,99 @@ async def ping():
     return {"ok": True, "ts": time.time()}
 
 
+@app.post("/api/moat_evaluation_stream")
+async def moat_evaluation_stream(request: Request, body: EvalBody):
+    rid = body.rid or request.headers.get("X-Request-Id") or uuid.uuid4().hex
+    prompt = body.prompt or ""
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Missing prompt")
+
+    # Build job and enqueue
+    job = Job(rid=rid, prompt=prompt, tool=body.tool)
+    # Initial position (includes already running)
+    position = JOB_QUEUE.qsize() + len(RUNNING) + 1
+    await job.updates.put(_sse("queued_position", {"rid": rid, "position": position}))
+
+    # Register in TASKS so your disconnect watcher can cancel running tasks;
+    # we'll store a dummy task that just waits for terminal state.
+    # (Optional—safe to omit if you prefer not to reuse TASKS here.)
+    async def _await_terminal():
+        while job.status not in ("done", "error", "cancelled"):
+            await asyncio.sleep(0.1)
+        return job.status
+    TASKS[rid] = asyncio.create_task(_await_terminal(), name=f"queued-{rid}")
+
+    # Enqueue
+    await JOB_QUEUE.put(job)
+
+    # Disconnect watcher: if client drops, mark job cancelled if still queued/running.
+    async def _disconnect_watch():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    log.info("RID %s: client disconnected -> cancel flag", rid)
+                    job.cancelled = True
+                    # If still queued, emit now
+                    if job.status == "queued":
+                        job.status = "cancelled"
+                        await job.updates.put(_sse("cancelled", {"rid": rid}))
+                    # If running, worker will observe job.cancelled
+                    return
+                await asyncio.sleep(0.5)
+        except Exception:
+            return
+    asyncio.create_task(_disconnect_watch())
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",   # Nginx: disable proxy buffering
+        "Connection": "keep-alive",
+    }
+    return StreamingResponse(_stream_job(job), media_type="text/event-stream", headers=headers)
+
+
+
 @app.post("/api/moat_evaluation")
 async def moat_evaluation(request: Request, body: EvalBody):
     rid = body.rid or request.headers.get("X-Request-Id") or uuid.uuid4().hex
-    log.info("START rid=%s tool=%s", rid, body.tool)
-    if rid in TASKS and not TASKS[rid].done():
-        raise HTTPException(status_code=409, detail=f"rid {rid} already running")
+    prompt = body.prompt or ""
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Missing prompt")
 
-    async def job():
-        # Put any per-request setup here
-        return await run_llm(body.prompt, rid)
+    # Build job
+    job = Job(rid=rid, prompt=prompt, tool=body.tool)
+    await JOB_QUEUE.put(job)
 
-    task = asyncio.create_task(job(), name=f"llm-{rid}")
-    TASKS[rid] = task
+    # Wait until terminal state
+    while job.status not in ("done", "error", "cancelled"):
+        await asyncio.sleep(0.1)
 
-    # Start watcher to cancel if client disconnects
-    asyncio.create_task(cancel_on_disconnect(request, rid))
-
-    try:
-        result = await task
-        # Always return JSON; your frontend expects {output_text: "..."} or similar
-        return JSONResponse(result)
-    except asyncio.CancelledError:
-        log.info("RID %s: cancelled", rid)
-        # 499 mimics nginx "client closed request"
+    if job.status == "done":
+        return JSONResponse(job.result or {"ok": True})
+    elif job.status == "cancelled":
         return JSONResponse({"ok": False, "error": "cancelled", "rid": rid}, status_code=499)
-    finally:
-        TASKS.pop(rid, None)
+    else:
+        return JSONResponse({"ok": False, "error": job.error or "error", "rid": rid}, status_code=500)
+
 
 
 @app.api_route("/api/cancel/{rid}", methods=["GET", "POST"])
 async def cancel_rid(rid: str):
+    # Cancel queued/running Job first
+    job = RUNNING.get(rid) or next((j for j in list(JOB_QUEUE._queue) if getattr(j, "rid", None) == rid), None)  # noqa: SLF001 (accessing _queue)
+    if job:
+        job.cancelled = True
+        if job.status == "queued":
+            job.status = "cancelled"
+            await job.updates.put(_sse("cancelled", {"rid": rid}))
+    # Back-compat: cancel any TASKS entry too
     task = TASKS.get(rid)
-    log.info("CANCEL rid=%s found=%s done=%s", rid, bool(task), getattr(task, "done", lambda: True)())
+    log.info("CANCEL rid=%s found_task=%s done=%s", rid, bool(task), getattr(task, "done", lambda: True)())
     if task and not task.done():
         task.cancel()
     return Response(status_code=204)
+
+
 
 
 # ---------- Shutdown: clean up tasks ----------
