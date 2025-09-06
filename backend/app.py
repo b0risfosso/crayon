@@ -29,55 +29,145 @@ def close_db(exception):
     if db is not None:
         db.close()
 
+def table_has_column(db: sqlite3.Connection, table: str, col: str) -> bool:
+    r = db.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(row["name"] == col for row in r)
+
 def init_db():
     db = get_db()
-    db.executescript(
-        """
-        PRAGMA foreign_keys = ON;
+    db.execute("PRAGMA foreign_keys = ON;")
 
-        CREATE TABLE IF NOT EXISTS narratives (
-          id          INTEGER PRIMARY KEY,
-          title       TEXT NOT NULL,
-          description TEXT,
-          created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-        );
+    # 1) Create core tables (non-destructive)
+    db.executescript("""
+    CREATE TABLE IF NOT EXISTS narratives (
+      id          INTEGER PRIMARY KEY,
+      title       TEXT NOT NULL,
+      description TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-        CREATE TABLE IF NOT EXISTS narrative_dimensions (
-          id           INTEGER PRIMARY KEY,
-          narrative_id INTEGER NOT NULL,
-          title        TEXT NOT NULL,
-          description  TEXT,
-          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE
-        );
+    CREATE TABLE IF NOT EXISTS narrative_dimensions (
+      id           INTEGER PRIMARY KEY,
+      narrative_id INTEGER NOT NULL,
+      title        TEXT NOT NULL,
+      description  TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE
+    );
 
-        -- Seeds attach to a dimension (and thus indirectly to a narrative)
-        CREATE TABLE IF NOT EXISTS narrative_seeds (
-          id           INTEGER PRIMARY KEY,
-          dimension_id INTEGER NOT NULL,
-          title        TEXT NOT NULL,
-          description  TEXT,
-          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE
-        );
+    -- create the current seeds table if it doesn't exist yet (new schema)
+    CREATE TABLE IF NOT EXISTS narrative_seeds (
+      id           INTEGER PRIMARY KEY,
+      dimension_id INTEGER NOT NULL,
+      title        TEXT NOT NULL,
+      description  TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE
+    );
 
-        CREATE TABLE IF NOT EXISTS narrative_structures (
-          id                 INTEGER PRIMARY KEY,
-          narrative_id       INTEGER NOT NULL,
-          narrative_seed_id  INTEGER NOT NULL,
-          text               TEXT NOT NULL,
-          created_at         TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY (narrative_id)      REFERENCES narratives(id)      ON DELETE CASCADE,
-          FOREIGN KEY (narrative_seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
-        );
+    CREATE TABLE IF NOT EXISTS narrative_structures (
+      id                 INTEGER PRIMARY KEY,
+      narrative_id       INTEGER NOT NULL,
+      narrative_seed_id  INTEGER NOT NULL,
+      text               TEXT NOT NULL,
+      created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (narrative_id)      REFERENCES narratives(id)      ON DELETE CASCADE,
+      FOREIGN KEY (narrative_seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
+    );
+    """)
 
-        CREATE INDEX IF NOT EXISTS idx_dims_by_narr   ON narrative_dimensions(narrative_id);
-        CREATE INDEX IF NOT EXISTS idx_seeds_by_dim   ON narrative_seeds(dimension_id);
-        CREATE INDEX IF NOT EXISTS idx_struct_by_seed ON narrative_structures(narrative_seed_id);
-        CREATE INDEX IF NOT EXISTS idx_struct_by_narr ON narrative_structures(narrative_id);
-        """
-    )
+    # 2) Detect legacy seeds schema (no 'dimension_id' but has 'narrative_id')
+    # If the table already existed with the old columns, SQLite kept it and the CREATE above was a no-op.
+    has_dim_col = table_has_column(db, "narrative_seeds", "dimension_id")
+    has_narr_col = table_has_column(db, "narrative_seeds", "narrative_id")
+
+    if has_narr_col and not has_dim_col:
+        # ---- MIGRATION: narrative_seeds (old) -> narrative_seeds_new (with dimension_id)
+        # Strategy:
+        #  - ensure at least one dimension per narrative (create default if missing)
+        #  - create new seeds table
+        #  - copy old seeds rows and map narrative_id -> default dimension_id
+        #  - drop old table & rename new
+        db.execute("BEGIN;")
+        try:
+            # 2a) ensure default dimension exists for each narrative (if none yet)
+            narratives = db.execute("SELECT id, title, description FROM narratives").fetchall()
+            for n in narratives:
+                existing_dim = db.execute(
+                    "SELECT id FROM narrative_dimensions WHERE narrative_id = ? LIMIT 1",
+                    (n["id"],)
+                ).fetchone()
+                if not existing_dim:
+                    db.execute(
+                        "INSERT INTO narrative_dimensions (narrative_id, title, description) VALUES (?, ?, ?)",
+                        (n["id"], f'{n["title"]} — root', n["description"])
+                    )
+
+            # Build mapping narrative_id -> (some) dimension_id
+            dim_map = {
+                row["narrative_id"]: row["id"]
+                for row in db.execute("""
+                    SELECT d.id, d.narrative_id
+                    FROM narrative_dimensions d
+                    JOIN (
+                      SELECT narrative_id, MIN(id) AS min_id
+                      FROM narrative_dimensions
+                      GROUP BY narrative_id
+                    ) x ON x.narrative_id = d.narrative_id AND x.min_id = d.id
+                """).fetchall()
+            }
+
+            # 2b) create new seeds table explicitly (fresh)
+            db.executescript("""
+            CREATE TABLE narrative_seeds_new (
+              id           INTEGER PRIMARY KEY,
+              dimension_id INTEGER NOT NULL,
+              title        TEXT NOT NULL,
+              description  TEXT,
+              created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+              FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE
+            );
+            """)
+
+            # 2c) copy old rows
+            old_rows = db.execute("SELECT id, narrative_id, title, description, created_at FROM narrative_seeds").fetchall()
+            for r in old_rows:
+                dim_id = dim_map.get(r["narrative_id"])
+                if not dim_id:
+                    # Fallback: create a default dimension on the fly
+                    cur = db.execute(
+                        "INSERT INTO narrative_dimensions (narrative_id, title) VALUES (?, ?)",
+                        (r["narrative_id"], "root")
+                    )
+                    dim_id = cur.lastrowid
+                    dim_map[r["narrative_id"]] = dim_id
+
+                db.execute(
+                    "INSERT INTO narrative_seeds_new (id, dimension_id, title, description, created_at) VALUES (?,?,?,?,?)",
+                    (r["id"], dim_id, r["title"], r["description"], r["created_at"])
+                )
+
+            # 2d) swap tables
+            db.executescript("""
+            ALTER TABLE narrative_seeds RENAME TO narrative_seeds_old;
+            ALTER TABLE narrative_seeds_new RENAME TO narrative_seeds;
+            DROP TABLE narrative_seeds_old;
+            """)
+
+            db.execute("COMMIT;")
+        except Exception:
+            db.execute("ROLLBACK;")
+            raise
+
+    # 3) (Re)create indexes (now safe)
+    db.executescript("""
+    CREATE INDEX IF NOT EXISTS idx_dims_by_narr   ON narrative_dimensions(narrative_id);
+    CREATE INDEX IF NOT EXISTS idx_seeds_by_dim   ON narrative_seeds(dimension_id);
+    CREATE INDEX IF NOT EXISTS idx_struct_by_seed ON narrative_structures(narrative_seed_id);
+    CREATE INDEX IF NOT EXISTS idx_struct_by_narr ON narrative_structures(narrative_id);
+    """)
     db.commit()
+
 
 with app.app_context():
     init_db()
