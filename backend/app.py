@@ -79,8 +79,7 @@ def init_db():
     )
     db.commit()
 
-@app.before_first_request
-def _boot():
+with app.app_context():
     init_db()
 
 # -----------------------------
