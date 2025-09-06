@@ -41,7 +41,6 @@
     border-radius: 12px;
     padding: 1rem 1.25rem;
     transition: transform .08s ease, box-shadow .08s ease;
-    cursor: pointer;
   }
   .card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.06); }
   .title { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
@@ -70,16 +69,11 @@
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
       data.forEach(n=>{
-        const href = (n.webpage || '').trim();
         const card = document.createElement('div');
         card.className = 'card';
-        if (href) {
-          card.addEventListener('click', ()=> window.open(href, '_blank','noopener'));
-        }
         card.innerHTML = `
           <h2 class="title">${n.id}. ${n.title}</h2>
           <p class="desc">${n.description || ''}</p>
-          <small>${href ? 'Opens: ' + href : 'No link set'} • Started: ${n.start_iso_local ? new Date(n.start_iso_local).toLocaleString() : '—'}</small>
         `;
         grid.appendChild(card);
       });
