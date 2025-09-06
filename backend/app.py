@@ -1,13 +1,14 @@
 # app.py
+import os
 import sqlite3
 import textwrap
-from flask import Flask, jsonify, request, g, Response
 from typing import Any, Dict
+from flask import Flask, jsonify, request, g, Response
 
 # -----------------------------
 # Config
 # -----------------------------
-DB_PATH = "/var/www/site/data/narratives_data.db"
+DB_PATH = os.environ.get("DB_PATH", "/var/www/site/data/narratives_data.db")
 
 app = Flask(__name__)
 
@@ -18,7 +19,6 @@ def get_db() -> sqlite3.Connection:
     if "db" not in g:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
-        # Enforce foreign keys
         conn.execute("PRAGMA foreign_keys = ON;")
         g.db = conn
     return g.db
@@ -42,13 +42,23 @@ def init_db():
           created_at  TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        CREATE TABLE IF NOT EXISTS narrative_seeds (
-          id            INTEGER PRIMARY KEY,
-          narrative_id  INTEGER NOT NULL,
-          title         TEXT NOT NULL,
-          description   TEXT,
-          created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        CREATE TABLE IF NOT EXISTS narrative_dimensions (
+          id           INTEGER PRIMARY KEY,
+          narrative_id INTEGER NOT NULL,
+          title        TEXT NOT NULL,
+          description  TEXT,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE
+        );
+
+        -- Seeds attach to a dimension (and thus indirectly to a narrative)
+        CREATE TABLE IF NOT EXISTS narrative_seeds (
+          id           INTEGER PRIMARY KEY,
+          dimension_id INTEGER NOT NULL,
+          title        TEXT NOT NULL,
+          description  TEXT,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS narrative_structures (
@@ -61,9 +71,10 @@ def init_db():
           FOREIGN KEY (narrative_seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
         );
 
-        CREATE INDEX IF NOT EXISTS idx_seeds_by_narrative ON narrative_seeds(narrative_id);
-        CREATE INDEX IF NOT EXISTS idx_struct_by_seed     ON narrative_structures(narrative_seed_id);
-        CREATE INDEX IF NOT EXISTS idx_struct_by_narr     ON narrative_structures(narrative_id);
+        CREATE INDEX IF NOT EXISTS idx_dims_by_narr   ON narrative_dimensions(narrative_id);
+        CREATE INDEX IF NOT EXISTS idx_seeds_by_dim   ON narrative_seeds(dimension_id);
+        CREATE INDEX IF NOT EXISTS idx_struct_by_seed ON narrative_structures(narrative_seed_id);
+        CREATE INDEX IF NOT EXISTS idx_struct_by_narr ON narrative_structures(narrative_id);
         """
     )
     db.commit()
@@ -131,12 +142,12 @@ def create_narrative():
     return jsonify(row_to_dict(row)), 201
 
 # -----------------------------
-# Narrative Seeds
+# Narrative Dimensions
 # -----------------------------
-@app.get("/api/narrative-seeds")
-def list_seeds():
-    narrative = request.args.get("narrative", type=int)
-    if not narrative:
+@app.get("/api/narrative-dimensions")
+def list_dimensions():
+    narrative_id = request.args.get("narrative", type=int)
+    if not narrative_id:
         return error_json("missing_narrative_param", 400)
 
     limit = max(1, min(request.args.get("limit", 100, type=int), 500))
@@ -146,28 +157,28 @@ def list_seeds():
     rows = db.execute(
         """
         SELECT id, narrative_id, title, description, created_at
-        FROM narrative_seeds
+        FROM narrative_dimensions
         WHERE narrative_id = ?
         ORDER BY id ASC
         LIMIT ? OFFSET ?
         """,
-        (narrative, limit, offset),
+        (narrative_id, limit, offset),
     ).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
-@app.get("/api/narrative-seeds/<int:seed_id>")
-def get_seed(seed_id: int):
+@app.get("/api/narrative-dimensions/<int:dimension_id>")
+def get_dimension(dimension_id: int):
     db = get_db()
     row = db.execute(
-        "SELECT id, narrative_id, title, description, created_at FROM narrative_seeds WHERE id = ?",
-        (seed_id,),
+        "SELECT id, narrative_id, title, description, created_at FROM narrative_dimensions WHERE id = ?",
+        (dimension_id,),
     ).fetchone()
     if not row:
-        return error_json("seed_not_found", 404)
+        return error_json("dimension_not_found", 404)
     return jsonify(row_to_dict(row))
 
-@app.post("/api/narrative-seeds")
-def create_seed():
+@app.post("/api/narrative-dimensions")
+def create_dimension():
     data = request.get_json(silent=True) or {}
     narrative_id = data.get("narrative_id")
     title = (data.get("title") or "").strip()
@@ -177,18 +188,81 @@ def create_seed():
         return error_json("missing_fields: narrative_id, title", 400)
 
     db = get_db()
-    exists = db.execute("SELECT 1 FROM narratives WHERE id = ?", (narrative_id,)).fetchone()
-    if not exists:
+    ok = db.execute("SELECT 1 FROM narratives WHERE id = ?", (narrative_id,)).fetchone()
+    if not ok:
         return error_json("narrative_not_found", 404)
 
     cur = db.execute(
-        "INSERT INTO narrative_seeds (narrative_id, title, description) VALUES (?, ?, ?)",
+        "INSERT INTO narrative_dimensions (narrative_id, title, description) VALUES (?, ?, ?)",
         (narrative_id, title, description or None),
+    )
+    db.commit()
+    did = cur.lastrowid
+    row = db.execute(
+        "SELECT id, narrative_id, title, description, created_at FROM narrative_dimensions WHERE id = ?",
+        (did,),
+    ).fetchone()
+    return jsonify(row_to_dict(row)), 201
+
+# -----------------------------
+# Narrative Seeds (by Dimension)
+# -----------------------------
+@app.get("/api/narrative-seeds")
+def list_seeds():
+    dimension_id = request.args.get("dimension", type=int)
+    if not dimension_id:
+        return error_json("missing_dimension_param", 400)
+
+    limit = max(1, min(request.args.get("limit", 100, type=int), 500))
+    offset = max(0, request.args.get("offset", 0, type=int))
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT id, dimension_id, title, description, created_at
+        FROM narrative_seeds
+        WHERE dimension_id = ?
+        ORDER BY id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (dimension_id, limit, offset),
+    ).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.get("/api/narrative-seeds/<int:seed_id>")
+def get_seed(seed_id: int):
+    db = get_db()
+    row = db.execute(
+        "SELECT id, dimension_id, title, description, created_at FROM narrative_seeds WHERE id = ?",
+        (seed_id,),
+    ).fetchone()
+    if not row:
+        return error_json("seed_not_found", 404)
+    return jsonify(row_to_dict(row))
+
+@app.post("/api/narrative-seeds")
+def create_seed():
+    data = request.get_json(silent=True) or {}
+    dimension_id = data.get("dimension_id")
+    title = (data.get("title") or "").strip()
+    description = (data.get("description") or "").strip()
+
+    if not dimension_id or not title:
+        return error_json("missing_fields: dimension_id, title", 400)
+
+    db = get_db()
+    ok = db.execute("SELECT 1 FROM narrative_dimensions WHERE id = ?", (dimension_id,)).fetchone()
+    if not ok:
+        return error_json("dimension_not_found", 404)
+
+    cur = db.execute(
+        "INSERT INTO narrative_seeds (dimension_id, title, description) VALUES (?, ?, ?)",
+        (dimension_id, title, description or None),
     )
     db.commit()
     sid = cur.lastrowid
     row = db.execute(
-        "SELECT id, narrative_id, title, description, created_at FROM narrative_seeds WHERE id = ?",
+        "SELECT id, dimension_id, title, description, created_at FROM narrative_seeds WHERE id = ?",
         (sid,),
     ).fetchone()
     return jsonify(row_to_dict(row)), 201
@@ -199,7 +273,6 @@ def create_seed():
 @app.post("/api/narrative-structures")
 def create_structure():
     """
-    Store a structure text for a seed.
     JSON: { "narrative_id": int, "narrative_seed_id": int, "text": str }
     """
     data = request.get_json(silent=True) or {}
@@ -215,12 +288,9 @@ def create_structure():
     if not n_ok:
         return error_json("narrative_not_found", 404)
 
-    s_ok = db.execute(
-        "SELECT 1 FROM narrative_seeds WHERE id = ? AND narrative_id = ?",
-        (narrative_seed_id, narrative_id),
-    ).fetchone()
+    s_ok = db.execute("SELECT 1 FROM narrative_seeds WHERE id = ?", (narrative_seed_id,)).fetchone()
     if not s_ok:
-        return error_json("seed_not_found_or_mismatch", 404)
+        return error_json("seed_not_found", 404)
 
     cur = db.execute(
         "INSERT INTO narrative_structures (narrative_id, narrative_seed_id, text) VALUES (?, ?, ?)",
@@ -267,15 +337,18 @@ def get_latest_structure_for_seed():
 @app.get("/api/narrative-structure/<int:seed_id>")
 def generate_narrative_structure(seed_id: int):
     """
-    Returns a plain-text Fantasiagenesis narrative template for the given seed,
-    generated on the fly from seed + narrative context.
+    Generate a plain-text template using:
+    seed -> dimension -> narrative
     """
     db = get_db()
     seed = db.execute(
         """
-        SELECT s.id, s.title, s.description, s.narrative_id, n.title AS narrative_title
+        SELECT s.id AS seed_id, s.title AS seed_title, s.description AS seed_desc,
+               d.id AS dimension_id, d.title AS dim_title, d.narrative_id AS narrative_id,
+               n.title AS narrative_title
         FROM narrative_seeds s
-        JOIN narratives n ON n.id = s.narrative_id
+        JOIN narrative_dimensions d ON d.id = s.dimension_id
+        JOIN narratives n ON n.id = d.narrative_id
         WHERE s.id = ?
         """,
         (seed_id,),
@@ -283,14 +356,15 @@ def generate_narrative_structure(seed_id: int):
     if not seed:
         return Response("Seed not found.", status=404, mimetype="text/plain")
 
-    title = seed["title"] or "Untitled Seed"
-    seed_desc = (seed["description"] or "").strip()
+    title = seed["seed_title"] or "Untitled Seed"
+    seed_desc = (seed["seed_desc"] or "").strip()
     narrative_title = seed["narrative_title"] or "Narrative"
+    dim_title = seed["dim_title"] or "Dimension"
 
     objective = (
         seed_desc
         if seed_desc
-        else f'Advance the seed "{title}" within the {narrative_title} narrative.'
+        else f'Advance seed "{title}" within "{dim_title}" of {narrative_title}.'
     )
     hypothesis = (
         "If the correct levers (people, tools, systems) are mobilized in the right order, "
@@ -362,5 +436,5 @@ def generate_narrative_structure(seed_id: int):
 # Main
 # -----------------------------
 if __name__ == "__main__":
-    # For local testing; in production use gunicorn
+    # Local testing; use gunicorn in production
     app.run(host="0.0.0.0", port=5000, debug=True)

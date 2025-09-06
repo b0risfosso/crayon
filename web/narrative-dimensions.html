@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Fantasiagenesis — Narrative Seeds</title>
+  <title>Fantasiagenesis — Narrative Dimensions</title>
   <style>
   :root { --bg:#f9fafb; --card:#fff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; }
   body { font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); margin:0; }
@@ -24,11 +24,11 @@
 <body>
   <header>
     <h1>fantasiagenesis</h1>
-    <span style="color:#6b7280">narratives → dimensions → seeds</span>
+    <span style="color:#6b7280">narratives → dimensions</span>
   </header>
 
   <main>
-    <p class="breadcrumb"><a class="back" href="javascript:history.back()">← back</a></p>
+    <p class="breadcrumb"><a class="back" href="./">← back to narratives</a></p>
     <div id="meta"></div>
     <section id="grid" class="grid" aria-live="polite"></section>
     <footer>© <span id="year"></span> fantasiagenesis.</footer>
@@ -36,38 +36,38 @@
 
   <script>
     const qs = new URLSearchParams(location.search);
-    const dimensionId = Number(qs.get('dimension') || '0');
+    const narrativeId = Number(qs.get('narrative') || '0');
 
     const api = {
-      dimension: (id) => fetch(`/api/narrative-dimensions/${id}`).then(r=>r.json()),
-      seeds: (id) => fetch(`/api/narrative-seeds?dimension=${id}`).then(r=>r.json())
+      narrative: (id) => fetch(`/api/narratives/${id}`).then(r=>r.json()),
+      dimensions: (id) => fetch(`/api/narrative-dimensions?narrative=${id}`).then(r=>r.json())
     };
 
-    function renderMeta(d) {
+    function renderMeta(n) {
       const meta = document.getElementById('meta');
-      if (!d || !d.id) { meta.innerHTML = `<h2 class="title">Dimension not found</h2>`; return; }
+      if (!n || !n.id) { meta.innerHTML = `<h2 class="title">Narrative not found</h2>`; return; }
       meta.innerHTML = `
-        <h2 class="title">${d.id}. ${d.title}</h2>
-        <p class="desc">${d.description || ''}</p>
+        <h2 class="title">${n.id}. ${n.title}</h2>
+        <p class="desc">${n.description || ''}</p>
       `;
     }
 
-    function renderSeeds(items){
+    function renderDimensions(items){
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
       if (!items.length){
-        grid.innerHTML = `<div class="card"><div class="desc">No seeds yet for this dimension.</div></div>`;
+        grid.innerHTML = `<div class="card"><div class="desc">No dimensions yet for this narrative.</div></div>`;
         return;
       }
-      items.forEach(s=>{
+      items.forEach(d=>{
         const card = document.createElement('div');
         card.className = 'card';
         card.addEventListener('click', ()=> {
-          window.location.href = `narrative-structure.html?seed=${s.id}`;
+          window.location.href = `narrative-seeds.html?dimension=${d.id}`;
         });
         card.innerHTML = `
-          <h3 class="title">${s.id}. ${s.title}</h3>
-          <p class="desc">${s.description || ''}</p>
+          <h3 class="title">${d.id}. ${d.title}</h3>
+          <p class="desc">${d.description || ''}</p>
         `;
         grid.appendChild(card);
       });
@@ -75,15 +75,15 @@
 
     async function boot(){
       document.getElementById('year').textContent = new Date().getFullYear();
-      if (!dimensionId){ renderMeta(null); renderSeeds([]); return; }
+      if (!narrativeId){ renderMeta(null); renderDimensions([]); return; }
       try{
-        const [d, seeds] = await Promise.all([api.dimension(dimensionId), api.seeds(dimensionId)]);
-        renderMeta(d);
-        renderSeeds(seeds);
+        const [n, dims] = await Promise.all([api.narrative(narrativeId), api.dimensions(narrativeId)]);
+        renderMeta(n);
+        renderDimensions(dims);
       } catch(e){
         console.error(e);
         renderMeta(null);
-        renderSeeds([]);
+        renderDimensions([]);
       }
     }
     boot();
