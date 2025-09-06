@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasiagenesis — Narrative Structure</title>
+  <style>
+  :root {
+    --bg: #f9fafb;
+    --card: #fff;
+    --text: #111827;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+  }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
+  header { position: sticky; top: 0; background: var(--card); border-bottom: 1px solid var(--line); padding: .75rem 1rem; display:flex; justify-content:space-between; align-items:center; }
+  h1 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+  main { max-width: 64rem; margin: 0 auto; padding: 1rem; }
+  .meta { margin-bottom: .75rem; color: var(--muted); }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+  }
+  .controls { display:flex; gap:.5rem; margin:.75rem 0 1rem; flex-wrap:wrap; }
+  button, .btn {
+    cursor: pointer; border:1px solid var(--line); background: var(--card);
+    padding:.4rem .7rem; border-radius:10px; font-size:.9rem;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    line-height: 1.4;
+  }
+  a.back { text-decoration:none; color: var(--muted); }
+  footer { color: var(--muted); margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>fantasiagenesis</h1>
+    <span style="color:var(--muted)">narrative → seeds → structure</span>
+  </header>
+
+  <main>
+    <p><a class="back" href="javascript:history.back()">← back</a></p>
+    <div class="meta" id="meta"></div>
+    <div class="controls">
+      <button id="copyBtn">Copy</button>
+      <a id="downloadBtn" class="btn" download="narrative-structure.txt">Download .txt</a>
+    </div>
+    <section class="panel">
+      <pre id="content">Loading…</pre>
+    </section>
+    <footer>© <span id="year"></span> fantasiagenesis.</footer>
+  </main>
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const seedId = Number(qs.get('seed') || '0');
+    const metaEl = document.getElementById('meta');
+    const contentEl = document.getElementById('content');
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    async function load() {
+      if (!seedId) {
+        metaEl.textContent = 'Seed not found';
+        contentEl.textContent = '';
+        return;
+      }
+      try {
+        const [seed, structure] = await Promise.all([
+          fetch(`/api/narrative-seeds/${seedId}`).then(r => r.json()),
+          fetch(`/api/narrative-structure/${seedId}`).then(r => r.text())
+        ]);
+        metaEl.textContent = `${seed.id}. ${seed.title}`;
+        contentEl.textContent = structure;
+
+        // wire copy
+        copyBtn.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(structure);
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => copyBtn.textContent = 'Copy', 900);
+          } catch {}
+        };
+
+        // wire download
+        const blob = new Blob([structure], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        downloadBtn.href = url;
+
+      } catch (e) {
+        metaEl.textContent = 'Failed to load';
+        contentEl.textContent = '';
+        console.error(e);
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
