@@ -1,3 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasiagenesis</title>
+  <!-- In your <head> -->
+<style>
+  :root{
+    --line: #cfd8dc;
+    --accent: #0ea5e9;
+    --muted: #64748b;
+    --bg: #0b1020;
+    --card: #0f172a;
+    --text: #e2e8f0;
+    --good: #22c55e;
+  }
+
+  /* Canvas */
+  body{background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";}
+  .narrative-tree{ 
+    display:grid; 
+    grid-template-rows: auto auto auto; /* branches, trunk+fruit, roots */
+    gap: 1.25rem; 
+    padding: 1.25rem; 
+    border:1px solid #1f2937; 
+    border-radius:16px; 
+    background: linear-gradient(180deg, #0f1222 0%, #0b1020 100%);
+    position:relative;
+    overflow: hidden;
+  }
+  .narrative-tree header{
+    display:flex; justify-content:space-between; align-items:center;
+    padding-bottom:.5rem; border-bottom:1px dashed #1f2937;
+  }
+  .narrative-tree h2{ font-size:1.25rem; margin:0; }
+  .pipeline{ font-size:.9rem; color:var(--muted); white-space:nowrap; }
+
+  /* Tree rows */
+  .branches, .trunk, .roots, .leaf, .fruit { position: relative; }
+  .tree-grid{
+    display:grid; 
+    grid-template-columns: 2fr 1fr 2fr; 
+    gap: 1rem;
+  }
+
+  /* Top row: Branches (left) and Leaf (right) */
+  .row-top{
+    display:grid; 
+    grid-template-columns: 2fr 1fr; 
+    gap:1rem; 
+    align-items:start;
+  }
+
+  /* Middle row: Trunk centered with Fruit panels fanning out */
+  .row-mid{
+    display:grid; 
+    grid-template-columns: 1fr 1fr 1fr; 
+    gap:1rem; 
+    align-items:start;
+  }
+
+  /* Bottom row: Roots full width */
+  .row-bot{ }
+
+  /* Cards */
+  .narrative-tree .roots, 
+  .narrative-tree .branches, 
+  .narrative-tree .leaf,
+  .narrative-tree .trunk, 
+  .narrative-tree .fruit > .panel{
+    background: var(--card);
+    border:1px solid #1f2937;
+    border-radius: 14px;
+    padding: .9rem 1rem;
+  }
+
+  /* Trunk emphasized */
+  .trunk { 
+    grid-column: 2; 
+    text-align:center; 
+    font-weight: 800; 
+    font-size:1.05rem; 
+    position:relative;
+  }
+
+  /* Fruit panels layout */
+  .fruit{ 
+    display:grid; 
+    grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); 
+    gap:.75rem; 
+  }
+  .panel h4{ margin:.15rem 0 .5rem; font-size:.95rem; }
+  .panel ul, .panel ol{ margin:.25rem 0 0 1.15rem; }
+
+  /* Possible lists collapsed by default */
+  .possible{ 
+    max-height:0; 
+    overflow:hidden; 
+    transition:max-height .28s ease, opacity .28s ease; 
+    opacity:0;
+  }
+  .possible[aria-expanded="true"]{ 
+    max-height: 260px; 
+    opacity:1; 
+  }
+  .selected{ color: var(--text); margin:.35rem 0 0; }
+  .selected strong{ color: var(--accent); }
+
+  /* Headings as toggles */
+  .branches h3, .roots h3{
+    display:flex; align-items:center; gap:.5rem; cursor:pointer; user-select:none;
+    margin:0 0 .4rem 0;
+  }
+  .branches h3::after, .roots h3::after{
+    content:"▸"; font-size:.9rem; color:var(--muted); transition: transform .2s ease;
+  }
+  .branches h3[aria-expanded="true"]::after,
+  .roots h3[aria-expanded="true"]::after{
+    transform: rotate(90deg);
+  }
+
+  /* Leaf highlight */
+  .leaf{
+    border:1px solid rgba(14,165,233,.35);
+    box-shadow: 0 0 0 3px rgba(14,165,233,.14) inset;
+  }
+
+  /* Connector lines (simple) */
+  .trunk::before, .trunk::after{
+    content:""; position:absolute; left:50%; transform:translateX(-50%); width:2px; background:var(--line);
+  }
+  .trunk::before{ top:-12px; height:12px; } /* up to leaf row */
+  .trunk::after{ bottom:-12px; height:12px; } /* down to roots row */
+
+  /* Small tweaks */
+  .narrative-tree h3{ margin:.1rem 0 .25rem; font-size:.95rem; color:#cbd5e1; font-weight:700; }
+  .narrative-tree p, .narrative-tree li{ color:#e2e8f0; }
+  .muted{ color: var(--muted); }
+  .good{ color: var(--good); font-weight:700; }
+</style>
+
+</head>
+<body>
+  <header>
+    <h1>fantasiagenesis</h1>
+    <span style="color:#6b7280;font-size:0.95rem;">creating and executing narratives</span>
+  </header>
+
+  <main>
+    <!-- =========================================
+     ⚡ ENERGY — Tree Metaphor
+     ========================================= -->
+<section class="narrative-tree" data-trunk="energy" data-root="survival" data-leaf="no-power->baseline-solar">
+  <header>
+    <h2>Energy</h2>
+    <p class="pipeline">Roots → Trunk → Branches → Leaf → Fruit</p>
+  </header>
+
+  <!-- ROOTS (Spaces) -->
+  <div class="roots">
+    <h3>Roots</h3>
+    <ul class="possible">
+      <li>Survival</li>
+      <li>Power / Geopolitics</li>
+      <li>Scale (electron → grid)</li>
+      <li>Innovation / Transitions</li>
+    </ul>
+    <p class="selected"><strong>Selected root:</strong> Survival</p>
+  </div>
+
+  <!-- TRUNK (Domain) -->
+  <div class="trunk">
+    <h3>Trunk</h3>
+    <p>Energy</p>
+  </div>
+
+  <!-- BRANCHES (A→B options) -->
+  <div class="branches">
+    <h3>Branches (Seeds)</h3>
+    <ul class="possible">
+      <li>A: Kerosene lighting → B: Solar lanterns</li>
+      <li>A: No refrigeration → B: Solar + battery cold-chain</li>
+      <li>A: No evening study → B: Off-grid study lights</li>
+    </ul>
+  </div>
+
+  <!-- LEAF (Chosen A→B) -->
+  <div class="leaf">
+    <h3>Leaf (Chosen A→B)</h3>
+    <p><strong>A:</strong> Communities lack reliable electricity →
+       <strong>B:</strong> Small-scale solar kits provide baseline survival power.</p>
+  </div>
+
+  <!-- FRUIT (Panels/Outputs) -->
+  <div class="fruit">
+    <article class="panel" data-panel="success-metric">
+      <h4>Success Metric</h4>
+      <ul>
+        <li>≥ <strong>1 MJ/day</strong> from solar</li>
+        <li>≥ <strong>4 hours</strong> of light nightly</li>
+      </ul>
+    </article>
+
+    <article class="panel" data-panel="materials">
+      <h4>Materials / BOM</h4>
+      <ul>
+        <li>100W solar panel</li>
+        <li>PWM/MPPT charge controller</li>
+        <li>12V battery or LFP pack</li>
+        <li>LED lamps, wiring, connectors, fuse</li>
+      </ul>
+    </article>
+
+    <article class="panel" data-panel="protocol">
+      <h4>Protocol</h4>
+      <ol>
+        <li>Mount panel in clear sun; aim true south (N. hemisphere).</li>
+        <li>Panel → controller; controller → battery (correct polarity).</li>
+        <li>Battery → LED load via fused controller terminals.</li>
+        <li>Verify charging; log daily Wh and hours of light.</li>
+        <li>Adjust tilt seasonally.</li>
+      </ol>
+    </article>
+
+    <article class="panel" data-panel="datasheet">
+      <h4>Datasheet / Notes</h4>
+      <ul>
+        <li>Expect ~300–600 Wh/day from a 100W panel (location dependent).</li>
+        <li>Limit DoD: ≤80% (lead-acid), ≤90% (LFP).</li>
+        <li>Upgrades: USB ports; series panels for 24V.</li>
+      </ul>
+    </article>
+  </div>
+</section>
+<!-- =========================================
+     💧 WATER — Tree Metaphor
+     ========================================= -->
+     <section class="narrative-tree" data-trunk="water" data-root="survival" data-leaf="unsafe->potable-10L-day">
+      <header>
+        <h2>Water</h2>
+        <p class="pipeline">Roots → Trunk → Branches → Leaf → Fruit</p>
+      </header>
+    
+      <div class="roots">
+        <h3>Roots</h3>
+        <ul class="possible">
+          <li>Survival</li>
+          <li>Conflict (rivers, aquifers)</li>
+          <li>Cycles (hydrology)</li>
+          <li>Infrastructure (WASH)</li>
+        </ul>
+        <p class="selected"><strong>Selected root:</strong> Survival</p>
+      </div>
+    
+      <div class="trunk">
+        <h3>Trunk</h3>
+        <p>Water</p>
+      </div>
+    
+      <div class="branches">
+        <h3>Branches (Seeds)</h3>
+        <ul class="possible">
+          <li>A: Untreated river water → B: Filter + chlorine tabs</li>
+          <li>A: Drought scarcity → B: Rainwater harvesting</li>
+          <li>A: Flooded wells → B: Portable purification</li>
+        </ul>
+      </div>
+    
+      <div class="leaf">
+        <h3>Leaf (Chosen A→B)</h3>
+        <p><strong>A:</strong> Households use unsafe sources →
+           <strong>B:</strong> Simple filtration + treatment deliver <strong>10 L/day</strong> potable water.</p>
+      </div>
+    
+      <div class="fruit">
+        <article class="panel" data-panel="success-metric">
+          <h4>Success Metric</h4>
+          <ul>
+            <li><strong>10 L/day</strong> potable per household</li>
+            <li>Target: coliform <strong>&lt; 1 / 100 mL</strong></li>
+          </ul>
+        </article>
+    
+        <article class="panel" data-panel="materials">
+          <h4>Materials / BOM</h4>
+          <ul>
+            <li>20 L collection bucket</li>
+            <li>Cloth or ceramic filter</li>
+            <li>Chlorine tablets (or fuel for boiling)</li>
+            <li>Sealable clean storage container</li>
+          </ul>
+        </article>
+    
+        <article class="panel" data-panel="protocol">
+          <h4>Protocol</h4>
+          <ol>
+            <li>Collect rain/surface water in clean bucket.</li>
+            <li>Filter to reduce turbidity.</li>
+            <li>Treat: chlorine per label or boil 10 minutes.</li>
+            <li>Cool, transfer to sealed container; label time/date.</li>
+            <li>Periodically check turbidity/odor; log outcomes.</li>
+          </ol>
+        </article>
+    
+        <article class="panel" data-panel="datasheet">
+          <h4>Datasheet / Notes</h4>
+          <ul>
+            <li>Keep chlorine tabs sealed; ~6 months after opening.</li>
+            <li>Ceramic elements clog ~500 L; clean/replace.</li>
+            <li>Keep “raw” vs “clean” containers separate.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+<!-- =========================================
+     🎵 MUSIC — Tree Metaphor
+     ========================================= -->
+     <section class="narrative-tree" data-trunk="music" data-root="survival" data-leaf="discoordination->synchronization">
+      <header>
+        <h2>Music</h2>
+        <p class="pipeline">Roots → Trunk → Branches → Leaf → Fruit</p>
+      </header>
+    
+      <div class="roots">
+        <h3>Roots</h3>
+        <ul class="possible">
+          <li>Cultural / Ritual</li>
+          <li>Survival (coordination)</li>
+          <li>Power (propaganda, protest)</li>
+          <li>Technology (instruments → AI)</li>
+        </ul>
+        <p class="selected"><strong>Selected root:</strong> Survival (coordination)</p>
+      </div>
+    
+      <div class="trunk">
+        <h3>Trunk</h3>
+        <p>Music</p>
+      </div>
+    
+      <div class="branches">
+        <h3>Branches (Seeds)</h3>
+        <ul class="possible">
+          <li>A: Workers out of sync → B: Shared beat aligns effort</li>
+          <li>A: Infant distress → B: Lullabies regulate emotion</li>
+          <li>A: Pre-battle fear → B: Chants synchronize courage</li>
+        </ul>
+      </div>
+    
+      <div class="leaf">
+        <h3>Leaf (Chosen A→B)</h3>
+        <p><strong>A:</strong> Groups fall out of sync →
+           <strong>B:</strong> Rhythm synchronizes bodies and minds for cooperation.</p>
+      </div>
+    
+      <div class="fruit">
+        <article class="panel" data-panel="success-metric">
+          <h4>Success Metric</h4>
+          <ul>
+            <li>Sync <strong>≥ 5 people</strong> for <strong>≥ 60 s</strong> at steady tempo</li>
+            <li>Reduced timing variance (pre vs. post beat)</li>
+          </ul>
+        </article>
+    
+        <article class="panel" data-panel="materials">
+          <h4>Materials / BOM</h4>
+          <ul>
+            <li>Drum or hard surface (hands/voice OK)</li>
+            <li>Metronome/phone app (optional)</li>
+            <li>Recording app (optional)</li>
+          </ul>
+        </article>
+    
+        <article class="panel" data-panel="protocol">
+          <h4>Protocol</h4>
+          <ol>
+            <li>Leader sets beat (60–120 bpm).</li>
+            <li>Group claps/chants in time for 60 s.</li>
+            <li>Perform a simple coordinated task with the beat.</li>
+            <li>Record pre/post; compare timing drift.</li>
+            <li>Adopt the most stable tempo for future tasks.</li>
+          </ol>
+        </article>
+    
+        <article class="panel" data-panel="datasheet">
+          <h4>Datasheet / Notes</h4>
+          <ul>
+            <li>Call-and-response helps late joiners lock in.</li>
+            <li>~90 bpm often feels most natural.</li>
+            <li>Morale ↑; perceived exertion ↓.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
 <!-- =========================================
      🧂 SPICE — Tree Metaphor
      ========================================= -->
@@ -77,4 +471,77 @@
         </article>
       </div>
     </section>
+            
+    <footer>
+      © <span id="year"></span> fantasiagenesis ·
+      <a href="mailto:boris@fantasiagenesis.com" style="color:#6b7280;text-decoration:none;">
+        boris@fantasiagenesis.com
+      </a>
+    </footer>
     
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1) Fix arrow text if it rendered garbled anywhere
+      document.querySelectorAll('.pipeline').forEach(el => {
+        el.textContent = 'Roots → Trunk → Branches → Leaf → Fruit';
+      });
+    
+      // 2) Rename "Branches (Seeds)" → "Branches" if present
+      document.querySelectorAll('.branches h3').forEach(h => {
+        const raw = h.textContent.trim();
+        if (/Branches\s*\(.*\)/i.test(raw)) h.textContent = 'Branches';
+      });
+    
+      // 3) Collapse all "possible" lists by default; show selected summaries only
+      const collapsibles = [
+        ...document.querySelectorAll('.branches .possible'),
+        ...document.querySelectorAll('.roots .possible')
+      ];
+      collapsibles.forEach(list => list.setAttribute('aria-expanded', 'false'));
+    
+      // 4) Make h3 a toggle for the nearest .possible within the same section
+      const toggles = [
+        ...document.querySelectorAll('.branches h3'),
+        ...document.querySelectorAll('.roots h3')
+      ];
+      toggles.forEach(h => {
+        const box = h.parentElement.querySelector('.possible');
+        if (!box) return;
+        h.setAttribute('aria-expanded','false');
+        h.addEventListener('click', () => {
+          const open = box.getAttribute('aria-expanded') === 'true';
+          box.setAttribute('aria-expanded', String(!open));
+          h.setAttribute('aria-expanded', String(!open));
+        });
+      });
+    
+      // 5) Emphasize the selected Leaf (already styled with border/glow)
+      // Add a tiny badge
+      document.querySelectorAll('.leaf').forEach(leaf => {
+        if (!leaf.querySelector('.badge')) {
+          const b = document.createElement('div');
+          b.className = 'badge';
+          b.textContent = 'Selected Leaf';
+          Object.assign(b.style, {
+            position:'absolute', top:'-10px', right:'10px',
+            background:'rgba(14,165,233,.2)', color:'#7dd3fc',
+            border:'1px solid rgba(14,165,233,.35)', padding:'2px 8px',
+            borderRadius:'999px', fontSize:'.72rem'
+          });
+          leaf.style.position = 'relative';
+          leaf.appendChild(b);
+        }
+      });
+    
+      // 6) Optional: emphasize the Trunk text strongly
+      document.querySelectorAll('.trunk p').forEach(p => {
+        p.style.letterSpacing = '0.5px';
+        p.style.textTransform = 'uppercase';
+      });
+    });
+    </script>
+    
+</body>
+</html>
