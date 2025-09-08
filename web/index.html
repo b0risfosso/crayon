@@ -1,64 +1,80 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Fantasiagenesis — Narratives</title>
-  <style>
-  :root { --bg:#f9fafb; --card:#fff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; }
-  body { font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); margin:0; }
-  header { position:sticky; top:0; background:var(--card); border-bottom:1px solid var(--line); padding:.75rem 1rem; display:flex; justify-content:space-between; align-items:center; }
-  h1 { font-size:1.25rem; font-weight:700; margin:0; }
-  main { max-width:64rem; margin:0 auto; padding:1rem; }
-  .grid { display:grid; grid-template-columns:1fr; gap:1rem; }
-  @media (min-width:640px){ .grid{ grid-template-columns:1fr 1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem 1.25rem; transition:transform .08s ease, box-shadow .08s ease; cursor:pointer; }
-  .card:hover { transform:translateY(-2px); box-shadow:0 4px 14px rgba(0,0,0,.06); }
-  .title { font-size:1rem; font-weight:600; margin-bottom:.5rem; }
-  .desc { color:var(--muted); font-size:.9rem; margin-bottom:.25rem; }
-  footer { color:var(--muted); margin-top:2rem; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>fantasiagenesis</h1>
-    <span style="color:#6b7280;font-size:0.95rem;">creating and executing narratives</span>
-  </header>
-
-  <main>
-    <section id="grid" class="grid"></section>
-    <footer>
-      © <span id="year"></span> fantasiagenesis ·
-      <a href="mailto:boris@fantasiagenesis.com" style="color:#6b7280;text-decoration:none;">
-        boris@fantasiagenesis.com
-      </a>
-    </footer>
+<!-- =========================================
+     🧂 SPICE — Tree Metaphor
+     ========================================= -->
+     <section class="narrative-tree" data-trunk="spice" data-root="monopoly" data-leaf="monopoly->substitution-innovation">
+      <header>
+        <h2>Spice</h2>
+        <p class="pipeline">Roots → Trunk → Branches → Leaf → Fruit</p>
+      </header>
     
-  </main>
-
-  <script>
-    const api = { list: () => fetch('/api/narratives').then(r=>r.json()) };
-
-    async function render(){
-      const data = await api.list();
-      const grid = document.getElementById('grid');
-      grid.innerHTML = '';
-      data.forEach(n=>{
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.addEventListener('click', ()=> {
-          window.location.href = 'narrative-dimensions.html?narrative=' + n.id;
-        });
-        card.innerHTML = `
-          <h2 class="title">${n.id}. ${n.title}</h2>
-          <p class="desc">${n.description || ''}</p>
-        `;
-        grid.appendChild(card);
-      });
-    }
-
-    document.getElementById('year').textContent = new Date().getFullYear();
-    render();
-  </script>
-</body>
-</html>
+      <div class="roots">
+        <h3>Roots</h3>
+        <ul class="possible">
+          <li>Markets / Monopoly</li>
+          <li>Myth / Power</li>
+          <li>Material / Survival (preservation, fuel)</li>
+          <li>Substitution / Innovation</li>
+        </ul>
+        <p class="selected"><strong>Selected root:</strong> Markets / Monopoly</p>
+      </div>
+    
+      <div class="trunk">
+        <h3>Trunk</h3>
+        <p>Spice (salt, oil, lithium, data, compute)</p>
+      </div>
+    
+      <div class="branches">
+        <h3>Branches (Seeds)</h3>
+        <ul class="possible">
+          <li>A: Empire taxes salt → B: Local salt pans/evaporation</li>
+          <li>A: Oil dependency → B: Renewables + EV/heat-pumps</li>
+          <li>A: Data monopolies → B: Open models, synthetic data, edge inference</li>
+        </ul>
+      </div>
+    
+      <div class="leaf">
+        <h3>Leaf (Chosen A→B)</h3>
+        <p><strong>A:</strong> A monopoly controls a vital spice →
+           <strong>B:</strong> Substitution + innovation democratize access.</p>
+      </div>
+    
+      <div class="fruit">
+        <article class="panel" data-panel="success-metric">
+          <h4>Success Metric</h4>
+          <ul>
+            <li>Identify one monopolized spice in context</li>
+            <li>Propose ≥1 credible substitution/alternative pathway</li>
+          </ul>
+        </article>
+    
+        <article class="panel" data-panel="materials">
+          <h4>Materials / BOM</h4>
+          <ul>
+            <li>Local case study (salt/oil/lithium/data/compute/bandwidth)</li>
+            <li>Brief market + technical notes</li>
+            <li>Editor/whiteboard for mapping</li>
+          </ul>
+        </article>
+    
+        <article class="panel" data-panel="protocol">
+          <h4>Protocol</h4>
+          <ol>
+            <li>Define the spice (resource/permission underpinning survival/growth).</li>
+            <li>Map control: producers, transport, standards.</li>
+            <li>Brainstorm substitutes (e.g., salt pans; solar + EV; open models).</li>
+            <li>Score by cost/time/risk/resilience.</li>
+            <li>Publish substitution narrative + next actions.</li>
+          </ol>
+        </article>
+    
+        <article class="panel" data-panel="datasheet">
+          <h4>Datasheet / Notes</h4>
+          <ul>
+            <li>Every monopoly has a technological half-life.</li>
+            <li>Substitution often births new industries.</li>
+            <li>Track 2nd-order effects (jobs, geopolitics, environment).</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+    
