@@ -67,7 +67,6 @@ def init_db():
 
     CREATE TABLE IF NOT EXISTS narrative_structures (
       id                 INTEGER PRIMARY KEY,
-      narrative_id       INTEGER NOT NULL,
       narrative_seed_id  INTEGER NOT NULL,
       text               TEXT NOT NULL,
       created_at         TEXT NOT NULL DEFAULT (datetime('now')),
