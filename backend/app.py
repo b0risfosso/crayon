@@ -3,7 +3,7 @@ import sqlite3
 from flask import Flask, jsonify
 app = Flask(__name__)
 
-DB_PATH = "/var/www/site/current/backend/narratives_data.db"  # adjust path
+DB_PATH = "/var/www/site/data/narratives_data.db"  # adjust path
 
 @app.get("/api/narratives")
 def api_narratives():
