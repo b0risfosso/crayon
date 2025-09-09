@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>seeds</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.6; }
+    header { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; }
+    h1 { font-size: 1.1rem; margin: 0; }
+    .hint { opacity: .7; font-size: .9rem; }
+    .controls { margin-top: .75rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+    input, select { padding: .5rem .6rem; border-radius: .5rem; border: 1px solid currentColor; background: transparent; }
+    .grid { margin-top: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .75rem; }
+    .card { border: 1px solid currentColor; border-radius: .75rem; padding: .9rem; }
+    .card h3 { margin: 0 0 .35rem; font-size: 1rem; }
+    .meta { font-size: .85rem; opacity: .8; margin-bottom: .35rem; }
+    .empty { opacity: .7; margin-top: 1rem; }
+    nav { margin-top: 1.5rem; }
+    nav a { margin-right: 1rem; }
+    .pill { display: inline-block; padding: .15rem .45rem; border: 1px solid currentColor; border-radius: 999px; font-size: .75rem; opacity: .8; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>seeds (last <span id="days-label">7</span> days)</h1>
+    <span class="hint">A→B narrative seeds explored recently</span>
+  </header>
+
+  <div class="controls">
+    <label>Days:
+      <input type="number" id="days" min="1" max="30" value="7" />
+    </label>
+    <label>Filter by narrative:
+      <select id="narrativeFilter">
+        <option value="">All</option>
+      </select>
+    </label>
+    <span id="count" class="pill">0 seeds</span>
+  </div>
+
+  <section id="grid" class="grid" aria-live="polite"></section>
+
+  <p id="empty" class="empty" hidden>No seeds found in this window.</p>
+
+  <nav>
+    <a href="index.html">back to index</a>
+    <a href="earth.html">earth</a>
+  </nav>
+
+  <script>
+    const gridEl = document.getElementById('grid');
+    const emptyEl = document.getElementById('empty');
+    const daysInput = document.getElementById('days');
+    const daysLabel = document.getElementById('days-label');
+    const narrativeFilter = document.getElementById('narrativeFilter');
+    const countEl = document.getElementById('count');
+
+    async function fetchSeeds() {
+      const days = Math.max(1, Math.min(30, Number(daysInput.value) || 7));
+      daysLabel.textContent = String(days);
+
+      const res = await fetch(`/api/seeds?days=${encodeURIComponent(days)}`);
+      if (!res.ok) {
+        gridEl.innerHTML = '';
+        emptyEl.hidden = false;
+        emptyEl.textContent = `Error loading seeds (${res.status}).`;
+        countEl.textContent = '0 seeds';
+        return;
+      }
+      const seeds = await res.json();
+
+      // populate filter
+      const names = Array.from(new Set(seeds.map(s => s.narrative_title).filter(Boolean))).sort();
+      const current = narrativeFilter.value;
+      narrativeFilter.innerHTML = `<option value="">All</option>` + names.map(n => `<option>${n}</option>`).join('');
+      if (names.includes(current)) narrativeFilter.value = current;
+
+      render(seeds);
+    }
+
+    function render(allSeeds) {
+      const filter = narrativeFilter.value;
+      const seeds = filter ? allSeeds.filter(s => s.narrative_title === filter) : allSeeds;
+      gridEl.innerHTML = seeds.map(s => cardHTML(s)).join('');
+      const empty = seeds.length === 0;
+      emptyEl.hidden = !empty;
+      emptyEl.textContent = empty ? 'No seeds found in this window.' : '';
+      countEl.textContent = `${seeds.length} seed${seeds.length === 1 ? '' : 's'}`;
+    }
+
+    function cardHTML(s) {
+      const when = new Date(s.created_at || '').toLocaleString();
+      const title = s.title || 'Untitled seed';
+      const a = s.problem || s.a || '';
+      const b = s.objective || s.b || '';
+      const link = s.link || s.href || '';
+      const desc = s.description || '';
+
+      return `
+        <article class="card">
+          <h3>${escapeHTML(title)}</h3>
+          <div class="meta">
+            ${s.narrative_title ? `<span class="pill">${escapeHTML(s.narrative_title)}</span> ` : ''}
+            ${when ? `• ${escapeHTML(when)}` : ''}
+          </div>
+          ${desc ? `<p>${escapeHTML(desc)}</p>` : ''}
+          ${a || b ? `<p><strong>A→B:</strong> ${escapeHTML(a)} ${a && b ? '&rarr;' : ''} ${escapeHTML(b)}</p>` : ''}
+          ${link ? `<p><a href="${escapeAttr(link)}" target="_blank" rel="noopener">open</a></p>` : ''}
+        </article>
+      `;
+    }
+
+    function escapeHTML(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function escapeAttr(s) {
+      return String(s ?? '').replace(/"/g, '&quot;');
+    }
+
+    daysInput.addEventListener('change', fetchSeeds);
+    narrativeFilter.addEventListener('change', fetchSeeds);
+    fetchSeeds();
+  </script>
+</body>
+</html>
