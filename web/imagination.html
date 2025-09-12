@@ -103,12 +103,12 @@
             wrap.innerHTML = `<p class="hint err">Error loading dimensions: ${escapeHTML(String(err.message || err))}</p>`;
             wrap.dataset.state = 'idle'; // allow retry by closing/re-opening
           }
-        });
+        }, true); // ← capture=true so it fires from <details>
       } catch (err) {
         emptyEl.hidden = false;
         emptyEl.textContent = `Error loading narratives (${String(err.message || err)}).`;
       }
-    }, true); // ← capture=true so it fires from <details>
+    })();
 
     function escapeHTML(s) {
       return String(s ?? '').replace(/[&<>"']/g, c => (
