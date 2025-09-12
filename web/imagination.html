@@ -66,7 +66,7 @@
         `).join('');
 
         // Lazy-load dimensions on first expand
-        listEl.addEventListener('toggle', async (e) => {
+        document.addEventListener('toggle', async (e) => {
           const det = e.target;
           if (!(det instanceof HTMLDetailsElement)) return;
           if (!det.open) return;
@@ -108,7 +108,7 @@
         emptyEl.hidden = false;
         emptyEl.textContent = `Error loading narratives (${String(err.message || err)}).`;
       }
-    })();
+    }, true); // ← capture=true so it fires from <details>
 
     function escapeHTML(s) {
       return String(s ?? '').replace(/[&<>"']/g, c => (
