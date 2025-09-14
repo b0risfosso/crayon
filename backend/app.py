@@ -9,6 +9,14 @@ DB_PATH = "/var/www/site/data/narratives_data.db"  # keep consistent with your s
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
+class NarrativeDimension(BaseModel):
+    name: str = Field(..., description="Short title for the dimension")
+    thesis: str = Field(..., description="1–2 sentence distilled description")
+    targets: List[str] = Field(..., description="3–6 concrete narrative targets")
+
+class NarrativeDimensions(BaseModel):
+    dimensions: List[NarrativeDimension]
+
 
 SYS_MSG = """You are an assistant trained to generate narrative dimensions for any given domain.
 Each narrative dimension should have two parts:
@@ -29,23 +37,52 @@ Generate 5–8 narrative dimensions unless otherwise requested.
 """
 
 @app.post("/api/narrative-dimensions")
+# --- route ---
+@app.post("/api/narrative-dimensions")
 def generate_narrative_dimensions():
-    data = request.get_json()
-    domain = data.get("domain")
+    data = request.get_json(silent=True) or {}
+    domain = (data.get("domain") or "").strip()
+    n = data.get("n")  # optional override 1..12
+
     if not domain:
-        return jsonify({"error": "Missing 'domain' field"}), 400
+        return jsonify({"error": "Missing 'domain'"}), 400
 
-    usr_msg = f"Create narrative dimensions for the domain of {domain}."
+    count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
+    usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
 
-    resp = client.responses.create(
-        model="gpt-5",
-        input=[
-            {"role": "system", "content": SYS_MSG},
-            {"role": "user", "content": usr_msg},
-                ],
+    try:
+        # Use the parsing endpoint to coerce into our schema.
+        parsed_resp = client.responses.parse(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+            input=[
+                {"role": "system", "content": SYS_MSG},
+                {"role": "user", "content": usr_msg},
+            ],
+            text_format=NarrativeDimensions,
         )
-    output_text = resp.output_text
-    return jsonify({"domain": domain, "dimensions": output_text})
+
+        parsed = parsed_resp.output_parsed  # → NarrativeDimensions | None
+        if parsed is not None:
+            # Pydantic → dict
+            return jsonify({
+                "domain": domain,
+                "model": os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+                **parsed.model_dump(),  # {"dimensions": [...]} with name/thesis/targets
+            }), 200
+
+        # Fallback: if parsing failed silently, return raw text to debug prompt/schema.
+        return jsonify({
+            "domain": domain,
+            "model": os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+            "raw": parsed_resp.output_text,
+            "note": "Parsing returned None; inspect 'raw'.",
+        }), 200
+
+    except OpenAIError as e:
+        return jsonify({"error": "OpenAI API error", "detail": str(e)}), 502
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
 
 
 def _query_all(sql, params=()):
