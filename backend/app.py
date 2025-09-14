@@ -135,7 +135,7 @@ def generate_narrative_seeds():
 
     try:
         parsed_resp = client.responses.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+            model=os.getenv("OPENAI_MODEL", "gpt-5"),
             input=[
                 {"role": "system", "content": SEED_SYS_MSG},
                 {"role": "user", "content": usr_msg},
