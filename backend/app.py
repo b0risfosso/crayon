@@ -2,6 +2,9 @@ import os
 from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request
+from typing import List
+from pydantic import BaseModel, Field
+from openai import OpenAI, OpenAIError
 
 app = Flask(__name__)
 
