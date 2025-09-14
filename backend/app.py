@@ -20,8 +20,16 @@ class NarrativeDimension(BaseModel):
 class NarrativeDimensions(BaseModel):
     dimensions: List[NarrativeDimension]
 
+class NarrativeSeed(BaseModel):
+    problem: str = Field(..., description="A (Problem)")
+    objective: str = Field(..., description="B (Objective)")
+    solution: str = Field(..., description="Solution (Link)")
 
-SYS_MSG = """You are an assistant trained to generate narrative dimensions for any given domain.
+class NarrativeSeeds(BaseModel):
+    seeds: List[NarrativeSeed]
+
+
+DIM_SYS_MSG = """You are an assistant trained to generate narrative dimensions for any given domain.
 Each narrative dimension should have two parts:
 
 1. A compressed, evocative description (1–2 sentences, almost like a thesis or proverb).
@@ -38,6 +46,25 @@ Narrative Targets: [list of 3–6 examples]
 
 Generate 5–8 narrative dimensions unless otherwise requested.
 """
+
+SEED_SYS_MSG = """You are an assistant trained to generate Fantasiagenesis narrative seeds.
+Input:
+- A narrative domain (e.g., biotechnology).
+- A single narrative dimension within that domain, including its thesis/description and narrative targets.
+
+Output:
+- 3–5 narrative seeds, each framed as an A→B arc in this structure:
+
+A (Problem): [the tension, obstacle, or deficiency in the current state]  
+B (Objective): [the desired outcome or state to reach]  
+Solution (Link): [the mechanism, innovation, or transformation that connects A to B]
+
+Seeds should tie directly to the narrative targets of the dimension where possible. 
+Keep each seed concise, concrete, and imaginative.
+
+Return ONLY structured JSON in the provided schema.
+"""
+
 
 @app.post("/api/narrative-dimensions")
 # --- route ---
@@ -58,7 +85,7 @@ def generate_narrative_dimensions():
         parsed_resp = client.responses.parse(
             model=os.getenv("OPENAI_MODEL", "gpt-5"),
             input=[
-                {"role": "system", "content": SYS_MSG},
+                {"role": "system", "content": DIM_SYS_MSG},
                 {"role": "user", "content": usr_msg},
             ],
             text_format=NarrativeDimensions,
@@ -83,6 +110,54 @@ def generate_narrative_dimensions():
 
     except OpenAIError as e:
         return jsonify({"error": "OpenAI API error", "detail": str(e)}), 502
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
+
+@app.post("/api/narrative-seeds")
+def generate_narrative_seeds():
+    data = request.get_json(silent=True) or {}
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    description = (data.get("description") or "").strip()
+    targets = data.get("targets") or []
+
+    if not (domain and dimension and description):
+        return jsonify({"error": "Missing required fields: domain, dimension, description"}), 400
+
+    usr_msg = (
+        f"Domain: {domain}\n"
+        f"Dimension: {dimension}\n"
+        f"Description: {description}\n"
+        f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
+        "Create A→B narrative seeds in this dimension."
+    )
+
+    try:
+        parsed_resp = client.responses.parse(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+            input=[
+                {"role": "system", "content": SEED_SYS_MSG},
+                {"role": "user", "content": usr_msg},
+            ],
+            text_format=NarrativeSeeds,
+        )
+
+        parsed = parsed_resp.output_parsed
+        if parsed:
+            return jsonify({
+                "domain": domain,
+                "dimension": dimension,
+                **parsed.model_dump()  # {"seeds": [...]}
+            }), 200
+
+        return jsonify({
+            "domain": domain,
+            "dimension": dimension,
+            "raw": parsed_resp.output_text,
+            "note": "Parsing failed, see raw output."
+        }), 200
+
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
 
