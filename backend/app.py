@@ -37,8 +37,8 @@ def generate_narrative_dimensions():
 
     usr_msg = f"Create narrative dimensions for the domain of {domain}."
 
-    resp = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-5"),
+    resp = client.responses.create(
+        model="gpt-5",
         input=[
             {"role": "system", "content": SYS_MSG},
             {"role": "user", "content": usr_msg},
