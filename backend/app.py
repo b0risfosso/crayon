@@ -56,7 +56,7 @@ def generate_narrative_dimensions():
     try:
         # Use the parsing endpoint to coerce into our schema.
         parsed_resp = client.responses.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+            model=os.getenv("OPENAI_MODEL", "gpt-5"),
             input=[
                 {"role": "system", "content": SYS_MSG},
                 {"role": "user", "content": usr_msg},
