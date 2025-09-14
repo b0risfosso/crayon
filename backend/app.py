@@ -1,5 +1,5 @@
 import os
-import openai
+from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request
 
@@ -7,7 +7,8 @@ app = Flask(__name__)
 
 DB_PATH = "/var/www/site/data/narratives_data.db"  # keep consistent with your setup
 
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
 
 SYS_MSG = """You are an assistant trained to generate narrative dimensions for any given domain.
 Each narrative dimension should have two parts:
@@ -36,16 +37,14 @@ def generate_narrative_dimensions():
 
     usr_msg = f"Create narrative dimensions for the domain of {domain}."
 
-    response = openai.ChatCompletion.create(
-        model="gpt-5",
-        messages=[
+    resp = client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-5"),
+        input=[
             {"role": "system", "content": SYS_MSG},
             {"role": "user", "content": usr_msg},
-        ],
-        temperature=0.7,
-    )
-
-    output_text = response["choices"][0]["message"]["content"].strip()
+                ],
+        temperature=0.7,)
+    output_text = resp.output_text
     return jsonify({"domain": domain, "dimensions": output_text})
 
 
