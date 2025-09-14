@@ -43,7 +43,7 @@ def generate_narrative_dimensions():
             {"role": "system", "content": SYS_MSG},
             {"role": "user", "content": usr_msg},
                 ],
-        temperature=0.7,)
+        )
     output_text = resp.output_text
     return jsonify({"domain": domain, "dimensions": output_text})
 
