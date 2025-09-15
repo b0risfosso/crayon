@@ -96,14 +96,14 @@ def generate_narrative_dimensions():
             # Pydantic → dict
             return jsonify({
                 "domain": domain,
-                "model": os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+                "model": os.getenv("OPENAI_MODEL", "gpt-5"),
                 **parsed.model_dump(),  # {"dimensions": [...]} with name/thesis/targets
             }), 200
 
         # Fallback: if parsing failed silently, return raw text to debug prompt/schema.
         return jsonify({
             "domain": domain,
-            "model": os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
+            "model": os.getenv("OPENAI_MODEL", "gpt-5"),
             "raw": parsed_resp.output_text,
             "note": "Parsing returned None; inspect 'raw'.",
         }), 200

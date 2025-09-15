@@ -87,15 +87,25 @@
 
       return card;
     }
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 600000) { // 2 minutes
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const resp = await fetch(url, { ...options, signal: controller.signal });
+            return resp;
+        } finally {
+            clearTimeout(id);
+        }
+    }
 
     async function fetchSeedsForDimension(payload, ui) {
       const { seedStatus, seedWrap } = ui;
       try {
-        const resp = await fetch('/api/narrative-seeds', {
+        const resp = await fetchWithTimeout('/api/narrative-seeds', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        });
+        }, 600000);
 
         let data;
         try { data = await resp.json(); } catch {
@@ -152,11 +162,11 @@
       meta.textContent = '';
       output.innerHTML = 'Loading dimensions…';
 
-      const resp = await fetch('/api/narrative-dimensions', {
+      const resp = await fetchWithTimeout('/api/narrative-dimensions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
-      });
+      }, 600000);
 
       let data;
       try { data = await resp.json(); } catch {
