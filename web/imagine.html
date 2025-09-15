@@ -37,14 +37,13 @@
   <div id="meta" class="meta"></div>
   <div id="err" class="error"></div>
   <div id="output" class="grid"></div>
-
   <script>
     const form = document.getElementById('form');
     const domainInput = document.getElementById('domain');
     const meta = document.getElementById('meta');
     const errBox = document.getElementById('err');
     const output = document.getElementById('output');
-
+  
     function el(tag, opts = {}) {
       const node = document.createElement(tag);
       if (opts.className) node.className = opts.className;
@@ -52,74 +51,77 @@
       if ('html' in opts) node.innerHTML = opts.html;
       return node;
     }
-
+  
     function renderDimensionCard(idx, dim, domain) {
       const card = el('details');
       const sum = el('summary', { text: `${idx + 1}. ${dim.name || 'Untitled'}` });
       const thesis = el('div', { className: 'thesis', text: dim.thesis || '' });
-
+  
       const targetsList = el('ul', { className: 'targets' });
       (Array.isArray(dim.targets) ? dim.targets : []).forEach(t => {
         targetsList.appendChild(el('li', { text: t }));
       });
-
+  
       const seedBox = el('div', { className: 'seedbox' });
       const seedHeader = el('div', { className: 'seed-title', text: 'Seeds' });
-      const seedStatus = el('div', { className: 'muted', text: 'Loading seeds…' });
+      const seedStatus = el('div', { className: 'muted', text: 'Waiting…' });
       const seedWrap = el('div');
-
+  
       seedBox.appendChild(seedHeader);
       seedBox.appendChild(seedStatus);
       seedBox.appendChild(seedWrap);
-
+  
       card.appendChild(sum);
       card.appendChild(thesis);
       card.appendChild(targetsList);
       card.appendChild(seedBox);
-
-      // Auto-fetch seeds for this dimension
-      fetchSeedsForDimension({
+  
+      // Stash references so the queue runner can fill them later
+      card._seedPayload = {
         domain,
         dimension: dim.name,
         description: dim.thesis,
         targets: dim.targets
-      }, { seedStatus, seedWrap });
-
+      };
+      card._seedUI = { seedStatus, seedWrap };
+  
       return card;
     }
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 600000) { // 2 minutes
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), timeoutMs);
-        try {
-            const resp = await fetch(url, { ...options, signal: controller.signal });
-            return resp;
-        } finally {
-            clearTimeout(id);
-        }
+  
+    // Generic fetch with abort/timeout (default 90s)
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 90000) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const resp = await fetch(url, { ...options, signal: controller.signal });
+        return resp;
+      } finally {
+        clearTimeout(id);
+      }
     }
-
-    async function fetchSeedsForDimension(payload, ui) {
+  
+    // Seed fetch with retry + backoff
+    async function fetchSeedsForDimension(payload, ui, tries = 2) {
       const { seedStatus, seedWrap } = ui;
       try {
+        seedStatus.textContent = 'Loading seeds…';
         const resp = await fetchWithTimeout('/api/narrative-seeds', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        }, 600000);
-
+        }, 90000);
+  
         let data;
         try { data = await resp.json(); } catch {
           throw new Error(`Non-JSON response from /api/narrative-seeds (status ${resp.status})`);
         }
-
+  
         seedStatus.textContent = '';
-
+  
         if (!resp.ok || data.error) {
-          seedStatus.className = 'seed-error';
-          seedStatus.textContent = data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`;
-          return;
+          throw new Error(data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`);
         }
-
+  
         if (Array.isArray(data.seeds)) {
           if (data.seeds.length === 0) {
             seedStatus.textContent = 'No seeds returned.';
@@ -143,11 +145,17 @@
           seedStatus.textContent = 'Unexpected response shape.';
         }
       } catch (e) {
+        if (tries > 0) {
+          // simple backoff
+          seedStatus.textContent = 'Retrying…';
+          await new Promise(r => setTimeout(r, 1500));
+          return fetchSeedsForDimension(payload, ui, tries - 1);
+        }
         seedStatus.className = 'seed-error';
         seedStatus.textContent = `Seed request failed: ${e.message || e}`;
       }
     }
-
+  
     function escapeHtml(s) {
       return String(s)
         .replaceAll('&', '&amp;')
@@ -156,38 +164,60 @@
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
     }
-
+  
     async function callDimensions(domain) {
       errBox.textContent = '';
       meta.textContent = '';
       output.innerHTML = 'Loading dimensions…';
-
+  
       const resp = await fetchWithTimeout('/api/narrative-dimensions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
-      }, 600000);
-
+      }, 90000);
+  
       let data;
       try { data = await resp.json(); } catch {
         output.innerHTML = '';
         errBox.textContent = `Non-JSON response (status ${resp.status})`;
         return;
       }
-
+  
       if (!resp.ok || data.error) {
         output.innerHTML = '';
         errBox.textContent = data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`;
         return;
       }
-
+  
       // Render dimensions
       if (Array.isArray(data.dimensions)) {
         output.innerHTML = '';
         meta.textContent = `Domain: ${data.domain ?? '—'} · Model: ${data.model ?? '—'} · Count: ${data.dimensions.length}`;
-        data.dimensions.forEach((dim, idx) => {
-          output.appendChild(renderDimensionCard(idx, dim, data.domain || domain));
+  
+        const cards = data.dimensions.map((dim, idx) => {
+          const card = renderDimensionCard(idx, dim, data.domain || domain);
+          output.appendChild(card);
+          return card;
         });
+  
+        // Throttle seed calls: small concurrency pool
+        const MAX_CONCURRENCY = 2;
+        let ptr = 0;
+  
+        async function worker() {
+          while (ptr < cards.length) {
+            const myIndex = ptr++;
+            const card = cards[myIndex];
+            const payload = card._seedPayload;
+            const ui = card._seedUI;
+            await fetchSeedsForDimension(payload, ui);
+          }
+        }
+  
+        await Promise.all(
+          Array.from({ length: Math.min(MAX_CONCURRENCY, cards.length) }, () => worker())
+        );
+  
       } else if (data.raw) {
         meta.textContent = `Domain: ${data.domain ?? '—'} · Model: ${data.model ?? '—'} (raw text shown; parsing failed)`;
         const pre = el('pre'); pre.textContent = data.raw;
@@ -197,12 +227,13 @@
         output.replaceChildren(pre);
       }
     }
-
+  
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const domain = domainInput.value.trim();
       if (domain) callDimensions(domain);
     });
   </script>
+  
 </body>
 </html>
