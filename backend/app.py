@@ -5,10 +5,76 @@ from flask import Flask, jsonify, abort, request
 from typing import List
 from pydantic import BaseModel, Field
 from openai import OpenAI, OpenAIError
+# app.py (top-level, after Flask app creation)
+import sqlite3, json, os
+from contextlib import closing
 
 app = Flask(__name__)
 
 DB_PATH = "/var/www/site/data/narratives_data.db"  # keep consistent with your setup
+
+def connect():
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+    return con
+
+def bootstrap_schema():
+    with closing(connect()) as con, con:
+        # Ensure narratives table exists (you already have this, but harmless)
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS narratives (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            webpage TEXT
+        );
+        """)
+
+        # Dimensions table (you already have this)
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS narrative_dimensions (
+            id INTEGER PRIMARY KEY,
+            narrative_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            -- optional new column added separately below
+            FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE
+        );
+        """)
+
+        # Add targets_json to narrative_dimensions if missing
+        cols = [r["name"] for r in con.execute("PRAGMA table_info(narrative_dimensions)")]
+        if "targets_json" not in cols:
+            con.execute("ALTER TABLE narrative_dimensions ADD COLUMN targets_json TEXT")
+
+        # Seeds table
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS narrative_seeds (
+            id INTEGER PRIMARY KEY,
+            dimension_id INTEGER NOT NULL,
+            problem TEXT NOT NULL,
+            objective TEXT NOT NULL,
+            solution TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE
+        );
+        """)
+
+        # Helpful uniqueness to avoid dup spam
+        con.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_title ON narratives(title);
+        """)
+        con.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dim_unique ON narrative_dimensions(narrative_id, title);
+        """)
+        con.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_dedup ON narrative_seeds(dimension_id, problem, objective, solution);
+        """)
+
+bootstrap_schema()
+
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
@@ -65,8 +131,46 @@ Keep each seed concise, concrete, and imaginative.
 Return ONLY structured JSON in the provided schema.
 """
 
+def get_or_create_narrative(con, domain_title: str) -> int:
+    row = con.execute("SELECT id FROM narratives WHERE title = ?", (domain_title,)).fetchone()
+    if row:
+        return row["id"]
+    cur = con.execute("INSERT INTO narratives (title) VALUES (?)", (domain_title,))
+    return cur.lastrowid
 
-@app.post("/api/narrative-dimensions")
+def upsert_dimension(con, narrative_id: int, name: str, thesis: str, targets: list) -> int:
+    row = con.execute(
+        "SELECT id FROM narrative_dimensions WHERE narrative_id=? AND title=?",
+        (narrative_id, name)
+    ).fetchone()
+    targets_json = json.dumps(targets or [])
+    if row:
+        con.execute(
+            "UPDATE narrative_dimensions SET description=?, targets_json=? WHERE id=?",
+            (thesis, targets_json, row["id"])
+        )
+        return row["id"]
+    cur = con.execute(
+        "INSERT INTO narrative_dimensions (narrative_id, title, description, targets_json) VALUES (?,?,?,?)",
+        (narrative_id, name, thesis, targets_json)
+    )
+    return cur.lastrowid
+
+def insert_seed(con, dimension_id: int, problem: str, objective: str, solution: str):
+    # dedup via unique index; ignore if exact duplicate
+    con.execute("""
+        INSERT OR IGNORE INTO narrative_seeds (dimension_id, problem, objective, solution)
+        VALUES (?,?,?,?)
+    """, (dimension_id, problem, objective, solution))
+
+def find_dimension_id(con, narrative_id: int, dim_name: str):
+    row = con.execute(
+        "SELECT id FROM narrative_dimensions WHERE narrative_id=? AND title=?",
+        (narrative_id, dim_name)
+    ).fetchone()
+    return row["id"] if row else None
+
+
 # --- route ---
 @app.post("/api/narrative-dimensions")
 def generate_narrative_dimensions():
@@ -81,7 +185,6 @@ def generate_narrative_dimensions():
     usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
 
     try:
-        # Use the parsing endpoint to coerce into our schema.
         parsed_resp = client.responses.parse(
             model=os.getenv("OPENAI_MODEL", "gpt-5"),
             input=[
@@ -93,14 +196,29 @@ def generate_narrative_dimensions():
 
         parsed = parsed_resp.output_parsed  # → NarrativeDimensions | None
         if parsed is not None:
-            # Pydantic → dict
+            dims = parsed.model_dump()["dimensions"]
+
+            # === NEW: save to DB ===
+            with closing(connect()) as con, con:
+                narrative_id = get_or_create_narrative(con, domain)
+                saved = []
+                for d in dims:
+                    dim_id = upsert_dimension(
+                        con,
+                        narrative_id=narrative_id,
+                        name=d["name"],
+                        thesis=d["thesis"],
+                        targets=d.get("targets") or []
+                    )
+                    saved.append({**d, "id": dim_id})
+
             return jsonify({
                 "domain": domain,
                 "model": os.getenv("OPENAI_MODEL", "gpt-5"),
-                **parsed.model_dump(),  # {"dimensions": [...]} with name/thesis/targets
+                "dimensions": saved
             }), 200
 
-        # Fallback: if parsing failed silently, return raw text to debug prompt/schema.
+        # fallback: parsing failed
         return jsonify({
             "domain": domain,
             "model": os.getenv("OPENAI_MODEL", "gpt-5"),
@@ -108,8 +226,6 @@ def generate_narrative_dimensions():
             "note": "Parsing returned None; inspect 'raw'.",
         }), 200
 
-    except OpenAIError as e:
-        return jsonify({"error": "OpenAI API error", "detail": str(e)}), 502
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
 
@@ -143,23 +259,69 @@ def generate_narrative_seeds():
             text_format=NarrativeSeeds,
         )
 
-        parsed = parsed_resp.output_parsed
-        if parsed:
+        parsed = parsed_resp.output_parsed  # -> NarrativeSeeds | None
+        if not parsed:
+            # Return raw for debugging if parsing failed
             return jsonify({
                 "domain": domain,
                 "dimension": dimension,
-                **parsed.model_dump()  # {"seeds": [...]}
+                "raw": parsed_resp.output_text,
+                "note": "Parsing failed, see raw output."
             }), 200
+
+        seeds = parsed.model_dump()["seeds"]  # list of {problem, objective, solution}
+
+        # === Persist to DB ===
+        with closing(connect()) as con, con:
+            # ensure domain exists
+            narrative_id = get_or_create_narrative(con, domain)
+            # ensure/refresh the dimension row with description+targets from the request
+            dim_id = upsert_dimension(
+                con,
+                narrative_id=narrative_id,
+                name=dimension,
+                thesis=description,
+                targets=targets
+            )
+            # insert seeds (dedup via UNIQUE index)
+            for s in seeds:
+                insert_seed(
+                    con,
+                    dimension_id=dim_id,
+                    problem=(s.get("problem") or "").strip(),
+                    objective=(s.get("objective") or "").strip(),
+                    solution=(s.get("solution") or "").strip()
+                )
+
+            # return latest seeds from DB (with ids/timestamps)
+            rows = con.execute("""
+                SELECT id, problem, objective, solution, created_at
+                FROM narrative_seeds
+                WHERE dimension_id=?
+                ORDER BY id DESC
+                LIMIT 50
+            """, (dim_id,)).fetchall()
+
+        seeds_out = [
+            {
+                "id": r["id"],
+                "problem": r["problem"],
+                "objective": r["objective"],
+                "solution": r["solution"],
+                "created_at": r["created_at"]
+            } for r in rows
+        ]
 
         return jsonify({
             "domain": domain,
             "dimension": dimension,
-            "raw": parsed_resp.output_text,
-            "note": "Parsing failed, see raw output."
+            "dimension_id": dim_id,
+            "seeds": seeds_out
         }), 200
 
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
 
 
 
