@@ -58,7 +58,7 @@
         .replaceAll('>', '&gt;').replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
     }
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 90000) {
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -117,7 +117,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        }, 90000);
+        }, 180000);
   
         let data; try { data = await resp.json(); } catch {
           throw new Error(`Non-JSON response from /api/narrative-seeds (status ${resp.status})`);
@@ -172,7 +172,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
-      }, 90000);
+      }, 180000);
   
       let data;
       try { data = await resp.json(); } catch {
