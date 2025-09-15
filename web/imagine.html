@@ -30,26 +30,52 @@
   <h1>Imagine Narrative Dimensions → Seeds</h1>
 
   <form id="form">
-    <input id="domain" type="text" placeholder="Enter a domain (e.g., biotechnology)" required>
+    <input id="domain" type="text" placeholder="Single domain (optional)">
+    <textarea id="domains" rows="4" placeholder="Or multiple domains — one per line"></textarea>
     <button type="submit">Generate</button>
   </form>
 
-  <div id="meta" class="meta"></div>
-  <div id="err" class="error"></div>
-  <div id="output" class="grid"></div>
+  <div id="globalStatus" class="meta"></div>
+  <div id="container"></div> 
   <script>
     const form = document.getElementById('form');
-    const domainInput = document.getElementById('domain');
-    const meta = document.getElementById('meta');
-    const errBox = document.getElementById('err');
-    const output = document.getElementById('output');
+    const singleDomainInput = document.getElementById('domain');
+    const multiDomainsInput = document.getElementById('domains');
+    const globalStatus = document.getElementById('globalStatus');
+    const container = document.getElementById('container');
   
+    // ---------- utilities ----------
     function el(tag, opts = {}) {
       const node = document.createElement(tag);
       if (opts.className) node.className = opts.className;
       if ('text' in opts) node.textContent = opts.text;
       if ('html' in opts) node.innerHTML = opts.html;
       return node;
+    }
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 90000) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally { clearTimeout(id); }
+    }
+  
+    // ---------- per-domain UI ----------
+    function makeDomainSection(domain) {
+      const section = el('section');
+      const h2 = el('h2', { text: domain });
+      const meta = el('div', { className: 'meta' });
+      const err = el('div', { className: 'error' });
+      const grid = el('div', { className: 'grid' });
+      section.append(h2, meta, err, grid);
+      container.appendChild(section);
+      return { section, meta, err, grid };
     }
   
     function renderDimensionCard(idx, dim, domain) {
@@ -67,16 +93,10 @@
       const seedStatus = el('div', { className: 'muted', text: 'Waiting…' });
       const seedWrap = el('div');
   
-      seedBox.appendChild(seedHeader);
-      seedBox.appendChild(seedStatus);
-      seedBox.appendChild(seedWrap);
+      seedBox.append(seedHeader, seedStatus, seedWrap);
+      card.append(sum, thesis, targetsList, seedBox);
   
-      card.appendChild(sum);
-      card.appendChild(thesis);
-      card.appendChild(targetsList);
-      card.appendChild(seedBox);
-  
-      // Stash references so the queue runner can fill them later
+      // stash for queued run
       card._seedPayload = {
         domain,
         dimension: dim.name,
@@ -88,19 +108,7 @@
       return card;
     }
   
-    // Generic fetch with abort/timeout (default 90s)
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 600000) {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const resp = await fetch(url, { ...options, signal: controller.signal });
-        return resp;
-      } finally {
-        clearTimeout(id);
-      }
-    }
-  
-    // Seed fetch with retry + backoff
+    // ---------- seeds ----------
     async function fetchSeedsForDimension(payload, ui, tries = 2) {
       const { seedStatus, seedWrap } = ui;
       try {
@@ -109,21 +117,19 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        }, 600000);
+        }, 90000);
   
-        let data;
-        try { data = await resp.json(); } catch {
+        let data; try { data = await resp.json(); } catch {
           throw new Error(`Non-JSON response from /api/narrative-seeds (status ${resp.status})`);
         }
   
         seedStatus.textContent = '';
-  
         if (!resp.ok || data.error) {
           throw new Error(data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`);
         }
   
         if (Array.isArray(data.seeds)) {
-          if (data.seeds.length === 0) {
+          if (!data.seeds.length) {
             seedStatus.textContent = 'No seeds returned.';
             return;
           }
@@ -146,7 +152,6 @@
         }
       } catch (e) {
         if (tries > 0) {
-          // simple backoff
           seedStatus.textContent = 'Retrying…';
           await new Promise(r => setTimeout(r, 1500));
           return fetchSeedsForDimension(payload, ui, tries - 1);
@@ -156,84 +161,94 @@
       }
     }
   
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-    }
-  
-    async function callDimensions(domain) {
-      errBox.textContent = '';
+    // ---------- dimensions (for one domain) ----------
+    async function runForDomain(domain, ui) {
+      const { meta, err, grid } = ui;
+      err.textContent = '';
       meta.textContent = '';
-      output.innerHTML = 'Loading dimensions…';
+      grid.innerHTML = 'Loading dimensions…';
   
       const resp = await fetchWithTimeout('/api/narrative-dimensions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
-      }, 600000);
+      }, 90000);
   
       let data;
       try { data = await resp.json(); } catch {
-        output.innerHTML = '';
-        errBox.textContent = `Non-JSON response (status ${resp.status})`;
+        grid.innerHTML = '';
+        err.textContent = `Non-JSON response (status ${resp.status})`;
         return;
       }
   
       if (!resp.ok || data.error) {
-        output.innerHTML = '';
-        errBox.textContent = data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`;
+        grid.innerHTML = '';
+        err.textContent = data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`;
         return;
       }
   
-      // Render dimensions
       if (Array.isArray(data.dimensions)) {
-        output.innerHTML = '';
-        meta.textContent = `Domain: ${data.domain ?? '—'} · Model: ${data.model ?? '—'} · Count: ${data.dimensions.length}`;
-  
+        grid.innerHTML = '';
+        meta.textContent = `Model: ${data.model ?? '—'} · Count: ${data.dimensions.length}`;
         const cards = data.dimensions.map((dim, idx) => {
           const card = renderDimensionCard(idx, dim, data.domain || domain);
-          output.appendChild(card);
+          grid.appendChild(card);
           return card;
         });
   
-        // Throttle seed calls: small concurrency pool
+        // Throttle seed calls per domain
         const MAX_CONCURRENCY = 2;
         let ptr = 0;
-  
         async function worker() {
           while (ptr < cards.length) {
             const myIndex = ptr++;
             const card = cards[myIndex];
-            const payload = card._seedPayload;
-            const ui = card._seedUI;
-            await fetchSeedsForDimension(payload, ui);
+            await fetchSeedsForDimension(card._seedPayload, card._seedUI);
           }
         }
-  
         await Promise.all(
           Array.from({ length: Math.min(MAX_CONCURRENCY, cards.length) }, () => worker())
         );
-  
       } else if (data.raw) {
-        meta.textContent = `Domain: ${data.domain ?? '—'} · Model: ${data.model ?? '—'} (raw text shown; parsing failed)`;
+        meta.textContent = `Model: ${data.model ?? '—'} (raw text shown; parsing failed)`;
         const pre = el('pre'); pre.textContent = data.raw;
-        output.replaceChildren(pre);
+        grid.replaceChildren(pre);
       } else {
         const pre = el('pre'); pre.textContent = JSON.stringify(data, null, 2);
-        output.replaceChildren(pre);
+        grid.replaceChildren(pre);
       }
     }
   
-    form.addEventListener('submit', (e) => {
+    // ---------- orchestrator for multiple domains (sequential) ----------
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const domain = domainInput.value.trim();
-      if (domain) callDimensions(domain);
+      container.innerHTML = '';
+      globalStatus.textContent = '';
+  
+      // Collect domains
+      const listFromTextarea = (multiDomainsInput.value || '')
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+  
+      const single = (singleDomainInput.value || '').trim();
+      const domains = listFromTextarea.length ? listFromTextarea : (single ? [single] : []);
+  
+      if (domains.length === 0) {
+        globalStatus.textContent = 'Please enter at least one domain.';
+        return;
+      }
+  
+      // Run sequentially to avoid overload
+      for (let i = 0; i < domains.length; i++) {
+        const domain = domains[i];
+        globalStatus.textContent = `Processing ${i + 1} of ${domains.length}: ${domain}`;
+        const ui = makeDomainSection(domain);
+        await runForDomain(domain, ui);
+      }
+      globalStatus.textContent = `Done. Processed ${domains.length} domain(s).`;
     });
-  </script>
+  </script>  
   
 </body>
 </html>
