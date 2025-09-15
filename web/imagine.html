@@ -89,7 +89,7 @@
     }
   
     // Generic fetch with abort/timeout (default 90s)
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 90000) {
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 600000) {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -109,7 +109,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        }, 90000);
+        }, 600000);
   
         let data;
         try { data = await resp.json(); } catch {
@@ -174,7 +174,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
-      }, 90000);
+      }, 600000);
   
       let data;
       try { data = await resp.json(); } catch {
