@@ -94,6 +94,30 @@ class NarrativeSeed(BaseModel):
 class NarrativeSeeds(BaseModel):
     seeds: List[NarrativeSeed]
 
+class NarrativePrototype(BaseModel):
+    core_intent: str = Field(..., description="Smallest truth or principle tested")
+    minimal_build: str = Field(..., description="Tiny computational/physical/narrative sketch")
+    load_bearing_test: str = Field(..., description="What to show and the validating reaction")
+    first_eyes: List[str] = Field(..., description="Who sees it first")
+    why_box_of_dirt: str = Field(..., description="Why it's minimal, disposable, growth-inviting")
+
+PROTOTYPE_SYS_MSG = """You are a narrative prototyper.
+Your task is to translate narrative seeds into narrative prototypes.
+A narrative prototype — also called a "box of dirt" — is a minimal, disposable artifact
+that embodies the intent of the seed, tests whether the idea feels real, and invites growth into more complex systems.
+
+Your output must include:
+1. Core Intent — the smallest truth or principle the prototype tests.
+2. Minimal Build — a simple computational/physical/narrative sketch that embodies the seed.
+3. Load-Bearing Test — what to show to first eyes and what reaction would validate it.
+4. First Eyes — who to put it in front of first (supporters, skeptics, peers).
+5. Why This is a Box of Dirt — how it is minimal, disposable, and growth-inviting.
+
+Do not output a full implementation; focus on the smallest credible prototype.
+
+Return ONLY structured JSON in the provided schema.
+"""
+
 
 DIM_SYS_MSG = """You are an assistant trained to generate narrative dimensions for any given domain.
 Each narrative dimension should have two parts:
@@ -169,6 +193,18 @@ def find_dimension_id(con, narrative_id: int, dim_name: str):
         (narrative_id, dim_name)
     ).fetchone()
     return row["id"] if row else None
+
+
+def _prototype_user_msg(domain: str, dimension: str, problem: str, objective: str, solution: str) -> str:
+    return (
+        f"Narrative Domain: {domain}\n"
+        f"Narrative Dimension: {dimension}\n"
+        f"Narrative Seed:\n"
+        f"A (Problem): {problem}\n"
+        f"B (Objective): {objective}\n"
+        f"Solution (Link): {solution}\n\n"
+        "Construct a narrative prototype sketch following the format defined in the system message."
+    )
 
 
 # --- route ---
@@ -374,3 +410,59 @@ def api_dimension_seeds(dimension_id: int):
         LIMIT 200
     """, (dimension_id,))
     return jsonify({"ok": True, "dimension_id": dimension_id, "seeds": rows})
+
+
+@app.post("/api/narrative-prototype")
+def api_narrative_prototype():
+    data = request.get_json(silent=True) or {}
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+
+    # Accept either flat fields or a nested seed object
+    seed = data.get("seed") or {}
+    problem = (data.get("problem") or seed.get("problem") or "").strip()
+    objective = (data.get("objective") or seed.get("objective") or "").strip()
+    solution = (data.get("solution") or seed.get("solution") or "").strip()
+
+    # Validation
+    missing = []
+    if not domain: missing.append("domain")
+    if not dimension: missing.append("dimension")
+    if not problem: missing.append("problem")
+    if not objective: missing.append("objective")
+    if not solution: missing.append("solution")
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    usr_msg = _prototype_user_msg(domain, dimension, problem, objective, solution)
+
+    try:
+        parsed_resp = client.responses.parse(
+            model=os.getenv("OPENAI_MODEL", "gpt-5"),
+            input=[
+                {"role": "system", "content": PROTOTYPE_SYS_MSG},
+                {"role": "user", "content": usr_msg},
+            ],
+            text_format=NarrativePrototype,
+        )
+
+        parsed = parsed_resp.output_parsed  # -> NarrativePrototype | None
+        if not parsed:
+            # Helpful debug path if parsing fails
+            return jsonify({
+                "domain": domain,
+                "dimension": dimension,
+                "raw": parsed_resp.output_text,
+                "note": "Parsing failed; 'raw' contains the unparsed model output."
+            }), 200
+
+        proto = parsed.model_dump()
+        return jsonify({
+            "ok": True,
+            "domain": domain,
+            "dimension": dimension,
+            "prototype": proto
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
