@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasiagenesis · v4</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: Canvas; color: CanvasText;
+    }
+    header {
+      padding: .75rem 1rem; border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, transparent);
+      display: flex; align-items: center; gap: .75rem; justify-content: space-between;
+    }
+    header h1 { font-size: 1rem; margin: 0; letter-spacing: .02em; font-weight: 650; }
+
+    .app {
+      display: grid; grid-template-columns: 340px 1fr; min-height: calc(100dvh - 56px);
+    }
+    /* Left rail has 3 stacked panels */
+    .left-rail {
+      border-right: 1px solid color-mix(in oklab, CanvasText 12%, transparent);
+      padding: .75rem; display: grid; grid-template-rows: 1fr 1fr 1fr; gap: .75rem; min-height: 0;
+      background: color-mix(in oklab, Canvas 96%, CanvasText 4%);
+    }
+    .panel {
+      display: flex; flex-direction: column; min-height: 0; border: 1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius: .6rem;
+      background: color-mix(in oklab, Canvas 92%, CanvasText 8%);
+      box-shadow: 0 1px 0 rgba(0,0,0,.04) inset;
+    }
+    .panel header { border: 0; padding: .55rem .7rem; background: transparent; }
+    .panel header h2 { font-size: .9rem; margin: 0; font-weight: 650; opacity: .9; }
+    .panel .content { padding: .35rem .35rem .5rem; overflow: auto; min-height: 0; }
+
+    .list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+    .item {
+      display: flex; align-items: center; gap: .5rem; padding: .5rem .6rem; border-radius: .5rem; cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .item:hover { background: color-mix(in oklab, CanvasText 8%, transparent); }
+    .item.active { background: color-mix(in oklab, Highlight 22%, transparent); border-color: color-mix(in oklab, Highlight 30%, transparent); }
+    .item .title { font-size: .92rem; font-weight: 560; }
+    .item .sub { font-size: .75rem; opacity: .7; }
+
+    /* Right side display */
+    .display {
+      min-width: 0; display: grid; grid-template-rows: auto 1fr; min-height: 0;
+    }
+    .breadcrumbs { padding: .75rem 1rem; border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, transparent); font-size: .85rem; opacity: .8; }
+    .viewer { padding: 1rem 1.25rem 2rem; overflow: auto; min-height: 0; }
+    .viewer .seed-title { font-size: 1.1rem; font-weight: 650; margin: 0 0 .5rem; }
+    .viewer .seed-body { white-space: pre-wrap; line-height: 1.5; font-size: .98rem; }
+
+    .empty { opacity: .6; font-size: .95rem; padding: .5rem; }
+
+    /* Small screens: collapse left rail height-wise */
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 100%; }
+      .left-rail { grid-template-rows: auto; grid-auto-rows: minmax(240px, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fantasiagenesis · v4</h1>
+    <div style="font-size:.85rem; opacity:.7">Domains → Dimensions → Seeds</div>
+  </header>
+
+  <main class="app" id="app">
+    <aside class="left-rail" aria-label="Navigation panels">
+      <section class="panel" id="panel-domains" aria-labelledby="h-domains">
+        <header><h2 id="h-domains">Narrative Domains</h2></header>
+        <div class="content">
+          <ul class="list" id="domainsList"></ul>
+          <div class="empty" id="domainsEmpty" hidden>Load or define narrative domains.</div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-dimensions" aria-labelledby="h-dimensions">
+        <header><h2 id="h-dimensions">Narrative Dimensions</h2></header>
+        <div class="content">
+          <ul class="list" id="dimensionsList"></ul>
+          <div class="empty" id="dimensionsEmpty" hidden>Select a domain to load dimensions.</div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-seeds" aria-labelledby="h-seeds">
+        <header><h2 id="h-seeds">Narrative Seeds</h2></header>
+        <div class="content">
+          <ul class="list" id="seedsList"></ul>
+          <div class="empty" id="seedsEmpty" hidden>Select a dimension to load seeds.</div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="display" aria-label="Display">
+      <div class="breadcrumbs" id="crumbs">Choose a seed to view its text.</div>
+      <div class="viewer" id="viewer">
+        <p class="empty" id="viewerEmpty">Nothing selected yet.</p>
+        <article id="seedView" hidden>
+          <h3 class="seed-title" id="seedTitle"></h3>
+          <div class="seed-body" id="seedBody"></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  (function(){
+    const els = {
+      domainsList: document.getElementById('domainsList'),
+      domainsEmpty: document.getElementById('domainsEmpty'),
+      dimensionsList: document.getElementById('dimensionsList'),
+      dimensionsEmpty: document.getElementById('dimensionsEmpty'),
+      seedsList: document.getElementById('seedsList'),
+      seedsEmpty: document.getElementById('seedsEmpty'),
+      crumbs: document.getElementById('crumbs'),
+      viewerEmpty: document.getElementById('viewerEmpty'),
+      seedView: document.getElementById('seedView'),
+      seedTitle: document.getElementById('seedTitle'),
+      seedBody: document.getElementById('seedBody'),
+    };
+
+    // --- API helpers: try common endpoints; fallback to mock if none exist ---
+    const API = {
+      domains: [
+        '/api/narrative-domains',
+        '/api/domains',
+      ],
+      dimensions: (domainId) => [
+        `/api/narrative-dimensions?domain=${encodeURIComponent(domainId)}`,
+        `/api/dimensions?domain=${encodeURIComponent(domainId)}`,
+      ],
+      seeds: (domainId, dimensionId) => [
+        `/api/narrative-seeds?domain=${encodeURIComponent(domainId)}&dimension=${encodeURIComponent(dimensionId)}`,
+        `/api/seeds?domain=${encodeURIComponent(domainId)}&dimension=${encodeURIComponent(dimensionId)}`,
+      ]
+    };
+
+    async function tryFetchJSON(urls){
+      const list = Array.isArray(urls) ? urls : [urls];
+      for (const u of list){
+        try {
+          const res = await fetch(u, { headers: { 'Accept': 'application/json' }});
+          if (!res.ok) continue;
+          const data = await res.json();
+          return data;
+        } catch (e){ /* continue */ }
+      }
+      return null;
+    }
+
+    // Label + id extractors accept flexible shapes
+    const label = {
+      domain: (d) => d?.title || d?.name || d?.domain || String(d),
+      dimension: (x) => x?.title || x?.name || x?.dimension || String(x),
+      seedTitle: (s) => s?.title || s?.name || s?.seed || s?.id || 'Seed',
+    };
+    const keyOf = (o) => o?.id ?? o?.slug ?? o?.name ?? o?.title ?? String(o);
+
+    // State
+    let state = { domain: null, dimension: null, seed: null };
+
+    function setBreadcrumbs(){
+      const parts = [];
+      if (state.domain) parts.push(label.domain(state.domain));
+      if (state.dimension) parts.push(label.dimension(state.dimension));
+      if (state.seed) parts.push(label.seedTitle(state.seed));
+      els.crumbs.textContent = parts.length ? parts.join(' / ') : 'Choose a seed to view its text.';
+    }
+
+    function clearList(ul){ while (ul.firstChild) ul.removeChild(ul.firstChild); }
+
+    function renderList(ul, items, getText, onClick, activeKey){
+      clearList(ul);
+      items.forEach(it => {
+        const li = document.createElement('li');
+        li.className = 'item' + (activeKey && keyOf(it) === activeKey ? ' active' : '');
+        li.tabIndex = 0;
+        li.dataset.key = keyOf(it);
+        li.innerHTML = `<div class="title">${getText(it)}</div>` + (it?.description ? `<div class="sub">${it.description}</div>` : '');
+        li.addEventListener('click', () => onClick(it, li));
+        li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(it, li); }});
+        ul.appendChild(li);
+      });
+    }
+
+    function setActive(ul, li){
+      Array.from(ul.children).forEach(ch => ch.classList.remove('active'));
+      if (li) li.classList.add('active');
+    }
+
+    function showEmpty(el, show){ el.hidden = !show; }
+
+    // Viewer
+    function showSeed(seed){
+      state.seed = seed || null;
+      setBreadcrumbs();
+      if (!seed){
+        els.seedView.hidden = true; els.viewerEmpty.hidden = false; return;
+      }
+      els.viewerEmpty.hidden = true; els.seedView.hidden = false;
+      els.seedTitle.textContent = label.seedTitle(seed);
+      els.seedBody.textContent = seed.text || seed.body || joinAB(seed) || JSON.stringify(seed, null, 2);
+    }
+
+    function joinAB(s){
+      const A = s.A || s.a || s.problem || s.Problem;
+      const B = s.B || s.b || s.objective || s.Objective;
+      const L = s.Solution || s.solution || s.link || s.Link;
+      if (!(A || B || L)) return '';
+      return [
+        A ? `A (Problem): ${A}` : '',
+        B ? `B (Objective): ${B}` : '',
+        L ? `Solution (Link): ${L}` : ''
+      ].filter(Boolean).join('\n\n');
+    }
+
+    // Loaders
+    async function loadDomains(){
+      const data = await tryFetchJSON(API.domains);
+      let domains = Array.isArray(data) ? data : [];
+      if (!domains.length){
+        // Fallback sample data; replace when API is ready
+        domains = [
+          { id: 'energy', title: 'Energy' },
+          { id: 'water', title: 'Water' },
+          { id: 'music', title: 'Music' },
+        ];
+      }
+      showEmpty(els.domainsEmpty, domains.length === 0);
+      renderList(els.domainsList, domains, label.domain, onSelectDomain, state.domain && keyOf(state.domain));
+    }
+
+    async function onSelectDomain(domain, li){
+      state.domain = domain; state.dimension = null; state.seed = null; setBreadcrumbs();
+      setActive(els.domainsList, li);
+      clearList(els.dimensionsList); clearList(els.seedsList);
+      showEmpty(els.dimensionsEmpty, true); showEmpty(els.seedsEmpty, true);
+      showSeed(null);
+      const domainId = keyOf(domain);
+      const data = await tryFetchJSON(API.dimensions(domainId));
+      let dims = Array.isArray(data) ? data : [];
+      if (!dims.length){
+        // Fallback samples grouped by domainId
+        const SAMPLE = {
+          energy: [
+            { id: 'microgrids', title: 'Microgrid Metabolism', description: 'Rooftop solar + batteries as civic metabolism.' },
+            { id: 'storage', title: 'Storage & Flex', description: 'Distributed batteries, V2G, demand response.' },
+          ],
+          water: [
+            { id: 'ecology', title: 'Ecology as Infrastructure', description: 'Reefs, marshes, mussels do hard work.' },
+          ],
+          music: [
+            { id: 'awe', title: 'Awe & Play', description: 'Scores that change behavior.' },
+          ]
+        };
+        dims = SAMPLE[domainId] || [];
+      }
+      showEmpty(els.dimensionsEmpty, dims.length === 0);
+      renderList(els.dimensionsList, dims, label.dimension, onSelectDimension, state.dimension && keyOf(state.dimension));
+    }
+
+    async function onSelectDimension(dimension, li){
+      state.dimension = dimension; state.seed = null; setBreadcrumbs();
+      setActive(els.dimensionsList, li);
+      clearList(els.seedsList);
+      showEmpty(els.seedsEmpty, true);
+      showSeed(null);
+      const domainId = keyOf(state.domain);
+      const dimId = keyOf(dimension);
+      const data = await tryFetchJSON(API.seeds(domainId, dimId));
+      let seeds = Array.isArray(data) ? data : [];
+      if (!seeds.length){
+        // Fallback examples
+        if (domainId === 'water' && dimId === 'ecology') {
+          seeds = [{ id: 'street-to-lagoon', title: 'Street-to-Lagoon Bioreactors', text: (
+            'A (Problem): Cloudbursts overwhelm sewers; nutrient-rich runoff fuels algal blooms and beach closures.\n\n' +
+            'B (Objective): Treat stormwater in the open and harvest nutrients as resources.\n\n' +
+            'Solution (Link): Street-to-lagoon bioreactors—myco-biochar filters feeding mussel-populated floating wetlands—polish water and upcycle phosphorus into struvite tiles.'
+          ) }];
+        } else if (domainId === 'energy' && dimId === 'microgrids') {
+          seeds = [{ id: 'chicago-microgrid', title: 'Chicago Microgrid Metabolism', text: (
+            'A (Problem): Outages and heat waves expose brittle feeder lines in vulnerable tracts.\n\n' +
+            'B (Objective): Anchor-based rooftop solar + storage microgrids providing resilience hubs.\n\n' +
+            'Solution (Link): School/library/fire station anchors with islanding inverters, community batteries, and PPA-backed O&M.'
+          ) }];
+        }
+      }
+      showEmpty(els.seedsEmpty, seeds.length === 0);
+      renderList(els.seedsList, seeds, (s)=>label.seedTitle(s), onSelectSeed, state.seed && keyOf(state.seed));
+    }
+
+    function onSelectSeed(seed, li){
+      state.seed = seed; setBreadcrumbs(); setActive(els.seedsList, li); showSeed(seed);
+    }
+
+    // Boot
+    loadDomains();
+  })();
+  </script>
+</body>
+</html>

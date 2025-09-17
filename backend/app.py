@@ -362,3 +362,15 @@ def api_narrative_dimensions(narrative_id: int):
         ORDER BY id ASC
     """, (narrative_id,))
     return jsonify(dims)
+
+
+@app.get("/api/dimensions/<int:dimension_id>/seeds")
+def api_dimension_seeds(dimension_id: int):
+    rows = _query_all("""
+        SELECT id, problem, objective, solution, created_at
+        FROM narrative_seeds
+        WHERE dimension_id = ?
+        ORDER BY id DESC
+        LIMIT 200
+    """, (dimension_id,))
+    return jsonify({"ok": True, "dimension_id": dimension_id, "seeds": rows})
