@@ -124,55 +124,39 @@
       seedBody: document.getElementById('seedBody'),
     };
 
-    // --- API helpers: try common endpoints; fallback to mock if none exist ---
+    // === API endpoints wired to provided Flask app ===
     const API = {
-      domains: [
-        '/api/narrative-domains',
-        '/api/domains',
-      ],
-      dimensions: (domainId) => [
-        `/api/narrative-dimensions?domain=${encodeURIComponent(domainId)}`,
-        `/api/dimensions?domain=${encodeURIComponent(domainId)}`,
-      ],
-      seeds: (domainId, dimensionId) => [
-        `/api/narrative-seeds?domain=${encodeURIComponent(domainId)}&dimension=${encodeURIComponent(dimensionId)}`,
-        `/api/seeds?domain=${encodeURIComponent(domainId)}&dimension=${encodeURIComponent(dimensionId)}`,
-      ]
+      listNarratives: '/api/narratives',
+      listDimensions: (narrativeId) => `/api/narratives/${encodeURIComponent(narrativeId)}/dimensions`,
+      listSeeds: (dimensionId) => `/api/dimensions/${encodeURIComponent(dimensionId)}/seeds`,
     };
 
-    async function tryFetchJSON(urls){
-      const list = Array.isArray(urls) ? urls : [urls];
-      for (const u of list){
-        try {
-          const res = await fetch(u, { headers: { 'Accept': 'application/json' }});
-          if (!res.ok) continue;
-          const data = await res.json();
-          return data;
-        } catch (e){ /* continue */ }
-      }
-      return null;
+    async function fetchJSON(url){
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
     }
 
-    // Label + id extractors accept flexible shapes
-    const label = {
-      domain: (d) => d?.title || d?.name || d?.domain || String(d),
-      dimension: (x) => x?.title || x?.name || x?.dimension || String(x),
-      seedTitle: (s) => s?.title || s?.name || s?.seed || s?.id || 'Seed',
-    };
+    // Helpers
     const keyOf = (o) => o?.id ?? o?.slug ?? o?.name ?? o?.title ?? String(o);
+    const label = {
+      domain: (d) => d?.title ?? `Narrative ${d?.id ?? ''}`,
+      dimension: (x) => x?.title ?? `Dimension ${x?.id ?? ''}`,
+      seedTitle: (s) => (s?.problem ? s.problem : `Seed ${s?.id ?? ''}`).slice(0, 100),
+    };
 
-    // State
     let state = { domain: null, dimension: null, seed: null };
 
     function setBreadcrumbs(){
       const parts = [];
       if (state.domain) parts.push(label.domain(state.domain));
       if (state.dimension) parts.push(label.dimension(state.dimension));
-      if (state.seed) parts.push(label.seedTitle(state.seed));
+      if (state.seed) parts.push('Seed');
       els.crumbs.textContent = parts.length ? parts.join(' / ') : 'Choose a seed to view its text.';
     }
 
     function clearList(ul){ while (ul.firstChild) ul.removeChild(ul.firstChild); }
+    function showEmpty(el, show){ el.hidden = !show; }
 
     function renderList(ul, items, getText, onClick, activeKey){
       clearList(ul);
@@ -193,9 +177,20 @@
       if (li) li.classList.add('active');
     }
 
-    function showEmpty(el, show){ el.hidden = !show; }
+    function joinAB(s){
+      const A = s.problem || s.A || s.a || s.Problem;
+      const B = s.objective || s.B || s.b || s.Objective;
+      const L = s.solution || s.Solution || s.link || s.Link;
+      if (!(A || B || L)) return '';
+      return [
+        A ? `A (Problem): ${A}` : '',
+        B ? `B (Objective): ${B}` : '',
+        L ? `Solution (Link): ${L}` : ''
+      ].filter(Boolean).join('
 
-    // Viewer
+');
+    }
+
     function showSeed(seed){
       state.seed = seed || null;
       setBreadcrumbs();
@@ -204,35 +199,20 @@
       }
       els.viewerEmpty.hidden = true; els.seedView.hidden = false;
       els.seedTitle.textContent = label.seedTitle(seed);
-      els.seedBody.textContent = seed.text || seed.body || joinAB(seed) || JSON.stringify(seed, null, 2);
+      els.seedBody.textContent = joinAB(seed) || JSON.stringify(seed, null, 2);
     }
 
-    function joinAB(s){
-      const A = s.A || s.a || s.problem || s.Problem;
-      const B = s.B || s.b || s.objective || s.Objective;
-      const L = s.Solution || s.solution || s.link || s.Link;
-      if (!(A || B || L)) return '';
-      return [
-        A ? `A (Problem): ${A}` : '',
-        B ? `B (Objective): ${B}` : '',
-        L ? `Solution (Link): ${L}` : ''
-      ].filter(Boolean).join('\n\n');
-    }
-
-    // Loaders
+    // Loaders aligned to Flask API
     async function loadDomains(){
-      const data = await tryFetchJSON(API.domains);
-      let domains = Array.isArray(data) ? data : [];
-      if (!domains.length){
-        // Fallback sample data; replace when API is ready
-        domains = [
-          { id: 'energy', title: 'Energy' },
-          { id: 'water', title: 'Water' },
-          { id: 'music', title: 'Music' },
-        ];
+      try {
+        const data = await fetchJSON(API.listNarratives);
+        const domains = Array.isArray(data) ? data : [];
+        showEmpty(els.domainsEmpty, domains.length === 0);
+        renderList(els.domainsList, domains, label.domain, onSelectDomain, state.domain && keyOf(state.domain));
+      } catch (e){
+        showEmpty(els.domainsEmpty, true);
+        els.domainsEmpty.textContent = 'Failed to load narratives: ' + e.message;
       }
-      showEmpty(els.domainsEmpty, domains.length === 0);
-      renderList(els.domainsList, domains, label.domain, onSelectDomain, state.domain && keyOf(state.domain));
     }
 
     async function onSelectDomain(domain, li){
@@ -241,27 +221,14 @@
       clearList(els.dimensionsList); clearList(els.seedsList);
       showEmpty(els.dimensionsEmpty, true); showEmpty(els.seedsEmpty, true);
       showSeed(null);
-      const domainId = keyOf(domain);
-      const data = await tryFetchJSON(API.dimensions(domainId));
-      let dims = Array.isArray(data) ? data : [];
-      if (!dims.length){
-        // Fallback samples grouped by domainId
-        const SAMPLE = {
-          energy: [
-            { id: 'microgrids', title: 'Microgrid Metabolism', description: 'Rooftop solar + batteries as civic metabolism.' },
-            { id: 'storage', title: 'Storage & Flex', description: 'Distributed batteries, V2G, demand response.' },
-          ],
-          water: [
-            { id: 'ecology', title: 'Ecology as Infrastructure', description: 'Reefs, marshes, mussels do hard work.' },
-          ],
-          music: [
-            { id: 'awe', title: 'Awe & Play', description: 'Scores that change behavior.' },
-          ]
-        };
-        dims = SAMPLE[domainId] || [];
+      try {
+        const dims = await fetchJSON(API.listDimensions(domain.id));
+        showEmpty(els.dimensionsEmpty, dims.length === 0);
+        renderList(els.dimensionsList, dims, label.dimension, onSelectDimension, state.dimension && keyOf(state.dimension));
+      } catch (e){
+        showEmpty(els.dimensionsEmpty, true);
+        els.dimensionsEmpty.textContent = 'Failed to load dimensions: ' + e.message;
       }
-      showEmpty(els.dimensionsEmpty, dims.length === 0);
-      renderList(els.dimensionsList, dims, label.dimension, onSelectDimension, state.dimension && keyOf(state.dimension));
     }
 
     async function onSelectDimension(dimension, li){
@@ -270,28 +237,15 @@
       clearList(els.seedsList);
       showEmpty(els.seedsEmpty, true);
       showSeed(null);
-      const domainId = keyOf(state.domain);
-      const dimId = keyOf(dimension);
-      const data = await tryFetchJSON(API.seeds(domainId, dimId));
-      let seeds = Array.isArray(data) ? data : [];
-      if (!seeds.length){
-        // Fallback examples
-        if (domainId === 'water' && dimId === 'ecology') {
-          seeds = [{ id: 'street-to-lagoon', title: 'Street-to-Lagoon Bioreactors', text: (
-            'A (Problem): Cloudbursts overwhelm sewers; nutrient-rich runoff fuels algal blooms and beach closures.\n\n' +
-            'B (Objective): Treat stormwater in the open and harvest nutrients as resources.\n\n' +
-            'Solution (Link): Street-to-lagoon bioreactors—myco-biochar filters feeding mussel-populated floating wetlands—polish water and upcycle phosphorus into struvite tiles.'
-          ) }];
-        } else if (domainId === 'energy' && dimId === 'microgrids') {
-          seeds = [{ id: 'chicago-microgrid', title: 'Chicago Microgrid Metabolism', text: (
-            'A (Problem): Outages and heat waves expose brittle feeder lines in vulnerable tracts.\n\n' +
-            'B (Objective): Anchor-based rooftop solar + storage microgrids providing resilience hubs.\n\n' +
-            'Solution (Link): School/library/fire station anchors with islanding inverters, community batteries, and PPA-backed O&M.'
-          ) }];
-        }
+      try {
+        const payload = await fetchJSON(API.listSeeds(dimension.id));
+        const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
+        showEmpty(els.seedsEmpty, seeds.length === 0);
+        renderList(els.seedsList, seeds, (s)=>label.seedTitle(s), onSelectSeed, state.seed && keyOf(state.seed));
+      } catch (e){
+        showEmpty(els.seedsEmpty, true);
+        els.seedsEmpty.textContent = 'Failed to load seeds: ' + e.message;
       }
-      showEmpty(els.seedsEmpty, seeds.length === 0);
-      renderList(els.seedsList, seeds, (s)=>label.seedTitle(s), onSelectSeed, state.seed && keyOf(state.seed));
     }
 
     function onSelectSeed(seed, li){

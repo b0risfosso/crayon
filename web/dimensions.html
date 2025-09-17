@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dimensions • Fantasiagenesis</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      margin: 2rem;
+      line-height: 1.45;
+    }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; gap: 1rem; flex-wrap: wrap; }
+    h1 { font-size: 1.25rem; margin: 0; }
+    .subtitle { opacity: .75; font-size: .95rem; }
+    .controls { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    input[type="search"] {
+      padding: .6rem .7rem; min-width: 16rem; border: 1px solid #ccc; border-radius: .6rem; background: transparent;
+    }
+
+    .list { display: grid; gap: .8rem; }
+    details.dimension {
+      border: 1px solid rgba(128,128,128,.35);
+      border-radius: 14px;
+      background: rgba(127,127,127,.05);
+      padding: .25rem .9rem;
+    }
+    summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+      padding: .6rem 0;
+    }
+    summary::-webkit-details-marker { display: none; }
+    .dim-title { font-weight: 600; }
+    .created { font-size: .8rem; opacity: .65; }
+    .thesis { margin: .25rem 0 .6rem; }
+    .targets { margin: .25rem 0 .75rem; padding-left: 1.2rem; }
+    .targets li { margin: .15rem 0; }
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem 0 .25rem; }
+    button, .btn {
+      padding: .5rem .7rem; border: 1px solid rgba(128,128,128,.35); border-radius: .6rem; background: transparent; cursor: pointer;
+    }
+    button.primary { background: #0b5cff; color: #fff; border-color: #0b5cff; }
+    button[disabled] { opacity: .6; cursor: not-allowed; }
+    .seeds { border-top: 1px dashed rgba(128,128,128,.35); margin-top: .6rem; padding-top: .6rem; }
+    .seed { padding: .6rem .5rem; border: 1px solid rgba(128,128,128,.3); border-radius: 10px; margin: .5rem 0; background: rgba(127,127,127,.04); }
+    .seed .meta { font-size: .8rem; opacity: .65; margin-top: .25rem; }
+    .status { margin-top: 1rem; opacity: .8; font-style: italic; }
+    .error { color: #b00020; }
+    .crumbs { font-size: .9rem; margin-bottom: .6rem; }
+    .crumbs a { color: inherit; }
+    .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="crumbs"><a href="domains.html">← Domains</a></div>
+      <h1 id="hdr">Dimensions</h1>
+      <div id="sub" class="subtitle"></div>
+    </div>
+    <div class="controls">
+      <label class="sr" for="q">Search dimensions</label>
+      <input id="q" type="search" placeholder="Search…" autocomplete="off" />
+    </div>
+  </header>
+
+  <div id="status" class="status">Loading…</div>
+  <div id="list" class="list" hidden></div>
+
+  <script>
+    const listEl = document.getElementById('list');
+    const statusEl = document.getElementById('status');
+    const searchEl = document.getElementById('q');
+    const hdrEl = document.getElementById('hdr');
+    const subEl = document.getElementById('sub');
+
+    const params = new URLSearchParams(location.search);
+    const narrativeId = parseInt(params.get('narrative_id') || '', 10);
+    const domainTitle = params.get('title') || '';
+
+    if (!Number.isFinite(narrativeId)) {
+      statusEl.textContent = 'Missing or invalid narrative_id.';
+      statusEl.classList.add('error');
+    }
+
+    if (domainTitle) {
+      hdrEl.textContent = domainTitle || 'Dimensions';
+      subEl.textContent = `Narrative #${narrativeId}`;
+    } else {
+      subEl.textContent = `Narrative #${narrativeId}`;
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+    }
+
+    // Fetch all dimensions for the narrative
+    async function fetchDimensions() {
+      const r = await fetch(`/api/narratives/${encodeURIComponent(narrativeId)}/dimensions`, { credentials: 'same-origin' });
+      if (!r.ok) throw new Error('Failed to load dimensions');
+      return r.json();
+    }
+
+    // Optional: fetch seeds per dimension (requires the small backend route below)
+    async function fetchSeeds(dimId) {
+      try {
+        const r = await fetch(`/api/dimensions/${encodeURIComponent(dimId)}/seeds`, { credentials: 'same-origin' });
+        if (!r.ok) throw new Error('no route');
+        return await r.json();
+      } catch {
+        return { ok: false, seeds: [] };
+      }
+    }
+
+    function parseTargets(row) {
+      // If the API returns targets_json, use it; otherwise none.
+      try {
+        if (row.targets_json) {
+          const v = JSON.parse(row.targets_json);
+          return Array.isArray(v) ? v : [];
+        }
+      } catch {}
+      return [];
+    }
+
+    function render(list) {
+      listEl.innerHTML = '';
+      if (!list.length) {
+        statusEl.textContent = 'No dimensions yet.';
+        listEl.hidden = true;
+        return;
+      }
+
+      for (const row of list) {
+        const details = document.createElement('details');
+        details.className = 'dimension';
+
+        const summary = document.createElement('summary');
+        const left = document.createElement('div');
+        const right = document.createElement('div');
+
+        const title = document.createElement('span');
+        title.className = 'dim-title';
+        title.textContent = row.title || '(untitled dimension)';
+
+        const created = document.createElement('span');
+        created.className = 'created';
+        const dstr = fmtDate(row.created_at);
+        created.textContent = dstr ? `Created ${dstr}` : '';
+
+        left.appendChild(title);
+        summary.appendChild(left);
+        summary.appendChild(created);
+
+        details.appendChild(summary);
+
+        const thesis = document.createElement('div');
+        thesis.className = 'thesis';
+        thesis.textContent = row.description || '';
+        details.appendChild(thesis);
+
+        const targets = parseTargets(row);
+        if (targets.length) {
+          const ul = document.createElement('ul');
+          ul.className = 'targets';
+          for (const t of targets) {
+            const li = document.createElement('li');
+            li.textContent = t;
+            ul.appendChild(li);
+          }
+          details.appendChild(ul);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const loadBtn = document.createElement('button');
+        loadBtn.textContent = 'Load seeds';
+        loadBtn.addEventListener('click', async () => {
+          loadBtn.disabled = true;
+          await showSeeds(details, row);
+          loadBtn.disabled = false;
+        });
+        actions.appendChild(loadBtn);
+
+        const genBtn = document.createElement('button');
+        genBtn.textContent = 'Generate seeds';
+        genBtn.className = 'primary';
+        genBtn.title = 'Create 3–5 seeds via /api/narrative-seeds and display them';
+        genBtn.addEventListener('click', async () => {
+          try {
+            genBtn.disabled = true;
+            genBtn.textContent = 'Generating…';
+
+            const payload = {
+              domain: domainTitle || '',
+              dimension: row.title || '',
+              description: row.description || '',
+              targets: targets
+            };
+
+            const r = await fetch('/api/narrative-seeds', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify(payload)
+            });
+
+            if (!r.ok) throw new Error('Failed to generate seeds');
+            // regardless of response shape, try to refresh seeds via GET
+            await showSeeds(details, row);
+          } catch (e) {
+            alert('Error generating seeds. Check server logs.');
+            console.error(e);
+          } finally {
+            genBtn.disabled = false;
+            genBtn.textContent = 'Generate seeds';
+          }
+        });
+        actions.appendChild(genBtn);
+
+        details.appendChild(actions);
+
+        const seedsWrap = document.createElement('div');
+        seedsWrap.className = 'seeds';
+        seedsWrap.hidden = true;
+        seedsWrap.dataset.role = 'seeds';
+        details.appendChild(seedsWrap);
+
+        listEl.appendChild(details);
+      }
+
+      statusEl.textContent = '';
+      listEl.hidden = false;
+    }
+
+    async function showSeeds(detailsEl, row) {
+      const wrap = detailsEl.querySelector('[data-role="seeds"]');
+      if (!wrap) return;
+      wrap.hidden = false;
+      wrap.innerHTML = 'Loading seeds…';
+
+      const result = await fetchSeeds(row.id);
+      if (!result || result.ok === false) {
+        wrap.innerHTML = '<div style="opacity:.8">No seed read endpoint available. (Tip: add GET /api/dimensions/:id/seeds)</div>';
+        return;
+      }
+
+      const seeds = result.seeds || [];
+      if (!seeds.length) {
+        wrap.textContent = 'No seeds yet.';
+        return;
+      }
+
+      wrap.innerHTML = '';
+      for (const s of seeds) {
+        const div = document.createElement('div');
+        div.className = 'seed';
+        const p = document.createElement('p');
+        p.innerHTML =
+          `<strong>A (Problem):</strong> ${escapeHTML(s.problem)}<br>` +
+          `<strong>B (Objective):</strong> ${escapeHTML(s.objective)}<br>` +
+          `<strong>Solution (Link):</strong> ${escapeHTML(s.solution)}`;
+        div.appendChild(p);
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = s.created_at ? `Saved ${fmtDate(s.created_at)}` : '';
+        div.appendChild(meta);
+
+        wrap.appendChild(div);
+      }
+    }
+
+    function escapeHTML(str) {
+      return (str || '').replace(/[&<>"']/g, s => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]
+      ));
+    }
+
+    function filter(list, q) {
+      if (!q) return list;
+      const s = q.toLowerCase();
+      return list.filter(it =>
+        (it.title || '').toLowerCase().includes(s) ||
+        (it.description || '').toLowerCase().includes(s) ||
+        (parseTargets(it).join(' ') || '').toLowerCase().includes(s)
+      );
+    }
+
+    (async function init() {
+      try {
+        const items = await fetchDimensions();
+
+        // Wire up search
+        let current = items.slice();
+        render(current);
+        searchEl.addEventListener('input', () => {
+          const q = searchEl.value.trim();
+          render(filter(items, q));
+        });
+      } catch (e) {
+        statusEl.textContent = 'Error loading dimensions.';
+        statusEl.classList.add('error');
+        console.error(e);
+      }
+    })();
+  </script>
+</body>
+</html>
