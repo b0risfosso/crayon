@@ -108,12 +108,14 @@ that embodies the intent of the seed, tests whether the idea feels real, and inv
 
 Your output must include:
 1. Core Intent — the smallest truth or principle the prototype tests.
-2. Minimal Build — a simple computational/physical/narrative sketch that embodies the seed.
+2. Minimal Build — a storyboard, dashboard, flow chart, or pre-scripted simulation 
+   that illustrates how the system would work. It should be conceptual and visualizable,
+   not a functional application. No real backend, uploads, or panels — only mocked or prefilled flows.
 3. Load-Bearing Test — what to show to first eyes and what reaction would validate it.
 4. First Eyes — who to put it in front of first (supporters, skeptics, peers).
 5. Why This is a Box of Dirt — how it is minimal, disposable, and growth-inviting.
 
-Do not output a full implementation; focus on the smallest credible prototype.
+Do not output code or a full implementation; focus only on the simplest conceptual sketch.
 
 Return ONLY structured JSON in the provided schema.
 """
