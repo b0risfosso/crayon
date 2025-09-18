@@ -159,6 +159,124 @@
       <div class="placeholder">[two curves: zero vs 70% by D30]</div>
     </div>
   </section>
+  <section class="card" id="interactive-control-room">
+    <h2>Interactive Control Room (mocked — no backend)</h2>
+  
+    <!-- MODE TOGGLE -->
+    <div class="card">
+      <h3>Mode</h3>
+      <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+        <button id="mLegacy" class="ghost">OFF — Legacy</button>
+        <button id="mQuad" class="mutebtn">ON — Quadrilateral</button>
+        <span class="muted" id="modeNote">Harmonized PDKs • dual masks • allied-cloud EDA</span>
+      </div>
+    </div>
+  
+    <!-- INCIDENT & ALLOCATION -->
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Incident Drill</h3>
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+          <select id="incidentSite" style="padding:.5rem .6rem; border:1px solid #ccc; border-radius:.5rem;">
+            <option value="tsmc">Straits disruption — TSMC (Hsinchu)</option>
+            <option value="samsung">Export tool freeze — Samsung (Hwaseong)</option>
+          </select>
+          <button id="btnTrigger" class="mutebtn">Trigger Incident</button>
+        </div>
+        <p class="muted" id="incidentNote" style="margin:.4rem 0 0;">No incident yet.</p>
+        <div class="placeholder" style="margin-top:.5rem;">[Tiles: TSMC / Samsung / Rapidus / India — affected site turns red]</div>
+      </div>
+  
+      <div class="card">
+        <h3>Failover Lot Plan</h3>
+        <div class="muted" style="margin-bottom:.3rem;">Reallocate wafer starts across surviving sites (sum = 100%)</div>
+        <label>Samsung <span id="pctSamsung" class="badge">40%</span></label>
+        <input type="range" id="rSamsung" min="0" max="100" value="40" />
+        <label>Rapidus <span id="pctRapidus" class="badge">35%</span></label>
+        <input type="range" id="rRapidus" min="0" max="100" value="35" />
+        <label>India (PLI Dholera) <span id="pctIndia" class="badge">25%</span></label>
+        <input type="range" id="rIndia" min="0" max="100" value="25" />
+        <div class="muted" id="sumNote" style="margin-top:.35rem;">Sum: <strong>100%</strong> ✓</div>
+        <div style="margin-top:.5rem; display:flex; gap:.5rem; flex-wrap:wrap;">
+          <button id="btnAuto" class="ghost" title="Restore default split 40/35/25">Auto-balance</button>
+          <button id="btnRun" class="mutebtn">Run Failover Script</button>
+        </div>
+      </div>
+    </div>
+  
+    <!-- PROCESS STEPS -->
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Step A — OPC/ILT deltas</h3>
+        <div class="muted">Re-compute site-specific OPC/ILT (Rapidus/India)</div>
+        <div class="meter" style="margin-top:.35rem;"><div id="pOPC" class="fill" style="width:0%"></div></div>
+        <small id="tOPC" class="muted">ETA ~18h (mocked)</small>
+      </div>
+      <div class="card">
+        <h3>Step B — Mask B release</h3>
+        <div class="muted">Release from DNP (Tokyo) / Photronics (Boise)</div>
+        <div class="meter" style="margin-top:.35rem;"><div id="pMask" class="fill" style="width:0%"></div></div>
+        <small id="tMask" class="muted">Queued</small>
+      </div>
+      <div class="card">
+        <h3>Step C — Overlay correction</h3>
+        <div class="muted">India overlay +1.5nm → apply correction recipe</div>
+        <div class="meter" style="margin-top:.35rem;"><div id="pOverlay" class="fill" style="width:0%"></div></div>
+        <small id="tOverlay" class="muted">Queued</small>
+      </div>
+    </div>
+  
+    <!-- QUAL SPRINT -->
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Qual 1 — Resist/Pellicle</h3>
+        <div class="meter"><div id="pQ1" class="fill" style="width:0%"></div></div>
+        <small class="muted" id="tQ1">0/2h</small>
+      </div>
+      <div class="card">
+        <h3>Qual 2 — FEM</h3>
+        <div class="meter"><div id="pQ2" class="fill" style="width:0%"></div></div>
+        <small class="muted" id="tQ2">0/6h</small>
+      </div>
+      <div class="card">
+        <h3>Qual 3 — Metrology signoff</h3>
+        <div class="meter"><div id="pQ3" class="fill" style="width:0%"></div></div>
+        <small class="muted" id="tQ3">0/4h</small>
+      </div>
+    </div>
+  
+    <!-- KPIs -->
+    <div class="grid cols-3">
+      <div class="card">
+        <strong>Days to Resume Wafer Starts</strong>
+        <div class="meter" style="margin-top:.3rem;"><div id="kDays" class="fill" style="width:64%"></div></div>
+        <p class="muted" id="kDaysTxt">4.5 days</p>
+      </div>
+      <div class="card">
+        <strong>Expected Output at T+30</strong>
+        <div class="meter" style="margin-top:.3rem;"><div id="kOut" class="fill" style="width:70%"></div></div>
+        <p class="muted" id="kOutTxt">70% of plan</p>
+      </div>
+      <div class="card">
+        <strong>Confidence to Ramp</strong>
+        <div class="meter" style="margin-top:.3rem;"><div id="kConf" class="fill" style="width:68%"></div></div>
+        <p class="muted" id="kConfTxt">68% → 92% (after qual)</p>
+      </div>
+    </div>
+  
+    <!-- ACTION LOG -->
+    <div class="card">
+      <h3>Action Log (mock)</h3>
+      <table id="log">
+        <thead><tr><th>T</th><th>Event</th><th>Detail</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="noprint" style="margin-top:.5rem; display:flex; gap:.5rem; flex-wrap:wrap;">
+        <button id="btnReset" class="ghost">Reset demo</button>
+        <button id="btnPrint" class="ghost">Print summary</button>
+      </div>
+    </div>
+  </section>
 
   <!-- 3) Toggle Panel: What‑if Comparisons -->
   <section class="card">
@@ -223,6 +341,172 @@
   </section>
 
   <script>
+    (() => {
+  // helpers
+  const $ = sel => document.querySelector(sel);
+  const log = (e, d) => {
+    const tr = document.createElement('tr');
+    const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    tr.innerHTML = `<td>${t}</td><td>${e}</td><td class="muted">${d}</td>`;
+    $('#log tbody').prepend(tr);
+  };
+  const setFill = (id, pct) => { $(id).style.width = pct + '%'; };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // elements
+  const mLegacy = $('#mLegacy'), mQuad = $('#mQuad'), modeNote = $('#modeNote');
+  const incidentSite = $('#incidentSite'), btnTrigger = $('#btnTrigger'), incidentNote = $('#incidentNote');
+  const rS = $('#rSamsung'), rR = $('#rRapidus'), rI = $('#rIndia'),
+        pctS = $('#pctSamsung'), pctR = $('#pctRapidus'), pctI = $('#pctIndia'), sumNote = $('#sumNote');
+  const btnAuto = $('#btnAuto'), btnRun = $('#btnRun'), btnReset = $('#btnReset'), btnPrint = $('#btnPrint');
+
+  const pOPC = '#pOPC', pMask = '#pMask', pOverlay = '#pOverlay';
+  const tOPC = $('#tOPC'), tMask = $('#tMask'), tOverlay = $('#tOverlay');
+
+  const pQ1 = '#pQ1', pQ2 = '#pQ2', pQ3 = '#pQ3';
+  const tQ1 = $('#tQ1'), tQ2 = $('#tQ2'), tQ3 = $('#tQ3');
+
+  const kDays = '#kDays', kDaysTxt = $('#kDaysTxt'),
+        kOut  = '#kOut',  kOutTxt  = $('#kOutTxt'),
+        kConf = '#kConf', kConfTxt = $('#kConfTxt');
+
+  // state
+  let mode = 'quad'; // 'legacy' | 'quad'
+  let incident = null; // 'tsmc' | 'samsung'
+  let running = false;
+
+  // MODE
+  const setMode = (m) => {
+    mode = m;
+    if (m === 'legacy') {
+      setFill(kDays, 100); kDaysTxt.textContent = 'Re-qual 6–10 weeks';
+      setFill(kOut, 2);    kOutTxt.textContent  = 'Output near-zero';
+      setFill(kConf, 40);  kConfTxt.textContent = 'Low confidence (no harmonization)';
+      modeNote.textContent = 'Non-harmonized PDKs • single masks • on-prem EDA';
+      log('Mode', 'Legacy — expect long re-qualification and near-zero output during disruption');
+    } else {
+      setFill(kDays, 64);  kDaysTxt.textContent = '4.5 days';
+      setFill(kOut, 70);   kOutTxt.textContent  = '70% of plan';
+      setFill(kConf, 68);  kConfTxt.textContent = '68% → 92% (after qual)';
+      modeNote.textContent = 'Harmonized PDKs • dual masks • allied-cloud EDA';
+      log('Mode', 'Quadrilateral — fast failover enabled by harmonization & dual sourcing');
+    }
+  };
+
+  mLegacy.addEventListener('click', ()=> setMode('legacy'));
+  mQuad  .addEventListener('click', ()=> setMode('quad'));
+  setMode('quad');
+
+  // ALLOCATION SUM
+  const refreshAlloc = () => {
+    const s = +rS.value, r = +rR.value, i = +rI.value;
+    pctS.textContent = s + '%'; pctR.textContent = r + '%'; pctI.textContent = i + '%';
+    const sum = s + r + i;
+    sumNote.innerHTML = `Sum: <strong>${sum}%</strong> ` + (sum === 100 ? '✓' : '<span style="color:#b00020">— adjust to 100%</span>');
+    return sum;
+  };
+  [rS, rR, rI].forEach(inp => inp.addEventListener('input', refreshAlloc));
+  refreshAlloc();
+
+  btnAuto.addEventListener('click', () => {
+    rS.value = 40; rR.value = 35; rI.value = 25; refreshAlloc();
+    log('Allocation', 'Auto-balance → Samsung 40%, Rapidus 35%, India 25%');
+  });
+
+  // INCIDENT
+  btnTrigger.addEventListener('click', () => {
+    incident = incidentSite.value;
+    const name = incident==='tsmc' ? 'TSMC (Hsinchu)' : 'Samsung (Hwaseong)';
+    incidentNote.innerHTML = `Incident: <strong>${name}</strong> impacted. Primary capacity at risk.`;
+    log('Incident', `${name} disrupted; initiating playbook`);
+  });
+
+  // RUN SCRIPT
+  btnRun.addEventListener('click', () => {
+    if (running) return;
+    if (!incident) { alert('Trigger an incident first.'); return; }
+    if (refreshAlloc() !== 100) { alert('Allocation must sum to 100%.'); return; }
+    running = true;
+
+    // reset bars
+    [pOPC, pMask, pOverlay, pQ1, pQ2, pQ3].forEach(sel => setFill(sel, 0));
+    [tOPC, tMask, tOverlay].forEach(el => el.textContent = 'Running…');
+    tQ1.textContent = '0/2h'; tQ2.textContent = '0/6h'; tQ3.textContent = '0/4h';
+    setFill(kConf, 68); kConfTxt.textContent = '68%';
+
+    // A. OPC/ILT deltas (simulate ~1.2s)
+    log('OPC/ILT', 'Re-compute deltas for Rapidus & India');
+    let a=0; const aInt = setInterval(()=>{ a+=10; setFill(pOPC, a); if(a>=100){ clearInterval(aInt); tOPC.textContent='Done (~18h)'; stepB(); }}, 120);
+
+    // B. Mask release
+    const stepB = () => {
+      log('Mask B', 'Release from DNP (Tokyo) / Photronics (Boise)');
+      let b=0; const bInt = setInterval(()=>{ b+=20; setFill(pMask, b); if(b>=100){ clearInterval(bInt); tMask.textContent='Released'; stepC(); }}, 150);
+    };
+
+    // C. Overlay correction
+    const stepC = () => {
+      log('Overlay', 'India +1.5nm correction recipe applied');
+      let c=0; const cInt = setInterval(()=>{ c+=25; setFill(pOverlay, c); if(c>=100){ clearInterval(cInt); tOverlay.textContent='Aligned'; qual(); }}, 140);
+    };
+
+    // QUAL sprint (2h → 6h → 4h; compressed)
+    const qual = () => {
+      // bump confidence as we pass stages
+      const bump = (to, labelEl, totalHrs, barSel, cb) => {
+        let x=0, ticks = 10; // compress
+        const int = setInterval(()=>{
+          x++; setFill(barSel, x*10);
+          labelEl.textContent = `${Math.round((x/ticks)*totalHrs)}/${totalHrs}h`;
+          const conf = clamp(68 + Math.round((x/ticks)*8), 68, 76);
+          setFill(kConf, conf); kConfTxt.textContent = conf + '%';
+          if(x>=ticks){ clearInterval(int); cb && cb(); }
+        }, 120);
+      };
+
+      log('Qual', 'Resist/Pellicle checks');
+      bump(76, tQ1, 2, pQ1, () => {
+        log('Qual', 'Focus-Exposure Matrix');
+        bump(84, tQ2, 6, pQ2, () => {
+          log('Qual', 'Metrology signoff');
+          bump(92, tQ3, 4, pQ3, finish);
+        });
+      });
+    };
+
+    // FINISH: update KPIs based on allocation realism
+    const finish = () => {
+      // crude heuristic: more to high-match fabs → faster resume/better T+30
+      const s = +rS.value, r = +rR.value, i = +rI.value;
+      const matchScore = (s*0.98 + r*0.96 + i*0.93) / 100; // weighted by tool-match
+      const days = Math.max(3.6, 6 - (matchScore-0.90)*40); // ~3.6–6 days
+      const out  = clamp(Math.round(50 + (matchScore-0.90)*200), 55, 78); // ~55–78%
+
+      setFill(kDays, clamp((days/10)*100, 30, 100)); kDaysTxt.textContent = days.toFixed(1) + ' days';
+      setFill(kOut, out); kOutTxt.textContent = out + '% of plan';
+      setFill(kConf, 92); kConfTxt.textContent = '92% (wafer starts authorized)';
+
+      const disrupted = incident==='tsmc' ? 'TSMC' : 'Samsung';
+      log('Authorize', `First wafers started at T+${(days*24).toFixed(0)}h (primary: ${disrupted} down)`);
+      running = false;
+    };
+  });
+
+  // RESET / PRINT
+  btnReset.addEventListener('click', () => {
+    $('#log tbody').innerHTML = '';
+    incident = null; incidentNote.textContent = 'No incident yet.';
+    [rS.value = 40, rR.value = 35, rI.value = 25];
+    refreshAlloc();
+    [pOPC, pMask, pOverlay, pQ1, pQ2, pQ3].forEach(sel => setFill(sel, 0));
+    tOPC.textContent = 'ETA ~18h (mocked)'; tMask.textContent = 'Queued'; tOverlay.textContent = 'Queued';
+    tQ1.textContent = '0/2h'; tQ2.textContent = '0/6h'; tQ3.textContent = '0/4h';
+    setMode(mode); // re-apply current mode KPIs
+    log('Reset', 'Cleared state');
+  });
+
+  btnPrint.addEventListener('click', () => window.print());
+})();
     // Tiny comparison toggle to shift KPIs/text between Legacy and Quadrilateral modes
     const kpiDays = document.getElementById('kpiDays');
     const kpiOut = document.getElementById('kpiOut');
