@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chip Quadrilateral — Control Room Storyboard & Mock Dashboard (Site‑Styled)</title>
+  <!-- White site styling with cards; no expand/collapse; single-file mock -->
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: .6rem 0 .4rem; }
+    h3 { font-size: 1rem; margin: .2rem 0 .4rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .muted { opacity: .75; font-size: .95rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    @media (max-width: 1000px){ .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .chip { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.5rem; background:#fff; font-size:.85rem; margin:.15rem .25rem .15rem 0; }
+    .badge { display:inline-block; padding:.15rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:.45rem .4rem; border-bottom:1px solid #e9e9e9; text-align:left; font-size:.95rem; }
+    th { background:#fafafa; }
+
+    /* Lights & meters */
+    .light { width:.7rem; height:.7rem; border-radius:50%; display:inline-block; vertical-align:middle; margin-right:.35rem; border:1px solid #d0d0d0; }
+    .green { background:#16a34a; border-color:#16a34a; }
+    .yellow { background:#f59e0b; border-color:#f59e0b; }
+    .red { background:#ef4444; border-color:#ef4444; }
+    .meter { height: 10px; background: #f5f5f5; border: 1px solid #dfdfdf; border-radius: 999px; overflow: hidden; }
+    .fill { height:100%; width:0%; background: linear-gradient(90deg,#0b5cff,#16a34a); transition: width .5s ease; }
+
+    /* Buttons */
+    button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
+    .mutebtn { background:#eef2ff; color:#0b5cff; border:1px solid #cfe0ff; }
+    .ghost { background:#f6f6f6; color:#333; }
+
+    /* Print */
+    @media print { body{max-width:100%; margin:.6in;} .noprint{display:none;} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Asia / Silicon, Steel, and Batteries / Seed — Chip Quadrilateral</h1>
+    <div class="meta">
+      <strong>A (Problem):</strong> Advanced-node capacity is concentrated in Taiwan & Korea; tool controls and straits risks can freeze global chip supply overnight. <br>
+      <strong>B (Objective):</strong> A friend‑shored, redundant pipeline for sub‑5nm chips resilient to sanctions and geopolitical shocks. <br>
+      <strong>Link:</strong> TSMC, Samsung, Rapidus (JP), and India’s PLI cluster co‑build modular fabs with identical PDKs/tool stacks; dual‑source masks/EDA in allied clouds so tape‑outs jump sites within days.
+    </div>
+    <p class="muted"><strong>Core intent:</strong> Do harmonized PDKs/tool stacks + dual‑sourced masks + allied‑cloud EDA make it believable that a 5nm‑class tape‑out can jump from a disrupted site to allied sites in days, not months?</p>
+  </header>
+
+  <!-- 1) One-page Mock Dashboard -->
+  <section class="card">
+    <h2>T+0 Incident Drill: 5nm‑class SoC — Tape‑out Jump Test</h2>
+    <div class="grid cols-4">
+      <!-- TSMC -->
+      <div class="card">
+        <h3>TSMC — Hsinchu</h3>
+        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
+        <p>Tool Stack Match Index: <strong>100%</strong></p>
+        <p>EUV/DUV readiness: NXE:3600D • Pellicle <em>JP‑Alpha</em> • Resist <em>Chem‑A v3</em></p>
+        <p>Mask Sets: A (TW/KO) on‑site; B (JP/US) at DNP/Photronics</p>
+        <p>EDA Cloud Mirror: <strong>Active</strong> (Tokyo/Seoul/Mumbai) • RPO 15m • RTO 2h</p>
+        <p>Pre‑Qualified Golden Lot: ring‑osc • SRAM • PHY — corners aligned</p>
+      </div>
+      <!-- Samsung -->
+      <div class="card">
+        <h3>Samsung — Hwaseong</h3>
+        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
+        <p>Tool Stack Match Index: <strong>98%</strong></p>
+        <p>EUV/DUV readiness: NXE:3600D • Pellicle JP‑Alpha • Resist Chem‑A v3</p>
+        <p>Mask Sets: A on‑site; B at DNP/Photronics</p>
+        <p>EDA Cloud Mirror: <strong>Active</strong> • RPO 15m • RTO 2h</p>
+        <p>Golden Lot: signoff corners aligned</p>
+      </div>
+      <!-- Rapidus -->
+      <div class="card">
+        <h3>Rapidus — Hokkaido</h3>
+        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
+        <p>Tool Stack Match Index: <strong>96%</strong></p>
+        <p>EUV/DUV readiness: NXE:3600D • Pellicle JP‑Alpha • Resist Chem‑A v3</p>
+        <p>Mask Sets: B at DNP (Tokyo)</p>
+        <p>EDA Cloud Mirror: <strong>Active</strong> • RPO 15m • RTO 2h</p>
+        <p>Golden Lot: ring‑osc/SRAM/PHY aligned</p>
+      </div>
+      <!-- India -->
+      <div class="card">
+        <h3>India PLI Cluster — Dholera</h3>
+        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
+        <p>Tool Stack Match Index: <strong>93%</strong></p>
+        <p>EUV/DUV readiness: NXE:3600D • Pellicle JP‑Alpha • Resist Chem‑A v3</p>
+        <p>Mask Sets: B at Photronics (Boise)</p>
+        <p>EDA Cloud Mirror: <strong>Active</strong> • RPO 15m • RTO 2h</p>
+        <p>Golden Lot: corners aligned</p>
+      </div>
+    </div>
+
+    <div class="grid cols-3" style="margin-top:.6rem">
+      <div class="card">
+        <strong>Days to Resume Wafer Starts</strong>
+        <div class="meter" style="margin-top:.3rem"><div id="kpiDays" class="fill" style="width:64%"></div></div>
+        <p class="muted" id="kpiDaysTxt">4.5 days</p>
+      </div>
+      <div class="card">
+        <strong>Expected Output Recovery at T+30</strong>
+        <div class="meter" style="margin-top:.3rem"><div id="kpiOut" class="fill" style="width:70%"></div></div>
+        <p class="muted" id="kpiOutTxt">70% of plan</p>
+      </div>
+      <div class="card">
+        <strong>Single‑Point Failure Exposure</strong>
+        <p class="muted" id="spfTxt">EUV service spares — mitigated by prepositioned kits (JP/IN)</p>
+      </div>
+    </div>
+
+    <div class="noprint" style="margin-top:.6rem; display:flex; gap:.5rem; flex-wrap:wrap">
+      <button id="btnLegacy" class="ghost">Toggle: OFF (Legacy)</button>
+      <button id="btnQuad" class="mutebtn">Toggle: ON (Quadrilateral)</button>
+    </div>
+  </section>
+
+  <!-- 2) Six-Panel Storyboard -->
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Frame 1 — Steady State</h3>
+      <p class="muted">Design team finalizes SoC in Allied Cloud EDA workspace. Target PDK: <strong>Q5N v1.2</strong>. Dual OPC/ILT recipes compiled; Masks A & B slotted at two mask shops.</p>
+      <div class="placeholder">[EDA workspace + PDK dropdown + completed OPC/ILT button]</div>
+    </div>
+    <div class="card">
+      <h3>Frame 2 — Pre‑Arm</h3>
+      <p class="muted">Mask A crates prepped for TSMC/Samsung; Mask B pellicles validated at DNP/Photronics. Tool Stack Checker shows 95%+ match across fabs; Golden Lot alignment signed.</p>
+      <div class="placeholder">[split screen: mask shops + tool match checker]</div>
+    </div>
+    <div class="card">
+      <h3>Frame 3 — Shock</h3>
+      <p class="muted">Alert: <strong>Straits Disruption</strong> — TSMC card turns red; export controls constrain tool shipments to Korea. Primary site down; 55% of global sub‑5nm capacity at risk.</p>
+      <div class="placeholder">[alert card + red TSMC tile]</div>
+    </div>
+    <div class="card">
+      <h3>Frame 4 — Failover Script</h3>
+      <p class="muted">Playbook reassigns lot plan: Samsung 40%, Rapidus 35%, India 25%. EDA mirror shifts primary to Tokyo/Mumbai; license entitlements float. Re‑run OPC deltas; release Mask B; apply India overlay correction (+1.5nm).</p>
+      <div class="placeholder">[sliders + sub‑panels for OPC deltas / mask release / overlay correction]</div>
+    </div>
+    <div class="card">
+      <h3>Frame 5 — Qualification Sprint</h3>
+      <p class="muted">Golden Lot sequence: Resist/pellicle (2h) → FEM (6h) → Metrology signoff (4h). <em>Confidence to Ramp</em> ticks 68% → 92%.</p>
+      <div class="placeholder">[timeline gauge for qual sprint]</div>
+    </div>
+    <div class="card">
+      <h3>Frame 6 — Recovery</h3>
+      <p class="muted">Output: “No Quadrilateral” → 0% for 3–6 weeks; “Quadrilateral Ready” → 70% by Day 30. Banner: First wafers started at <strong>T+108 hours</strong>.</p>
+      <div class="placeholder">[two curves: zero vs 70% by D30]</div>
+    </div>
+  </section>
+
+  <!-- 3) Toggle Panel: What‑if Comparisons -->
+  <section class="card">
+    <h2>What‑if Comparison</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>OFF — Legacy</h3>
+        <ul class="muted">
+          <li>Non‑harmonized PDKs; single mask shop; on‑prem EDA</li>
+          <li>Re‑qualification: <strong>6–10 weeks</strong></li>
+          <li>Output: near‑zero during disruption</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>ON — Quadrilateral</h3>
+        <ul class="muted">
+          <li>Harmonized PDKs/tool stacks; dual masks; allied‑cloud EDA</li>
+          <li>Re‑qualification: <strong>&lt; 7 days</strong> (shuttle), <strong>&lt; 14 days</strong> (volume ramp)</li>
+          <li>Output: rebounds to <strong>~70% by Day 30</strong></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4) Traceability Strip -->
+  <section class="card">
+    <h2>Traceability — Brittle Points & Mitigations</h2>
+    <ul class="muted">
+      <li><strong>EUV single‑vendor risk →</strong> Prepositioned spares + cross‑servicing MOUs (JP/IN depots)</li>
+      <li><strong>Pellicle/resist variability →</strong> Locked bill‑of‑materials + shared Certificates of Analysis across sites</li>
+      <li><strong>Signoff corners drift →</strong> Shared statistical PDK + cross‑foundry correlation data packs</li>
+    </ul>
+  </section>
+
+  <!-- First Eyes -->
+  <section class="card">
+    <h2>First Eyes</h2>
+    <div class="grid cols-2">
+      <ul>
+        <li>Foundry PDK/manufacturing VPs: TSMC, Samsung, Rapidus</li>
+        <li>India PLI semiconductor leads & anchor fab operators</li>
+        <li>EDA vendors (Cadence, Synopsys, Siemens) — cloud/license portability</li>
+        <li>Mask shops (DNP, Toppan, Photronics)</li>
+      </ul>
+      <ul>
+        <li>Fabless CTOs/chief architects (Apple, NVIDIA, Qualcomm, MediaTek)</li>
+        <li>Metrology/lithography leads (ASML service, KLA)</li>
+        <li>Allied gov resilience teams (JP/US/IN/TW liaisons)</li>
+        <li>Supply‑chain risk analysts & export‑control counsel</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Why Box of Dirt -->
+  <section class="card">
+    <h2>Why This is a Box of Dirt</h2>
+    <ul class="muted">
+      <li><strong>Minimal:</strong> paper/dashboard storyboard with mocked data — no real IP, no backend, no NDAs.</li>
+      <li><strong>Disposable:</strong> if the room rejects assumptions, toss & redraw without sunk engineering.</li>
+      <li><strong>Growth‑inviting:</strong> next steps: run a cross‑foundry Golden Lot, formalize Q5N subset, stand up dual mask SLAs, preposition EUV spares, expand to OSAT once FEOL works.</li>
+    </ul>
+  </section>
+
+  <script>
+    // Tiny comparison toggle to shift KPIs/text between Legacy and Quadrilateral modes
+    const kpiDays = document.getElementById('kpiDays');
+    const kpiOut = document.getElementById('kpiOut');
+    const kpiDaysTxt = document.getElementById('kpiDaysTxt');
+    const kpiOutTxt = document.getElementById('kpiOutTxt');
+    const spfTxt = document.getElementById('spfTxt');
+
+    function setMode(mode){
+      if(mode==='legacy'){
+        kpiDays.style.width = '100%';
+        kpiDaysTxt.textContent = 'Re‑qual 6–10 weeks';
+        kpiOut.style.width = '2%';
+        kpiOutTxt.textContent = 'Output near‑zero';
+        spfTxt.textContent = 'Single mask shop; on‑prem EDA; no cross‑site spares';
+      } else {
+        kpiDays.style.width = '64%';
+        kpiDaysTxt.textContent = '4.5 days';
+        kpiOut.style.width = '70%';
+        kpiOutTxt.textContent = '70% of plan (T+30)';
+        spfTxt.textContent = 'EUV service spares — mitigated by prepositioned kits (JP/IN)';
+      }
+    }
+
+    document.getElementById('btnLegacy').addEventListener('click',()=>setMode('legacy'));
+    document.getElementById('btnQuad').addEventListener('click',()=>setMode('quad'));
+
+    setMode('quad');
+  </script>
+</body>
+</html>

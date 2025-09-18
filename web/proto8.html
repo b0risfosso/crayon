@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Chip Quadrilateral — Control Room Storyboard & Mock Dashboard (Site‑Styled)</title>
+  <title>Money — Rails & Plumbing / Agent‑Centric Switch on Instant Rails (Site‑Styled)</title>
   <!-- White site styling with cards; no expand/collapse; single-file mock -->
   <style>
     :root { color-scheme: light dark; }
@@ -29,18 +29,16 @@
     th, td { padding:.45rem .4rem; border-bottom:1px solid #e9e9e9; text-align:left; font-size:.95rem; }
     th { background:#fafafa; }
 
-    /* Lights & meters */
-    .light { width:.7rem; height:.7rem; border-radius:50%; display:inline-block; vertical-align:middle; margin-right:.35rem; border:1px solid #d0d0d0; }
-    .green { background:#16a34a; border-color:#16a34a; }
-    .yellow { background:#f59e0b; border-color:#f59e0b; }
-    .red { background:#ef4444; border-color:#ef4444; }
-    .meter { height: 10px; background: #f5f5f5; border: 1px solid #dfdfdf; border-radius: 999px; overflow: hidden; }
-    .fill { height:100%; width:0%; background: linear-gradient(90deg,#0b5cff,#16a34a); transition: width .5s ease; }
-
-    /* Buttons */
+    /* Buttons & tiny meters */
     button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
     .mutebtn { background:#eef2ff; color:#0b5cff; border:1px solid #cfe0ff; }
     .ghost { background:#f6f6f6; color:#333; }
+    .meter { height: 10px; background: #f5f5f5; border: 1px solid #dfdfdf; border-radius: 999px; overflow: hidden; }
+    .fill { height:100%; width:0%; background: linear-gradient(90deg,#0b5cff,#16a34a); transition: width .5s ease; }
+
+    /* SMS/USSD cards */
+    .sms { background:#fcfcff; border:1px solid #e3e7ff; padding:.6rem .7rem; border-radius:.6rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.92rem; }
+    .ussd { background:#fffef6; border:1px solid #f2e7a1; padding:.6rem .7rem; border-radius:.6rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.92rem; }
 
     /* Print */
     @media print { body{max-width:100%; margin:.6in;} .noprint{display:none;} }
@@ -48,208 +46,213 @@
 </head>
 <body>
   <header>
-    <h1>Asia / Silicon, Steel, and Batteries / Seed — Chip Quadrilateral</h1>
+    <h1>Money / Rails & Plumbing / Seed — Agent‑Centric Switch on Instant Rails</h1>
     <div class="meta">
-      <strong>A (Problem):</strong> Advanced-node capacity is concentrated in Taiwan & Korea; tool controls and straits risks can freeze global chip supply overnight. <br>
-      <strong>B (Objective):</strong> A friend‑shored, redundant pipeline for sub‑5nm chips resilient to sanctions and geopolitical shocks. <br>
-      <strong>Link:</strong> TSMC, Samsung, Rapidus (JP), and India’s PLI cluster co‑build modular fabs with identical PDKs/tool stacks; dual‑source masks/EDA in allied clouds so tape‑outs jump sites within days.
+      <strong>A (Problem):</strong> Mobile money (e.g., M‑Pesa) is a walled garden; agents can’t natively interoperate with instant rails or cross‑border corridors. <br>
+      <strong>B (Objective):</strong> Make wallets and agents first‑class nodes on national instant systems and low‑cost remittance routes. <br>
+      <strong>Link:</strong> An agent‑centric switch maps SIM wallets to instant‑rail aliases, supports offline request‑to‑pay (QR/USSD), and settles to telco float in real time; corridor hubs translate between UPI/PIX/SEPA Instant and mobile wallets.
     </div>
-    <p class="muted"><strong>Core intent:</strong> Do harmonized PDKs/tool stacks + dual‑sourced masks + allied‑cloud EDA make it believable that a 5nm‑class tape‑out can jump from a disrupted site to allied sites in days, not months?</p>
+    <p class="muted"><strong>Core intent:</strong> Show that alias‑mapped SIM wallets + offline R2P make agents/wallets behave like first‑class instant‑rail participants domestically and across borders—without changing agent routines.</p>
   </header>
 
-  <!-- 1) One-page Mock Dashboard -->
+  <!-- Cast -->
   <section class="card">
-    <h2>T+0 Incident Drill: 5nm‑class SoC — Tape‑out Jump Test</h2>
-    <div class="grid cols-4">
-      <!-- TSMC -->
-      <div class="card">
-        <h3>TSMC — Hsinchu</h3>
-        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
-        <p>Tool Stack Match Index: <strong>100%</strong></p>
-        <p>EUV/DUV readiness: NXE:3600D • Pellicle <em>JP‑Alpha</em> • Resist <em>Chem‑A v3</em></p>
-        <p>Mask Sets: A (TW/KO) on‑site; B (JP/US) at DNP/Photronics</p>
-        <p>EDA Cloud Mirror: <strong>Active</strong> (Tokyo/Seoul/Mumbai) • RPO 15m • RTO 2h</p>
-        <p>Pre‑Qualified Golden Lot: ring‑osc • SRAM • PHY — corners aligned</p>
-      </div>
-      <!-- Samsung -->
-      <div class="card">
-        <h3>Samsung — Hwaseong</h3>
-        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
-        <p>Tool Stack Match Index: <strong>98%</strong></p>
-        <p>EUV/DUV readiness: NXE:3600D • Pellicle JP‑Alpha • Resist Chem‑A v3</p>
-        <p>Mask Sets: A on‑site; B at DNP/Photronics</p>
-        <p>EDA Cloud Mirror: <strong>Active</strong> • RPO 15m • RTO 2h</p>
-        <p>Golden Lot: signoff corners aligned</p>
-      </div>
-      <!-- Rapidus -->
-      <div class="card">
-        <h3>Rapidus — Hokkaido</h3>
-        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
-        <p>Tool Stack Match Index: <strong>96%</strong></p>
-        <p>EUV/DUV readiness: NXE:3600D • Pellicle JP‑Alpha • Resist Chem‑A v3</p>
-        <p>Mask Sets: B at DNP (Tokyo)</p>
-        <p>EDA Cloud Mirror: <strong>Active</strong> • RPO 15m • RTO 2h</p>
-        <p>Golden Lot: ring‑osc/SRAM/PHY aligned</p>
-      </div>
-      <!-- India -->
-      <div class="card">
-        <h3>India PLI Cluster — Dholera</h3>
-        <p><span class="light green"></span>PDK: <strong>Q5N v1.2</strong> (Harmonized)</p>
-        <p>Tool Stack Match Index: <strong>93%</strong></p>
-        <p>EUV/DUV readiness: NXE:3600D • Pellicle JP‑Alpha • Resist Chem‑A v3</p>
-        <p>Mask Sets: B at Photronics (Boise)</p>
-        <p>EDA Cloud Mirror: <strong>Active</strong> • RPO 15m • RTO 2h</p>
-        <p>Golden Lot: corners aligned</p>
-      </div>
-    </div>
-
-    <div class="grid cols-3" style="margin-top:.6rem">
-      <div class="card">
-        <strong>Days to Resume Wafer Starts</strong>
-        <div class="meter" style="margin-top:.3rem"><div id="kpiDays" class="fill" style="width:64%"></div></div>
-        <p class="muted" id="kpiDaysTxt">4.5 days</p>
-      </div>
-      <div class="card">
-        <strong>Expected Output Recovery at T+30</strong>
-        <div class="meter" style="margin-top:.3rem"><div id="kpiOut" class="fill" style="width:70%"></div></div>
-        <p class="muted" id="kpiOutTxt">70% of plan</p>
-      </div>
-      <div class="card">
-        <strong>Single‑Point Failure Exposure</strong>
-        <p class="muted" id="spfTxt">EUV service spares — mitigated by prepositioned kits (JP/IN)</p>
-      </div>
-    </div>
-
-    <div class="noprint" style="margin-top:.6rem; display:flex; gap:.5rem; flex-wrap:wrap">
-      <button id="btnLegacy" class="ghost">Toggle: OFF (Legacy)</button>
-      <button id="btnQuad" class="mutebtn">Toggle: ON (Quadrilateral)</button>
+    <h2>Cast</h2>
+    <div class="grid cols-3">
+      <div class="card"><strong>Agent</strong><br><span class="muted">feature phone</span></div>
+      <div class="card"><strong>Wallet Holder</strong><br><span class="muted">any phone</span></div>
+      <div class="card"><strong>Bank Payer</strong><br><span class="muted">bank app on instant rails</span></div>
+      <div class="card"><strong>Scheme Operator</strong><br><span class="muted">domestic instant</span></div>
+      <div class="card"><strong>Corridor Hub</strong><br><span class="muted">UPI/PIX/SEPA translator</span></div>
     </div>
   </section>
 
-  <!-- 2) Six-Panel Storyboard -->
+  <!-- Storyboard Panels 1-8 -->
   <section class="grid cols-2">
     <div class="card">
-      <h3>Frame 1 — Steady State</h3>
-      <p class="muted">Design team finalizes SoC in Allied Cloud EDA workspace. Target PDK: <strong>Q5N v1.2</strong>. Dual OPC/ILT recipes compiled; Masks A & B slotted at two mask shops.</p>
-      <div class="placeholder">[EDA workspace + PDK dropdown + completed OPC/ILT button]</div>
+      <h3>Panel 1 — Directory‑as‑the‑Switch (Mock Lookup)</h3>
+      <div class="card" style="margin:.4rem 0">
+        <strong>Alias Directory</strong>
+        <div class="grid cols-2" style="margin-top:.4rem">
+          <div class="placeholder">[search box: 2547 123 456]</div>
+          <div>
+            <table>
+              <tbody>
+                <tr><td>Wallet</td><td>Safaritel Wallet</td></tr>
+                <tr><td>Owner</td><td>Agent A</td></tr>
+                <tr><td>Alias</td><td><strong>agentA@ke</strong></td></tr>
+                <tr><td>Capabilities</td><td>Receive RTP, Offline USSD/QR, Cash‑in/out</td></tr>
+                <tr><td>Settlement acct</td><td>Safaritel Trust 001 (real‑time)</td></tr>
+              </tbody>
+            </table>
+            <p class="muted" style="margin:.3rem 0 0">Prefilled mock — proves alias can represent a SIM wallet + agent node.</p>
+          </div>
+        </div>
+      </div>
     </div>
+
     <div class="card">
-      <h3>Frame 2 — Pre‑Arm</h3>
-      <p class="muted">Mask A crates prepped for TSMC/Samsung; Mask B pellicles validated at DNP/Photronics. Tool Stack Checker shows 95%+ match across fabs; Golden Lot alignment signed.</p>
-      <div class="placeholder">[split screen: mask shops + tool match checker]</div>
+      <h3>Panel 2 — Agent Creates Offline Request‑to‑Pay (USSD/QR)</h3>
+      <div class="ussd">
+        *777#  → 1) Request Payment  →  Amount: 1,500 KES  →  Purpose: Grocery<br>
+        <br>
+        Token: <strong>849201</strong>  •  TTL: 5 min  •  Alias: <strong>agentA@ke</strong><br>
+        QR: [paper print mock]
+      </div>
+      <p class="muted" style="margin-top:.4rem">Payer can scan the QR or enter the token in their bank app.</p>
     </div>
+
     <div class="card">
-      <h3>Frame 3 — Shock</h3>
-      <p class="muted">Alert: <strong>Straits Disruption</strong> — TSMC card turns red; export controls constrain tool shipments to Korea. Primary site down; 55% of global sub‑5nm capacity at risk.</p>
-      <div class="placeholder">[alert card + red TSMC tile]</div>
+      <h3>Panel 3 — Payer on National Instant App (Pre‑scripted)</h3>
+      <div class="card">
+        <p><strong>Pay</strong> <em>agentA@ke</em></p>
+        <p class="muted">Route: NIP → Agent Switch → Safaritel Wallet</p>
+        <table>
+          <tbody>
+            <tr><td>Payer fee</td><td>0</td></tr>
+            <tr><td>Merchant fee</td><td>0.5%</td></tr>
+            <tr><td>ETA</td><td>instant</td></tr>
+          </tbody>
+        </table>
+        <div class="meter" style="margin:.4rem 0 .2rem"><div class="fill" style="width:100%"></div></div>
+        <p class="muted">Sent • Ref <strong>NIP‑9032</strong> • 1,500 KES</p>
+      </div>
     </div>
+
     <div class="card">
-      <h3>Frame 4 — Failover Script</h3>
-      <p class="muted">Playbook reassigns lot plan: Samsung 40%, Rapidus 35%, India 25%. EDA mirror shifts primary to Tokyo/Mumbai; license entitlements float. Re‑run OPC deltas; release Mask B; apply India overlay correction (+1.5nm).</p>
-      <div class="placeholder">[sliders + sub‑panels for OPC deltas / mask release / overlay correction]</div>
+      <h3>Panel 4 — Real‑Time Settlement to Telco Float (Ops View Mock)</h3>
+      <table>
+        <thead><tr><th>Ref</th><th>From</th><th>To</th><th>Gross</th><th>Fees</th><th>Net</th><th>Time</th></tr></thead>
+        <tbody>
+          <tr><td>NIP‑9032</td><td>Bank XYZ</td><td>Safaritel Trust 001</td><td>1,500.00</td><td>7.50</td><td>1,492.50</td><td>T+0</td></tr>
+        </tbody>
+      </table>
+      <p class="muted" style="margin-top:.3rem">Exposure: 0 (real‑time prefunded) • Scheme: RTP (domestic)</p>
+      <p class="muted">Telco float credited in real time; wallet credit mirrors settlement.</p>
     </div>
+
     <div class="card">
-      <h3>Frame 5 — Qualification Sprint</h3>
-      <p class="muted">Golden Lot sequence: Resist/pellicle (2h) → FEM (6h) → Metrology signoff (4h). <em>Confidence to Ramp</em> ticks 68% → 92%.</p>
-      <div class="placeholder">[timeline gauge for qual sprint]</div>
+      <h3>Panel 5 — Wallet Credit & Agent Confirmation (Low‑Tech)</h3>
+      <div class="sms">SMS to Wallet Holder: “You received 1,500 KES from Bank XYZ via agentA@ke. Bal: 3,240 KES.”</div>
+      <div class="ussd" style="margin-top:.4rem">Agent USSD: “Payment received. Available float +1,492.50 (after fees).”</div>
+      <div class="placeholder" style="margin-top:.4rem">[paper receipt mock — Ref NIP‑9032]</div>
     </div>
+
     <div class="card">
-      <h3>Frame 6 — Recovery</h3>
-      <p class="muted">Output: “No Quadrilateral” → 0% for 3–6 weeks; “Quadrilateral Ready” → 70% by Day 30. Banner: First wafers started at <strong>T+108 hours</strong>.</p>
-      <div class="placeholder">[two curves: zero vs 70% by D30]</div>
+      <h3>Panel 6 — Cross‑Border Corridor Translation (Quote + Pay)</h3>
+      <div class="grid cols-2">
+        <div class="card">
+          <strong>Sender (UPI)</strong>
+          <p>Pay to <em>agentA@ke</em> • Amount: <strong>INR 1,000</strong></p>
+          <p class="muted">Route: UPI → Corridor Hub → KE Instant → Agent Switch → Safaritel Wallet</p>
+          <table>
+            <tbody>
+              <tr><td>Quote</td><td>INR 1,000 → KES 1,420</td></tr>
+              <tr><td>FX</td><td>1.4200</td></tr>
+              <tr><td>Fees</td><td>INR 10</td></tr>
+              <tr><td>Compliance</td><td class="badge">KYC matched • Sanctions clear</td></tr>
+            </tbody>
+          </table>
+          <p class="muted">Pay → 18s later → Receiver SMS: “1,420 KES received (cross‑border).”</p>
+        </div>
+        <div class="card">
+          <strong>Ops Ledger (stitched)</strong>
+          <ul class="muted">
+            <li>UPI settlement leg</li>
+            <li>Domestic instant leg</li>
+            <li>Joined by corridor hub ref</li>
+          </ul>
+          <div class="placeholder">[two‑hop ledger tiles]</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 7 — Failure / Edge Case</h3>
+      <ul class="muted">
+        <li><strong>TTL expired:</strong> Bank app shows “Request expired — generate new token.”</li>
+        <li><strong>Agent offline:</strong> Can still issue token/QR; payer completes later within TTL; ledger shows pending until executed.</li>
+      </ul>
+      <div class="placeholder">[expired token + pending ledger placeholder]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 8 — Scheme Operator View (Rules Fit)</h3>
+      <div class="grid cols-2">
+        <div>
+          <table>
+            <tbody>
+              <tr><td>Alias domain</td><td><strong>@ke</strong> registered as participant</td></tr>
+              <tr><td>Message type</td><td>RTP with R2P</td></tr>
+              <tr><td>Risk</td><td>Prefunded</td></tr>
+              <tr><td>Dispute</td><td>N/A chargeback; refund via alias credit</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <ul class="muted">
+            <li>No new stored value — funds settle into existing telco trust</li>
+            <li>Full traceability across hops</li>
+          </ul>
+          <div class="placeholder">[scheme checklist ticks]</div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- 3) Toggle Panel: What‑if Comparisons -->
+  <!-- How to run the demo -->
   <section class="card">
-    <h2>What‑if Comparison</h2>
-    <div class="grid cols-2">
-      <div class="card">
-        <h3>OFF — Legacy</h3>
-        <ul class="muted">
-          <li>Non‑harmonized PDKs; single mask shop; on‑prem EDA</li>
-          <li>Re‑qualification: <strong>6–10 weeks</strong></li>
-          <li>Output: near‑zero during disruption</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>ON — Quadrilateral</h3>
-        <ul class="muted">
-          <li>Harmonized PDKs/tool stacks; dual masks; allied‑cloud EDA</li>
-          <li>Re‑qualification: <strong>&lt; 7 days</strong> (shuttle), <strong>&lt; 14 days</strong> (volume ramp)</li>
-          <li>Output: rebounds to <strong>~70% by Day 30</strong></li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- 4) Traceability Strip -->
-  <section class="card">
-    <h2>Traceability — Brittle Points & Mitigations</h2>
+    <h2>How to Run the Demo (no tech)</h2>
     <ul class="muted">
-      <li><strong>EUV single‑vendor risk →</strong> Prepositioned spares + cross‑servicing MOUs (JP/IN depots)</li>
-      <li><strong>Pellicle/resist variability →</strong> Locked bill‑of‑materials + shared Certificates of Analysis across sites</li>
-      <li><strong>Signoff corners drift →</strong> Shared statistical PDK + cross‑foundry correlation data packs</li>
+      <li>Printed alias directory card, paper QR, laminated bank‑app storyboard, one‑page ledger printout.</li>
+      <li>Facilitator advances panels, reads prefilled SMS/USSD, places sticky notes for settlement & fees.</li>
     </ul>
   </section>
 
-  <!-- First Eyes -->
+  <!-- Load‑Bearing Test & First Eyes -->
   <section class="card">
-    <h2>First Eyes</h2>
+    <h2>Load‑Bearing Test & Validation</h2>
     <div class="grid cols-2">
-      <ul>
-        <li>Foundry PDK/manufacturing VPs: TSMC, Samsung, Rapidus</li>
-        <li>India PLI semiconductor leads & anchor fab operators</li>
-        <li>EDA vendors (Cadence, Synopsys, Siemens) — cloud/license portability</li>
-        <li>Mask shops (DNP, Toppan, Photronics)</li>
-      </ul>
-      <ul>
-        <li>Fabless CTOs/chief architects (Apple, NVIDIA, Qualcomm, MediaTek)</li>
-        <li>Metrology/lithography leads (ASML service, KLA)</li>
-        <li>Allied gov resilience teams (JP/US/IN/TW liaisons)</li>
-        <li>Supply‑chain risk analysts & export‑control counsel</li>
-      </ul>
+      <div>
+        <h3>Show</h3>
+        <ul class="muted">
+          <li>8‑panel clickthrough: domestic RTP first, then cross‑border.</li>
+          <li>Paper QR + printed settlement ledger.</li>
+        </ul>
+        <h3>Validation Reactions</h3>
+        <ul class="muted">
+          <li>Agent ops: “I can accept bank→wallet with existing USSD.”</li>
+          <li>Telco risk: “T+0 to trust removes exposure; fees fit.”</li>
+          <li>Scheme op: “Just another participant/domain with R2P.”</li>
+          <li>Corridor lead: “VPA/PIX ⇄ alias mapping is clear.”</li>
+          <li>Regulator: “Traceable end‑to‑end; KYC anchors stay put.”</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Disqualifiers</h3>
+        <ul class="muted">
+          <li>Agent needs new hardware/smartphone</li>
+          <li>No T+0 settlement to telco trust</li>
+          <li>Alias can’t piggyback scheme directory</li>
+          <li>Cross‑border compliance requires offshore consumer funds</li>
+        </ul>
+        <h3>First Eyes</h3>
+        <ul class="muted">
+          <li>Telco mobile money product & risk</li>
+          <li>Instant scheme operator (switch & rules WG)</li>
+          <li>Agent network managers (urban & rural)</li>
+          <li>Remittance corridor PMs (UPI↔KE, PIX↔GH)</li>
+          <li>Payments regulator/central bank oversight</li>
+          <li>Bank PSP RTP/R2P API leads</li>
+        </ul>
+      </div>
     </div>
   </section>
 
   <!-- Why Box of Dirt -->
   <section class="card">
     <h2>Why This is a Box of Dirt</h2>
-    <ul class="muted">
-      <li><strong>Minimal:</strong> paper/dashboard storyboard with mocked data — no real IP, no backend, no NDAs.</li>
-      <li><strong>Disposable:</strong> if the room rejects assumptions, toss & redraw without sunk engineering.</li>
-      <li><strong>Growth‑inviting:</strong> next steps: run a cross‑foundry Golden Lot, formalize Q5N subset, stand up dual mask SLAs, preposition EUV spares, expand to OSAT once FEOL works.</li>
-    </ul>
+    <p class="muted">Mocked screens, paper artifacts, and prefilled ledgers test the mapping‑and‑settlement idea without integrations. Minimal (1 domestic flow, 1 corridor, 1 failure), disposable (adjust fees/settlement model if any actor objects), and growth‑inviting (dynamic QR, POS plugins, broader alias domains, merchant payouts, tiered KYC, more corridors). The box proves the smallest claim: agents + wallets act like scheme participants via alias mapping, offline R2P, and T+0 settlement—before any infrastructure is built.</p>
   </section>
-
-  <script>
-    // Tiny comparison toggle to shift KPIs/text between Legacy and Quadrilateral modes
-    const kpiDays = document.getElementById('kpiDays');
-    const kpiOut = document.getElementById('kpiOut');
-    const kpiDaysTxt = document.getElementById('kpiDaysTxt');
-    const kpiOutTxt = document.getElementById('kpiOutTxt');
-    const spfTxt = document.getElementById('spfTxt');
-
-    function setMode(mode){
-      if(mode==='legacy'){
-        kpiDays.style.width = '100%';
-        kpiDaysTxt.textContent = 'Re‑qual 6–10 weeks';
-        kpiOut.style.width = '2%';
-        kpiOutTxt.textContent = 'Output near‑zero';
-        spfTxt.textContent = 'Single mask shop; on‑prem EDA; no cross‑site spares';
-      } else {
-        kpiDays.style.width = '64%';
-        kpiDaysTxt.textContent = '4.5 days';
-        kpiOut.style.width = '70%';
-        kpiOutTxt.textContent = '70% of plan (T+30)';
-        spfTxt.textContent = 'EUV service spares — mitigated by prepositioned kits (JP/IN)';
-      }
-    }
-
-    document.getElementById('btnLegacy').addEventListener('click',()=>setMode('legacy'));
-    document.getElementById('btnQuad').addEventListener('click',()=>setMode('quad'));
-
-    setMode('quad');
-  </script>
 </body>
 </html>
