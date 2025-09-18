@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gust-Sensing Feather Interface — Box of Dirt</title>
+  <style>
+    :root{
+      --bg:#0e0f12;--panel:#171821;--ink:#e6e8ef;--muted:#a3a7b9;--accent:#7dd3fc;--good:#34d399;--bad:#f87171;--warn:#fbbf24;--grid:#22253a;--chip:#262a40;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;}
+    a{color:var(--accent)}
+    .wrap{max-width:1200px;margin:0 auto;padding:24px}
+    h1{font-size:28px;margin:0 0 8px}
+    h2{font-size:20px;margin:24px 0 8px}
+    p.lead{color:var(--muted);margin:0 0 16px}
+    .grid{display:grid;gap:16px}
+    .panels{grid-template-columns:1.3fr 1fr}
+    @media (max-width: 980px){.panels{grid-template-columns:1fr}}
+    .card{background:var(--panel);border:1px solid #24273f;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);}
+    .card h3{margin:0 0 8px;font-size:16px;color:#d2d6ea}
+    .card .body{padding:16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .chip{background:var(--chip);border:1px solid #2c3150;color:#c9cbe0;padding:6px 10px;border-radius:999px;font-size:12px}
+    .sb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .sb{padding:12px;border-radius:12px;border:1px dashed #343853;background:#141625;min-height:140px;display:flex;flex-direction:column;justify-content:space-between}
+    .sb .cap{color:var(--muted);font-size:12px}
+    .sb img{width:100%;height:90px;object-fit:cover;background:#0f1120;border-radius:10px;border:1px dashed #2a2e4a}
+    .sb .lbl{font-size:12px;color:#cbd1ea}
+    @media (max-width: 980px){.sb-grid{grid-template-columns:1fr 1fr}}
+    @media (max-width: 680px){.sb-grid{grid-template-columns:1fr}}
+
+    .dash{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    @media (max-width: 980px){.dash{grid-template-columns:1fr}}
+    canvas{width:100%;height:260px;background:#0f1120;border-radius:12px;border:1px solid #2a2e4a}
+    .haptics{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:40px;gap:8px;padding:8px;background:#0f1120;border:1px solid #2a2e4a;border-radius:12px}
+    .cell{background:#131734;border:1px solid #1c2142;border-radius:10px;transition:transform .1s ease, background .1s ease, box-shadow .1s ease}
+    .cell.on{background:#1b2a5f;box-shadow:0 0 0 1px #2c4fbf inset,0 0 12px rgba(125,211,252,.35)}
+
+    .bars{display:grid;grid-template-columns:1fr;gap:10px}
+    .bar{display:flex;align-items:center;gap:10px}
+    .bar .name{min-width:120px;color:#c9cbe0;font-size:12px}
+    .bar .track{flex:1;height:12px;background:#111326;border-radius:999px;border:1px solid #222643;position:relative;overflow:hidden}
+    .bar .fill{position:absolute;height:100%;left:50%;width:0;background:linear-gradient(90deg,var(--good),#3b82f6);transform-origin:left center}
+    .bar .fill.neg{background:linear-gradient(90deg,var(--bad),#fb7185)}
+
+    .controls{display:flex;flex-wrap:wrap;gap:12px}
+    button{background:#1a1f3b;border:1px solid #2a2f57;color:#e6e8ef;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button:hover{background:#222650}
+    .toggle{display:inline-flex;align-items:center;gap:10px;padding:10px 14px;border-radius:999px;background:#12142a;border:1px solid #2a2e4a}
+    .lamp{width:12px;height:12px;border-radius:50%;background:#394261;box-shadow:0 0 0 2px #2a2e4a inset}
+    .on .lamp{background:#34d399;box-shadow:0 0 12px rgba(52,211,153,.7)}
+    .legend{display:flex;gap:12px;color:#a3a7b9;font-size:12px}
+
+    .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+    .tick{padding:10px;border:1px dashed #343853;border-radius:10px;text-align:center;background:#0f1120;color:#c9cbe0}
+
+    .fail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+    @media (max-width: 980px){.fail-grid{grid-template-columns:1fr}}
+    .thumb{background:#0f1120;border:1px dashed #2a2e4a;border-radius:12px;padding:10px;min-height:120px}
+    .thumb.good{border-style:solid;border-color:#1f704d}
+
+    .endcard{padding:14px;border:1px dashed #2a2e4a;border-radius:12px;background:#12142a;color:#e6e8ef}
+    .muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Gust‑Sensing Feather Interface — Box of Dirt</h1>
+      <p class="lead">Core intent: a preemptive, body‑centered haptic map of incoming airflow aligns reflexes with automatic micro‑actuation before vision or conscious reaction.</p>
+      <div class="row">
+        <span class="chip">Problem → Humans can’t feel microgusts; visual loop is late</span>
+        <span class="chip">Objective → Preemptive feather‑like sensing</span>
+        <span class="chip">Link → Sensors → Predictor → (Spinal micro‑actuation + Torso haptics)</span>
+      </div>
+    </header>
+
+    <!-- STORYBOARD -->
+    <section class="card" style="margin-top:18px">
+      <div class="body">
+        <h2>Storyboard (8 frames, mocked)</h2>
+        <div class="sb-grid" id="storyboard">
+          <!-- 1 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>1) Calm Glide</strong></div>
+              <p class="cap">Baseline: smooth air, no cues.</p>
+            </div>
+            <img src="" alt="[placeholder image] Calm glide vector field"/>
+          </div>
+          <!-- 2 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>2) Microgust Forms (t = −120 ms)</strong></div>
+              <p class="cap">Feather arrays predict shear line; pre‑cue to torso.</p>
+            </div>
+            <img src="" alt="[placeholder image] Shear line + diagonal torso glow"/>
+          </div>
+          <!-- 3 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>3) Reflex Path Splits (t = −100 ms)</strong></div>
+              <p class="cap">Two channels fire together; pilot not yet aware.</p>
+            </div>
+            <img src="" alt="[placeholder image] Flow arrows: sensors → spinal + haptic"/>
+          </div>
+          <!-- 4 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>4) Preemptive Actuation (t = −60 ms)</strong></div>
+              <p class="cap">Micro‑actuation biases lift before gust hits.</p>
+            </div>
+            <img src="" alt="[placeholder image] Asym twist + camber; torso cue brightens"/>
+          </div>
+          <!-- 5 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>5) Gust Arrives (t = 0)</strong></div>
+              <p class="cap">Lift preserved; buffet avoided (ON vs OFF).</p>
+            </div>
+            <img src="" alt="[placeholder image] ON/OFF lift traces"/>
+          </div>
+          <!-- 6 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>6) Pilot Feel</strong></div>
+              <p class="cap">Pre‑attentive, not distracting.</p>
+            </div>
+            <img src="" alt="[placeholder image] Head + torso with thought bubble"/>
+          </div>
+          <!-- 7 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>7) Timeline Strip</strong></div>
+              <p class="cap">Lead time beats human visual loop.</p>
+            </div>
+            <img src="" alt="[placeholder image] Predict → Fire → Gust → Vision → Conscious"/>
+          </div>
+          <!-- 8 -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>8) Failure Toggle</strong></div>
+              <p class="cap">Tune mapping and gains to feel feather‑like.</p>
+            </div>
+            <img src="" alt="[placeholder image] Bad vs tuned mapping thumbnails"/>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD MOCK -->
+    <section class="card" style="margin-top:18px">
+      <div class="body">
+        <h2>Dashboard Mock (static with mock data)</h2>
+        <div class="dash">
+          <div>
+            <h3>Wing Top‑View (shear line & “feathers”)</h3>
+            <canvas id="wing"></canvas>
+            <div class="legend" style="margin-top:8px">
+              <span>Shear line: mock gust path</span>
+            </div>
+          </div>
+          <div>
+            <h3>Torso Haptic Grid (6×4)</h3>
+            <div id="haptics" class="haptics"></div>
+            <div class="legend" style="margin-top:8px">
+              <span>Cells light in direction & intensity of gust</span>
+            </div>
+          </div>
+          <div>
+            <h3>Actuation & Lift</h3>
+            <div class="bars">
+              <div class="bar"><div class="name">Right LE twist (°)</div><div class="track"><div id="barTwistR" class="fill"></div></div></div>
+              <div class="bar"><div class="name">Left camber (°)</div><div class="track"><div id="barCamberL" class="fill neg"></div></div></div>
+            </div>
+            <canvas id="lift" style="margin-top:12px"></canvas>
+            <div class="legend" style="margin-top:8px">
+              <span>ON trace (smoother) vs OFF trace (buffet)</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px" class="row controls">
+          <div id="toggle" class="toggle on" role="button" aria-pressed="true" tabindex="0"><span class="lamp"></span><span><strong>System</strong> ON</span></div>
+          <button id="play">▶ Play 90s Animatic (mock)</button>
+          <button id="peek">⏱ Mapping Peek (t = −80 ms)</button>
+          <button id="replay">↺ Replay Gusts</button>
+        </div>
+
+        <div style="margin-top:12px" class="timeline">
+          <div class="tick">Predict (−120 ms)</div>
+          <div class="tick">Haptic/Servo (−100→−40 ms)</div>
+          <div class="tick">Gust (0)</div>
+          <div class="tick">Visual (+80 ms)</div>
+          <div class="tick">Conscious (+180 ms)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAILURE / TUNING THUMBS -->
+    <section class="card" style="margin-top:18px">
+      <div class="body">
+        <h2>Failure Toggle (mock thumbnails)</h2>
+        <div class="fail-grid">
+          <div class="thumb">
+            <strong>A) Haptic map too coarse → confusion</strong>
+            <p class="muted">Placeholder image slot</p>
+          </div>
+          <div class="thumb">
+            <strong>B) Autonomy too strong → pilot fight</strong>
+            <p class="muted">Placeholder image slot</p>
+          </div>
+          <div class="thumb good">
+            <strong>Tuned: finer gradient + smaller gains</strong>
+            <p class="muted">Placeholder image slot</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- END CARD / PROMPTS -->
+    <section class="card" style="margin-top:18px">
+      <div class="body endcard">
+        <h2>End Card</h2>
+        <p>Did this <em>feel like having feathers</em>? Where did your attention go?</p>
+        <p class="muted">This is a mocked, non‑physical prototype: numbers are prefills and sequences are scripted to test language, anticipation, and trust.</p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ------------------------------
+    // MOCK DATA
+    // ------------------------------
+    const gusts = [
+      { azimuth: 30, intensity: 0.7, t0: 0 },   // front-right
+      { azimuth: 220, intensity: 0.5, t0: 4 },  // rear-left
+      { azimuth: 320, intensity: 0.9, t0: 8 }   // front-left-ish
+    ];
+    let systemOn = true;
+
+    // ------------------------------
+    // TORSO HAPTIC GRID (6×4)
+    // ------------------------------
+    const hapticEl = document.getElementById('haptics');
+    const HCOLS = 6, HROWS = 4;
+    const cells = [];
+    for(let r=0;r<HROWS;r++){
+      for(let c=0;c<HCOLS;c++){
+        const d=document.createElement('div');
+        d.className='cell';
+        hapticEl.appendChild(d);
+        cells.push(d);
+      }
+    }
+    function clearHaptics(){ cells.forEach(c=>c.classList.remove('on')); }
+    function lightHapticsFromAzimuth(az, intensity){
+      // Map azimuth (deg, 0 = forward) to a diagonal on the grid; crude but illustrative.
+      // 0° -> top center; 90° -> right mid; 180° -> bottom center; 270° -> left mid
+      const rad = az * Math.PI/180;
+      const vx = Math.cos(rad), vy = Math.sin(rad);
+      // normalized to [0,1]
+      const cx = Math.round((vx*0.5+0.5)*(HCOLS-1));
+      const ry = Math.round((vy*0.5+0.5)*(HROWS-1));
+      clearHaptics();
+      const idx = ry*HCOLS + cx;
+      const neigh = [idx, idx-1, idx+1, idx-HCOLS, idx+HCOLS].filter(i=>i>=0 && i<cells.length);
+      neigh.forEach((i,k)=>{
+        if(!cells[i]) return;
+        cells[i].classList.add('on');
+        const scale = 1 + (intensity * (k===0?0.35:0.15));
+        cells[i].style.transform = `scale(${scale})`;
+      });
+    }
+
+    // ------------------------------
+    // ACTUATION BARS
+    // ------------------------------
+    function setBar(id, value){
+      // value in degrees; negative allowed; map to ±100% from center
+      const el = document.getElementById(id);
+      const clamped = Math.max(-6, Math.min(6, value));
+      const sign = clamped >= 0 ? 1 : -1;
+      const mag = Math.abs(clamped)/6 * 50; // 50% max from center
+      el.style.left = sign===-1? `${50 - mag}%` : '50%';
+      el.style.width = `${mag}%`;
+      el.classList.toggle('neg', sign===-1);
+    }
+
+    // ------------------------------
+    // WING & LIFT CANVASES
+    // ------------------------------
+    const wing = document.getElementById('wing');
+    const lift = document.getElementById('lift');
+
+    function fitCanvas(c){
+      const dpr = window.devicePixelRatio||1; const r=c.getBoundingClientRect();
+      c.width = Math.max(320, Math.floor(r.width*dpr));
+      c.height = Math.max(200, Math.floor(r.height*dpr));
+      return c.getContext('2d');
+    }
+
+    function drawWing(gust){
+      const ctx = fitCanvas(wing);
+      const {width:w,height:h} = wing;
+      ctx.clearRect(0,0,w,h);
+      // wing outline
+      ctx.strokeStyle = '#3b4270'; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.ellipse(w*0.5,h*0.55,w*0.42,h*0.18,0,0,Math.PI*2); ctx.stroke();
+      // feather icons (tiny ticks along leading edge)
+      for(let i=0;i<22;i++){
+        const t=i/21; const x=w*0.1 + t*w*0.8; const y=h*0.45 - Math.sin(t*Math.PI)*h*0.08;
+        ctx.strokeStyle='#2f3560'; ctx.lineWidth=1.5; ctx.beginPath();
+        ctx.moveTo(x,y); ctx.lineTo(x,y-6); ctx.stroke();
+      }
+      if(gust){
+        // shear line
+        ctx.strokeStyle = 'rgba(125,211,252,0.9)'; ctx.lineWidth = 3; ctx.beginPath();
+        const a = (gust.azimuth-90) * Math.PI/180; // map azimuth to screen angle
+        const cx=w*0.55, cy=h*0.45; const L=Math.min(w,h)*0.5;
+        ctx.moveTo(cx-Math.cos(a)*L, cy-Math.sin(a)*L);
+        ctx.lineTo(cx+Math.cos(a)*L, cy+Math.sin(a)*L); ctx.stroke();
+        // highlight a few feathers near intersection
+        ctx.fillStyle='rgba(125,211,252,0.25)';
+        for(let k=-2;k<=2;k++){
+          const x=cx+Math.cos(a)*k*20; const y=cy+Math.sin(a)*k*12;
+          ctx.beginPath(); ctx.arc(x,y,7+gust.intensity*4,0,Math.PI*2); ctx.fill();
+        }
+      }
+    }
+
+    function drawLift(traces){
+      const ctx = fitCanvas(lift); const {width:w,height:h}=lift; ctx.clearRect(0,0,w,h);
+      // axes
+      ctx.strokeStyle='#2a2e4a'; ctx.lineWidth=1; ctx.beginPath(); ctx.rect(40,20,w-60,h-40); ctx.stroke();
+      // helper to plot
+      function plot(data,color){
+        ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=2;
+        data.forEach((y,i)=>{
+          const xpx = 40 + i/(data.length-1)*(w-60);
+          const ypx = 20 + (1-y)*(h-40);
+          if(i===0) ctx.moveTo(xpx,ypx); else ctx.lineTo(xpx,ypx);
+        }); ctx.stroke();
+      }
+      plot(traces.off,'#f87171'); // OFF (buffet)
+      plot(traces.on,'#34d399');  // ON (smooth)
+    }
+
+    function synthLiftTraces(gust){
+      // build short traces 0..1 normalized; ON smoother than OFF
+      const n=120; const on=new Array(n).fill(0).map((_,i)=>0.75+0.02*Math.sin(i/7));
+      const off=new Array(n).fill(0).map((_,i)=>0.75+0.06*Math.sin(i/5));
+      // inject a disturbance at index around gust arrival (center)
+      const hit = Math.floor(n*0.55);
+      for(let k=-12;k<=24;k++){
+        const i=hit+k; if(i<0||i>=n) continue;
+        const spike = gust.intensity * (k<0? 0.02*(12+k)/12 : 0.05*Math.exp(-k/12));
+        off[i] -= spike; on[i] -= spike*0.35; // ON attenuates buffet
+      }
+      return {on, off};
+    }
+
+    // ------------------------------
+    // SYSTEM TOGGLE
+    // ------------------------------
+    const toggle = document.getElementById('toggle');
+    toggle.addEventListener('click',()=>{
+      systemOn = !systemOn;
+      toggle.classList.toggle('on', systemOn);
+      toggle.setAttribute('aria-pressed', String(systemOn));
+      toggle.querySelector('span:nth-child(2)').innerHTML = `<strong>System</strong> ${systemOn? 'ON':'OFF'}`;
+    });
+
+    // ------------------------------
+    // ANIMATIC (mock sequence ~10s; the 90s button loops sequences)
+    // ------------------------------
+    const btnPlay = document.getElementById('play');
+    const btnPeek = document.getElementById('peek');
+    const btnReplay = document.getElementById('replay');
+
+    function runSequence(){
+      let t=0; // seconds since start (mock)
+      gusts.forEach((g,idx)=>{
+        const at = g.t0; // schedule
+        // pre-cue at -0.12s
+        setTimeout(()=>{ if(systemOn){ lightHapticsFromAzimuth(g.azimuth, g.intensity); setBar('barTwistR', +g.intensity*4); setBar('barCamberL', -g.intensity*3); } drawWing(g); }, (at*1000));
+        // lift traces at 0s
+        setTimeout(()=>{ drawLift(synthLiftTraces(g)); if(!systemOn){ clearHaptics(); setBar('barTwistR',0); setBar('barCamberL',0);} }, (at*1000)+400);
+        // settle after
+        setTimeout(()=>{ clearHaptics(); setBar('barTwistR',0); setBar('barCamberL',0); }, (at*1000)+1500);
+      });
+    }
+
+    btnPlay.addEventListener('click',()=>{
+      // loop 9 cycles to roughly suggest 90s without real timing precision
+      let loops=0; runSequence();
+      const id = setInterval(()=>{ runSequence(); if(++loops>=8) clearInterval(id); }, 11000);
+    });
+
+    btnReplay.addEventListener('click',()=>{ runSequence(); });
+
+    btnPeek.addEventListener('click',()=>{
+      // Freeze a representative state at t = −80 ms before gust #1
+      const g = gusts[0]; drawWing(g); lightHapticsFromAzimuth(g.azimuth, g.intensity*0.85);
+      setBar('barTwistR', +g.intensity*3.5); setBar('barCamberL', -g.intensity*2.5);
+    });
+
+    // initial paint
+    drawWing(null); drawLift(synthLiftTraces({azimuth:45,intensity:.6}));
+  </script>
+</body>
+</html>
