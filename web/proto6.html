@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ogallala — Cap‑and‑Recharge Compact / Box of Dirt (Site‑Styled)</title>
+  <!-- White site styling with cards, no collapse -->
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    @media (max-width: 900px){ .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; } }
+    .muted { opacity: .75; font-size: .95rem; }
+    .chip { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.5rem; background:#fff; font-size:.85rem; margin:.15rem .25rem .15rem 0; }
+
+    /* Cards */
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h2 { font-size: 1.1rem; margin: .1rem 0 .6rem; }
+    .card h3 { font-size: 1rem; margin: .2rem 0 .4rem; }
+
+    /* Placeholders + simple meters */
+    .placeholder { height: 130px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .meter { height: 12px; background: #f5f5f5; border: 1px solid #dfdfdf; border-radius: 999px; overflow: hidden; }
+    .fill { height:100%; width:0%; background: linear-gradient(90deg,#0b5cff,#16a34a); transition: width .5s ease; }
+    .badge { display:inline-block; padding:.15rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+
+    /* Table */
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:.45rem .4rem; border-bottom:1px solid #e9e9e9; text-align:left; font-size:.95rem; }
+    th { background:#fafafa; }
+
+    /* Map segments */
+    .seg { border:1px solid #d0d0d0; border-radius:.5rem; padding:.5rem; background:#fff; }
+    .sw { display:inline-block; width:.8rem; height:.8rem; border-radius:.2rem; margin-right:.4rem; vertical-align: middle; }
+    .amber { background:#f59e0b; } .red { background:#ef4444; } .green { background:#22c55e; }
+
+    /* Buttons */
+    button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
+    .mutebtn { background:#f0f2ff; color:#0b5cff; border:1px solid #cfe0ff; }
+    .ghost { background:#f6f6f6; color:#333; }
+
+    /* Print */
+    @media print { .noprint { display:none; } body{max-width:100%; margin:.6in;} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Under rule‑of‑capture, pumps race to the bottom — Can a cap‑and‑recharge compact fix it?</h1>
+    <div class="meta">
+      <strong>A (Problem):</strong> Texas Panhandle pumps under rule‑of‑capture shrink the Ogallala and dry domestic wells. <br>
+      <strong>B (Objective):</strong> Lock in long‑term water security for farms, towns, and springs. <br>
+      <strong>Link:</strong> A 3‑district cap‑and‑recharge compact: metered wells, tradable rights auctions, and playa‑basin recharge funded by satellite‑verified soil‑moisture credits.
+    </div>
+    <p class="muted"><strong>Core intent:</strong> Will irrigators and GCD boards accept metering and a shared cap if rights are bankable/tradable and auction revenue visibly restores local recharge to stabilize wells and springs without collapsing farm income?</p>
+  </header>
+
+  <!-- STORYBOARD (9 frames) -->
+  <section class="grid cols-3">
+    <div class="card">
+      <h3>1) Opening problem map — Rule‑of‑capture reality</h3>
+      <p class="muted">Three districts (High Plains UWCD, North Plains GCD, Panhandle GCD), major towns (Hereford, Dumas, Pampa), ring of domestic wells.</p>
+      <ul class="muted">
+        <li>Avg Ogallala decline: <strong>1.6 ft/yr</strong></li>
+        <li>Domestic‑well outages (late summer): <strong>20%</strong></li>
+        <li>Pumped in study area: <strong>150,000 AF/yr</strong></li>
+      </ul>
+      <div class="placeholder">[map placeholder — cones of depression overlap under Current rules]</div>
+      <div class="grid cols-2 noprint" style="margin-top:.5rem">
+        <button id="toggleCurrent" class="ghost">Current rules</button>
+        <button id="toggleCompact" class="mutebtn">Compact</button>
+      </div>
+      <p id="mapNote" class="muted" style="margin-top:.4rem">View: <strong>Compact</strong> — cones eased; buffers around domestic wells.</p>
+    </div>
+
+    <div class="card">
+      <h3>2) Compact set‑up — Cap + rights + guardrails</h3>
+      <ul class="muted">
+        <li>Regional cap (year 1): <strong>135,000 AF</strong> (−10% from baseline), glidepath −2%/yr for 5 yrs.</li>
+        <li>Allocations: <strong>80%</strong> historic‑use baselines to existing meters; <strong>20%</strong> auctioned annually.</li>
+        <li>Guardrails: 0.5‑mi domestic buffer; spring trigger if baseflow &lt; 90% of 5‑yr median; max field drawdown 3 ft/yr.</li>
+      </ul>
+      <div class="chip">Equity: 5% of auction volume reserved for new/young farmers.</div>
+    </div>
+
+    <div class="card">
+      <h3>3) Metering — You have rights; now measure</h3>
+      <p class="muted">Farmer view (prefilled): Pivot #12 baseline right = <strong>120 AF</strong>; meter logs <strong>98 AF</strong>; remaining transferable: <strong>22 AF</strong>.</p>
+      <p class="muted"><em>Privacy:</em> Only aggregated data is public; field‑level stays with GCD + owner.</p>
+      <div class="placeholder">[meter face + rights ledger placeholder]</div>
+    </div>
+
+    <div class="card">
+      <h3>4) Auction — Who buys, who sells</h3>
+      <table>
+        <thead><tr><th>Bidder</th><th>Type</th><th>Qty (AF)</th><th>Price</th></tr></thead>
+        <tbody>
+          <tr><td>City of Hereford</td><td>Buy</td><td>2,000</td><td>≤ $75</td></tr>
+          <tr><td>Corn Farm A</td><td>Buy</td><td>1,500</td><td>≤ $70</td></tr>
+          <tr><td>Cotton Farm B</td><td>Sell</td><td>800</td><td>≥ $55</td></tr>
+          <tr><td>Feedlot Supply Co.</td><td>Buy</td><td>3,000</td><td>≤ $65</td></tr>
+          <tr><td>Dryland Pivot C</td><td>Sell</td><td>1,200</td><td>≥ $50</td></tr>
+          <tr><td>Reserve (new farmers)</td><td>Pool</td><td>1,350</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <p class="muted"><strong>Clearing:</strong> 27,000 AF @ <strong>$61/AF</strong> → revenue <strong>$1.647M</strong>; reserve awarded 1,350 AF @ $45/AF.</p>
+      <div class="placeholder">[post‑trade map placeholder — pumping shifts; two pivots sell & switch to dryland]</div>
+    </div>
+
+    <div class="card">
+      <h3>5) Recharge marketplace — Turning revenue into water</h3>
+      <ul class="muted">
+        <li>Playas: 110 candidates; <strong>60 restored</strong> this year @ $22k → <strong>$1.32M</strong>.</li>
+        <li>Satellite‑verified infiltration after two storms: +6" over <strong>9,000 acres</strong>.</li>
+        <li>Credits minted: 9,000 × 0.5 AF/ac = <strong>4,500 AF</strong> recharge credits.</li>
+        <li>Credit price: <strong>$150/AF</strong> paid to landowner co‑ops → <strong>$675k</strong>.</li>
+        <li>Verification: 12 basins spot‑checked; variance &lt; 8% vs satellite.
+      </ul>
+      <div class="placeholder">[satellite tile placeholder + playa restoration photos]</div>
+    </div>
+
+    <div class="card">
+      <h3>6) Results (5‑yr pre‑scripted: dry, wet, avg, avg, dry)</h3>
+      <div class="grid cols-2">
+        <div>
+          <h4>Current rules</h4>
+          <ul class="muted">
+            <li>Cumulative decline: <strong>−8.0 ft</strong></li>
+            <li>Domestic wells deepened: <strong>24%</strong></li>
+            <li>Spring index: <strong>72</strong></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Compact</h4>
+          <ul class="muted">
+            <li>Cumulative decline: <strong>−4.6 ft</strong></li>
+            <li>Domestic wells deepened: <strong>8%</strong></li>
+            <li>Spring index: <strong>94</strong></li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted">Irrigated net income: −1% overall; +6% for top‑quartile efficiency. Municipal reliability: +15%. Cost curve (net): <strong>$43/AF</strong> avoided depletion.</p>
+    </div>
+
+    <div class="card">
+      <h3>7) Farmer journey — Does this pencil?</h3>
+      <ol class="muted">
+        <li><strong>Preseason:</strong> sees allocation; upgrades nozzles; places buy order 120 AF @ $60.</li>
+        <li><strong>Midseason:</strong> meter trending high; drops low ground acres; sells 35 AF @ $61.</li>
+        <li><strong>Postseason:</strong> reconciles 103 AF used; net +$1,525; no violation flags.</li>
+      </ol>
+      <div class="placeholder">[farmer ledger & meter screen placeholder]</div>
+    </div>
+
+    <div class="card">
+      <h3>8) Governance — Who decides what</h3>
+      <p class="muted">Compact council: 3 GCD boards + municipal seat + producer seat (advisory) + science advisor.</p>
+      <ul class="muted">
+        <li>Dials adjust annually: cap glidepath; auction share 10–30%; recharge credit factor 0.3–0.8; guardrail triggers.</li>
+        <li>Legal note (mock): Fit to TX Water Code Ch. 36; aligned with DFC/MAG; interlocal template.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>9) Trust & transparency</h3>
+      <ul class="muted">
+        <li><strong>Public:</strong> monthly basin‑level pumping totals, recharge credits, spring index, drawdown heatmap, auction clearing price.</li>
+        <li><strong>Private:</strong> field‑level meter logs and bids; 3rd‑party audit annually.</li>
+      </ul>
+      <div class="placeholder">[public dashboard tiles placeholder]</div>
+    </div>
+  </section>
+
+  <!-- Mock Dashboard Panels (prefilled; minimal scripted toggles) -->
+  <section class="card">
+    <h2>Mock Dashboard — 3‑District Compact (prefilled)</h2>
+    <div class="grid cols-2">
+      <!-- Panel: Map & Gauges -->
+      <div class="card">
+        <h3>Panel A — Map & Gauges</h3>
+        <p id="viewLabel" class="muted">View: Compact</p>
+        <div class="grid cols-3" style="align-items:end">
+          <div>
+            <div class="muted">Ogallala decline</div>
+            <div class="meter"><div id="gDecline" class="fill" style="width:42%"></div></div>
+          </div>
+          <div>
+            <div class="muted">Domestic outages</div>
+            <div class="meter"><div id="gOutage" class="fill" style="width:20%"></div></div>
+          </div>
+          <div>
+            <div class="muted">Pumped (AF/yr)</div>
+            <div class="meter"><div id="gPumped" class="fill" style="width:90%"></div></div>
+          </div>
+        </div>
+        <p class="muted" style="margin-top:.4rem">Numbers are illustrative; bars shift when toggling Current vs Compact.</p>
+      </div>
+
+      <!-- Panel: Policy Dials (locked) -->
+      <div class="card">
+        <h3>Panel B — Policy Dials (locked for demo)</h3>
+        <ul class="muted">
+          <li>Cap glidepath: −2%/yr × 5 yrs</li>
+          <li>Auction share: 20% of regional cap</li>
+          <li>Recharge credit factor: 0.5 AF/ac</li>
+          <li>Guardrails: domestic 0.5‑mi • springs ≥ 90% baseflow • field drawdown ≤ 3 ft/yr</li>
+        </ul>
+      </div>
+
+      <!-- Panel: Wallets (prefilled) -->
+      <div class="card">
+        <h3>Panel C — Community Wallets (sample)</h3>
+        <table>
+          <thead><tr><th>Entity</th><th>Cash disbursed</th><th>Top‑up</th><th>Credits</th></tr></thead>
+          <tbody>
+            <tr><td>HH‑01</td><td>$60</td><td><span class="badge">pending</span></td><td>12</td></tr>
+            <tr><td>HH‑02</td><td>$55</td><td><span class="badge">pending</span></td><td>9</td></tr>
+            <tr><td>HH‑03</td><td>$48</td><td><span class="badge">unlocked</span></td><td>18</td></tr>
+            <tr><td>Hereford Utility</td><td>$0</td><td><span class="badge">unlocked</span></td><td>—</td></tr>
+          </tbody>
+        </table>
+        <p class="muted">Top‑ups flip when rubble—er, <em>recharge</em> KPI is reached at year milestone (mock logic).</p>
+      </div>
+
+      <!-- Panel: Auction snapshot -->
+      <div class="card">
+        <h3>Panel D — Auction Snapshot</h3>
+        <p class="muted">Cleared 27,000 AF @ $61/AF. High‑value buyers: Hereford, Feedlot Supply Co., Corn Farm A. Sellers: Cotton B, Dryland C.</p>
+        <div class="placeholder">[clearing price chart placeholder]</div>
+      </div>
+
+      <!-- Panel: Recharge Credits -->
+      <div class="card">
+        <h3>Panel E — Recharge Credits</h3>
+        <p class="muted">Credits minted: 4,500 AF • Paid out: $675k • Basins restored: 60</p>
+        <div class="meter"><div id="gRecharge" class="fill" style="width:65%"></div></div>
+      </div>
+    </div>
+
+    <div class="noprint" style="margin-top:.6rem; display:flex; gap:.5rem; flex-wrap:wrap">
+      <button id="btnCurrent" class="ghost">Toggle: Current rules</button>
+      <button id="btnCompact" class="mutebtn">Toggle: Compact</button>
+      <button id="btnPrint" class="ghost">Print one‑page summary</button>
+    </div>
+  </section>
+
+  <!-- Quick flowchart -->
+  <section class="card">
+    <h2>Quick Flowchart</h2>
+    <p class="muted">Metered pumping → Rights ledger updates → Annual auction clears → Revenue → Playa restoration + credit minting (satellite verified) → Credits retire to meet recharge obligation → Annual report checks guardrails → Next‑year cap adjusts.</p>
+  </section>
+
+  <!-- First Eyes -->
+  <section class="card">
+    <h2>First Eyes</h2>
+    <div class="grid cols-2">
+      <ul>
+        <li>High Plains UWCD, North Plains GCD, Panhandle GCD boards</li>
+        <li>5–8 Panhandle irrigators (corn, cotton, sorghum)</li>
+        <li>Hereford, Dumas, Pampa city managers/utilities</li>
+        <li>Domestic well owner reps</li>
+      </ul>
+      <ul>
+        <li>TWDB groundwater modelers (DFC/MAG)</li>
+        <li>Playa Lakes JV & TPWD playa leads</li>
+        <li>USDA‑NRCS & local SWCD chairs</li>
+        <li>EDF Texas water team; ag lenders/insurers</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Why Box of Dirt -->
+  <section class="card">
+    <h2>Why This is a Box of Dirt</h2>
+    <ul class="muted">
+      <li><strong>Minimal:</strong> Static storyboard + mocked dashboard with prefilled numbers/tiles; no meters, auctions, or legal instruments.</li>
+      <li><strong>Disposable:</strong> If metering or recharge is a nonstarter, re‑skin for a different governance mix.</li>
+      <li><strong>Growth‑inviting:</strong> Dials (cap, auction share, credit factor, guardrails) are explicit and co‑designable; real feeds can snap in later.</li>
+    </ul>
+  </section>
+
+  <!-- Print Summary (revealed on click) -->
+  <section id="printSummary" class="card" style="display:none">
+    <h2>One‑Page Summary</h2>
+    <div class="grid cols-2">
+      <div>
+        <h3>What changed</h3>
+        <ul>
+          <li>Cap enacted (−10% year 1; −2%/yr glidepath)</li>
+          <li>Rights issued (80% baseline; 20% auctioned)</li>
+          <li>Recharge funded: 60 playas restored; 4,500 AF credits minted</li>
+        </ul>
+        <h3>Who paid / Who got paid</h3>
+        <ul>
+          <li>Auction revenue: $1.647M</li>
+          <li>Credits to landowner co‑ops: $675k</li>
+          <li>Reserve pool: 1,350 AF to new/young farmers</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Outcomes (5‑yr)</h3>
+        <ul>
+          <li>Decline: −8.0 → −4.6 ft (compact)</li>
+          <li>Domestic deepening: 24% → 8%</li>
+          <li>Spring index: 72 → 94</li>
+          <li>Net farm income: −1% overall; +6% for efficient ops</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Minimal scripted toggles for demo
+    const mapNote = document.getElementById('mapNote');
+    const viewLabel = document.getElementById('viewLabel');
+    const gDecline = document.getElementById('gDecline');
+    const gOutage = document.getElementById('gOutage');
+    const gPumped = document.getElementById('gPumped');
+    const gRecharge = document.getElementById('gRecharge');
+
+    function setView(mode){
+      if(mode==='current'){
+        mapNote.innerHTML = 'View: <strong>Current rules</strong> — cones overlap; no buffers; outages up.';
+        viewLabel.textContent = 'View: Current rules';
+        gDecline.style.width = '80%';
+        gOutage.style.width = '40%';
+        gPumped.style.width = '100%';
+        gRecharge.style.width = '25%';
+      } else {
+        mapNote.innerHTML = 'View: <strong>Compact</strong> — cones eased; buffers around domestic wells; recharge active.';
+        viewLabel.textContent = 'View: Compact';
+        gDecline.style.width = '42%';
+        gOutage.style.width = '20%';
+        gPumped.style.width = '90%';
+        gRecharge.style.width = '65%';
+      }
+    }
+
+    document.getElementById('toggleCurrent').addEventListener('click',()=>setView('current'));
+    document.getElementById('toggleCompact').addEventListener('click',()=>setView('compact'));
+    document.getElementById('btnCurrent').addEventListener('click',()=>setView('current'));
+    document.getElementById('btnCompact').addEventListener('click',()=>setView('compact'));
+
+    document.getElementById('btnPrint').addEventListener('click',()=>{
+      const s = document.getElementById('printSummary');
+      s.style.display = '';
+      window.print();
+    });
+
+    // Initialize in Compact view
+    setView('compact');
+  </script>
+</body>
+</html>
