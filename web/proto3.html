@@ -35,6 +35,9 @@
     .split { display:grid; grid-template-columns: 1fr 1fr; gap:.8rem; }
     @media(max-width: 800px){ .split{ grid-template-columns:1fr; } }
     .list-compact li{ margin:.25rem 0; }
+      /* Card styling to match your white theme */
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
   </style>
 </head>
 <body>
@@ -44,20 +47,20 @@
     <p class="thesis">Core intent: offer a visibly private, trusted, low‑friction entry so women in bandwidth/space deserts actually complete a confidential visit and feel safe enough to return.</p>
   </header>
 
-  <!-- Storyboard (6 frames) using <details> to stay on-brand -->
+  <!-- Storyboard (6 frames) — cards, no collapse -->
   <section class="grid cols-2">
-    <details open>
-      <summary>1) Discovery & Approach</summary>
-      <p class="muted">Entrance cling “Private Women’s Health Visits Here” (no “telehealth” word). Navigator greets softly and offers to help or wait outside.</p>
+    <div class="card">
+      <h3>1) Discovery & Approach</h3>
+      <p class="muted">Entrance cling “Private Women’s Health Visits Here” (no “telehealth”). Navigator greets softly and offers to help or wait outside.</p>
       <div class="placeholder">[image placeholder — entrance & A‑frame languages/hours]</div>
       <div class="seedbox">
         <div class="seed-title">Box‑of‑dirt prop</div>
         <div class="seed">Foam‑core kiosk front with door, occupied light, and white‑noise speaker.</div>
       </div>
-    </details>
+    </div>
 
-    <details>
-      <summary>2) Entry & Consent</summary>
+    <div class="card">
+      <h3>2) Entry & Consent</h3>
       <div class="grid">
         <div>
           <div class="seed-title">Language</div>
@@ -79,20 +82,20 @@
         </div>
       </div>
       <div class="placeholder">[image placeholder — tablet UI with consent + Quick Exit]</div>
-    </details>
+    </div>
 
-    <details>
-      <summary>3) Intake & Privacy Controls</summary>
+    <div class="card">
+      <h3>3) Intake & Privacy Controls</h3>
       <ul class="list-compact">
         <li>Mock conversational intake: birth control refill, period concerns, pregnancy questions, STI test, pelvic pain, free text.</li>
         <li>Headphones on hook; white‑noise on; sound meter card turns green when adequate.</li>
         <li>Review Summary with per‑item toggles (Share/Don’t Share) + big <em>Delete All</em> button.</li>
       </ul>
       <div class="placeholder">[image placeholder — intake cards & sound meter green]</div>
-    </details>
+    </div>
 
-    <details>
-      <summary>4) Connection Simulation</summary>
+    <div class="card">
+      <h3>4) Connection Simulation</h3>
       <div class="split">
         <div>
           <div class="seed">Screen: “Securing a private line… Satellite link ~30–60s” + progress ring. If failure → info stays encrypted on kiosk until reconnect.</div>
@@ -102,10 +105,10 @@
           <div class="placeholder">[video placeholder — prerecorded clinician greeting (“Hi, I’m Dr. Lee…”)]</div>
         </div>
       </div>
-    </details>
+    </div>
 
-    <details>
-      <summary>5) Handoff & Follow‑up</summary>
+    <div class="card">
+      <h3>5) Handoff & Follow‑up</h3>
       <div class="split">
         <div>
           <div class="placeholder">[image placeholder — QR/NFC “Care Key” token]</div>
@@ -118,10 +121,10 @@
           </ul>
         </div>
       </div>
-    </details>
+    </div>
 
-    <details>
-      <summary>6) Data Flow Overlay</summary>
+    <div class="card">
+      <h3>6) Data Flow Overlay</h3>
       <div class="grid cols-2">
         <div>
           <div class="seed-title">Flow</div>
@@ -143,38 +146,38 @@
         </div>
       </div>
       <div class="placeholder">[image placeholder — flow arrows poster]</div>
-    </details>
+    </div>
   </section>
 
-  <!-- Measurement & Signals -->
+  <!-- Measurement & Signals — cards, no collapse -->
   <section>
-    <h2>Measurement Prompts</h2>
+    <h2>Measurement & Signals</h2>
     <div class="grid cols-3">
-      <details open>
-        <summary>Sliders (1–5)</summary>
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
         <ul class="list-compact">
           <li>Did you feel private?</li>
           <li>Did you understand what was shared?</li>
           <li>Would you recommend this?</li>
         </ul>
-      </details>
-      <details>
-        <summary>Observer checklist</summary>
+      </div>
+      <div class="card">
+        <h3>Observer checklist</h3>
         <ul class="list-compact">
           <li>Door → Ready to Connect &lt; 7 min (target)</li>
           <li>Help requests; teach‑back comprehension</li>
           <li>Quick‑exit used due to fear &lt; 15%</li>
         </ul>
-      </details>
-      <details>
-        <summary>Validation signals</summary>
+      </div>
+      <div class="card">
+        <h3>Validation signals</h3>
         <ul class="list-compact">
           <li>Trust: ≥70% select 4–5 privacy</li>
           <li>Control: ≥80% explain data flow, use ≥1 toggle</li>
           <li>Completion: ≥60% reach “Ready” without staff inside</li>
           <li>Willingness: ≥60% return/recommend; ≥50% take Care Key</li>
         </ul>
-      </details>
+      </div>
     </div>
   </section>
 
