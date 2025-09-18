@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Joy‑First Movement — Box of Dirt</title>
+  <style>
+    :root{
+      --bg:#0e0f12;--panel:#171821;--ink:#e7e9f3;--muted:#a3a7b9;--accent:#7dd3fc;--good:#34d399;--bad:#f87171;--chip:#262a40;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+    a{color:var(--accent)}
+    .wrap{max-width:1200px;margin:0 auto;padding:24px}
+    h1{font-size:28px;margin:0 0 6px}
+    h2{font-size:20px;margin:20px 0 10px}
+    h3{font-size:16px;margin:0 0 8px;color:#d2d6ea}
+    p.lead{color:var(--muted);margin:0 0 16px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .chip{background:var(--chip);border:1px solid #2a2f53;color:#cad0ec;padding:6px 10px;border-radius:999px;font-size:12px}
+    .card{background:var(--panel);border:1px solid #24273f;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-top:16px}
+    .card .body{padding:16px}
+
+    /* Storyboard grid */
+    .sb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    @media (max-width: 980px){.sb-grid{grid-template-columns:1fr 1fr}}
+    @media (max-width: 640px){.sb-grid{grid-template-columns:1fr}}
+    .sb{padding:12px;border-radius:12px;border:1px dashed #343853;background:#141625;min-height:160px;display:flex;flex-direction:column;justify-content:space-between}
+    .sb .cap{color:var(--muted);font-size:12px}
+    .sb img{width:100%;height:90px;object-fit:cover;background:#0f1120;border-radius:10px;border:1px dashed #2a2e4a}
+    .sb .lbl{font-size:12px;color:#cbd1ea}
+
+    /* Layout panels */
+    .grid{display:grid;gap:16px}
+    .panels{grid-template-columns:1.2fr 1fr}
+    @media (max-width: 980px){.panels{grid-template-columns:1fr}}
+
+    /* Mood meter */
+    .mood-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width: 680px){.mood-wrap{grid-template-columns:1fr}}
+    .meter{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,120px);gap:6px;padding:8px;background:#0f1120;border:1px solid #2a2e4a;border-radius:12px;position:relative}
+    .quad{border-radius:10px;border:1px solid #273058;display:flex;align-items:center;justify-content:center;color:#9aa4ce;font-size:12px}
+    .quad:nth-child(1){background:rgba(59,130,246,.08)} /* Calm‑Low */
+    .quad:nth-child(2){background:rgba(52,211,153,.08)} /* Calm‑High */
+    .quad:nth-child(3){background:rgba(250,204,21,.08)} /* Energized‑Low */
+    .quad:nth-child(4){background:rgba(248,113,113,.08)} /* Energized‑High */
+    .dots{position:absolute;inset:8px;pointer-events:none}
+    .dot{position:absolute;width:12px;height:12px;border-radius:50%;background:#eab308;box-shadow:0 0 0 2px #0f1120}
+    .legend{display:flex;gap:10px;color:var(--muted);font-size:12px;margin-top:6px}
+
+    /* Posters */
+    .poster{background:#0f1120;border:1px solid #2a2e4a;border-radius:12px;padding:12px}
+    .poster h4{margin:0 0 8px;font-size:14px;color:#d6daf1}
+    .stat{display:flex;justify-content:space-between;padding:8px;border-bottom:1px dashed #2a2e4a}
+    .stat:last-child{border-bottom:0}
+
+    /* Controls */
+    .controls{display:flex;flex-wrap:wrap;gap:10px}
+    button{background:#1a1f3b;border:1px solid #2a2f57;color:var(--ink);padding:10px 14px;border-radius:10px;cursor:pointer}
+    button:hover{background:#222650}
+
+    /* Quotes wall */
+    .quotes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    @media (max-width: 980px){.quotes{grid-template-columns:1fr 1fr}}
+    @media (max-width: 640px){.quotes{grid-template-columns:1fr}}
+    .quote{background:#0f1120;border:1px dashed #2a2e4a;border-radius:10px;padding:10px;color:#d7daf0}
+
+    /* Joy Rx + SMS storyboard */
+    .rx{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width: 980px){.rx{grid-template-columns:1fr}}
+    .rx-card{background:#0f1120;border:1px solid #2a2e4a;border-radius:12px;padding:12px}
+    .rx-card .rx-pad{background:#141625;border:1px dashed #343853;border-radius:8px;padding:10px;min-height:120px}
+    .sms{display:grid;gap:8px}
+    .sms .bubble{background:#141625;border:1px solid #2a2e4a;border-radius:12px;padding:8px}
+
+    /* Map mock */
+    .map{background:#0f1120;border:1px solid #2a2e4a;border-radius:12px;height:220px;position:relative}
+    .pin{position:absolute;width:10px;height:10px;border-radius:50%;background:#34d399;box-shadow:0 0 0 2px #0f1120}
+
+    /* Image placeholders */
+    .ph{width:100%;height:120px;background:#0f1120;border:1px dashed #2a2e4a;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4b557e;font-size:12px}
+
+    .muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Joy‑First Movement — Box of Dirt</h1>
+      <p class="lead">Core intent: frame movement as <strong>play and social joy</strong> (not fixing or calories) so people feel at home in their bodies and want to return — and bring someone with them.</p>
+      <div class="row">
+        <span class="chip">Problem → Movement framed as punishment</span>
+        <span class="chip">Objective → Daily homecoming to one’s body</span>
+        <span class="chip">Link → Mirror‑free classes • Play parks • Mood Meter • Joy Rx</span>
+      </div>
+    </header>
+
+    <!-- STORYBOARD SCENES -->
+    <section class="card">
+      <div class="body">
+        <h2>Storyboard — One‑Day Joy‑First Pilot (mocked)</h2>
+        <div class="sb-grid">
+          <!-- 1 Joy Prescription -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 1: Joy Prescription</strong></div>
+              <p class="cap">Tear‑off Joy Rx; QR opens mocked schedule poster.</p>
+            </div>
+            <img src="" alt="[placeholder] Joy Rx pad & QR" />
+          </div>
+          <!-- 2 Arrival Ritual -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 2: Arrival Ritual — Body as Home</strong></div>
+              <p class="cap">Host asks for mood color; dots placed on board.</p>
+            </div>
+            <img src="" alt="[placeholder] Foam‑core Mood Meter" />
+          </div>
+          <!-- 3 Park Play Pop-up -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 3: Park Play Pop‑up</strong></div>
+              <p class="cap">Playlist, chalk prompts, scarves; gratitude cool‑down.</p>
+            </div>
+            <img src="" alt="[placeholder] Park play zone" />
+          </div>
+          <!-- 4 Mirror‑Free Class -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 4: Mirror‑Free Groove Class</strong></div>
+              <p class="cap">Mirrors covered; circle layout; play‑based cues.</p>
+            </div>
+            <img src="" alt="[placeholder] Studio with mirrors covered" />
+          </div>
+          <!-- 5 Social Mood Feedback -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 5: Social Mood Feedback</strong></div>
+              <p class="cap">Printed dashboard updated by staff; no app.</p>
+            </div>
+            <img src="" alt="[placeholder] Community Joy poster" />
+          </div>
+          <!-- 6 Roles & Touchpoints -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 6: Roles & Touchpoints</strong></div>
+              <p class="cap">Woman, physician, instructor, city parks partner.</p>
+            </div>
+            <img src="" alt="[placeholder] Roles sheet" />
+          </div>
+          <!-- 7 Visual Map -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 7: Visual Map</strong></div>
+              <p class="cap">Three Joy Hotspots; neighborhood loop.</p>
+            </div>
+            <img src="" alt="[placeholder] City map with hotspots" />
+          </div>
+          <!-- 8 Quotes Wall / Success Markers -->
+          <div class="sb">
+            <div>
+              <div class="lbl"><strong>Scene 8: Quotes & Success Markers</strong></div>
+              <p class="cap">Pre‑filled quotes; checkmarks for the day.</p>
+            </div>
+            <img src="" alt="[placeholder] Quotes wall and checklist" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INTERACTIVE PANELS -->
+    <section class="grid panels card">
+      <div class="body">
+        <h2>Mood Meter (2×2) — mock dots</h2>
+        <div class="mood-wrap">
+          <div>
+            <div class="meter" id="meter">
+              <div class="quad">Calm • Low</div>
+              <div class="quad">Calm • High</div>
+              <div class="quad">Energized • Low</div>
+              <div class="quad">Energized • High</div>
+              <div class="dots" id="dots"></div>
+            </div>
+            <div class="legend"><span>Tap a quadrant to add a mock dot.</span><span id="count" class="muted">Dots: 0</span></div>
+          </div>
+          <div>
+            <div class="poster">
+              <h4>Community Joy Poster (prefilled)</h4>
+              <div class="stat"><span>Participants today</span><strong id="pCount">36</strong></div>
+              <div class="stat"><span>Avg mood shift (quadrants)</span><strong id="pShift">+1.7</strong></div>
+              <div class="stat"><span>“Felt at home in body”</span><strong id="pHome">78%</strong></div>
+              <div class="stat"><span>Return‑with‑a‑friend pledges</span><strong id="pPledge">24</strong></div>
+              <div class="stat"><span>Most‑mentioned joy prompt</span><strong id="pPrompt">Paint the sky</strong></div>
+            </div>
+            <div class="legend" style="margin-top:8px">Updated by marker pen during the day (mock numbers).</div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px" class="controls">
+          <button id="btnArrive">Arrival Dots</button>
+          <button id="btnPark">Run Park Pop‑up</button>
+          <button id="btnStudio">Run Mirror‑Free Class</button>
+          <button id="btnAfter">After Dots + Pledges</button>
+          <button id="btnReset">Reset</button>
+        </div>
+      </div>
+
+      <div class="body">
+        <h2>Joy Rx & SMS (storyboard)</h2>
+        <div class="rx">
+          <div class="rx-card">
+            <h3>Joy Prescription</h3>
+            <div class="rx-pad">
+              <strong>Joy Rx</strong>
+              <p>30 minutes of play that makes you smile — redeem today.</p>
+              <div class="ph">QR placeholder → mocked schedule poster</div>
+              <ul class="muted">
+                <li>12:00 Park Play Pop‑up</li>
+                <li>18:00 Mirror‑Free Groove Class</li>
+              </ul>
+            </div>
+          </div>
+          <div class="rx-card">
+            <h3>Mocked Text Thread</h3>
+            <div class="sms">
+              <div class="bubble">Clinic: How did your Joy Rx go? Reply with a color emoji 💙💚💛❤️</div>
+              <div class="bubble">You: 💛</div>
+              <div class="bubble">Auto: Your color added to the Community Joy Map! Want tomorrow’s pop‑up? Y/N</div>
+              <div class="bubble muted">(Nothing actually sent — storyboard only.)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAP + QUOTES + SUCCESS -->
+    <section class="card">
+      <div class="body">
+        <h2>Visual Map + Quotes + Success Markers</h2>
+        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px">
+          <div>
+            <h3>Joy Hotspots Map (mock)</h3>
+            <div class="map" id="map">
+              <!-- pins injected -->
+            </div>
+            <div class="legend">Park • Clinic • Studio loop (mock pins)</div>
+          </div>
+          <div>
+            <h3>Pre‑filled Quotes Wall</h3>
+            <div class="quotes" id="quotes">
+              <div class="quote">“I forgot to suck in my stomach for 20 minutes.”</div>
+              <div class="quote">“I met a neighbor because we both liked the scarf dance.”</div>
+              <div class="quote">“I didn’t check my watch once.”</div>
+            </div>
+          </div>
+          <div>
+            <h3>Success Markers (checklist)</h3>
+            <div class="poster" id="checks">
+              <div class="stat"><span>Spontaneous laughter observed</span><strong>✓</strong></div>
+              <div class="stat"><span>10+ min linger & new intros</span><strong>✓</strong></div>
+              <div class="stat"><span>50% take Joy Rx for a friend</span><strong id="chkPledge">✓ (target)</strong></div>
+              <div class="stat"><span>Zero staff mentions of calories/weight</span><strong>✓</strong></div>
+            </div>
+            <div class="legend">Updated by staff marker; all mocked here.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- IMAGE PLACEHOLDERS SHEET -->
+    <section class="card">
+      <div class="body">
+        <h2>Image Placeholders (drop in later)</h2>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:12px">
+          <div class="ph">Photo: Park Play</div>
+          <div class="ph">Photo: Mirror‑Free Studio</div>
+          <div class="ph">Photo: Mood Board before/after</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- END CARD -->
+    <section class="card">
+      <div class="body">
+        <h2>End Card</h2>
+        <p>Did movement feel like <em>home</em> today? What color are you now, and who will you bring tomorrow?</p>
+        <p class="muted">This is a mocked, disposable prototype: paper props, posters, mirror covers, playlist, and scripted flow. No app, no backend.</p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ----------------------------
+    // MOCK STATE
+    // ----------------------------
+    const meter = document.getElementById('meter');
+    const dotsLayer = document.getElementById('dots');
+    const countEl = document.getElementById('count');
+    const pCount = document.getElementById('pCount');
+    const pShift = document.getElementById('pShift');
+    const pHome = document.getElementById('pHome');
+    const pPledge = document.getElementById('pPledge');
+    const pPrompt = document.getElementById('pPrompt');
+    const chkPledge = document.getElementById('chkPledge');
+
+    const btnArrive = document.getElementById('btnArrive');
+    const btnPark = document.getElementById('btnPark');
+    const btnStudio = document.getElementById('btnStudio');
+    const btnAfter = document.getElementById('btnAfter');
+    const btnReset = document.getElementById('btnReset');
+
+    let dotCount = 0;
+
+    // ----------------------------
+    // HELPERS
+    // ----------------------------
+    function addDot(q){
+      // q: 0..3 for each quadrant; place dot randomly within that cell
+      const rect = meter.getBoundingClientRect();
+      const w = rect.width - 16; // minus insets
+      const h = rect.height - 16;
+      const col = q % 2; const row = Math.floor(q/2);
+      const cellW = w/2, cellH = h/2;
+      const x = 8 + col*cellW + 8 + Math.random()*(cellW-24);
+      const y = 8 + row*cellH + 8 + Math.random()*(cellH-24);
+      const d = document.createElement('div');
+      d.className = 'dot'; d.style.left = x+'px'; d.style.top = y+'px';
+      dotsLayer.appendChild(d); dotCount++; countEl.textContent = 'Dots: '+dotCount;
+    }
+
+    function clearDots(){ dotsLayer.innerHTML=''; dotCount=0; countEl.textContent='Dots: 0'; }
+
+    // click to add a dot
+    meter.addEventListener('click',(e)=>{
+      const r = meter.getBoundingClientRect();
+      const x = e.clientX - r.left; const y = e.clientY - r.top;
+      const q = (y < r.height/2 ? 0 : 2) + (x < r.width/2 ? 0 : 1);
+      addDot(q);
+    });
+
+    // ----------------------------
+    // MAP MOCK PINS
+    // ----------------------------
+    const map = document.getElementById('map');
+    function pin(left,top){ const p=document.createElement('div'); p.className='pin'; p.style.left=left; p.style.top=top; map.appendChild(p); }
+    pin('20%','70%'); // Park
+    pin('55%','30%'); // Clinic
+    pin('78%','65%'); // Studio
+
+    // ----------------------------
+    // QUOTES (append new)
+    // ----------------------------
+    const quotes = document.getElementById('quotes');
+    function addQuote(text){ const q=document.createElement('div'); q.className='quote'; q.textContent='“'+text+'”'; quotes.appendChild(q); }
+
+    // ----------------------------
+    // DAY SEQUENCE (mock)
+    // ----------------------------
+    function arrivalDots(){
+      // people arrive across all quadrants
+      [0,1,2,3,0,1,3,1,2,2,3,1,0].forEach((q,i)=> setTimeout(()=>addDot(q), i*80));
+    }
+    function runPark(){
+      // playful prompts → shift upward in energy
+      [2,3,3,3,3,3,1,3,3,3,3].forEach((q,i)=> setTimeout(()=>addDot(q), i*90));
+      pPrompt.textContent = 'Paint the sky';
+    }
+    function runStudio(){
+      // mirror‑free groove → spread across calm‑high + energized‑high
+      [1,1,3,1,3,1,1,3,1,1,3].forEach((q,i)=> setTimeout(()=>addDot(q), i*90));
+    }
+    function afterDots(){
+      // pledges & stats bump
+      pCount.textContent = String(36 + Math.floor(5 + Math.random()*6));
+      pShift.textContent = '+'+(1.6 + Math.random()*0.3).toFixed(1);
+      pHome.textContent = (75 + Math.floor(Math.random()*8)) + '%';
+      const pledges = 24 + Math.floor(6+Math.random()*8); pPledge.textContent = String(pledges);
+      chkPledge.textContent = pledges >= 30 ? '✓ met' : '✓ (target)';
+      addQuote("I'm bringing my sister.");
+    }
+    function resetAll(){
+      clearDots(); pCount.textContent='36'; pShift.textContent='+1.7'; pHome.textContent='78%'; pPledge.textContent='24'; pPrompt.textContent='Paint the sky'; chkPledge.textContent='✓ (target)';
+      // remove dynamic quotes beyond the first three
+      while(quotes.children.length>3){ quotes.removeChild(quotes.lastChild); }
+    }
+
+    btnArrive.addEventListener('click', arrivalDots);
+    btnPark.addEventListener('click', runPark);
+    btnStudio.addEventListener('click', runStudio);
+    btnAfter.addEventListener('click', afterDots);
+    btnReset.addEventListener('click', resetAll);
+  </script>
+</body>
+</html>
