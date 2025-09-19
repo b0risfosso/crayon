@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polarity Fence — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Polarity Fence — Hindgut / Seed</h1>
+    <div class="meta">Problem → Basolateral determinants spill across the boundary during remodeling, eroding side‑specific identity • Objective → Side‑locked, non‑overlapping basolateral maps on each side of the Crumbs line • Link → Nanobody relocalization of Scrib/Lgl/Dlg to side‑restricted scaffolds + aPKC‑phosphomimic gates to enforce exclusion; monitor with shape metrics & aPKC biosensors</div>
+    <p class="thesis">Core intent: If the Crumbs line acts as a functional polarity fence, then forcibly side‑locking basolateral determinants and gating aPKC exclusion should yield two non‑overlapping, independently stable basolateral identity maps that persist through hindgut remodeling.</p>
+  </header>
+
+  <section>
+    <h2>Storyboard — Polarity Fence Simulator (Mocked)</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Frame 1 — Map & Fence</h3>
+        <ul class="list-compact">
+          <li>Hindgut outline with bright Crumbs seam</li>
+          <li>Left vs right tinted; basolateral determinants (purple dots); aPKC activity (gold heat)</li>
+        </ul>
+        <div class="placeholder">[Seam + side tints + purple dots + gold apical heat]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 2 — Baseline Remodeling (Leak)</h3>
+        <ul class="list-compact">
+          <li>Purple dots drift across seam; aPKC heat bleeds irregularly</li>
+          <li>Prefilled metrics: Overlap across seam = 0.42; FPI = 0.58; aPKC asymmetry = 0.35; Cell‑shape variance near seam = high</li>
+        </ul>
+        <div class="placeholder">[Leak across seam + noisy shapes]</div>
+        <p class="muted">Identity erosion during remodeling.</p>
+      </div>
+
+      <div class="card">
+        <h3>Frame 3 — Intervention Logic</h3>
+        <ul class="list-compact">
+          <li>Nanobody scaffolds capture Scrib/Lgl/Dlg on each side</li>
+          <li>aPKC phosphomimic gate at seam rejects basolateral set</li>
+          <li>Arrows: side determinants bind → cannot cross; seam gate blocks strays</li>
+        </ul>
+        <div class="placeholder">[Cartoon flow: left/right scaffolds + seam padlock]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 4 — Fence‑Locked Remodeling</h3>
+        <ul class="list-compact">
+          <li>Determinants confined to original side; seam sharp</li>
+          <li>Prefilled metrics: Overlap = 0.06; FPI = 0.94; aPKC asymmetry = 0.81; Shape variance near seam = low; Lumen axis straightness ↑</li>
+        </ul>
+        <div class="placeholder">[Clean split; sharp aPKC discontinuity; smooth seam shapes]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 5 — Biosensor & Shape Dash</h3>
+        <ul class="list-compact">
+          <li>aPKC biosensor traces: anti‑correlated left vs right at seam, stable across remodeling window</li>
+          <li>Shape metrics: reduced eccentricity variance near seam; toggle Baseline ↔ Fence‑Locked updates numbers</li>
+        </ul>
+        <div class="placeholder">[Two mini plots: biosensor traces + boxplots]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 6 — Perturbation Checks</h3>
+        <ul class="list-compact">
+          <li>Scrambled nanobody → overlap 0.38; aPKC asymmetry ↓</li>
+          <li>Gate disabled → determinants accumulate at seam; overlap 0.31</li>
+          <li>Mechanical stress → fence‑locked overlap remains low (~0.10)</li>
+        </ul>
+        <div class="placeholder">[Three vignettes with metric chips]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 7 — Alternative Hypotheses</h3>
+        <ul class="list-compact">
+          <li>Model A: single continuous basolateral domain → graded mixing during remodeling</li>
+          <li>Model B: two independent systems → stable non‑overlap under fence‑lock</li>
+          <li>Tick appears next to model matching Frame 4 curves</li>
+        </ul>
+        <div class="placeholder">[Model A vs B overlay + tick]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 8 — Decision Card</h3>
+        <p class="muted">If FPI ≥ 0.9 and biosensor anti‑correlation persists during peak remodeling → <strong>Fence acts as functional border; two independent basolateral systems supportable.</strong> Else → <strong>Leakage implies shared basin; revisit gating/scaffold specificity.</strong></p>
+        <div class="placeholder">[Decision banner with thresholds]</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <p class="muted">Show Baseline vs Fence‑Locked panels plus the mocked dash to polarity experts.</p>
+    <ol class="list-compact">
+      <li>Do they read non‑overlap, sharp aPKC discontinuity, and stabilized shape metrics as sufficient to separate two‑systems from one?</li>
+      <li>Do they say: “If numbers looked like this during remodeling, I’d accept the Crumbs line as a functional fence”?</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Drosophila epithelial polarity researchers (Scrib/Lgl/Dlg, aPKC)</li>
+      <li>Hindgut remodeling biologists</li>
+      <li>Skeptics favoring gradient/continuum models</li>
+      <li>Imaging core leads (biosensor interpretability)</li>
+      <li>Computational morphometrics peers (metric sufficiency)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did the fence + gate concept feel sufficient?</li>
+          <li>Was FPI (1 − overlap) legible and convincing?</li>
+          <li>Would you try nanobody relocalization or aPKC gating?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Names measurable readouts: overlap, FPI, aPKC asymmetry, near‑seam shape variance</li>
+          <li>Predicts perturbation outcomes (scrambled nanobody, gate off, stress)</li>
+          <li>Identifies decision threshold (FPI ≥ 0.9 + biosensor anti‑correlation)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% choose 4–5 on “functional fence plausible”</li>
+          <li>≥60% propose concrete construct or imaging plan</li>
+          <li>≥50% accept FPI + biosensor as sufficient first pass</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (✓ match, ? uncertain) — to orient discussion, not to claim proof.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>aPKC Seam Discontinuity</h3>
+        <p><strong>Predicted:</strong> Sharp aPKC drop at Crumbs seam when fence‑locked; anti‑correlated biosensor traces across seam.</p>
+        <p><strong>Reported:</strong> ✓ aPKC/Crumbs apico‑lateral fences documented in epithelia; ? explicit hindgut remodeling traces with enforced gates.</p>
+      </div>
+      <div class="card">
+        <h3>Scrib/Lgl/Dlg Overlap During Remodeling</h3>
+        <p><strong>Predicted:</strong> Baseline remodeling shows seam overlap (~0.3–0.4); fence‑lock reduces to ≤0.1.</p>
+        <p><strong>Reported:</strong> ✓ Basolateral determinant drift reported in dynamic tissues; ? quantified overlap at hindgut seam.</p>
+      </div>
+      <div class="card">
+        <h3>Nanobody Relocalization & aPKC Gating</h3>
+        <p><strong>Predicted:</strong> Side‑restricted scaffolds + phosphomimic gate enforce exclusion; shape metrics stabilize.</p>
+        <p><strong>Reported:</strong> ✓ Nanobody relocalization works broadly; aPKC‑dependent exclusion known; ? combined hindgut implementation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Disposable, static storyboard with mocked numbers—no constructs, imaging, or live gating—just the minimal visual logic to test the fence‑plus‑gate hypothesis as a falsifiable separation of identities. Growth‑inviting: swap in real biosensor traces, stress‑test seam geometries, refine metrics, or replace nanobody/gate cartoons with whatever modulation is feasible.</p>
+  </section>
+</body>
+</html>

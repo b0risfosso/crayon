@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Boundaries, Constraints & Global Load Paths — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Boundaries, Constraints & Global Load Paths — Hindgut / Seed</h1>
+    <div class="meta">Problem → Uncoupled from midline tissues, hindgut bending & lumenization desynchronize from axial elongation • Objective → Synchronize gut curvature & diameter with body‑axis growth to preserve patency • Link → Fibronectin/collagen tethers couple gut to stiffening notochord/neural tube, creating a shared load path</div>
+    <p class="thesis">Core intent: Mechanical tethering of the hindgut to midline stiffening elements phase‑locks curvature and diameter changes to axial elongation, maintaining lumen patency via a shared load path.</p>
+  </header>
+
+  <section>
+    <h2>Storyboard / Dashboard (Prefilled)</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Panel 1 — Intact Coupling (Reference)</h3>
+        <ul class="list-compact">
+          <li>Midline rod stiffens over time; gut tube tethered dorsally (FN/Col springs)</li>
+          <li>Plots: L_axis(t) ↑ smoothly; E_mid(t) ramps; κ_gut(t) tracks dL_axis/dt; D(t) stays above collapse threshold</li>
+          <li>Metrics: S=0.86; C_tether=1.0; R=0.10</li>
+        </ul>
+        <div class="placeholder">[Midline + tethered gut; four mini plots; metrics chips]</div>
+        <p class="muted">Shared load path converts global axial tension/stiffening into guided bending without collapse.</p>
+      </div>
+
+      <div class="card">
+        <h3>Panel 2 — Tethers Cut (Desynchrony & Risk)</h3>
+        <ul class="list-compact">
+          <li>Springs absent (C_tether=0); gut bows unpredictably; red pinch marker</li>
+          <li>Plots: L_axis(t), E_mid(t) unchanged; κ_gut(t) lags & spikes; D(t) dips below threshold</li>
+          <li>Metrics: S=0.22; C_tether=0.0; R=0.70; Δx_apex=40 µm</li>
+        </ul>
+        <div class="placeholder">[Untethered gut; pinch icon; plots crossing threshold]</div>
+        <p class="muted">Without coupling, bending/lumenization desynchronize from axis growth; collapse & misalignment emerge.</p>
+      </div>
+
+      <div class="card">
+        <h3>Panel 3 — ECM Rescue (Tethers Restored)</h3>
+        <ul class="list-compact">
+          <li>Thicker springs to notochord & neural tube; curvature realigns; pinch→green</li>
+          <li>Plots: κ_gut(t) re‑enters step with dL_axis/dt; D(t) stabilizes</li>
+          <li>Metrics: S=0.75; C_tether=0.6; R=0.20; Δx_apex=8 µm</li>
+        </ul>
+        <div class="placeholder">[Retethered geometry; improved plots; metrics chips]</div>
+        <p class="muted">Partial tether restoration re‑establishes shared load path, improving synchrony & patency.</p>
+      </div>
+
+      <div class="card">
+        <h3>Interactive Prompts (Conceptual)</h3>
+        <ul class="list-compact">
+          <li><strong>Slow midline stiffening ramp:</strong> reduced κ_gut; lower risk; with tethers, coordination persists but amplitude falls</li>
+          <li><strong>Elevate luminal pressure ΔP:</strong> with tethers, lumen open; without, local collapse spikes</li>
+          <li><strong>Relocate tethers (ventral vs dorsal):</strong> bending plane rotates; asymmetry → misorientation when removed</li>
+        </ul>
+        <div class="placeholder">[Toggle chips → predicted plot overlays]</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load Path Trace (Callout)</h2>
+    <p class="muted">Axial extension → midline stiffening E_mid(t) → ECM tethers (springs) → gut wall tension redistribution → controlled curvature + maintained hoop balance. Boundary notes: posterior growth zone free; cloacal end mildly anchored.</p>
+    <div class="placeholder">[Arrow chain + boundary icons]</div>
+  </section>
+
+  <section>
+    <h2>What This Reveals at a Glance</h2>
+    <p class="muted">A single coupling parameter C_tether and a stiffening ramp E_mid(t) are sufficient to explain synchrony vs desynchrony and predict occlusion risk R as a function of load sharing.</p>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <ol class="list-compact">
+      <li>Show the three panels with prefilled curves & metrics (S, C_tether, R, Δx_apex)</li>
+      <li>Ask for point‑and‑predict on FN reduction, midline softening, ECM rescue</li>
+      <li>Success: predictions match prefilled outcomes; observers articulate measurable readouts & minimal experiments</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Developmental mechanobiologists (gut morphogenesis)</li>
+      <li>ECM mechanics experts (FN/Col assembly)</li>
+      <li>Notochord/neural tube biomechanics researchers</li>
+      <li>Organoid engineers (constraint scaffolds)</li>
+      <li>Computational morphogenesis peers (FE/vertex)</li>
+      <li>Skeptical developmental geneticists</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did the load‑path coupling feel sufficient?</li>
+          <li>Was phase‑lock (S) legible from the plots?</li>
+          <li>Would you test tether cuts/rescue in your system?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Names measurable readouts: κ_gut(t), D(t), S, FN/Col presence, E_mid(t)</li>
+          <li>Proposes minimal experiment (ECM cut → ΔS, ΔR; rescue with aligned fibers)</li>
+          <li>Explains boundary effects (anchoring, growth zone)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% choose 4–5 on “coupling picture persuasive”</li>
+          <li>≥60% outline an FN/Col cut & rescue plan</li>
+          <li>≥50% suggest a stiffness‑ramp measurement (AFM/indentation)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (✓ match, ? uncertain) — to orient discussion, not claim proof.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>FN/Col Reduction</h3>
+        <p><strong>Predicted:</strong> S ↓, R ↑, κ_gut spikes; local pinches; Δx_apex increases.</p>
+        <p><strong>Reported:</strong> ✓ ECM‑cut desynchrony reported in related systems; ? direct hindgut tether cuts.</p>
+      </div>
+      <div class="card">
+        <h3>Midline Softening / Slower Stiffening</h3>
+        <p><strong>Predicted:</strong> Curvature amplitude ↓; with tethers, synchrony persists; without, still desynchronized.</p>
+        <p><strong>Reported:</strong> ✓ Notochord stiffening guides adjacent tissues in some models; ? quantitative gut coupling data.</p>
+      </div>
+      <div class="card">
+        <h3>Aligned Fiber Rescue</h3>
+        <p><strong>Predicted:</strong> C_tether ↑; S recovers (~0.7–0.8); R ↓.</p>
+        <p><strong>Reported:</strong> ✓ ECM realignment rescues morphogenesis in scaffolds; ? targeted FN/Col rescue in hindgut.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: reduces to a rod (midline), a tube (gut), a coupling knob (C_tether), and a stiffening ramp E_mid(t), with prefilled curves/metrics—no solver or pipeline. Disposable: toss or redraw if coupling premise fails. Growth‑inviting: add anisotropy, time‑varying FN/Col deposition, viscous coupling, pressure mechanics, real boundary conditions, and species‑specific parameters; escalate to benchtop tests and calibrated simulation.</p>
+  </section>
+</body>
+</html>

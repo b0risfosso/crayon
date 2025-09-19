@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Time as the Fourth Morphogen — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Time as the Fourth Morphogen — Embryonic Temperature / Seed</h1>
+    <div class="meta">Problem → Tissue mechanics may violate simple Arrhenius scaling; myosin kinetics vs cortical viscosity shift differently with T, derailing proportional germband extension • Objective → Preserve proportional morphogenesis across temperature • Link → Couple myosin turnover & tissue viscosity via Rho‑kinase feedback so activation energies match → thermo‑isochronous mechanical module tracking a global thermal clock</div>
+    <p class="thesis">Core intent: If ROCK feedback couples myosin turnover to cortical viscosity so their effective activation energies match, a single dimensionless myo–viscous ratio stays temperature‑invariant, yielding proportional (thermo‑isochronous) germband extension across a global thermal clock.</p>
+  </header>
+
+  <section>
+    <h2>Thermo‑Isochronous Germband Module — Storyboard</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Frame 1 — Baseline mismatch (Feedback OFF)</h3>
+        <ul class="list-compact">
+          <li>Arrhenius plot (ln rate vs 1/T): Myosin turnover (steeper slope) vs Cortical viscosity (shallower; inverse relation)</li>
+          <li>MVR gauge (myo–viscous ratio) drifts upward with temperature</li>
+        </ul>
+        <div class="placeholder">[Arrhenius lines + drifting MVR gauge]</div>
+        <p class="muted">Without coupling, activation energies differ; mechanical regime shifts with T.</p>
+      </div>
+
+      <div class="card">
+        <h3>Frame 2 — Introduce coupling (Feedback ON)</h3>
+        <ul class="list-compact">
+          <li>Node‑link cartoon: Temperature → RhoA/ROCK → {myosin phosphorylation/turnover, actin crosslinking/viscosity}</li>
+          <li>Negative feedback from cortical strain rate to ROCK gain</li>
+          <li>Arrhenius lines redraw with matched slopes; MVR gauge flat across T</li>
+        </ul>
+        <div class="placeholder">[ROCK node + matched slopes + flat MVR]</div>
+        <p class="muted">ROCK feedback tunes crosslinking so viscosity’s T‑dependence tracks myosin turnover.</p>
+      </div>
+
+      <div class="card">
+        <h3>Frame 3 — Morphogenesis outcome</h3>
+        <ul class="list-compact">
+          <li>Left: Germband extension (% EL) vs absolute time at 18, 25, 30 °C — OFF traces diverge (overshoot at 30 °C; stall at 18 °C)</li>
+          <li>Right: Same against a global thermal clock — ON traces collapse to one sigmoid; OFF traces don’t</li>
+        </ul>
+        <div class="placeholder">[Two panels: absolute‑time divergence vs thermal‑clock collapse]</div>
+        <p class="muted">Matched activation energies → proportional morphogenesis follows the global thermal clock.</p>
+      </div>
+
+      <div class="card">
+        <h3>Frame 4 — Perturbation vignette</h3>
+        <ul class="list-compact">
+          <li>Mock slider: ROCK inhibition 50%</li>
+          <li>Arrhenius slopes re‑diverge; MVR tilts with T</li>
+          <li>Kymograph thumbnails: skewed intercalations at 30 °C; delayed CE at 18 °C</li>
+        </ul>
+        <div class="placeholder">[Slope re‑divergence + kymograph thumbnails]</div>
+        <p class="muted">Breaking the coupling reintroduces temperature‑dependent distortion.</p>
+      </div>
+
+      <div class="card">
+        <h3>Frame 5 — Minimal measurement checklist</h3>
+        <ul class="list-compact">
+          <li>FRAP Myosin II turnover vs T → slope A</li>
+          <li>Microrheology / laser‑ablation viscosity vs T → slope B</li>
+          <li>ROCK activity reporter vs T → gain curve</li>
+          <li>Germband kymographs vs T → proportionality collapse test</li>
+        </ul>
+        <div class="placeholder">[Four mini boxes labeled A, B, gain, collapse]</div>
+        <p class="muted">Rule‑of‑thumb: if A ≈ B → MVR constant → curves collapse on the thermal clock.</p>
+      </div>
+
+      <div class="card">
+        <h3>Flow cue — Pre‑scripted clicks</h3>
+        <p class="muted">OFF view → drifting MVR & distorted morphogenesis → toggle ON → slopes align → MVR flattens → traces collapse → add partial ROCK inhibition → partial de‑alignment & proportionality loss.</p>
+        <div class="placeholder">[Flow arrows / toggle icons]</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <p class="muted">Ask: “If FRAP/viscosity Arrhenius slopes match under ROCK feedback, would you expect proportional germband extension on a thermal clock — and can your assays falsify this?”</p>
+    <ol class="list-compact">
+      <li>Restate core: keep one dimensionless number (MVR) constant across T → proportionality follows</li>
+      <li>Map to assays: obtain slopes A & B; test collapse of kymographs vs scaled time</li>
+      <li>Decisive perturbation: titrate ROCK / alter RLC to tilt one slope → proportionality breaks</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Drosophila gastrulation biophysicists (FRAP & ablation)</li>
+      <li>RhoA/ROCK mechanochemistry experts</li>
+      <li>Skeptical Arrhenius‑assumption modelers</li>
+      <li>Imagers with temperature‑controlled rigs & kymograph pipelines</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did MVR‑invariance feel sufficient to explain proportionality?</li>
+          <li>Were Arrhenius slope matches A≈B legible?</li>
+          <li>Would you adopt a thermal‑clock normalization in your analysis?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Names measurable slopes A (turnover) & B (viscosity)</li>
+          <li>Describes collapse test vs thermal clock</li>
+          <li>Proposes ROCK titration / RLC mutation to tilt slopes</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% choose 4–5 on “MVR‑invariance is a good target”</li>
+          <li>≥60% outline FRAP+viscosity slope measurements</li>
+          <li>≥50% propose a ROCK titration falsification plan</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (✓ match, ? uncertain) — to orient discussion, not claim proof.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Arrhenius Slopes for Turnover vs Viscosity</h3>
+        <p><strong>Predicted:</strong> With feedback ON, slopes match (A≈B); OFF → A>B (steeper turnover).</p>
+        <p><strong>Reported:</strong> ✓ Distinct temperature dependences for turnover & viscosity in epithelia; ? matched‑slope demonstration under ROCK feedback during gastrulation.</p>
+      </div>
+      <div class="card">
+        <h3>Thermal‑Clock Collapse</h3>
+        <p><strong>Predicted:</strong> Germband extension traces collapse across T when plotted on thermal time with feedback ON.</p>
+        <p><strong>Reported:</strong> ✓ Global thermal scaling used in embryos; ? explicit mechanical‑module collapse for germband.</p>
+      </div>
+      <div class="card">
+        <h3>ROCK Titration Effects</h3>
+        <p><strong>Predicted:</strong> Partial inhibition tilts B relative to A → proportionality loss (overshoot at high T, stall at low T).</p>
+        <p><strong>Reported:</strong> ✓ ROCK alters viscoelastic balance and intercalation; ? systematic Arrhenius‑slope tilting vs proportionality readout.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Reduces the idea to one invariant (slope matching → constant MVR) and one visual consequence (trace collapse on a thermal clock). No models, fits, or data ingestion—only mocked panels and prefilled traces—so it’s discardable if the core doesn’t resonate. Growth‑inviting: swap in real slopes, reporters, and kymographs; extend to other tissues/species or alternative feedback paths beyond ROCK.</p>
+  </section>
+</body>
+</html>
