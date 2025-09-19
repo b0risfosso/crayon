@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Heat as a Dial on Force & Material State — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Heat as a Dial on Force & Material State — Hindgut / Seed</h1>
+    <div class="meta">Problem → Acute heat pulses fluidize cortex & destabilize actomyosin → erratic deformations, lost fidelity • Objective → Buffer mechanics against thermal spikes without blunting force • Link → Precondition to raise Hsp70/Hsp90; preserve contractility & viscosity setpoints; verify via laser‑recoil & AFM modulus across shocks</div>
+    <p class="thesis">Core intent: Preconditioning that elevates Hsp70/Hsp90 can buffer cortical material state so acute heat spikes do not shift contractile force or effective viscosity enough to derail hindgut morphogenesis.</p>
+  </header>
+
+  <section>
+    <h2>Storyboard — Heat‑as‑a‑Dial on Mechanics</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>1) Opening Frame — The Dial</h3>
+        <ul class="list-compact">
+          <li>Dial: Heat Pulse Off → Mild → Acute</li>
+          <li>Toggle: Preconditioning OFF/ON</li>
+          <li>Gauges: Force Output (myosin tension) & Material State (Gel ↔ Fluidized)</li>
+        </ul>
+        <div class="placeholder">[Heat dial + preconditioning toggle + two gauges]</div>
+      </div>
+
+      <div class="card">
+        <h3>2) Baseline — No Preconditioning, No Heat</h3>
+        <ul class="list-compact">
+          <li>Smooth, stereotyped bend trajectory</li>
+          <li>Laser‑recoil: crisp snap‑back</li>
+          <li>AFM modulus: stable mid‑high bar</li>
+          <li>Morphology variance: tight band</li>
+        </ul>
+        <div class="placeholder">[Tube cartoon + recoil trace + modulus bar + variance ribbon]</div>
+      </div>
+
+      <div class="card">
+        <h3>3) Acute Heat Pulse — No Preconditioning</h3>
+        <ul class="list-compact">
+          <li>Erratic bulges; trajectory misses target</li>
+          <li>Force dips/flickers; Material State → fluidized</li>
+          <li>Recoil: sluggish/overdamped; AFM modulus drops</li>
+          <li>Myosin kymograph: fragmented, short‑lived assemblies</li>
+        </ul>
+        <div class="placeholder">[Wobbly tube + sluggish recoil + low modulus + fragmented belts]</div>
+      </div>
+
+      <div class="card">
+        <h3>4) Acute Heat Pulse — Preconditioning ON</h3>
+        <ul class="list-compact">
+          <li>Trajectory tracks intended shape</li>
+          <li>Force near baseline; Material State in viscoelastic plateau</li>
+          <li>Recoil ~ baseline; modulus rebounds</li>
+          <li>Myosin belts contiguous; normal turnover</li>
+        </ul>
+        <div class="placeholder">[Recovered readouts]</div>
+      </div>
+
+      <div class="card">
+        <h3>5) Phase Sketch — Buffering as a Shift</h3>
+        <p class="muted">Temperature (x) vs Effective Viscosity/Contractility (y). Boundaries shift rightward with preconditioning; operating point stays in morphogenetic window.</p>
+        <div class="placeholder">[Two curves: no‑pre vs preconditioned; window highlighted]</div>
+      </div>
+
+      <div class="card">
+        <h3>6) Fidelity Readout</h3>
+        <p class="muted">Morphogenetic Fidelity Score aggregates recoil, modulus, myosin continuity, shape variance → green/yellow/red light.</p>
+        <div class="placeholder">[Fidelity meter: red (no pre, acute) → green (pre, acute)]</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>7) What‑If Panel</h3>
+      <ul class="list-compact">
+        <li>Mild heat • Acute heat • Repeated pulses</li>
+        <li>Thumbnails: recoil, modulus, myosin continuity, shape variance — buffered vs unbuffered</li>
+        <li>Interaction is pretend; panels swap pre‑rendered states</li>
+      </ul>
+      <div class="placeholder">[Three scenario cards with four tiny readouts each]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <ol class="list-compact">
+      <li>Sense‑making: heat is a dial on cortical material state & force</li>
+      <li>Agreement: Hsp70/90 preconditioning shifts operating point without blunting contractility</li>
+      <li>Readouts: recoil, AFM modulus, myosin continuity, morphology variance would convince if real</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Epithelial mechanics biophysicists</li>
+      <li>Actomyosin regulation researchers</li>
+      <li>Hsp70/Hsp90 experts</li>
+      <li>Laser ablation & AFM method peers</li>
+      <li>Fidelity‑focused developmental PIs</li>
+      <li>Material‑state modelers</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did the buffering story feel plausible?</li>
+          <li>Were the chosen readouts sufficient?</li>
+          <li>Would you adopt preconditioning in your protocol?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer predicts recoil/modulus behavior with/without preconditioning</li>
+          <li>Viewer distinguishes force loss vs fluidization in readouts</li>
+          <li>Viewer proposes a test for “viscoelastic plateau” maintenance</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% choose 4–5 on “preconditioning should buffer mechanics”</li>
+          <li>≥60% name two readouts they’d measure</li>
+          <li>≥50% propose an AFM+recoil combo across pulses</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (✓ match, ? uncertain) to orient discussion, not to claim proof.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Laser‑Recoil under Heat Shock</h3>
+        <p><strong>Predicted:</strong> Overdamped recoil without preconditioning; near‑baseline with preconditioning.</p>
+        <p><strong>Reported:</strong> ✓ Heat‑induced slowing of recoil seen in epithelia; ? specific hindgut datasets with Hsp70/Hsp90 preconditioning.</p>
+      </div>
+      <div class="card">
+        <h3>AFM Modulus during Pulses</h3>
+        <p><strong>Predicted:</strong> Modulus drop under acute heat; buffered plateau with preconditioning.</p>
+        <p><strong>Reported:</strong> ✓ Temperature‑dependent modulus shifts broadly observed; ? direct buffering measurements in hindgut.</p>
+      </div>
+      <div class="card">
+        <h3>Myosin Continuity Index</h3>
+        <p><strong>Predicted:</strong> Fragmented assemblies under heat; restored belt continuity after preconditioning.</p>
+        <p><strong>Reported:</strong> ✓ Chaperone support of cytoskeletal integrity documented; ? quantitative continuity index under shocks in vivo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: a static, prefilled storyboard with a heat dial and preconditioning toggle; mocked gauges & plots. Disposable: easy to redraw if causal chain or readouts don’t land. Growth‑inviting: add time windows, alternative chaperones, toy phase model, or link to real microscopy/mechanics summaries after buy‑in.</p>
+  </section>
+</body>
+</html>
