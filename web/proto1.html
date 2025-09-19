@@ -52,6 +52,7 @@
     .tag{font-size:.75rem;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:#0b121a;color:var(--muted)}
     .foot{color:#7f93a8;font-size:.85rem;margin-top:6px}
     canvas{background:#0e1620;border:1px solid var(--line);border-radius:12px;padding:6px}
+    canvas.chart{width:100%;max-width:520px;height:220px}
   </style>
 </head>
 <body>
@@ -149,10 +150,10 @@
         <div class="card">
           <h3 class="title">Panel 6 — Outcome Preview</h3>
           <div class="grid cols-2" style="gap:12px">
-            <canvas id="chartROH" height="170"></canvas>
-            <canvas id="chartNe" height="170"></canvas>
-            <canvas id="chartSemen" height="170"></canvas>
-            <canvas id="chartDisease" height="170"></canvas>
+            <canvas id="chartROH" class="chart"></canvas>
+            <canvas id="chartNe" class="chart"></canvas>
+            <canvas id="chartSemen" class="chart"></canvas>
+            <canvas id="chartDisease" class="chart"></canvas>
           </div>
           <p class="foot" id="chartFoot">Status quo projections.</p>
         </div>
@@ -229,6 +230,11 @@
   </div>
 
   <script>
+    // Clamp device pixel ratio to avoid huge canvases on high‑DPR displays
+    if (window.Chart) {
+      Chart.defaults.devicePixelRatio = 1; // cap DPR for stability
+    }
+
     // --- Mock Data ---
     const reserves = [
       { id: 'KE', name: 'Kalahari East', risk:'bad', F:0.31, roh10mb:28, semen:24, disease:'High', coords:[2,1] },
@@ -416,6 +422,7 @@
         data:{ labels, datasets:[{ label, data, borderWidth:2, tension:0.25, pointRadius:3 }] },
         options:{
           responsive:true,
+          maintainAspectRatio:false,
           plugins:{ legend:{ display:false } },
           scales:{
             x:{ grid:{ color:'#1b2736' }, ticks:{ color:'#7fa0bd' } },
