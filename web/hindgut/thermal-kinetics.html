@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thermal Kinetics vs Chiral Bias — Box of Dirt (Site-Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Thermal Kinetics vs Chiral Bias — Hindgut Rotation / Seed</h1>
+    <div class="meta">Problem → Arrhenius slopes of ω(T) conflate motor, turnover, and drag • Objective → Deconvolve activation energies • Link → ω(T) ∝ [k_myo(T)·k_turnover(T)]/η(T) with perturbation reweighting</div>
+    <p class="thesis">Core intent: Test whether a composite Arrhenius model with separable activation energies for motor torque, turnover, and viscous drag can explain temperature dependence of hindgut rotation and chirality.</p>
+  </header>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Frame 1 — Concept Map</h3>
+      <p class="muted">Static diagram linking Myo1D torque, turnover, viscosity, and bias. Ea_myo, Ea_turnover, Ea_eta tags. Bias_b T-invariant.</p>
+      <div class="placeholder">[Concept nodes + arrows]</div>
+    </div>
+
+    <div class="card">
+      <h3>Frame 2 — Model Toggle Panel</h3>
+      <ul class="list-compact">
+        <li>Radio: Product, Series-gated, Control-coefficient models</li>
+        <li>Sliders: Ea_myo, Ea_turnover, Ea_eta (prefilled values)</li>
+        <li>Checkbox: Bias temperature-invariant?</li>
+      </ul>
+      <div class="placeholder">[Mock control panel with sliders & toggles]</div>
+    </div>
+
+    <div class="card">
+      <h3>Frame 3 — Prefilled Data Overlays</h3>
+      <ul class="list-compact">
+        <li>Arrhenius ln ω vs 1/T plots: WT, motor hypomorph, turnover-slow, viscosity bump</li>
+        <li>Handedness fraction vs T: flat by default</li>
+        <li>Tooltips explain intended reweighting</li>
+      </ul>
+      <div class="placeholder">[Arrhenius plot + handedness curves]</div>
+    </div>
+
+    <div class="card">
+      <h3>Frame 4 — Fit & Explain</h3>
+      <p class="muted">Click Fit → show fitted Ea_myo, Ea_turnover, Ea_eta with CI bars; AIC table for models; stacked control allocation vs T chart.</p>
+      <div class="placeholder">[Mock fit output tiles + bar chart]</div>
+    </div>
+
+    <div class="card">
+      <h3>Frame 5 — Cross-Validation</h3>
+      <p class="muted">Hide dataset → model predicts it convincingly (e.g., Myo1D hypomorph). Hide viscosity bump → prediction drifts at low T.</p>
+      <div class="placeholder">[Prediction vs hidden data overlays]</div>
+    </div>
+
+    <div class="card">
+      <h3>Frame 6 — Stress Tests & Failure Modes</h3>
+      <ul class="list-compact">
+        <li>Switch turnover dominant at low T → curvature emerges; Series-gated model improves</li>
+        <li>Switch bias T-dependent → handedness fraction tilts</li>
+        <li>Knob viscosity source external vs intrinsic shifts Ea_eta</li>
+      </ul>
+      <div class="placeholder">[What-if plots and toggles]</div>
+    </div>
+
+    <div class="card">
+      <h3>Frame 7 — Suggested Perturbation Map</h3>
+      <ul class="list-compact">
+        <li>Motor: Myo1D ATPase modulation</li>
+        <li>Turnover: actin nucleation modifiers, junction mutants</li>
+        <li>Drag: viscosity additives, perivitelline space changes</li>
+      </ul>
+      <div class="placeholder">[Static checklist panel]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load-Bearing Test</h2>
+    <p class="muted">Walk domain experts through 10-min mocked dashboard. Validation if they identify control shifts, accept distinct model predictions, and believe three Ea parameters are in principle identifiable.</p>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Drosophila asymmetry labs (Myo1D)</li>
+      <li>Active chiral fluid/tissue modelers</li>
+      <li>Cytoskeleton turnover experts</li>
+      <li>Rheology/viscosity specialists</li>
+      <li>Skeptical quantitative modelers</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did the decomposition feel convincing across temperatures?</li>
+          <li>Could you track which process (myo, turnover, viscosity) was limiting?</li>
+          <li>Would you use this decomposition to plan perturbations?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer distinguishes product vs series vs control-coefficient models</li>
+          <li>Viewer predicts curvature or slope changes under toggled conditions</li>
+          <li>Viewer understands bias T-invariant vs T-dependent distinction</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% select 4–5 on “decomposition convincing”</li>
+          <li>≥60% predict perturbation outcome correctly</li>
+          <li>≥50% propose a concrete perturbation to discriminate models</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: fake dashboard with sliders, models, and datasets. Disposable: toss if decomposition unconvincing. Growth-inviting: integrate real traces, alternative physics, Bayesian comparison, rheology & turnover data for priors. Exposes where identifiability hinges before heavy implementation.</p>
+  </section>
+</body>
+</html>
