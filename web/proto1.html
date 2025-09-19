@@ -3,413 +3,518 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gust-Sensing Feather Interface — Box of Dirt</title>
+  <title>Spots + Ice: Cheetah Gene‑Flow Planner — Mock Storyboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    :root{
-      --bg:#0e0f12;--panel:#171821;--ink:#e6e8ef;--muted:#a3a7b9;--accent:#7dd3fc;--good:#34d399;--bad:#f87171;--warn:#fbbf24;--grid:#22253a;--chip:#262a40;
-    }
+    :root{--bg:#0b0f14;--card:#111822;--ink:#dfe7ef;--muted:#9fb0c3;--accent:#64d6ff;--ok:#2fd573;--warn:#ffb020;--bad:#ff6161;--chip:#0f141d;--line:#1b2330}
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#0b0f14 0%,#0b1018 60%,#0a0e15 100%);color:var(--ink);}
     a{color:var(--accent)}
-    .wrap{max-width:1200px;margin:0 auto;padding:24px}
-    h1{font-size:28px;margin:0 0 8px}
-    h2{font-size:20px;margin:24px 0 8px}
-    p.lead{color:var(--muted);margin:0 0 16px}
+    .wrap{max-width:1200px;margin:auto;padding:24px}
     .grid{display:grid;gap:16px}
-    .panels{grid-template-columns:1.3fr 1fr}
-    @media (max-width: 980px){.panels{grid-template-columns:1fr}}
-    .card{background:var(--panel);border:1px solid #24273f;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);}
-    .card h3{margin:0 0 8px;font-size:16px;color:#d2d6ea}
-    .card .body{padding:16px}
-    .row{display:flex;gap:12px;flex-wrap:wrap}
-    .chip{background:var(--chip);border:1px solid #2c3150;color:#c9cbe0;padding:6px 10px;border-radius:999px;font-size:12px}
-    .sb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    .sb{padding:12px;border-radius:12px;border:1px dashed #343853;background:#141625;min-height:140px;display:flex;flex-direction:column;justify-content:space-between}
-    .sb .cap{color:var(--muted);font-size:12px}
-    .sb img{width:100%;height:90px;object-fit:cover;background:#0f1120;border-radius:10px;border:1px dashed #2a2e4a}
-    .sb .lbl{font-size:12px;color:#cbd1ea}
-    @media (max-width: 980px){.sb-grid{grid-template-columns:1fr 1fr}}
-    @media (max-width: 680px){.sb-grid{grid-template-columns:1fr}}
-
-    .dash{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
-    @media (max-width: 980px){.dash{grid-template-columns:1fr}}
-    canvas{width:100%;height:260px;background:#0f1120;border-radius:12px;border:1px solid #2a2e4a}
-    .haptics{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:40px;gap:8px;padding:8px;background:#0f1120;border:1px solid #2a2e4a;border-radius:12px}
-    .cell{background:#131734;border:1px solid #1c2142;border-radius:10px;transition:transform .1s ease, background .1s ease, box-shadow .1s ease}
-    .cell.on{background:#1b2a5f;box-shadow:0 0 0 1px #2c4fbf inset,0 0 12px rgba(125,211,252,.35)}
-
-    .bars{display:grid;grid-template-columns:1fr;gap:10px}
-    .bar{display:flex;align-items:center;gap:10px}
-    .bar .name{min-width:120px;color:#c9cbe0;font-size:12px}
-    .bar .track{flex:1;height:12px;background:#111326;border-radius:999px;border:1px solid #222643;position:relative;overflow:hidden}
-    .bar .fill{position:absolute;height:100%;left:50%;width:0;background:linear-gradient(90deg,var(--good),#3b82f6);transform-origin:left center}
-    .bar .fill.neg{background:linear-gradient(90deg,var(--bad),#fb7185)}
-
-    .controls{display:flex;flex-wrap:wrap;gap:12px}
-    button{background:#1a1f3b;border:1px solid #2a2f57;color:#e6e8ef;padding:10px 14px;border-radius:10px;cursor:pointer}
-    button:hover{background:#222650}
-    .toggle{display:inline-flex;align-items:center;gap:10px;padding:10px 14px;border-radius:999px;background:#12142a;border:1px solid #2a2e4a}
-    .lamp{width:12px;height:12px;border-radius:50%;background:#394261;box-shadow:0 0 0 2px #2a2e4a inset}
-    .on .lamp{background:#34d399;box-shadow:0 0 12px rgba(52,211,153,.7)}
-    .legend{display:flex;gap:12px;color:#a3a7b9;font-size:12px}
-
-    .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-    .tick{padding:10px;border:1px dashed #343853;border-radius:10px;text-align:center;background:#0f1120;color:#c9cbe0}
-
-    .fail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-    @media (max-width: 980px){.fail-grid{grid-template-columns:1fr}}
-    .thumb{background:#0f1120;border:1px dashed #2a2e4a;border-radius:12px;padding:10px;min-height:120px}
-    .thumb.good{border-style:solid;border-color:#1f704d}
-
-    .endcard{padding:14px;border:1px dashed #2a2e4a;border-radius:12px;background:#12142a;color:#e6e8ef}
+    .grid.cols-2{grid-template-columns:1.2fr .8fr}
+    .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+    .grid.cols-4{grid-template-columns:repeat(4,1fr)}
+    .card{background:linear-gradient(180deg,#121a24 0%,#0f1620 100%);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .title{font-weight:800;letter-spacing:.3px}
+    .subtitle{color:var(--muted);font-size:.95rem}
+    .pill{display:inline-flex;align-items:center;gap:8px;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:.8rem;color:var(--muted)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .btn{--b:var(--line);--bg:#121b26;--fg:#dfe7ef;display:inline-flex;align-items:center;gap:8px;background:var(--bg, var(--bg));border:1px solid var(--b);color:var(--fg);padding:10px 14px;border-radius:12px;cursor:pointer;transition:all .2s ease;font-weight:600}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.25)}
+    .btn.primary{--bg:linear-gradient(180deg,#1a8fff,#0ea5e9);--b:transparent;color:#001018}
+    .btn.good{--bg:linear-gradient(180deg,#2fd573,#1fb55b);--b:transparent;color:#00180b}
+    .btn.bad{--bg:linear-gradient(180deg,#ff6161,#ff3b3b);--b:transparent;color:#2b0000}
+    .switch{position:relative;display:inline-block;width:54px;height:28px}
+    .switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#233041;transition:.2s;border-radius:28px;border:1px solid var(--line)}
+    .slider:before{position:absolute;content:"";height:22px;width:22px;left:2px;bottom:2px;background:white;transition:.2s;border-radius:50%}
+    input:checked + .slider{background:#1fa3ff}
+    input:checked + .slider:before{transform:translateX(26px)}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:12px;border:1px solid var(--line);background:var(--chip);color:var(--muted);font-size:.85rem}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+    .tooltip{position:absolute;pointer-events:none;background:#0e1620;border:1px solid var(--line);padding:10px 12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.35);min-width:240px;z-index:50}
     .muted{color:var(--muted)}
+    .mini{font-size:.8rem}
+    .barcode{display:flex;gap:2px;height:16px}
+    .stripe{background:linear-gradient(180deg,#5aa2ff,#63ddff);height:100%}
+    .reserve-btn{display:flex;flex-direction:column;gap:4px;align-items:flex-start;background:#0e1620;border:1px solid var(--line);padding:10px;border-radius:12px;cursor:pointer}
+    .reserve-btn:hover{outline:1px solid #2b88ff}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#0a1016;border:1px solid var(--line);border-bottom-width:2px;border-radius:8px;padding:1px 6px}
+    .checklist li{margin:.35rem 0}
+    .timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .milestone{background:#0e1620;border:1px dashed #2e3b4f;padding:10px;border-radius:10px}
+    .tag{font-size:.75rem;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:#0b121a;color:var(--muted)}
+    .foot{color:#7f93a8;font-size:.85rem;margin-top:6px}
+    canvas{background:#0e1620;border:1px solid var(--line);border-radius:12px;padding:6px}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <h1>Gust‑Sensing Feather Interface — Box of Dirt</h1>
-      <p class="lead">Core intent: a preemptive, body‑centered haptic map of incoming airflow aligns reflexes with automatic micro‑actuation before vision or conscious reaction.</p>
+    <header class="card" style="position:sticky;top:12px;z-index:20">
       <div class="row">
-        <span class="chip">Problem → Humans can’t feel microgusts; visual loop is late</span>
-        <span class="chip">Objective → Preemptive feather‑like sensing</span>
-        <span class="chip">Link → Sensors → Predictor → (Spinal micro‑actuation + Torso haptics)</span>
+        <div class="pill">big cats / <strong>Genes, Spots, and Ice</strong> / Seed</div>
+        <span class="pill">Mock storyboard · no real data</span>
+      </div>
+      <h1 class="title" style="margin:8px 0 6px">Spots + Ice: Cheetah Gene‑Flow Planner</h1>
+      <p class="subtitle">A genome‑informed assisted gene flow pilot: cryobank + AI mate‑choice + coordinated exchanges across fenced reserves.</p>
+      <div class="row" style="margin-top:10px">
+        <span class="chip"><span class="dot bad"></span> High inbreeding risk</span>
+        <span class="chip"><span class="dot warn"></span> Moderate</span>
+        <span class="chip"><span class="dot ok"></span> Low</span>
+        <span class="chip">What‑If <label class="switch" style="margin-left:6px"><input id="whatIf" type="checkbox"><span class="slider"></span></label> <span id="whatIfLabel" class="mini muted" style="margin-left:6px">Status quo</span></span>
+        <button class="btn" id="resetBtn">Reset storyboard</button>
+        <button class="btn primary" id="exportBtn">Export mocked plan (JSON)</button>
       </div>
     </header>
 
-    <!-- STORYBOARD -->
-    <section class="card" style="margin-top:18px">
-      <div class="body">
-        <h2>Storyboard (8 frames, mocked)</h2>
-        <div class="sb-grid" id="storyboard">
-          <!-- 1 -->
-          <div class="sb">
-            <div>
-              <div class="lbl"><strong>1) Calm Glide</strong></div>
-              <p class="cap">Baseline: smooth air, no cues.</p>
-            </div>
-            <img src="" alt="[placeholder image] Calm glide vector field"/>
+    <section class="grid cols-2" style="margin-top:16px">
+      <!-- LEFT COLUMN: Panels 1-4 -->
+      <div class="grid" style="gap:16px">
+        <!-- Panel 1: Metapop Map Snapshot -->
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <h3 class="title">Panel 1 — Metapop Map Snapshot</h3>
+            <span class="mini muted">Hover/Click a reserve</span>
           </div>
-          <!-- 2 -->
-          <div class="sb">
-            <div>
-              <div class="lbl"><strong>2) Microgust Forms (t = −120 ms)</strong></div>
-              <p class="cap">Feather arrays predict shear line; pre‑cue to torso.</p>
-            </div>
-            <img src="" alt="[placeholder image] Shear line + diagonal torso glow"/>
+          <div id="map" class="grid cols-4" style="margin-top:8px"></div>
+          <div id="mapTip" class="tooltip" style="display:none"></div>
+        </div>
+
+        <!-- Panel 2: Genes-as-Stripes -->
+        <div class="card">
+          <h3 class="title">Panel 2 — Genes‑as‑Stripes</h3>
+          <p class="foot">ROH tracts (10 reps/Reserve). Icons: 
+            <span class="kbd">S</span> sperm quality, 
+            <span class="kbd">P</span> pathogen screen.
+          </p>
+          <div id="stripes"></div>
+        </div>
+
+        <!-- Panel 3: Matchmaker Card -->
+        <div class="card" id="matchmaker">
+          <h3 class="title">Panel 3 — Matchmaker Card</h3>
+          <div class="row">
+            <div class="chip">Constraint: <label style="display:inline-flex;align-items:center;gap:6px"><input id="noLiveMoves" type="checkbox"> no live moves</label></div>
+            <div class="chip">Permits: ~90d</div>
+            <div class="chip">Quarantine: 30d</div>
+            <div class="chip">Disease panels: FIV / FeLV / TB</div>
           </div>
-          <!-- 3 -->
-          <div class="sb">
+          <div class="grid cols-2" style="margin-top:12px">
             <div>
-              <div class="lbl"><strong>3) Reflex Path Splits (t = −100 ms)</strong></div>
-              <p class="cap">Two channels fire together; pilot not yet aware.</p>
+              <h4>Target female</h4>
+              <div id="targetFemale" class="milestone"></div>
+              <h4 style="margin-top:10px">Suggested action</h4>
+              <div id="suggestedAction" class="milestone"></div>
+              <div class="row" style="margin-top:10px">
+                <button class="btn good" id="approveBtn">Approve pairing</button>
+                <button class="btn bad" id="rejectBtn">Reject pairing</button>
+              </div>
             </div>
-            <img src="" alt="[placeholder image] Flow arrows: sensors → spinal + haptic"/>
-          </div>
-          <!-- 4 -->
-          <div class="sb">
             <div>
-              <div class="lbl"><strong>4) Preemptive Actuation (t = −60 ms)</strong></div>
-              <p class="cap">Micro‑actuation biases lift before gust hits.</p>
+              <h4>Candidate donors</h4>
+              <div id="donorList" class="grid" style="gap:8px"></div>
             </div>
-            <img src="" alt="[placeholder image] Asym twist + camber; torso cue brightens"/>
           </div>
-          <!-- 5 -->
-          <div class="sb">
-            <div>
-              <div class="lbl"><strong>5) Gust Arrives (t = 0)</strong></div>
-              <p class="cap">Lift preserved; buffet avoided (ON vs OFF).</p>
-            </div>
-            <img src="" alt="[placeholder image] ON/OFF lift traces"/>
+        </div>
+
+        <!-- Panel 4: Cryobank Inventory -->
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h3 class="title">Panel 4 — Ice Shelf (Cryobank Inventory)</h3>
+            <span class="mini muted">All values mocked</span>
           </div>
-          <!-- 6 -->
-          <div class="sb">
-            <div>
-              <div class="lbl"><strong>6) Pilot Feel</strong></div>
-              <p class="cap">Pre‑attentive, not distracting.</p>
-            </div>
-            <img src="" alt="[placeholder image] Head + torso with thought bubble"/>
-          </div>
-          <!-- 7 -->
-          <div class="sb">
-            <div>
-              <div class="lbl"><strong>7) Timeline Strip</strong></div>
-              <p class="cap">Lead time beats human visual loop.</p>
-            </div>
-            <img src="" alt="[placeholder image] Predict → Fire → Gust → Vision → Conscious"/>
-          </div>
-          <!-- 8 -->
-          <div class="sb">
-            <div>
-              <div class="lbl"><strong>8) Failure Toggle</strong></div>
-              <p class="cap">Tune mapping and gains to feel feather‑like.</p>
-            </div>
-            <img src="" alt="[placeholder image] Bad vs tuned mapping thumbnails"/>
-          </div>
+          <div id="cryo" class="grid cols-3"></div>
         </div>
       </div>
-    </section>
 
-    <!-- DASHBOARD MOCK -->
-    <section class="card" style="margin-top:18px">
-      <div class="body">
-        <h2>Dashboard Mock (static with mock data)</h2>
-        <div class="dash">
-          <div>
-            <h3>Wing Top‑View (shear line & “feathers”)</h3>
-            <canvas id="wing"></canvas>
-            <div class="legend" style="margin-top:8px">
-              <span>Shear line: mock gust path</span>
-            </div>
+      <!-- RIGHT COLUMN: Panels 5-9 -->
+      <div class="grid" style="gap:16px">
+        <!-- Panel 5: Season Plan Timeline -->
+        <div class="card">
+          <h3 class="title">Panel 5 — Season Plan (18 months)</h3>
+          <div class="timeline" id="timeline"></div>
+          <div class="row" style="margin-top:8px">
+            <span class="tag">Milestone: Two litters born</span>
+            <span class="tag">Milestone: No disease incidents</span>
           </div>
-          <div>
-            <h3>Torso Haptic Grid (6×4)</h3>
-            <div id="haptics" class="haptics"></div>
-            <div class="legend" style="margin-top:8px">
-              <span>Cells light in direction & intensity of gust</span>
-            </div>
+        </div>
+
+        <!-- Panel 6: Outcome Preview (Charts) -->
+        <div class="card">
+          <h3 class="title">Panel 6 — Outcome Preview</h3>
+          <div class="grid cols-2" style="gap:12px">
+            <canvas id="chartROH" height="170"></canvas>
+            <canvas id="chartNe" height="170"></canvas>
+            <canvas id="chartSemen" height="170"></canvas>
+            <canvas id="chartDisease" height="170"></canvas>
           </div>
-          <div>
-            <h3>Actuation & Lift</h3>
-            <div class="bars">
-              <div class="bar"><div class="name">Right LE twist (°)</div><div class="track"><div id="barTwistR" class="fill"></div></div></div>
-              <div class="bar"><div class="name">Left camber (°)</div><div class="track"><div id="barCamberL" class="fill neg"></div></div></div>
+          <p class="foot" id="chartFoot">Status quo projections.</p>
+        </div>
+
+        <!-- Panel 7: What‑If Toggle & Panel 8 Logistics -->
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <h3 class="title">Panel 7 — What‑If & 8 — Logistics</h3>
+            <label class="row">Toggle scenario → <label class="switch" style="margin-left:8px"><input id="scenarioToggle" type="checkbox"><span class="slider"></span></label></label>
+          </div>
+          <div class="grid cols-2" style="margin-top:8px">
+            <div>
+              <h4>What‑If Snapshot</h4>
+              <ul class="checklist" id="whatIfList"></ul>
             </div>
-            <canvas id="lift" style="margin-top:12px"></canvas>
-            <div class="legend" style="margin-top:8px">
-              <span>ON trace (smoother) vs OFF trace (buffet)</span>
+            <div>
+              <h4>Logistics Reality Check</h4>
+              <div class="row">
+                <span class="chip">Semen import <span class="kbd">$</span></span>
+                <span class="chip">AI procedure <span class="kbd">$$</span></span>
+                <span class="chip">Live swap <span class="kbd">$$$</span></span>
+              </div>
+              <p class="foot">Community & welfare footprint: capture days, sedation count visualized per action.</p>
             </div>
           </div>
         </div>
 
-        <div style="margin-top:16px" class="row controls">
-          <div id="toggle" class="toggle on" role="button" aria-pressed="true" tabindex="0"><span class="lamp"></span><span><strong>System</strong> ON</span></div>
-          <button id="play">▶ Play 90s Animatic (mock)</button>
-          <button id="peek">⏱ Mapping Peek (t = −80 ms)</button>
-          <button id="replay">↺ Replay Gusts</button>
-        </div>
-
-        <div style="margin-top:12px" class="timeline">
-          <div class="tick">Predict (−120 ms)</div>
-          <div class="tick">Haptic/Servo (−100→−40 ms)</div>
-          <div class="tick">Gust (0)</div>
-          <div class="tick">Visual (+80 ms)</div>
-          <div class="tick">Conscious (+180 ms)</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- FAILURE / TUNING THUMBS -->
-    <section class="card" style="margin-top:18px">
-      <div class="body">
-        <h2>Failure Toggle (mock thumbnails)</h2>
-        <div class="fail-grid">
-          <div class="thumb">
-            <strong>A) Haptic map too coarse → confusion</strong>
-            <p class="muted">Placeholder image slot</p>
-          </div>
-          <div class="thumb">
-            <strong>B) Autonomy too strong → pilot fight</strong>
-            <p class="muted">Placeholder image slot</p>
-          </div>
-          <div class="thumb good">
-            <strong>Tuned: finer gradient + smaller gains</strong>
-            <p class="muted">Placeholder image slot</p>
+        <!-- Panel 9: Commit Card -->
+        <div class="card">
+          <h3 class="title">Panel 9 — Commit Card</h3>
+          <div class="grid cols-2">
+            <div>
+              <p><strong>Pilot Scope:</strong> 2 females, 6 straws, 1 reserve pair, 12 months.</p>
+              <ul class="checklist">
+                <li><input type="checkbox" checked disabled> ≥10% ROH reduction in offspring</li>
+                <li><input type="checkbox" checked disabled> ≥5 pp improvement in semen morphology (Yr‑2 males)</li>
+                <li><input type="checkbox" checked disabled> No new pathogen introductions</li>
+                <li><input type="checkbox" checked disabled> Permits & governance complete</li>
+              </ul>
+              <div class="row" style="margin-top:8px">
+                <input id="signer" placeholder="Your name" style="padding:10px;border-radius:10px;border:1px solid var(--line);background:#0a1118;color:var(--ink)"/>
+                <button class="btn primary" id="signBtn">Sign pilot</button>
+              </div>
+              <div id="signStatus" class="foot" style="margin-top:6px"></div>
+            </div>
+            <div>
+              <h4>Flow sketch</h4>
+              <ul class="checklist">
+                <li><strong>Inputs:</strong> SNP/ROH maps, kinship, semen/embryo QC, disease screens, permits</li>
+                <li><strong>Engine:</strong> Pairings ranked by <span class="kbd">heterozygosity gain × risk/cost</span></li>
+                <li><strong>Outputs:</strong> Season plan, cryobank pulls, live move schedule, predicted metrics</li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
 
-    <!-- END CARD / PROMPTS -->
-    <section class="card" style="margin-top:18px">
-      <div class="body endcard">
-        <h2>End Card</h2>
-        <p>Did this <em>feel like having feathers</em>? Where did your attention go?</p>
-        <p class="muted">This is a mocked, non‑physical prototype: numbers are prefills and sequences are scripted to test language, anticipation, and trust.</p>
+        <!-- Load‑Bearing Test -->
+        <div class="card">
+          <h3 class="title">Load‑Bearing Test — First Eyes</h3>
+          <p class="subtitle">Give this mock to: reserve managers (2), conservation geneticist, wildlife vet, cryobank lead, permitting liaison, biodiversity funder.</p>
+          <ol class="checklist" id="lbtTasks">
+            <li>Choose one <strong>red‑flag</strong> reserve and approve/reject the prefilled donor pairing. Why?</li>
+            <li>Toggle constraint <span class="kbd">no live moves</span> and choose among cryo options. Still viable?</li>
+            <li>Decide a 12‑month pilot scope using the Commit Card. Would you sign?</li>
+          </ol>
+          <textarea id="lbtNotes" rows="4" placeholder="Stakeholder notes…" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0b1219;color:var(--ink)"></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" id="saveNotes">Save notes</button>
+          </div>
+          <div id="notesSaved" class="foot"></div>
+        </div>
       </div>
     </section>
   </div>
 
   <script>
-    // ------------------------------
-    // MOCK DATA
-    // ------------------------------
-    const gusts = [
-      { azimuth: 30, intensity: 0.7, t0: 0 },   // front-right
-      { azimuth: 220, intensity: 0.5, t0: 4 },  // rear-left
-      { azimuth: 320, intensity: 0.9, t0: 8 }   // front-left-ish
+    // --- Mock Data ---
+    const reserves = [
+      { id: 'KE', name: 'Kalahari East', risk:'bad', F:0.31, roh10mb:28, semen:24, disease:'High', coords:[2,1] },
+      { id: 'SW', name: 'Serengeti West', risk:'warn', F:0.12, roh10mb:11, semen:39, disease:'Moderate', coords:[1,1] },
+      { id: 'NW', name: 'Namib West', risk:'warn', F:0.19, roh10mb:17, semen:31, disease:'Low', coords:[0,0] },
+      { id: 'SAZ', name: 'SAZ‑Zoo', risk:'ok', F:0.08, roh10mb:9, semen:48, disease:'Low', coords:[3,0] },
+      { id: 'RD', name: 'Reserve Delta', risk:'warn', F:0.18, roh10mb:16, semen:33, disease:'Moderate', coords:[0,3] },
+      { id: 'CE', name: 'Caprivi East', risk:'warn', F:0.20, roh10mb:18, semen:30, disease:'Low', coords:[2,0] },
+      { id: 'BW', name: 'Botswana Wild', risk:'ok', F:0.10, roh10mb:12, semen:41, disease:'Low', coords:[1,0] },
+      { id: 'SE', name: 'Savannah East', risk:'warn', F:0.16, roh10mb:15, semen:34, disease:'Moderate', coords:[3,1] },
+      { id: 'NE', name: 'Ngorongoro Edge', risk:'ok', F:0.11, roh10mb:13, semen:38, disease:'Low', coords:[2,2] },
+      { id: 'KV', name: 'Kavango', risk:'warn', F:0.21, roh10mb:20, semen:29, disease:'Moderate', coords:[1,3] },
+      { id: 'LW', name: 'Limpopo West', risk:'warn', F:0.17, roh10mb:15, semen:32, disease:'Low', coords:[2,3] },
+      { id: 'EZ', name: 'Etosha Z', risk:'ok', F:0.09, roh10mb:10, semen:43, disease:'Low', coords:[0,2] },
     ];
-    let systemOn = true;
 
-    // ------------------------------
-    // TORSO HAPTIC GRID (6×4)
-    // ------------------------------
-    const hapticEl = document.getElementById('haptics');
-    const HCOLS = 6, HROWS = 4;
-    const cells = [];
-    for(let r=0;r<HROWS;r++){
-      for(let c=0;c<HCOLS;c++){
-        const d=document.createElement('div');
-        d.className='cell';
-        hapticEl.appendChild(d);
-        cells.push(d);
+    const prefill = {
+      target: { id:'KE-F7', reserve:'Kalahari East', age:5, rohBurden:520, health:'cleared' },
+      donors: [
+        { id:'SW-M3', mode:'live or semen', kinship:0.03, hetGain:18, rohDrop:42, semenGain:'10–14', source:'Serengeti West' },
+        { id:'NW-M12', mode:'semen only', kinship:0.05, hetGain:14, rohDrop:30, semenGain:'—', source:'Namib West' },
+      ],
+      action: 'Import 6 semen straws from SW‑M3 for AI in KE‑F7 & KE‑F9; optional live male swap Q4 if permits clear.'
+    };
+
+    const cryobank = [
+      { label:'SW‑M3: 24 straws (2019, motility 65%)', value:'+ROH diversity; field‑proven', tags:['rare MHC?','QC good'] },
+      { label:'SAZ‑Zoo M5: 14 straws (ex situ, high MHC)', value:'Rare MHC haplotype', tags:['biosecurity: ex‑situ'] },
+      { label:'Namib F‑embryos: 3 vitrified blastocysts', value:'Embryo option for diversity', tags:['vitrified','pairing flexible'] },
+      { label:'BW‑M7: 10 straws (2021, motility 58%)', value:'OK QC', tags:['field collected'] },
+      { label:'KV‑M1: 6 straws (2018, motility 61%)', value:'Legacy line', tags:['quarantine strict'] },
+      { label:'NE‑M2: 8 straws (2022, motility 69%)', value:'High quality', tags:['screened 2024'] },
+    ];
+
+    // Status datasets for charts
+    const chartsData = {
+      statusQuo: {
+        roh: { labels:['Y0','Y1','Y2'], data:[27,25,23] },
+        ne: { labels:['Y0','Y1','Y2'], data:[35,38,40] },
+        semen: { labels:['Y0','Y1','Y2'], data:[24,27,29] },
+        disease: { labels:['Y0','Y1','Y2'], data:[3,3,3] }, // lower is better index
+        whatIf: [
+          'Cub survival 58%; two inbred matings flagged next year; Ne stagnates.',
+          'ROH trending down slowly; fertility marginal gains.',
+          'Biosecurity stable; minimal movement.'
+        ]
+      },
+      assisted: {
+        roh: { labels:['Y0','Y1','Y2'], data:[27,22,19] },
+        ne: { labels:['Y0','Y1','Y2'], data:[35,48,58] },
+        semen: { labels:['Y0','Y1','Y2'], data:[24,31,36] },
+        disease: { labels:['Y0','Y1','Y2'], data:[3,3,2] },
+        whatIf: [
+          'Cub survival 64% (+6 pp); two high‑value outcrosses replace inbred matings.',
+          'Mean ROH>10Mb drops 27→19 in KE by Year 2; Ne rises 35→58 across connected reserves.',
+          'Disease risk stable/improved due to screening + staggered moves.'
+        ]
       }
-    }
-    function clearHaptics(){ cells.forEach(c=>c.classList.remove('on')); }
-    function lightHapticsFromAzimuth(az, intensity){
-      // Map azimuth (deg, 0 = forward) to a diagonal on the grid; crude but illustrative.
-      // 0° -> top center; 90° -> right mid; 180° -> bottom center; 270° -> left mid
-      const rad = az * Math.PI/180;
-      const vx = Math.cos(rad), vy = Math.sin(rad);
-      // normalized to [0,1]
-      const cx = Math.round((vx*0.5+0.5)*(HCOLS-1));
-      const ry = Math.round((vy*0.5+0.5)*(HROWS-1));
-      clearHaptics();
-      const idx = ry*HCOLS + cx;
-      const neigh = [idx, idx-1, idx+1, idx-HCOLS, idx+HCOLS].filter(i=>i>=0 && i<cells.length);
-      neigh.forEach((i,k)=>{
-        if(!cells[i]) return;
-        cells[i].classList.add('on');
-        const scale = 1 + (intensity * (k===0?0.35:0.15));
-        cells[i].style.transform = `scale(${scale})`;
-      });
-    }
+    };
 
-    // ------------------------------
-    // ACTUATION BARS
-    // ------------------------------
-    function setBar(id, value){
-      // value in degrees; negative allowed; map to ±100% from center
-      const el = document.getElementById(id);
-      const clamped = Math.max(-6, Math.min(6, value));
-      const sign = clamped >= 0 ? 1 : -1;
-      const mag = Math.abs(clamped)/6 * 50; // 50% max from center
-      el.style.left = sign===-1? `${50 - mag}%` : '50%';
-      el.style.width = `${mag}%`;
-      el.classList.toggle('neg', sign===-1);
+    // --- UI Builders ---
+    const mapEl = document.getElementById('map');
+    const tip = document.getElementById('mapTip');
+    const stripesEl = document.getElementById('stripes');
+    const targetEl = document.getElementById('targetFemale');
+    const donorsEl = document.getElementById('donorList');
+    const actionEl = document.getElementById('suggestedAction');
+    const noLiveMovesEl = document.getElementById('noLiveMoves');
+
+    function riskDot(r){ return `<span class="dot ${r}"></span>` }
+
+    function makeReserveCard(r){
+      const btn = document.createElement('button');
+      btn.className = 'reserve-btn';
+      btn.innerHTML = `
+        <div class="row" style="justify-content:space-between;width:100%">
+          <strong>${r.name}</strong>
+          ${riskDot(r.risk)}
+        </div>
+        <div class="mini muted">F=${r.F.toFixed(2)} · ROH>10Mb=${r.roh10mb} · semen norm=${r.semen}%</div>`;
+      btn.addEventListener('mousemove', (e)=> showTip(e,r));
+      btn.addEventListener('mouseleave', hideTip);
+      btn.addEventListener('click', ()=> selectReserve(r));
+      return btn;
     }
 
-    // ------------------------------
-    // WING & LIFT CANVASES
-    // ------------------------------
-    const wing = document.getElementById('wing');
-    const lift = document.getElementById('lift');
+    function showTip(e,r){
+      tip.style.display = 'block';
+      tip.style.left = (e.pageX + 12) + 'px';
+      tip.style.top = (e.pageY + 12) + 'px';
+      // find a nearby donor example
+      const donor = reserves.find(x=> x.id==='SW');
+      tip.innerHTML = `<strong>${r.name}</strong><br>
+        Inbreeding Risk: ${r.risk.toUpperCase()}<br>
+        <div class="mini">F=${r.F.toFixed(2)}, mean ROH>10Mb=${r.roh10mb} tracts/indiv,<br> semen normal morphology=${r.semen}%, disease index=${r.disease}</div>
+        <hr style="border-color:#203046">
+        <div class="mini">Nearby donor candidate — <strong>${donor.name}</strong>: F=${donor.F.toFixed(2)}, ROH>10Mb=${donor.roh10mb}, semen=${donor.semen}%, disease=${donor.disease}</div>`
+    }
+    function hideTip(){ tip.style.display='none' }
 
-    function fitCanvas(c){
-      const dpr = window.devicePixelRatio||1; const r=c.getBoundingClientRect();
-      c.width = Math.max(320, Math.floor(r.width*dpr));
-      c.height = Math.max(200, Math.floor(r.height*dpr));
-      return c.getContext('2d');
+    function selectReserve(r){
+      // Prefill matchmaker with KE target regardless, but visually highlight selection
+      document.querySelectorAll('.reserve-btn').forEach(b=> b.style.outline='none');
+      event.currentTarget.style.outline = '2px solid #2b88ff';
     }
 
-    function drawWing(gust){
-      const ctx = fitCanvas(wing);
-      const {width:w,height:h} = wing;
-      ctx.clearRect(0,0,w,h);
-      // wing outline
-      ctx.strokeStyle = '#3b4270'; ctx.lineWidth = 2; ctx.beginPath();
-      ctx.ellipse(w*0.5,h*0.55,w*0.42,h*0.18,0,0,Math.PI*2); ctx.stroke();
-      // feather icons (tiny ticks along leading edge)
-      for(let i=0;i<22;i++){
-        const t=i/21; const x=w*0.1 + t*w*0.8; const y=h*0.45 - Math.sin(t*Math.PI)*h*0.08;
-        ctx.strokeStyle='#2f3560'; ctx.lineWidth=1.5; ctx.beginPath();
-        ctx.moveTo(x,y); ctx.lineTo(x,y-6); ctx.stroke();
-      }
-      if(gust){
-        // shear line
-        ctx.strokeStyle = 'rgba(125,211,252,0.9)'; ctx.lineWidth = 3; ctx.beginPath();
-        const a = (gust.azimuth-90) * Math.PI/180; // map azimuth to screen angle
-        const cx=w*0.55, cy=h*0.45; const L=Math.min(w,h)*0.5;
-        ctx.moveTo(cx-Math.cos(a)*L, cy-Math.sin(a)*L);
-        ctx.lineTo(cx+Math.cos(a)*L, cy+Math.sin(a)*L); ctx.stroke();
-        // highlight a few feathers near intersection
-        ctx.fillStyle='rgba(125,211,252,0.25)';
-        for(let k=-2;k<=2;k++){
-          const x=cx+Math.cos(a)*k*20; const y=cy+Math.sin(a)*k*12;
-          ctx.beginPath(); ctx.arc(x,y,7+gust.intensity*4,0,Math.PI*2); ctx.fill();
+    function renderMap(){
+      mapEl.innerHTML = '';
+      reserves.forEach(r=> mapEl.appendChild(makeReserveCard(r)));
+    }
+
+    function renderStripes(){
+      const makeRow = (risk)=>{
+        const n = 10; const row = document.createElement('div'); row.style.margin='6px 0 14px';
+        const barcode = document.createElement('div'); barcode.className='barcode';
+        // risk influences average stripe length
+        const base = risk==='bad'? 12 : risk==='warn'? 8 : 4;
+        for(let i=0;i<n;i++){
+          const s = document.createElement('div'); s.className='stripe';
+          s.style.width = (base + Math.floor(Math.random()*8)) + 'px';
+          s.style.opacity = risk==='bad'? 0.95 : risk==='warn'? 0.75 : 0.55;
+          barcode.appendChild(s);
         }
+        row.appendChild(barcode);
+        const icons = document.createElement('div'); icons.className='mini muted'; icons.textContent = 'S: ' + (risk==='bad'?'red':'amber') + '  ·  P: ' + (risk==='bad'?'hold':'tick');
+        row.appendChild(icons);
+        return row;
       }
+      stripesEl.innerHTML='';
+      reserves.forEach(r=>{
+        const box = document.createElement('div');
+        box.style.border='1px solid var(--line)'; box.style.borderRadius='12px'; box.style.padding='10px'; box.style.margin='6px 0';
+        const head = document.createElement('div'); head.className='row'; head.style.justifyContent='space-between';
+        head.innerHTML = `<strong>${r.name}</strong> <span class="mini muted">ROH patterns</span>`;
+        box.appendChild(head);
+        // two barcode rows per reserve
+        box.appendChild(makeRow(r.risk));
+        box.appendChild(makeRow(r.risk));
+        stripesEl.appendChild(box);
+      })
     }
 
-    function drawLift(traces){
-      const ctx = fitCanvas(lift); const {width:w,height:h}=lift; ctx.clearRect(0,0,w,h);
-      // axes
-      ctx.strokeStyle='#2a2e4a'; ctx.lineWidth=1; ctx.beginPath(); ctx.rect(40,20,w-60,h-40); ctx.stroke();
-      // helper to plot
-      function plot(data,color){
-        ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=2;
-        data.forEach((y,i)=>{
-          const xpx = 40 + i/(data.length-1)*(w-60);
-          const ypx = 20 + (1-y)*(h-40);
-          if(i===0) ctx.moveTo(xpx,ypx); else ctx.lineTo(xpx,ypx);
-        }); ctx.stroke();
-      }
-      plot(traces.off,'#f87171'); // OFF (buffet)
-      plot(traces.on,'#34d399');  // ON (smooth)
+    function renderMatchmaker(){
+      targetEl.innerHTML = `<div><strong>${prefill.target.id}</strong> — ${prefill.target.reserve}, age ${prefill.target.age}<br>ROH burden: ${prefill.target.rohBurden} Mb; health: ${prefill.target.health}</div>`;
+      donorsEl.innerHTML='';
+      prefill.donors.forEach(d=>{
+        const div = document.createElement('div'); div.className='milestone';
+        div.innerHTML = `<strong>${d.id}</strong> (${d.mode}) — from ${d.source}<br>
+          kinship=${d.kinship.toFixed(2)}, predicted offspring het +${d.hetGain}%, ROH>10Mb −${d.rohDrop}%<br>
+          predicted semen morphology in male offspring ${d.semenGain} pp`;
+        donorsEl.appendChild(div);
+      })
+      updateSuggestedAction();
     }
 
-    function synthLiftTraces(gust){
-      // build short traces 0..1 normalized; ON smoother than OFF
-      const n=120; const on=new Array(n).fill(0).map((_,i)=>0.75+0.02*Math.sin(i/7));
-      const off=new Array(n).fill(0).map((_,i)=>0.75+0.06*Math.sin(i/5));
-      // inject a disturbance at index around gust arrival (center)
-      const hit = Math.floor(n*0.55);
-      for(let k=-12;k<=24;k++){
-        const i=hit+k; if(i<0||i>=n) continue;
-        const spike = gust.intensity * (k<0? 0.02*(12+k)/12 : 0.05*Math.exp(-k/12));
-        off[i] -= spike; on[i] -= spike*0.35; // ON attenuates buffet
-      }
-      return {on, off};
+    function updateSuggestedAction(){
+      const noLive = noLiveMovesEl.checked;
+      const actionText = noLive ?
+        'Import 6 semen straws from SW‑M3 for AI in KE‑F7 & KE‑F9. Live swap disabled due to constraint.' :
+        prefill.action;
+      actionEl.textContent = actionText;
     }
 
-    // ------------------------------
-    // SYSTEM TOGGLE
-    // ------------------------------
-    const toggle = document.getElementById('toggle');
-    toggle.addEventListener('click',()=>{
-      systemOn = !systemOn;
-      toggle.classList.toggle('on', systemOn);
-      toggle.setAttribute('aria-pressed', String(systemOn));
-      toggle.querySelector('span:nth-child(2)').innerHTML = `<strong>System</strong> ${systemOn? 'ON':'OFF'}`;
+    // Timeline
+    const timeline = [
+      { q:'Q1', steps:['Sampling refresh (10 animals/reserve)','Permit applications','Semen collection scheduling'] },
+      { q:'Q2', steps:['Quarantine & disease screens','AI for KE‑F7, KE‑F9','Optional embryo placement @ Reserve Delta'] },
+      { q:'Q3–Q4', steps:['Cub monitoring','Contingency swap SW → KE'] },
+      { q:'Q5–Q6', steps:['Metrics readout','Adjust plan for Year‑2'] },
+    ];
+    function renderTimeline(){
+      const host = document.getElementById('timeline'); host.innerHTML='';
+      timeline.forEach(t=>{
+        const d = document.createElement('div'); d.className='milestone';
+        d.innerHTML = `<strong>${t.q}</strong><ul class="mini muted">${t.steps.map(s=>`<li>${s}</li>`).join('')}</ul>`;
+        host.appendChild(d);
+      })
+    }
+
+    // Charts
+    let cROH, cNe, cSemen, cDisease;
+    function makeChart(ctx, label, labels, data){
+      return new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets:[{ label, data, borderWidth:2, tension:0.25, pointRadius:3 }] },
+        options:{
+          responsive:true,
+          plugins:{ legend:{ display:false } },
+          scales:{
+            x:{ grid:{ color:'#1b2736' }, ticks:{ color:'#7fa0bd' } },
+            y:{ grid:{ color:'#1b2736' }, ticks:{ color:'#7fa0bd' } }
+          }
+        }
+      })
+    }
+
+    function renderCharts(dataset){
+      const d = chartsData[dataset];
+      if(cROH) { cROH.destroy(); cNe.destroy(); cSemen.destroy(); cDisease.destroy(); }
+      cROH = makeChart(document.getElementById('chartROH'), 'ROH>10Mb', d.roh.labels, d.roh.data);
+      cNe = makeChart(document.getElementById('chartNe'), 'Effective population size (Ne)', d.ne.labels, d.ne.data);
+      cSemen = makeChart(document.getElementById('chartSemen'), 'Semen morphology %', d.semen.labels, d.semen.data);
+      cDisease = makeChart(document.getElementById('chartDisease'), 'Disease vulnerability index', d.disease.labels, d.disease.data);
+      document.getElementById('chartFoot').textContent = dataset==='statusQuo'? 'Status quo projections.' : 'Assisted gene flow scenario projections.';
+    }
+
+    // What‑If list
+    function renderWhatIf(dataset){
+      const ul = document.getElementById('whatIfList'); ul.innerHTML='';
+      chartsData[dataset].whatIf.forEach(item=>{
+        const li = document.createElement('li'); li.textContent = item; ul.appendChild(li);
+      })
+    }
+
+    // Sign & Notes
+    document.getElementById('signBtn').addEventListener('click', ()=>{
+      const name = (document.getElementById('signer').value||'').trim();
+      const el = document.getElementById('signStatus');
+      if(!name){ el.textContent = 'Please enter your name to sign.'; return; }
+      el.textContent = `Signed by ${name} — committing to 2 females, 6 straws, 12 months.`;
+    });
+    document.getElementById('saveNotes').addEventListener('click', ()=>{
+      const txt = (document.getElementById('lbtNotes').value||'').trim();
+      if(!txt){ document.getElementById('notesSaved').textContent = 'No notes to save.'; return; }
+      localStorage.setItem('cheetah_notes', txt);
+      document.getElementById('notesSaved').textContent = 'Notes saved locally in your browser.';
     });
 
-    // ------------------------------
-    // ANIMATIC (mock sequence ~10s; the 90s button loops sequences)
-    // ------------------------------
-    const btnPlay = document.getElementById('play');
-    const btnPeek = document.getElementById('peek');
-    const btnReplay = document.getElementById('replay');
+    // Approve / Reject pairing (simple log)
+    document.getElementById('approveBtn').addEventListener('click', ()=>{
+      alert('Pairing approved. Proceed with cryo pull + AI scheduling.');
+    });
+    document.getElementById('rejectBtn').addEventListener('click', ()=>{
+      alert('Pairing rejected. Consider donor NW‑M12 or adjust constraints.');
+    });
 
-    function runSequence(){
-      let t=0; // seconds since start (mock)
-      gusts.forEach((g,idx)=>{
-        const at = g.t0; // schedule
-        // pre-cue at -0.12s
-        setTimeout(()=>{ if(systemOn){ lightHapticsFromAzimuth(g.azimuth, g.intensity); setBar('barTwistR', +g.intensity*4); setBar('barCamberL', -g.intensity*3); } drawWing(g); }, (at*1000));
-        // lift traces at 0s
-        setTimeout(()=>{ drawLift(synthLiftTraces(g)); if(!systemOn){ clearHaptics(); setBar('barTwistR',0); setBar('barCamberL',0);} }, (at*1000)+400);
-        // settle after
-        setTimeout(()=>{ clearHaptics(); setBar('barTwistR',0); setBar('barCamberL',0); }, (at*1000)+1500);
-      });
+    // Toggles and buttons
+    noLiveMovesEl.addEventListener('change', updateSuggestedAction);
+    const whatIf = document.getElementById('whatIf');
+    const scenarioToggle = document.getElementById('scenarioToggle');
+    function applyScenario(){
+      const assisted = whatIf.checked || scenarioToggle.checked;
+      const ds = assisted? 'assisted' : 'statusQuo';
+      document.getElementById('whatIfLabel').textContent = assisted? 'Assisted gene flow' : 'Status quo';
+      renderCharts(ds); renderWhatIf(ds);
+    }
+    whatIf.addEventListener('change', applyScenario);
+    scenarioToggle.addEventListener('change', applyScenario);
+
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      whatIf.checked=false; scenarioToggle.checked=false; noLiveMovesEl.checked=false; applyScenario(); updateSuggestedAction();
+      document.getElementById('signer').value=''; document.getElementById('signStatus').textContent='';
+    })
+
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      const payload = {
+        target: prefill.target,
+        donors: prefill.donors,
+        constraints: { noLiveMoves: noLiveMovesEl.checked },
+        action: actionEl.textContent,
+        scenario: (whatIf.checked||scenarioToggle.checked)? 'assisted':'statusQuo',
+        notes: localStorage.getItem('cheetah_notes')||''
+      };
+      const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='cheetah_mock_plan.json'; a.click(); URL.revokeObjectURL(url);
+    })
+
+    // Cryobank grid
+    function renderCryobank(){
+      const host = document.getElementById('cryo'); host.innerHTML='';
+      cryobank.forEach(item=>{
+        const c = document.createElement('div'); c.className='milestone';
+        c.innerHTML = `<strong>${item.label}</strong><div class="mini muted">Genetic value: ${item.value}</div><div class="row" style="margin-top:6px">${item.tags.map(t=>`<span class='tag'>${t}</span>`).join('')}</div>`;
+        host.appendChild(c);
+      })
     }
 
-    btnPlay.addEventListener('click',()=>{
-      // loop 9 cycles to roughly suggest 90s without real timing precision
-      let loops=0; runSequence();
-      const id = setInterval(()=>{ runSequence(); if(++loops>=8) clearInterval(id); }, 11000);
-    });
-
-    btnReplay.addEventListener('click',()=>{ runSequence(); });
-
-    btnPeek.addEventListener('click',()=>{
-      // Freeze a representative state at t = −80 ms before gust #1
-      const g = gusts[0]; drawWing(g); lightHapticsFromAzimuth(g.azimuth, g.intensity*0.85);
-      setBar('barTwistR', +g.intensity*3.5); setBar('barCamberL', -g.intensity*2.5);
-    });
-
-    // initial paint
-    drawWing(null); drawLift(synthLiftTraces({azimuth:45,intensity:.6}));
+    // Init
+    renderMap();
+    renderStripes();
+    renderMatchmaker();
+    renderTimeline();
+    renderCryobank();
+    renderCharts('statusQuo');
+    renderWhatIf('statusQuo');
   </script>
 </body>
 </html>
