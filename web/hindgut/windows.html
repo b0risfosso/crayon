@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Windows of Irreversibility — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Windows of Irreversibility — Symmetry‑Breaking Rotation / Seed</h1>
+    <div class="meta">Problem → Unknown if transient heating/cooling leaves lasting chirality bias • Objective → Quantify depth & duration of chirality memory after brief thermal biases • Link → Double‑pulse protocols + path dependence fits to non‑Markovian memory kernels</div>
+    <p class="thesis">Core intent: A brief thermal bias may leave a dose‑ and time‑limited memory of chirality such that outcomes depend on history, with a finite window beyond which a counter‑pulse cannot reverse the twist.</p>
+  </header>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Frame 1 — Title & Prompt</h3>
+      <p class="muted">Cartoon embryo with rotation needle (↺/↻). Subtitle: “Does a short heat/cool pulse leave lasting chirality?”</p>
+      <div class="placeholder">[Embryo + rotation needle]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel A — Protocol Composer</h3>
+      <p class="muted">Three pre‑scripted double‑pulse timelines per row (heat ↗ red; cool ↘ blue; recovery gray). Rows: short, medium, long recovery. Labels: Pulse 1 (ΔT, duration), Recovery (Δt), Pulse 2 (opposite sign), developmental stage marker.</p>
+      <div class="placeholder">[Double‑pulse timelines with stage markers]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel B — Outcome Cards (Archetypes)</h3>
+      <ul class="list-compact">
+        <li><strong>Reversible</strong>: counter‑pulse always flips outcome; no memory.</li>
+        <li><strong>Soft Memory</strong>: flip probability decays with recovery; partial hysteresis.</li>
+        <li><strong>Locking</strong>: sharp boundary beyond which flips fail; irreversible after window.</li>
+      </ul>
+      <div class="placeholder">[Three columns: rotation vs time traces + final sign + confidence stamp]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel C — Path‑Dependence Map</h3>
+      <p class="muted">Heatmap: X = recovery interval; Y = first‑pulse magnitude; color = P(clockwise). Overlays: flat band (reversible), graded slope (soft memory), wedge with cliff (locking). Dashed line marks putative irreversibility boundary.</p>
+      <div class="placeholder">[Heatmap + overlays + dashed boundary]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel D — Memory Kernel Fit Explorer</h3>
+      <p class="muted">Overlay soft‑memory trace with kernels: exponential, stretched‑exp, power‑law (aging), step+plateau (locking). Residual strips illustrate visual goodness; no numbers.</p>
+      <div class="placeholder">[Kernel overlays + residuals strip]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel E — State Machine Sketch</h3>
+      <p class="muted">States: Uncommitted → Soft‑Biased → Locked. Arrows: bias pulse drives Uncommitted→Soft‑Biased; decay loop; crossing bias×time threshold during recovery causes Soft‑Biased→Locked. Counter‑pulse resets before lock; fails after lock. Clock icon shows closing window.</p>
+      <div class="placeholder">[Three‑state diagram + arrows + clock]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel F — What‑If Narrative Sliders</h3>
+      <ul class="list-compact">
+        <li>Increase recovery → reversible: always flips; soft: flip chance ↓; locking: crosses cliff.</li>
+        <li>Weaken counter‑pulse → reversible: still flips; soft: depends on ΔT×t; locking: no effect post‑lock.</li>
+        <li>Move earlier in development → expands window (soft); no effect if instant locking.</li>
+      </ul>
+      <div class="placeholder">[Label‑only sliders + short captions]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel G — Readout Feasibility Notes</h3>
+      <ul class="list-compact">
+        <li>Rotation angle over time; onset time variability</li>
+        <li>Embryo viability at temps; ramp rates</li>
+        <li>Sample size hints; imaging cadence needs</li>
+      </ul>
+      <div class="placeholder">[Checklist icons]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>User Flow</h2>
+    <p class="muted">Start with Panel A (protocols) → compare Panel B outcomes across archetypes → inspect Panel C heatmap for hysteresis → glance Panel D for kernel intuition → use Panel E state machine to explain → leave with a recovery sweep proposal.</p>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <p class="muted">Single‑page mock with three protocols, path‑dependence heatmap, kernel overlays. Prompt: “If memoryless, curves collapse; do they in your gut? Where would you place the counter‑pulse to flip the sign?”</p>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Hindgut chirality biophysicist (supportive)</li>
+      <li>Drosophila embryologist (skeptical)</li>
+      <li>Active‑matter modeler (peer)</li>
+      <li>Imaging lead (practical)</li>
+      <li>Instrumentation engineer (feasibility)</li>
+      <li>Biostatistician (design & model comparison)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Was the memory vs reversibility distinction clear?</li>
+          <li>Did the heatmap make the window boundary legible?</li>
+          <li>Would you run the recovery sweep as proposed?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer identifies a recovery threshold (cliff) or graded decay (slope)</li>
+          <li>Viewer maps outcome to state machine transitions</li>
+          <li>Viewer suggests concrete pulse parameters (ΔT, durations, cadence)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% select 4–5 on “window boundary is identifiable”</li>
+          <li>≥60% propose parameter sweep without prompting</li>
+          <li>≥50% articulate an out‑of‑sample prediction (earlier stage shift)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (✓ match, ? uncertain) to focus discussion, not to claim proof.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Short Recovery Double‑Pulse</h3>
+        <p><strong>Predicted:</strong> Counter‑pulse flips sign for reversible/soft; fails for locking.</p>
+        <p><strong>Reported:</strong> ? Limited hindgut double‑pulse data; ✓ analogous hysteresis in other embryonic systems.</p>
+      </div>
+      <div class="card">
+        <h3>Long Recovery Double‑Pulse</h3>
+        <p><strong>Predicted:</strong> Flip probability decays (soft) or vanishes beyond window (locking).</p>
+        <p><strong>Reported:</strong> ? Sparse; ✓ qualitative memory reported under thermal shocks in some tissues.</p>
+      </div>
+      <div class="card">
+        <h3>Early‑Stage Pulses</h3>
+        <p><strong>Predicted:</strong> Reversibility window expands for soft memory; unchanged for instant locking.</p>
+        <p><strong>Reported:</strong> ? Timing dependence underexplored; ✓ stage‑sensitive responses in development generally observed.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: mocked timelines, archetype outcomes, and sketched kernels—no data or fitting. Disposable: redraw quickly if the state‑machine or protocol logic doesn’t land. Growth‑inviting: plug in pilot data, refine kernels, add stage dependence, or extend to triple‑pulse/ramp protocols; forces agreement on what counts as a “locking window.”</p>
+  </section>
+</body>
+</html>

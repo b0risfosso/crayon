@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chirality-to-Rotation Pipeline — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Chirality‑to‑Rotation Pipeline — Hindgut Mechanisms / Seed</h1>
+    <div class="meta">Problem → Role of visceral muscle in converting epithelial chirality to organ twist is unresolved • Objective → Determine whether muscle transmits, amplifies, or damps chirality and quantify coupling • Link → Two‑layer torque‑balance with interfacial friction; layer‑specific perturbations and fits</div>
+    <p class="thesis">Core intent: A minimal two‑layer torque‑balance with interfacial friction can explain how epithelial chirality yields whole‑organ rotation; the visceral muscle may transmit, amplify, or damp that chirality. We estimate the coupling’s sign and strength by comparing responses to muscle torque vs epithelial chirality flips.</p>
+  </header>
+
+  <section>
+    <h2>Chirality‑to‑Rotation Mapper (Storyboard)</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Center Graphic</h3>
+        <p class="muted">Two concentric bands: inner = epithelium, outer = visceral muscle. Arrows along bands show angular flow; central dial indicates net rotation Ω.</p>
+        <div class="placeholder">[Two rings + arrows + central Ω dial]</div>
+      </div>
+      <div class="card">
+        <h3>Left Controls (labels; prefilled)</h3>
+        <ul class="list-compact">
+          <li>Epithelial chirality source <em>C<sub>e</sub></em> (±)</li>
+          <li>Muscle active torque <em>T<sub>m</sub></em> (±)</li>
+          <li>Interfacial friction <em>γ</em> (slip coupling)</li>
+          <li>Rotational stiffnesses <em>S<sub>e</sub></em>, <em>S<sub>m</sub></em></li>
+          <li>Boundary: Ends free vs one end pinned</li>
+        </ul>
+        <div class="placeholder">[Knobs & toggles (labels only)]</div>
+      </div>
+      <div class="card">
+        <h3>Right Readouts</h3>
+        <ul class="list-compact">
+          <li>Predicted flows: ω<sub>e</sub>, ω<sub>m</sub>, slip s = ω<sub>e</sub> − ω<sub>m</sub></li>
+          <li>Net organ rotation Ω (direction & magnitude)</li>
+          <li>Inferred coupling J<sub>me</sub> (sign & magnitude)</li>
+          <li>Role: Transmitter / Amplifier / Damper / Decoupled</li>
+          <li>Prediction banner: “If apply X to layer Y → expect Z.”</li>
+        </ul>
+        <div class="placeholder">[Readout tiles]</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pre‑Scripted Scenes</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>1) Baseline Transmitter</h3>
+        <ul class="list-compact">
+          <li>C<sub>e</sub>=+1.5, T<sub>m</sub>=0, γ=medium, S<sub>e</sub>=S<sub>m</sub>=medium, ends free</li>
+          <li>ω<sub>e</sub>≈+0.7, ω<sub>m</sub>≈+0.6, s small; Ω=+0.6; J<sub>me</sub>>0; Role=Transmitter</li>
+          <li>Prediction: small +T<sub>m</sub> ↑Ω linearly; −T<sub>m</sub> ↓Ω</li>
+        </ul>
+        <div class="placeholder">[Co‑rotation; small slip]</div>
+      </div>
+      <div class="card">
+        <h3>2) Low‑Friction Slippage</h3>
+        <ul class="list-compact">
+          <li>C<sub>e</sub> as above; γ→low → ω<sub>e</sub>≫ω<sub>m</sub>; Ω≈+0.1</li>
+          <li>J<sub>me</sub>≈0; Role=Decoupled (damped by slippage)</li>
+          <li>Prediction: muscle torque has little influence unless γ increases</li>
+        </ul>
+        <div class="placeholder">[Inner swirls; outer near‑static]</div>
+      </div>
+      <div class="card">
+        <h3>3) Muscle as Damper</h3>
+        <ul class="list-compact">
+          <li>C<sub>e</sub>=+1.5; T<sub>m</sub>=−0.8; γ=medium → Ω≈+0.2</li>
+          <li>ω<sub>e</sub> reduced; ω<sub>m</sub><0; J<sub>me</sub><0; Role=Damper</li>
+          <li>Prediction: |T<sub>m</sub>| threshold reverses Ω; locate reversal to pin J<sub>me</sub></li>
+        </ul>
+        <div class="placeholder">[Opposing arrows; partial cancellation]</div>
+      </div>
+      <div class="card">
+        <h3>4) Muscle as Amplifier</h3>
+        <ul class="list-compact">
+          <li>C<sub>e</sub>=+1.5; T<sub>m</sub>=+0.8; γ=medium → Ω≈+1.0</li>
+          <li>ω<sub>e</sub>, ω<sub>m</sub> both high; s small; J<sub>me</sub>>0 strong; Role=Amplifier</li>
+          <li>Prediction: superlinear Ω vs C<sub>e</sub> with +T<sub>m</sub></li>
+        </ul>
+        <div class="placeholder">[Aligned long arrows]</div>
+      </div>
+      <div class="card">
+        <h3>5) Mosaic MyoID Flips</h3>
+        <ul class="list-compact">
+          <li>Clone fraction p=0.4 (right‑biased) → C<sub>e,eff</sub>=+0.7; T<sub>m</sub>=0; γ=medium; ends pinned</li>
+          <li>ω<sub>e</sub> heterogeneous; ω<sub>m</sub> low; position‑dependent slip; Ω small +</li>
+          <li>Prediction: if p>0.5 left‑biased, Ω flips sign unless +T<sub>m</sub> offsets</li>
+        </ul>
+        <div class="placeholder">[Shear patches; weak co‑rotation]</div>
+      </div>
+      <div class="card">
+        <h3>6) Wrap Compromised</h3>
+        <ul class="list-compact">
+          <li>S<sub>m</sub>→0; γ→low; C<sub>e</sub>=+1.5 → ω<sub>e</sub>>0, ω<sub>m</sub>≈0; Ω≈0</li>
+          <li>J<sub>me</sub>≈0; Role=No transmission</li>
+          <li>Prediction: strong epithelial chirality with near‑zero Ω flags missing coupling</li>
+        </ul>
+        <div class="placeholder">[Outer ring faded; Ω ~ 0]</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Fit Card & Experiment Picker</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Fit Card</h3>
+        <p class="muted">Example readouts per scene: J<sub>me</sub>=+0.45 (transmitter) | +0.90 (amplifier) | −0.35 (damper).</p>
+        <p class="muted">One‑step recipe: measure ω<sub>e</sub>, ω<sub>m</sub>, Ω; compute slip; locate on sign/magnitude map; choose ±T<sub>m</sub> or adjust clone fraction p to break degeneracies.</p>
+        <div class="placeholder">[Jme bar + sign map]</div>
+      </div>
+      <div class="card">
+        <h3>Experiment Picker</h3>
+        <ul class="list-compact">
+          <li>Transmitter vs Damper ambiguous? Apply small +T<sub>m</sub>: Ω ↑ → J<sub>me</sub>≥0; Ω ↓ → J<sub>me</sub><0.</li>
+          <li>Suspect slippage? Increase γ (adhesion). Prediction: Ω rises sharply only if coupling limits.</li>
+          <li>Geometry? Toggle end pinned: anchoring converts shear→rotation; banner updates.</li>
+        </ul>
+        <div class="placeholder">[Decision flow chips]</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <p class="muted">Walk Scenes 1–4; ask first eyes to match WT/perturbation movies to a role. Show Scene 5 (mosaic) if clone data exist; Scene 6 for wrap‑loss. Use the recipe and experiment picker to pick a decisive next perturbation.</p>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Fly gut morphogenesis labs with hindgut rotation movies</li>
+      <li>Visceral muscle mechanics skeptics</li>
+      <li>Torque‑balance/tissue rheology modelers</li>
+      <li>Postdocs who did MyoID mosaics or magnetogenetic muscle actuation</li>
+      <li>Imaging/analysis peers who can separate epithelial vs muscle motion</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did the two‑layer torque story fit your data?</li>
+          <li>Was slip (ω<sub>e</sub>−ω<sub>m</sub>) legible and useful?</li>
+          <li>Would you run ±T<sub>m</sub> or clone‑fraction sweeps?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer can classify role from a single movie pair (±T<sub>m</sub>)</li>
+          <li>Viewer names a threshold prediction (Ω reversal point)</li>
+          <li>Viewer describes how to estimate ω<sub>e</sub> vs ω<sub>m</sub></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% choose 4–5 on “coupling picture persuasive”</li>
+          <li>≥60% propose a decisive perturbation next step</li>
+          <li>≥50% adopt slip as a routine readout</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (icons: ✓ match, ? uncertain) to guide discussion.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Opposite‑Sign Muscle Torque</h3>
+        <p><strong>Predicted:</strong> Ω decreases; crosses zero at |T<sub>m</sub>| threshold if Damper.</p>
+        <p><strong>Reported:</strong> ? Limited hindgut actuation data; ✓ antagonist muscle effects shown in related systems.</p>
+      </div>
+      <div class="card">
+        <h3>Wrap Loss / Muscle Ablation</h3>
+        <p><strong>Predicted:</strong> ω<sub>e</sub>>0 with Ω≈0; large slip; Role=No transmission.</p>
+        <p><strong>Reported:</strong> ✓ Near‑zero rotation under wrap loss reported in some studies; ? epithelial flow quantification sparse.</p>
+      </div>
+      <div class="card">
+        <h3>Mosaic MyoID Flips</h3>
+        <p><strong>Predicted:</strong> Sign flip of Ω near p≈0.5 unless +T<sub>m</sub> offsets; slip gradient visible.</p>
+        <p><strong>Reported:</strong> ✓ Mosaic‑dependent rotation biases; ? precise p‑thresholds in hindgut.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: two rings + three knobs (C<sub>e</sub>, T<sub>m</sub>, γ) and Ω readout—no solver or data pipeline. Disposable: toss if the two‑layer framing or frictional coupling doesn’t land. Growth‑inviting: add anisotropy, spatial heterogeneity, end anchoring, viscoelasticity, or 3D geometry; replace scenes with fitted data; upgrade classifier to likelihood bands.</p>
+  </section>
+</body>
+</html>
