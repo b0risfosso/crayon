@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rate, Time, and Morphogenetic Trajectories — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Rate, Time, and Morphogenetic Trajectories — Hindgut / Seed</h1>
+    <div class="meta">Problem → Arrhenius scaling breaks near stress‑response thresholds, masking impending failures • Objective → Add non‑Arrhenius gates to forecast safe windows & collapses • Link → Piecewise kinetics with stress‑gated modules (Hsp70, myosin processivity) introduces diagnostic kinks</div>
+    <p class="thesis">Core intent: Stress‑gated kinetics create predictable kinks in rate–temperature and phase‑plane plots that reveal safe thermal windows and warn of imminent morphogenetic rate collapse.</p>
+  </header>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Panel 1 — Baseline vs Gated Rate–Temperature</h3>
+      <ul class="list-compact">
+        <li>Plot: rate (y) vs temperature (x). Dashed Arrhenius baseline; data dots deviate near <span class="badge">T_low≈15°C</span> and <span class="badge">T_hsp≈31–33°C</span>.</li>
+        <li>Movable gate markers: <em>T_low</em> (motor duty/viscosity) and <em>T_hsp</em> (Hsp70 activation).</li>
+        <li>Crossing a gate changes active slope → kink appears.</li>
+      </ul>
+      <div class="placeholder">[Rate–temperature curve with two vertical gates & kinks]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 2 — Phase Plane with Piecewise Nullclines</h3>
+      <ul class="list-compact">
+        <li>Axes: Tension T (x) vs flow/constriction rate v (y).</li>
+        <li>Black = Arrhenius nullclines; Color = stress‑gated.</li>
+        <li>At <em>T_hsp</em>: v(T) bends → critical slowing; fold → low‑flow state (collapse). At <em>T_low</em>: stiff slope → cold stall.</li>
+        </ul>
+      <div class="placeholder">[Nullclines + slider for temperature cursor]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 3 — Time Ramp Scenarios</h3>
+      <ul class="list-compact">
+        <li>Buttons: Gentle ramp 18→30°C • Heat pulse 25→34°C • Cold drop 25→12°C</li>
+        <li>Outputs (stacked): temperature; predicted rate; stress load meter.</li>
+        <li>Signature: early warning via variance ↑ and recovery‑time ↑ 5–10 min before kink.</li>
+      </ul>
+      <div class="placeholder">[Three mini time‑series strips with early‑warning highlight]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 4 — Genotype/Perturbation Toggles</h3>
+      <ul class="list-compact">
+        <li><span class="badge">hsp70‑/‑</span> (left shift <em>T_hsp</em>), <span class="badge">Hsp70 OE</span> (right shift <em>T_hsp</em> & blunted kink)</li>
+        <li><span class="badge">Myosin‑stabilizer</span> (left shift <em>T_low</em>), <span class="badge">ROCK inhibition</span> (accentuates cold stall)</li>
+        <li>Only gate parameters move; Arrhenius baseline unchanged.</li>
+      </ul>
+      <div class="placeholder">[Toggle chips → shifted gates on plots]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 5 — Piecewise Model Schematic</h3>
+      <p class="muted">Base Arrhenius modules: ATPase, actin turnover, adhesion. Gates: sigmoid “Hsp70 on” (repair capacity) and “Low‑T motor off‑rate ↑” (duty ratio & viscosity). Outputs feed phase‑plane.</p>
+      <div class="placeholder">[Block diagram: modules → gates → effective stress/viscosity → phase‑plane]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 6 — Safe Window & Time‑to‑Collapse</h3>
+      <ul class="list-compact">
+        <li>Badge: Safe window (e.g., 18–28°C) with hazard zones beyond <em>T_low</em>/<em>T_hsp</em>.</li>
+        <li>Countdown during ramps: minutes to stall post‑gate crossing.</li>
+        <li>Note: kink locations, not Arrhenius slope, set warning thresholds.</li>
+      </ul>
+      <div class="placeholder">[Safe‑window bar + countdown tile]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <ol class="list-compact">
+      <li>Show rate–temperature with two kinks aligned to prefilled dots.</li>
+      <li>Show phase‑plane fold at <em>T_hsp</em> with predicted stall under heat pulse.</li>
+      <li>Show scenario strip where early‑warning slowdown precedes collapse.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>First‑Eyes Tasks</h2>
+    <ul class="list-compact">
+      <li>Drag <em>T_hsp</em>/<em>T_low</em> to match lab thresholds; reproduce failures without changing Arrhenius slopes.</li>
+      <li>Toggle hsp70‑/‑ or OE; judge shift of safe window.</li>
+      <li>Run heat‑pulse; confirm stall/partial‑recovery pattern.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did the kink‑and‑gate story clarify your data?</li>
+          <li>Was the early‑warning slowdown legible?</li>
+          <li>Would you run a ramp to validate the safe window?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer links kinks to Hsp70 or motor/viscosity thresholds</li>
+          <li>Viewer predicts gate shifts under perturbations</li>
+          <li>Viewer identifies phase‑plane fold → stall</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% choose 4–5 on “non‑Arrhenius model persuasive”</li>
+          <li>≥60% correctly adjust gates to match datasets</li>
+          <li>≥50% propose a microfluidic ramp + reporter test</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (icons: ✓ match, ? uncertain). Not proof—just orientation for discussion.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Heat‑Pulse Stall</h3>
+        <p><strong>Predicted:</strong> Kink at <em>T_hsp</em> → stall & partial recovery after pulse.</p>
+        <p><strong>Reported:</strong> ✓ Heat‑shock onset near 31–33°C in embryos; ? specific hindgut stall curves.</p>
+      </div>
+      <div class="card">
+        <h3>Cold‑Drop Stall</h3>
+        <p><strong>Predicted:</strong> Stiffened nullcline below <em>T_low</em> → cold stall.</p>
+        <p><strong>Reported:</strong> ✓ Cold‑related slowdowns broadly observed; ? exact duty‑ratio link in hindgut.</p>
+      </div>
+      <div class="card">
+        <h3>Hsp70 Overexpression</h3>
+        <p><strong>Predicted:</strong> Right‑shifted <em>T_hsp</em> and blunted kink; safe window widens.</p>
+        <p><strong>Reported:</strong> ✓ Chaperone buffering of heat stress; ? quantitative shift in morphogenesis rate.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: prefilled plots, sliders, and schematic gates—no engine, fitting, or data import. Disposable: toss if kinks don’t map to experience. Growth‑inviting: add gates (other chaperones, adhesion failure), replace dots with data, and evolve the phase‑plane into a numeric bifurcation explorer; generalize beyond hindgut.</p>
+  </section>
+</body>
+</html>
