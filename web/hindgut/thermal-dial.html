@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thermal Dial on Active Mechanics — Box‑of‑Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .seed { margin: .35rem 0; padding: .5rem .6rem; border: 1px solid #e0e0e0; border-radius: .5rem; background: #fff; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Thermal Dial on Active Mechanics — Drosophila Hindgut / Seed</h1>
+    <div class="meta">Problem → Raw laser‑ablation recoil varies with temperature and confounds tension readouts • Objective → Create a viscosity‑normalized tension metric • Link → Ablation v₀ + η_eff (FRAP/rheology) → T̂ and Ĝ</div>
+    <p class="thesis">Core intent: Does multiplying ablation recoil speed by a co‑measured viscosity estimate collapse apparent tension differences across temperatures into a stable pre‑stress proxy?</p>
+  </header>
+
+  <!-- Storyboard / Dashboard (prefilled, no real data) -->
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Scene 1 — Thermal Dial Setup</h3>
+      <p class="muted">Cartoon hindgut with three ROIs (proximal, mid, distal). Dial toggles <span class="badge">18°C</span> <span class="badge">22°C</span> <span class="badge">28°C</span>. Annotation: Raw recoil speeds change with temperature; true pre‑stress should not once viscosity is accounted for.</p>
+      <div class="placeholder">[Hindgut + Thermal Dial + 3 ROI pins]</div>
+    </div>
+
+    <div class="card">
+      <h3>Scene 2 — Laser Ablation Panel</h3>
+      <ul class="list-compact">
+        <li>Selected ROI traces (displacement vs time) overlay when dialing temperature.</li>
+        <li><strong>Prefilled (same ROI):</strong> 18°C → v₀ = 0.80 μm/s, τ_recoil = 2.0 s • 28°C → v₀ = 1.60 μm/s, τ_recoil = 1.0 s.</li>
+        <li class="muted">Raw v₀ doubles at higher T; τ halves if viscosity drops (elastic modulus stable).</li>
+      </ul>
+      <div class="placeholder">[Overlaid recoil curves, two temps]</div>
+    </div>
+
+    <div class="card">
+      <h3>Scene 3 — Viscosity Proxy Panel (FRAP / microrheology)</h3>
+      <ul class="list-compact">
+        <li>Co‑local FRAP recovery or microrheology readout for the same ROI.</li>
+        <li><strong>Prefilled η_eff (relative units):</strong> 18°C → 2.5 • 28°C → 1.25.</li>
+        <li class="muted">η_eff is a relative cortical viscosity index; absolute units unnecessary if calibrated consistently.</li>
+      </ul>
+      <div class="placeholder">[FRAP curves or bead MSDs → η_eff tile]</div>
+    </div>
+
+    <div class="card">
+      <h3>Scene 4 — Computed Metric Tiles</h3>
+      <ul class="list-compact">
+        <li><span class="badge">T̂ = η_eff × v₀</span> (viscosity‑normalized tension proxy)</li>
+        <li><span class="badge">Ĝ = η_eff / τ_recoil</span> (effective modulus proxy)</li>
+      </ul>
+      <p class="muted"><strong>Prefilled (same ROI):</strong> 18°C → T̂ = 2.5×0.80 = 2.00; Ĝ = 2.5/2.0 = 1.25 • 28°C → T̂ = 1.25×1.60 = 2.00; Ĝ = 1.25/1.0 = 1.25.</p>
+      <div class="placeholder">[Two metric tiles show equality across temps]</div>
+    </div>
+
+    <div class="card">
+      <h3>Scene 5 — Spatial Map</h3>
+      <ul class="list-compact">
+        <li>Heatmap of T̂ across three ROIs at 18°C vs 28°C.</li>
+        <li><strong>Prefilled:</strong> Proximal 2.0→2.0 • Mid 1.6→1.6 • Distal 2.3→2.2 (minor variance).</li>
+        <li class="muted">Dial changes raw v₀ panel but leaves T̂ map nearly unchanged.</li>
+      </ul>
+      <div class="placeholder">[Paired heatmaps: T̂ @18°C vs @28°C]</div>
+    </div>
+
+    <div class="card">
+      <h3>Scene 6 — Control vs Perturbation Toggle</h3>
+      <ul class="list-compact">
+        <li><span class="badge">WT</span>: T̂ maps overlap across temperatures (collapse).</li>
+        <li><span class="badge">Myosin‑sensitized</span>: T̂ increases at all temperatures (true biological tension increase) and remains temperature‑consistent.</li>
+      </ul>
+      <div class="placeholder">[Toggle WT ↔ Myosin‑sensitized; overlaid T̂ maps]</div>
+    </div>
+
+    <div class="card">
+      <h3>Scene 7 — One‑Glance Summary</h3>
+      <p class="muted"><strong>Raw speed misleads across T.</strong> Viscosity‑normalized <em>T̂</em> reveals a stable pre‑stress landscape. Precision hinges on co‑local, contemporaneous viscosity estimate and consistent ROI geometry.</p>
+      <div class="placeholder">[Summary tile with small uncertainty bars]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <ul class="list-compact">
+      <li>Dial‑driven dashboard for 2–3 ROIs with prefilled recoil traces, FRAP curves, and computed T̂ & Ĝ.</li>
+      <li>Side‑by‑side T̂ heatmaps at 18°C vs 28°C showing collapse; raw v₀ maps differ.</li>
+      <li>Perturbation toggle where T̂ shifts in expected direction at all temperatures.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Validating Reaction</h2>
+    <p class="muted">“Yes—T̂ collapses across temperature; the spatial gradient is stable and biologically sensible. I’d trust T̂ over raw recoil and want to integrate co‑measurement (FRAP vs microrheology) into the ablation workflow.”</p>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Lab members who run laser ablations in Drosophila epithelia</li>
+      <li>Developmental biophysicists (Kelvin‑Voigt/Maxwell fitting)</li>
+      <li>Skeptical physicist/engineer concerned with temperature‑dependent viscosity confounds</li>
+      <li>Microrheology/FRAP experts for viscosity proxy sanity‑check</li>
+      <li>Hindgut morphogenesis PI comparing datasets across imaging temperatures</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <ul class="list-compact">
+      <li><strong>Minimal:</strong> Mocked storyboard/dashboard with a single arithmetic normalization (T̂ = η_eff × v₀) and a derived modulus proxy (Ĝ = η_eff/τ). No hardware control or fitting pipelines.</li>
+      <li><strong>Disposable:</strong> If collapse doesn’t persuade, discard with no sunk cost; numbers are placeholders to test the narrative.</li>
+      <li><strong>Growth‑inviting:</strong> Choose viscosity proxy (FRAP vs bead rheology), define calibration if needed, integrate co‑acquisition, extend to spatial maps & CIs, and test model assumptions.</li>
+    </ul>
+  </section>
+</body>
+</html>
