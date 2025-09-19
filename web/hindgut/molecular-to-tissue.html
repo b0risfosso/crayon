@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Molecular-to-Tissue Chirality Cascade — Box of Dirt (Site-Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Molecular-to-Tissue Chirality Cascade — Hindgut Rotation / Seed</h1>
+    <div class="meta">Problem → PCP vectors and chiral cues appear orthogonal, obscuring integration • Objective → Unify PCP orientation with chiral vorticity • Link → Coupled-field model: PCP sets alignment, chirality sets vorticity</div>
+    <p class="thesis">Core intent: Test whether a coupled-field rule (PCP provides alignment frame; chirality provides signed vorticity) predicts rotation direction and magnitude under combined perturbations.</p>
+  </header>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Panel A — PCP Alignment Map</h3>
+      <p class="muted">Cartoon hindgut with PCP arrow fields (magenta Frizzled/Stan, green Fat/Ds). Scenario buttons: WT, PCP rotated 45°, 90°, randomized.</p>
+      <div class="placeholder">[PCP arrow field overlay]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel B — Chiral Cortical Vorticity Map</h3>
+      <p class="muted">Heatmap of signed vorticity. Scenario buttons: WT positive, Myo1D loss, Myo1C ectopic negative, patchy flows.</p>
+      <div class="placeholder">[Vorticity heatmap overlays]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel C — Coupling Dial</h3>
+      <ul class="list-compact">
+        <li>Sliders: κ (strength), θ-sensitivity</li>
+        <li>Toggles: which PCP field (Frizzled vs Fat/Ds), anisotropy strength</li>
+      </ul>
+      <div class="placeholder">[Dial schematic: flow vector projected onto PCP director]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel D — Predicted Outcome</h3>
+      <p class="muted">Gauge & timeline: net torque → predicted rotation angle and direction. Donut plot shows net angle. Thumbnails show final orientations for each scenario.</p>
+      <div class="placeholder">[Predicted outcome gauges]</div>
+    </div>
+
+    <div class="card">
+      <h3>Comparison Strip</h3>
+      <p class="muted">Predicted vs Reported chips side-by-side with literature icons. Example: ✓ direction matches, ? magnitude.</p>
+      <div class="placeholder">[Comparison chips]</div>
+    </div>
+
+    <div class="card">
+      <h3>Model Cartoon</h3>
+      <p class="muted">PCP director P → anisotropic responsiveness → chiral flow ω → local torque τ = κ·projection(P, ω) → integrated rotation R(t).</p>
+      <ul class="list-compact">
+        <li>Alt A: Independence → strong rotation even at 90° misalignment</li>
+        <li>Alt B: Chirality-only → identical rotation regardless of PCP</li>
+        <li>Alt C: Coupled-field projection (cosθ)</li>
+      </ul>
+      <div class="placeholder">[Cartoon schematic with hypothesis toggle]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load-Bearing Test</h2>
+    <p class="muted">Experts click scenarios, adjust κ and PCP-weight, and see that only the projection rule reproduces reversals and stalls. Validation if they can map scenarios to known outcomes and propose next experiments.</p>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Drosophila asymmetry labs (Myo1D/Myo1C)</li>
+      <li>PCP signaling experts (Frizzled/Stan, Fat/Ds)</li>
+      <li>Biophysical modelers of cortical flows</li>
+      <li>Imaging scientists (PIV/vorticity maps)</li>
+      <li>Skeptics arguing PCP and chirality independence</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did projection (cosθ) coupling feel sufficient to unify PCP and chirality?</li>
+          <li>Did the alternative models (independent, chirality-only) fail at least one scenario?</li>
+          <li>Would you trust this coupled-field rule to design a perturbation?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer narrates back how PCP angle gates torque</li>
+          <li>Viewer predicts double-perturbation stall vs reversal</li>
+          <li>Viewer explains why chirality flips direction while PCP rotation stalls</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% select 4–5 on “projection coupling convincing”</li>
+          <li>≥60% correctly predict outcomes of PCP-90° and double perturbation</li>
+          <li>≥50% propose a concrete next experiment (e.g., rotate Ds gradient with Myo1D knockdown)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: mocked overlays and a single coupling dial with pre-scripted outcomes. Disposable: discard if projection idea fails. Growth-inviting: later ingest real PCP vectors and PIV flows, compare fits, and generalize. Alternative-hypothesis toggle seeds decisive experiments, turning the sketch into a roadmap.</p>
+  </section>
+</body>
+</html>
