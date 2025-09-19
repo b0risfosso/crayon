@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blueprint to Body Plan — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Blueprint to Body Plan — Hindgut Patterning / Seed</h1>
+    <div class="meta">Problem → Posterior tissues misinterpret shared signals → ectopic morphogenesis • Objective → Hox‑gated posterior morphogenesis in the hindgut • Link → abd‑A/Abd‑B dosage gates enhancer sensitivity to Torso/Wg/Dpp/Hh, restricting byn/fkh circuits posteriorly</div>
+    <p class="thesis">Core intent: Hox dosage gates hindgut enhancers so shared morphogens are interpreted as posterior‑only instructions—licensing elongation and anal valve formation only where abd‑A/Abd‑B permit.</p>
+  </header>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Panel 1 — Shared‑Signal Map</h3>
+      <p class="muted">Tail‑end embryo map with grayscale overlays: Torso high at posterior terminal; Wg, Dpp, Hh bands across posterior ectoderm/gut primordia. Signals are shared—interpretation must be gated.</p>
+      <div class="placeholder">[Torso/Wg/Dpp/Hh overlays]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 2 — Hox Dosage Overlay</h3>
+      <p class="muted">Color band: low Hox anterior; abd‑A mid posterior; Abd‑B at terminal posterior. The Hox code varies by position.</p>
+      <div class="placeholder">[abd‑A / Abd‑B domains]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 3 — Enhancer Gates</h3>
+      <ul class="list-compact">
+        <li><strong>E_spec</strong> (identity): Torso+Wg baseline; opens ≥ abd‑A; low Hox → OFF.</li>
+        <li><strong>E_elong</strong> (elongation): needs Wg+Hh; abd‑A lowers threshold; high Abd‑B permits but narrows domain.</li>
+        <li><strong>E_valve</strong> (anal valve): needs Torso+Wg; opens only at high Abd‑B; abd‑A prevents ectopic opening.</li>
+      </ul>
+      <div class="placeholder">[Logic cards with Hox sliders & ON/OFF lights]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 4 — Circuit Layer</h3>
+      <p class="muted">Signals → Hox‑gated enhancers → byn/fkh modules → outputs: elongation arrow & valve ring. Lines thicken only where gates are ON (posterior).</p>
+      <div class="placeholder">[Flow: signals → gates → byn/fkh → morphogenesis]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 5 — Outcome Map (WT)</h3>
+      <p class="muted">Posterior elongation within abd‑A zone; valve ring at Abd‑B tip. Anterior shows no icons despite shared signals.</p>
+      <div class="placeholder">[Outcome map WT]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 6 — Perturbation Gallery</h3>
+      <ul class="list-compact">
+        <li><span class="badge">A</span> Hox‑off posteriorly → gates OFF; short hindgut; no valve.</li>
+        <li><span class="badge">B</span> Abd‑B anteriorized stripe → ectopic valve ring; elongation truncated at border.</li>
+        <li><span class="badge">C</span> abd‑A reduced; Abd‑B tip normal → weak/patchy elongation; tip valve intact.</li>
+        <li><span class="badge">D</span> Wg broadened; Hox unchanged → elongation expands only within abd‑A domain.</li>
+      </ul>
+      <div class="placeholder">[Preset toggles swap storyboard]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Legend Inset</h2>
+    <p class="muted">Morphogens are ambiguous; Hox dosage shifts enhancer thresholds to disambiguate and prevent conflicts with anterior programs.</p>
+    <div class="placeholder">[Legend schematic]</div>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <p class="muted">Show WT plus four presets with gates and outcomes side‑by‑side. Include a cheat‑sheet mapping classic mutant/misexpression phenotypes to presets.</p>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Drosophila Hox & terminal patterning labs</li>
+      <li>Hindgut (byn, fkh) morphogenesis specialists</li>
+      <li>Enhancer‑logic modelers</li>
+      <li>Wg/Dpp‑centric skeptics</li>
+      <li>Editors/reviewers who value clear schematics</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did Hox‑gated thresholds clarify posterior‑only outcomes?</li>
+          <li>Was the gate metaphor sufficient to insulate byn/fkh from anterior programs?</li>
+          <li>Would you use this storyboard to design enhancer tests?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer maps ≥2 published phenotypes to presets</li>
+          <li>Viewer predicts effect of shifting Hox affinity in E_valve</li>
+          <li>Viewer distinguishes abd‑A vs Abd‑B roles across modules</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% select 4–5 on “gating clarifies posterior selectivity”</li>
+          <li>≥60% name one enhancer‑level falsification</li>
+          <li>≥50% propose a specific misexpression to test the map</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported outcomes for canonical manipulations (icons: ✓ match, ? uncertain). This strip anchors discussion, not proof.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Abd‑B anteriorized stripe</h3>
+        <p><strong>Predicted:</strong> E_valve ON in ectopic band; extra valve ring; elongation truncated at border.</p>
+        <p><strong>Reported:</strong> ✓ Ectopic posterior features in anterior territory; ? exact valve positioning.</p>
+      </div>
+      <div class="card">
+        <h3>Hox‑off posteriorly</h3>
+        <p><strong>Predicted:</strong> Gates OFF; shortened hindgut; no valve.</p>
+        <p><strong>Reported:</strong> ✓ Posterior morphogenesis defects; ? enhancer‑specific mapping.</p>
+      </div>
+      <div class="card">
+        <h3>Wg broadened (Hox unchanged)</h3>
+        <p><strong>Predicted:</strong> Elongation expands only within abd‑A domain.</p>
+        <p><strong>Reported:</strong> ✓ Wg‑driven posterior growth requires context; ? precise abd‑A boundaries.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: pre‑labeled maps, three gate cards, and four canned scenarios—no algorithms or data. Disposable: if Hox‑gating fails, toss the cards. Growth‑inviting: add time series, real enhancer candidates & site densities, quantitative thresholds, 3D shape readouts, and a panel that graduates from presets to tunable ranges once the metaphor proves explanatory.</p>
+  </section>
+</body>
+</html>

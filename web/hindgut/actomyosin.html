@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Actomyosin Choreography and Tube Shaping — Box of Dirt (Site-Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Actomyosin Choreography and Tube Shaping — Hindgut Morphogenesis / Seed</h1>
+    <div class="meta">Problem → Uniform E-cadherin turnover under load causes tears • Objective → Stabilize high-tension interfaces while patterning line tension • Link → Tension-gated endocytic switch</div>
+    <p class="thesis">Core intent: A tension-gated E-cadherin turnover rule stabilizes stressed edges and accelerates removal on low-tension edges, preventing junctional failure and guiding anisotropic remodeling.</p>
+  </header>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>Panel 0 — Context</h3>
+      <p class="muted">Hexagonal epithelial sheet. Edges colored by tension, thickness by E-cad density. Load set to High. Toggle: Uniform vs Tension-Gated turnover.</p>
+      <div class="placeholder">[Sheet + sliders/toggles]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 1 — Uniform Turnover</h3>
+      <p class="muted">Myosin pulses random; turnover clocks uniform. Tears at tricellular junctions; aborted T1 transitions; ragged outline.</p>
+      <ul class="list-compact">
+        <li>Integrity Index: 0.82</li>
+        <li>Tear Rate: 3.1</li>
+        <li>T1 Bias: 0.12</li>
+        <li>FRAP slope vs tension: ~0</li>
+      </ul>
+      <div class="placeholder">[Tears + noisy transitions]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 2 — Endocytic Switch Rule</h3>
+      <p class="muted">High-tension edges: pits stall, cadherin stabilized. Low-tension edges: pits accelerate, cadherin removed. Feedback loop sketch with padlock/open-gate icons.</p>
+      <div class="placeholder">[Rule icons]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 3 — Switch ON</h3>
+      <p class="muted">Warm edges thicken; cool edges thin. Coordinated T1 transitions along thinned edges; tissue elongates smoothly; no tears.</p>
+      <ul class="list-compact">
+        <li>Integrity Index: 0.96</li>
+        <li>Tear Rate: 0.4</li>
+        <li>T1 Bias: 0.68</li>
+        <li>FRAP slope vs tension: positive</li>
+      </ul>
+      <div class="placeholder">[Smooth elongation + aligned transitions]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 4 — Junction Vignettes</h3>
+      <ul class="list-compact">
+        <li>High-tension: FRAP slower, cadherin stable, pit stalled</li>
+        <li>Low-tension: FRAP faster, cadherin declines, pits frequent</li>
+      </ul>
+      <div class="placeholder">[Mini kymographs]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 5 — Perturbation Toggles</h3>
+      <ul class="list-compact">
+        <li>Clamp endocytosis → revert baseline, tears reappear</li>
+        <li>Raise load → integrity maintained until threshold</li>
+        <li>Invert threshold → misassigned stabilization, buckling</li>
+      </ul>
+      <div class="placeholder">[Perturbation outcomes]</div>
+    </div>
+
+    <div class="card">
+      <h3>Panel 6 — Predictive Signatures</h3>
+      <ul class="list-compact">
+        <li>FRAP half-time increases with tension only with switch active</li>
+        <li>Pit lifetimes ↑ on high-tension, frequency ↑ on low-tension</li>
+        <li>Under load, T1 align with low-tension map; tear frequency drops</li>
+        <li>Opto-increasing tension stabilizes cadherin; relaxation accelerates removal</li>
+      </ul>
+      <div class="placeholder">[Signature icons]</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Load-Bearing Test</h2>
+    <p class="muted">Narrate Uniform vs Tension-Gated runs plus one perturbation. Validation if experts name measurable signatures, accept plausibility of reduced tears and biased remodeling, and propose falsification tests.</p>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Hindgut morphogenesis biologists</li>
+      <li>Mechanobiologists (actomyosin, vertex models)</li>
+      <li>Cadherin trafficking specialists</li>
+      <li>FRAP/force inference method developers</li>
+      <li>Skeptics favoring ECM/friction stabilization</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did switch plausibly reduce junctional tears?</li>
+          <li>Were the predicted FRAP vs tension signatures clear?</li>
+          <li>Would you test this turnover rule experimentally?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Viewer distinguishes uniform vs tension-gated turnover</li>
+          <li>Viewer predicts perturbation outcomes (clamp, invert)</li>
+          <li>Viewer connects FRAP/pit signatures to tension rule</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% select 4–5 on “switch convincing”</li>
+          <li>≥60% recall two predictive signatures</li>
+          <li>≥50% propose concrete perturbations or datasets</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class=\"muted\">Predicted vs Reported outcomes for key signatures. Reported side uses ✓ for agreement and ? where literature/data are sparse.</p>
+    <div class=\"grid cols-3\">
+      <div class=\"card\">
+        <h3>FRAP vs Tension Slope</h3>
+        <p><strong>Predicted:</strong> Positive slope only with switch active.</p>
+        <p><strong>Reported:</strong> ✓ Hints in some datasets, ? not systematically quantified.</p>
+      </div>
+      <div class=\"card\">
+        <h3>Pit Dynamics</h3>
+        <p><strong>Predicted:</strong> Lifetimes ↑ on high-tension edges; frequency ↑ on low-tension edges.</p>
+        <p><strong>Reported:</strong> ✓ Qualitative agreement in clathrin studies, ? limited live quant.</p>
+      </div>
+      <div class=\"card\">
+        <h3>T1 Transitions & Tears</h3>
+        <p><strong>Predicted:</strong> Aligned T1s, reduced tears under load.</p>
+        <p><strong>Reported:</strong> ✓ Orientation bias under load observed, ? tear rate rarely reported.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: static storyboard with prefilled metrics and icons. Disposable: frames swappable if coupling wrong. Growth-inviting: scaffold ready for vertex models, optogenetic tests, molecular variants. Easy to expand, easy to discard.</p>
+  </section>
+</body>
+</html>
