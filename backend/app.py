@@ -1,7 +1,7 @@
 import os
 from openai import OpenAI
 import sqlite3
-from flask import Flask, jsonify, abort, request
+from flask import Flask, jsonify, abort, request, Response
 from typing import List
 from pydantic import BaseModel, Field
 from openai import OpenAI, OpenAIError
@@ -9,6 +9,7 @@ from openai import OpenAI, OpenAIError
 import sqlite3, json, os
 from contextlib import closing
 import hashlib 
+import re
 
 app = Flask(__name__)
 
@@ -185,6 +186,26 @@ Seeds should tie directly to the narrative targets of the dimension where possib
 Keep each seed concise, concrete, and imaginative.
 
 Return ONLY structured JSON in the provided schema.
+"""
+
+BODY_WRAPPER_STYLE = """
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+  h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+  .grid { display: grid; gap: .8rem; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+  .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+  .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+  .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+  .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+  .muted { opacity: .7; font-size: .9rem; }
+  .list-compact li { margin:.25rem 0; }
+  .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+</style>
 """
 
 def get_or_create_narrative(con, domain_title: str) -> int:
@@ -651,3 +672,47 @@ def api_list_seed_boxes(seed_id: int):
         ORDER BY version DESC
     """, (seed_id, kind))
     return jsonify(rows)
+
+
+@app.get("/boxes/<int:seed_id>")
+def public_box(seed_id: int):
+    # Optional: allow ?draft=1 for previewing drafts
+    want_draft = request.args.get("draft") in ("1", "true", "yes")
+
+    with closing(connect()) as con:
+        # Expecting you have a seed_boxes table from earlier steps
+        row = con.execute("""
+          SELECT html, doc_format, title, is_published, version, updated_at
+          FROM seed_boxes
+          WHERE seed_id = ?
+            AND (? = 1 OR is_published = 1)
+          ORDER BY version DESC
+          LIMIT 1
+        """, (seed_id, 1 if want_draft else 0)).fetchone()
+
+    if not row:
+        abort(404, description="No box found for this seed.")
+
+    html = (row["html"] or "")
+    fmt = (row["doc_format"] or "").lower()
+
+    looks_full = bool(re.search(r"<!DOCTYPE|<html[^>]*>", html, re.I)) or fmt == "full"
+
+    if looks_full:
+        # Return author-provided full HTML as-is
+        return Response(html, mimetype="text/html; charset=utf-8")
+
+    # Otherwise, wrap body-only snippet
+    wrapped = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{row['title'] or 'Box of Dirt'}</title>
+  {BODY_WRAPPER_STYLE}
+</head>
+<body>
+{html}
+</body>
+</html>"""
+    return Response(wrapped, mimetype="text/html; charset=utf-8")

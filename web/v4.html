@@ -112,13 +112,39 @@
           <section id="boxSection" hidden style="margin-top:1rem;">
             <div style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius:.6rem;
                         padding:.8rem .9rem; background:color-mix(in oklab, Canvas 96%, CanvasText 4%);">
-              <h4 style="margin:.2rem 0 .6rem; font-size:1rem; font-weight:650;">Prototype</h4>
-              <div id="boxError" class="muted" style="margin:.25rem 0 .5rem;"></div>
-              <div id="boxHost" style="min-height:60vh;">
-                <!-- will be populated with either innerHTML or an iframe[srcdoc] -->
+              <div style="display:flex; align-items:center; gap:.5rem; justify-content:space-between;">
+                <h4 style="margin:.2rem 0; font-size:1rem; font-weight:650;">Box of Dirt</h4>
+                <div style="display:flex; gap:.5rem; align-items:center;">
+                  <button id="expandBoxBtn"
+                          style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                                 background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer;">
+                    Expand
+                  </button>
+                  <button id="shareBoxBtn"
+                          style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                                 background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer;">
+                    Share
+                  </button>
+                </div>
               </div>
+          
+              <!-- Share row (hidden until Share is clicked) -->
+              <div id="shareRow" hidden style="margin:.5rem 0 .25rem; display:flex; gap:.5rem; align-items:center;">
+                <input id="shareLink" type="text" readonly
+                       style="flex:1; padding:.5rem .6rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                              border-radius:.5rem; background:color-mix(in oklab, Canvas 96%, CanvasText 4%); font-size:.9rem;" />
+                <button id="copyShareBtn"
+                        style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                               background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer;">
+                  Copy
+                </button>
+                <span id="shareStatus" class="muted"></span>
+              </div>
+          
+              <div id="boxError" class="muted" style="margin:.25rem 0 .5rem;"></div>
+              <div id="boxHost" style="min-height:60vh;"></div>
             </div>
-          </section>
+          </section>          
         </article>
       </div>
     </section>
@@ -141,7 +167,12 @@
       boxSection: document.getElementById('boxSection'),
       boxError: document.getElementById('boxError'),
       boxHost: document.getElementById('boxHost'),
-
+      expandBoxBtn: document.getElementById('expandBoxBtn'),
+    shareBoxBtn: document.getElementById('shareBoxBtn'),
+    shareRow: document.getElementById('shareRow'),
+    shareLink: document.getElementById('shareLink'),
+    copyShareBtn: document.getElementById('copyShareBtn'),
+    shareStatus: document.getElementById('shareStatus'),
     };
 
     // === API endpoints wired to provided Flask app ===
@@ -232,6 +263,7 @@
 
       // auto-load Box of Dirt for this seed
       loadBoxForSeed(seed.id);
+      setShareUiForSeed(seed || null);
     }
 
     // Loaders aligned to Flask API
@@ -322,6 +354,30 @@ async function loadBoxForSeed(seedId){
   }
 }
 
+function getShareUrlForSeed(seedId){
+  // Assumes a viewer route like /boxes/<seedId>
+  // Prefer absolute URL for copying.
+  try {
+    const base = `${location.origin}/boxes/${encodeURIComponent(seedId)}`;
+    return base;
+  } catch {
+    return `/boxes/${encodeURIComponent(seedId)}`;
+  }
+}
+
+function setShareUiForSeed(seed){
+  // Hide if no seed yet
+  if (!seed) {
+    els.shareRow.hidden = true;
+    els.shareLink.value = '';
+    els.shareStatus.textContent = '';
+    return;
+  }
+  const url = getShareUrlForSeed(seed.id);
+  els.shareLink.value = url;
+  els.shareStatus.textContent = '';
+}
+
 
 function renderBoxHTML(payload){
   const html = (payload && payload.html) ? String(payload.html) : '';
@@ -338,7 +394,7 @@ function renderBoxHTML(payload){
 
   if (looksFull) {
     const iframe = document.createElement('iframe');
-    iframe.title = 'Prototype';
+    iframe.title = 'Box of Dirt';
     iframe.loading = 'lazy';
     iframe.setAttribute('sandbox', 'allow-scripts'); // drop allow-same-origin unless needed
     iframe.style.width = '100%';
@@ -353,6 +409,31 @@ function renderBoxHTML(payload){
     els.boxHost.appendChild(container);
   }
 }
+
+els.expandBoxBtn.addEventListener('click', ()=>{
+  if (!state.seed) return;
+  const url = getShareUrlForSeed(state.seed.id);
+  window.open(url, '_blank', 'noopener');
+});
+
+els.shareBoxBtn.addEventListener('click', ()=>{
+  if (!state.seed) return;
+  setShareUiForSeed(state.seed);
+  els.shareRow.hidden = false;
+  // optional: auto-copy on reveal
+  // navigator.clipboard.writeText(els.shareLink.value).catch(()=>{});
+});
+
+els.copyShareBtn.addEventListener('click', async ()=>{
+  try {
+    await navigator.clipboard.writeText(els.shareLink.value || '');
+    els.shareStatus.textContent = 'Copied!';
+  } catch (e){
+    els.shareStatus.textContent = 'Copy failed';
+  }
+  setTimeout(()=> els.shareStatus.textContent = '', 2000);
+});
+
 
 
     // Boot
