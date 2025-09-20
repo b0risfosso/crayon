@@ -72,7 +72,7 @@
 <body>
   <header>
     <h1>Fantasiagenesis · v4</h1>
-    <div style="font-size:.85rem; opacity:.7">Domains → Dimensions → Seeds</div>
+    <div style="font-size:.85rem; opacity:.7">imagination and reality, growing together</div>
   </header>
 
   <main class="app" id="app">
@@ -120,11 +120,6 @@
                                  background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer;">
                     Expand
                   </button>
-                  <button id="shareBoxBtn"
-                          style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
-                                 background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer;">
-                    Share
-                  </button>
                 </div>
               </div>
           
@@ -168,7 +163,6 @@
       boxError: document.getElementById('boxError'),
       boxHost: document.getElementById('boxHost'),
       expandBoxBtn: document.getElementById('expandBoxBtn'),
-    shareBoxBtn: document.getElementById('shareBoxBtn'),
     shareRow: document.getElementById('shareRow'),
     shareLink: document.getElementById('shareLink'),
     copyShareBtn: document.getElementById('copyShareBtn'),
@@ -414,14 +408,6 @@ els.expandBoxBtn.addEventListener('click', ()=>{
   if (!state.seed) return;
   const url = getShareUrlForSeed(state.seed.id);
   window.open(url, '_blank', 'noopener');
-});
-
-els.shareBoxBtn.addEventListener('click', ()=>{
-  if (!state.seed) return;
-  setShareUiForSeed(state.seed);
-  els.shareRow.hidden = false;
-  // optional: auto-copy on reveal
-  // navigator.clipboard.writeText(els.shareLink.value).catch(()=>{});
 });
 
 els.copyShareBtn.addEventListener('click', async ()=>{
