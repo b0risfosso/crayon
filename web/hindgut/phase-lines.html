@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phase Lines in the Cytoplasm — Box of Dirt (Site‑Styled)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+    .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
+    .grid { display: grid; gap: .8rem; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+    .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+    .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+    .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .muted { opacity: .7; font-size: .9rem; }
+    .list-compact li { margin:.25rem 0; }
+    .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phase Lines in the Cytoplasm — Hindgut Development / Seed</h1>
+    <div class="meta">Problem → Natural variation in LC‑domain composition makes condensate phase lines hypersensitive to temperature → developmental variability • Objective → Flatten cytoplasmic phase diagram to widen safe operating window • Link → Rebalance Tyr/Ser and Gly→charged ratios across Rasputin & Me31B LC domains to raise critical‑concentration slopes and desensitize phase boundaries to temperature</div>
+    <p class="thesis">Core intent: Adjusting LC amino‑acid balance in Rasputin and Me31B can make cytoplasmic phase lines less temperature‑sensitive, buffering stress‑granule/P‑body behavior and widening the safe operating window for hindgut morphogenesis across microclimates.</p>
+  </header>
+
+  <section>
+    <h2>Storyboard — Phase Lines in the Cytoplasm</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Frame 1 — Microclimate → Morphology</h3>
+        <ul class="list-compact">
+          <li>Cartoon embryos across a temperature bar (cool→warm)</li>
+          <li>Hindgut outlines: kinked at extremes, smooth mid‑range</li>
+        </ul>
+        <div class="placeholder">[Embryo row across temperatures with hindgut outlines]</div>
+        <p class="muted">Same genotype, different shelf temps; variable outcomes suggest a temperature‑coupled cytoplasmic switch.</p>
+      </div>
+
+      <div class="card">
+        <h3>Frame 2 — Wild Phase Diagram (Mock)</h3>
+        <ul class="list-compact">
+          <li>Axes: Temperature (x) vs Protein concentration (y)</li>
+          <li>Two phase lines: Rasputin‑like (SG) & Me31B‑like (P‑body), shallow vs T</li>
+          <li>Vertical “developmental concentration range” band intersects lines → small ΔT toggles condensation</li>
+          <li>Readout: granules ↑ at cool T, dissolve at warm T; translation repression toggles; morphology variance ↑</li>
+        </ul>
+        <div class="placeholder">[Two shallow phase boundaries + vertical band + state labels]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 3 — Natural LC Variation as Hidden Knob</h3>
+        <ul class="list-compact">
+          <li>Mock sliders per protein: Tyr/Ser balance; Gly:charged ratio</li>
+          <li>Ghosted boundary rotates with slider presets</li>
+          <li>Tooltips: ↑Tyr/Ser → ↑aromatic contacts; ↑charged → ↑screening/solvation</li>
+        </ul>
+        <div class="placeholder">[Sliders + rotating ghost phase line]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 4 — Rebalanced LC Hypothesis</h3>
+        <ul class="list-compact">
+          <li>Re‑draw phase diagram with steeper (more vertical) boundaries</li>
+          <li>Wider “Safe Operating Window” spans ±5–8 °C without crossing phase lines</li>
+        </ul>
+        <div class="placeholder">[Steeper boundaries + shaded safe window]</div>
+        <p class="muted">Raising the effective critical‑concentration slope vs T desensitizes phase boundaries.</p>
+      </div>
+
+      <div class="card">
+        <h3>Frame 5 — Hindgut Dashboard (Mock Outputs)</h3>
+        <ul class="list-compact">
+          <li>Heatmaps vs temperature: Granule number; Coarsening; mRNA sequestration proxy</li>
+          <li>Wild: sharp T‑dependence; Rebalanced: flat</li>
+          <li>Variability gauge: high → low</li>
+        </ul>
+        <div class="placeholder">[Wild vs Rebalanced heatmaps + variability gauge]</div>
+      </div>
+
+      <div class="card">
+        <h3>Frame 6 — Predictive Claims Summary</h3>
+        <ul class="list-compact">
+          <li>Rebalanced LC content steepens phase lines vs T</li>
+          <li>Condensate states robust across ±5–8 °C microclimate shifts</li>
+          <li>Morphogenesis variance narrows without losing condensate function</li>
+        </ul>
+        <div class="placeholder">[Claim icons / checkmarks]</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Interaction Script (Pre‑scripted)</h2>
+    <ol class="list-compact">
+      <li>Show wild phase lines (Frame 2) → ask if Frame‑1 outcomes feel inevitable</li>
+      <li>Nudge LC sliders (Frame 3) to rebalance preset → watch boundaries rotate</li>
+      <li>Reveal rebalanced window & dashboard (Frames 4–5)</li>
+      <li>End on claims (Frame 6) → invite a one‑sentence critique</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Load‑Bearing Test</h2>
+    <ul class="list-compact">
+      <li>Show Frame 2 vs 4 overlays + Frame 5 dashboard with preset trends</li>
+      <li>Success if experts accept boundary‑steepening → buffered condensates → reduced variability as testable and plausible</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>First Eyes</h2>
+    <ul class="list-compact">
+      <li>Hindgut morphogenesis variability trackers</li>
+      <li>Phase‑separation biophysicists</li>
+      <li>RNA granule experts (Rasputin/G3BP, Me31B)</li>
+      <li>Skeptical LC‑variation geneticists</li>
+      <li>Quantitative phase‑diagram modelers</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measurement & Signals</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Sliders (1–5)</h3>
+        <ul class="list-compact">
+          <li>Did LC‑rebalance → steeper phase lines feel sufficient to flatten T‑dependence?</li>
+          <li>Was the “safe window” intuition clear?</li>
+          <li>Would you test LC‑tuned variants vs microclimate ramps?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Observer Checklist</h3>
+        <ul class="list-compact">
+          <li>Names measurable readouts: phase diagram slopes; granule number/coarsening; mRNA sequestration; morphology variance</li>
+          <li>Predicts compression of granule coarsening vs T under rebalanced LC</li>
+          <li>Proposes Rasputin/Me31B LC variants or charge/π‑aromatic edits</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Validation Signals</h3>
+        <ul class="list-compact">
+          <li>≥70% select 4–5 on “boundary‑steepening is a viable buffer”</li>
+          <li>≥60% outline LC variant design + microclimate assay</li>
+          <li>≥50% propose a quantitative slope‑measurement strategy</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparison Strip</h2>
+    <p class="muted">Predicted vs Reported anchors (✓ match, ? uncertain) — to guide discussion, not claim proof.</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>LC Composition → Phase‑Line Slope</h3>
+        <p><strong>Predicted:</strong> ↑Tyr/Ser or tuned charge patterning steepens phase boundaries vs T (more vertical).</p>
+        <p><strong>Reported:</strong> ✓ Aromatic/Ser balance & charge patterning modulate condensate phase behavior; ? explicit steepening quantified for Rasputin/Me31B in vivo.</p>
+      </div>
+      <div class="card">
+        <h3>Granule Behavior vs Temperature</h3>
+        <p><strong>Predicted:</strong> Wild shows sharp T‑dependence in number/coarsening; Rebalanced flattens across ±5–8 °C.</p>
+        <p><strong>Reported:</strong> ✓ Temperature‑sensitive SG/P‑body dynamics widely observed; ? hindgut‑specific microclimate mapping.</p>
+      </div>
+      <div class="card">
+        <h3>Morphogenesis Variability</h3>
+        <p><strong>Predicted:</strong> Variability gauge drops with rebalanced LC without abolishing condensate function.</p>
+        <p><strong>Reported:</strong> ✓ Condensate tuning can buffer cellular phenotypes; ? direct link to hindgut morphogenesis variance.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why This is a Box of Dirt</h2>
+    <p class="muted">Minimal: a six‑frame cartoon + mock dashboard; no data or code. Disposable: easy to scrap or pivot if boundary‑steepening doesn’t resonate. Growth‑inviting: refine LC parameters, add crowding/ATP‑remodeling axes, and plug in real phase maps and microclimate assays to turn the scaffold into a quantitative plan.</p>
+  </section>
+</body>
+</html>

@@ -8,6 +8,7 @@ from openai import OpenAI, OpenAIError
 # app.py (top-level, after Flask app creation)
 import sqlite3, json, os
 from contextlib import closing
+import hashlib 
 
 app = Flask(__name__)
 
@@ -60,6 +61,35 @@ def bootstrap_schema():
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE
         );
+        """)
+
+        # === Box-of-Dirt artifacts tied to seeds ===
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS seed_artifacts (
+            id INTEGER PRIMARY KEY,
+            seed_id INTEGER NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'box_of_dirt',      -- future-proof: other artifact kinds later
+            title TEXT,
+            html TEXT NOT NULL,                             -- full-page HTML or body-only HTML
+            doc_format TEXT NOT NULL DEFAULT 'full'         -- 'full' or 'body'
+                CHECK (doc_format IN ('full','body')),
+            version INTEGER NOT NULL DEFAULT 1,             -- monotonically increasing per (seed_id, kind)
+            is_published INTEGER NOT NULL DEFAULT 0,        -- 0/1
+            checksum TEXT,                                  -- sha256(html) for cache/ETag
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
+        );
+        """)
+
+        # Useful indexes
+        con.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_artifacts_unique
+        ON seed_artifacts(seed_id, kind, version);
+        """)
+        con.execute("""
+        CREATE INDEX IF NOT EXISTS idx_seed_artifacts_lookup
+        ON seed_artifacts(seed_id, kind, is_published, version);
         """)
 
         # Helpful uniqueness to avoid dup spam
@@ -208,6 +238,16 @@ def _prototype_user_msg(domain: str, dimension: str, problem: str, objective: st
         "Construct a narrative prototype sketch following the format defined in the system message."
     )
 
+def _artifact_next_version(con, seed_id: int, kind: str = "box_of_dirt") -> int:
+    row = con.execute(
+        "SELECT COALESCE(MAX(version), 0) AS v FROM seed_artifacts WHERE seed_id=? AND kind=?",
+        (seed_id, kind)
+    ).fetchone()
+    return int(row["v"]) + 1
+
+def _seed_exists(con, seed_id: int) -> bool:
+    r = con.execute("SELECT 1 FROM narrative_seeds WHERE id=? LIMIT 1", (seed_id,)).fetchone()
+    return bool(r)
 
 # --- route ---
 @app.post("/api/narrative-dimensions")
@@ -468,3 +508,146 @@ def api_narrative_prototype():
 
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
+
+@app.get("/api/seeds/<int:seed_id>/box")
+def api_get_seed_box(seed_id: int):
+    """
+    Returns the latest published artifact for this seed (kind='box_of_dirt').
+    Optional query params:
+      - kind: override artifact kind (default box_of_dirt)
+      - version: fetch a specific version (int)
+      - draft=1: if set, prefer latest version even if not published
+    """
+    kind = (request.args.get("kind") or "box_of_dirt").strip()
+    version = request.args.get("version")
+    draft = request.args.get("draft") in ("1", "true", "yes")
+
+    with closing(connect()) as con:
+        if not _seed_exists(con, seed_id):
+            abort(404, description="Seed not found")
+
+        params = [seed_id, kind]
+        if version is not None:
+            row = con.execute("""
+                SELECT id, seed_id, kind, title, html, doc_format, version, is_published, checksum,
+                       created_at, updated_at
+                FROM seed_artifacts
+                WHERE seed_id=? AND kind=? AND version=?
+                LIMIT 1
+            """, (seed_id, kind, int(version))).fetchone()
+        else:
+            if draft:
+                row = con.execute("""
+                    SELECT id, seed_id, kind, title, html, doc_format, version, is_published, checksum,
+                           created_at, updated_at
+                    FROM seed_artifacts
+                    WHERE seed_id=? AND kind=?
+                    ORDER BY version DESC
+                    LIMIT 1
+                """, params).fetchone()
+            else:
+                row = con.execute("""
+                    SELECT id, seed_id, kind, title, html, doc_format, version, is_published, checksum,
+                           created_at, updated_at
+                    FROM seed_artifacts
+                    WHERE seed_id=? AND kind=? AND is_published=1
+                    ORDER BY version DESC
+                    LIMIT 1
+                """, params).fetchone()
+
+        if not row:
+            abort(404, description="No artifact found for this seed/kind")
+
+        payload = dict(row)
+
+        # Simple ETag support for cache friendliness
+        etag = payload.get("checksum") or ""
+        if etag and request.headers.get("If-None-Match") == etag:
+            return ("", 304, {"ETag": etag})
+
+        resp = jsonify(payload)
+        if etag:
+            resp.headers["ETag"] = etag
+        return resp
+
+
+@app.post("/api/seeds/<int:seed_id>/box")
+def api_create_seed_box(seed_id: int):
+    """
+    Create a new artifact version for a seed.
+    Body JSON:
+      - html (str, required)
+      - title (str, optional)
+      - kind (str, default 'box_of_dirt')
+      - doc_format ('full'|'body', default matches table default)
+      - publish (bool, default false)  # set is_published=1 on insert
+    """
+    data = request.get_json(silent=True) or {}
+    html = (data.get("html") or "").strip()
+    if not html:
+        return jsonify({"error": "html is required"}), 400
+
+    kind = (data.get("kind") or "box_of_dirt").strip()
+    title = (data.get("title") or "").strip() or None
+    doc_format = (data.get("doc_format") or "full").strip()
+    if doc_format not in ("full", "body"):
+        return jsonify({"error": "doc_format must be 'full' or 'body'"}), 400
+    publish = bool(data.get("publish"))
+
+    checksum = hashlib.sha256(html.encode("utf-8")).hexdigest()
+
+    with closing(connect()) as con, con:
+        if not _seed_exists(con, seed_id):
+            return jsonify({"error": "Seed not found"}), 404
+
+        version = _artifact_next_version(con, seed_id, kind)
+        con.execute("""
+            INSERT INTO seed_artifacts (seed_id, kind, title, html, doc_format, version, is_published, checksum, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        """, (seed_id, kind, title, html, doc_format, version, 1 if publish else 0, checksum))
+
+        new_id = con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+
+    return jsonify({
+        "ok": True,
+        "artifact_id": new_id,
+        "seed_id": seed_id,
+        "kind": kind,
+        "version": version,
+        "is_published": bool(publish),
+        "checksum": checksum
+    }), 201
+
+@app.post("/api/seeds/<int:seed_id>/box/<int:version>/publish")
+def api_publish_seed_box(seed_id: int, version: int):
+    data = request.get_json(silent=True) or {}
+    publish = bool(data.get("publish", True))  # default: publish
+    kind = (data.get("kind") or "box_of_dirt").strip()
+
+    with closing(connect()) as con, con:
+        # Ensure the artifact exists
+        row = con.execute("""
+            SELECT id FROM seed_artifacts WHERE seed_id=? AND kind=? AND version=? LIMIT 1
+        """, (seed_id, kind, version)).fetchone()
+        if not row:
+            return jsonify({"error": "Artifact version not found"}), 404
+
+        con.execute("""
+            UPDATE seed_artifacts
+            SET is_published=?, updated_at=datetime('now')
+            WHERE seed_id=? AND kind=? AND version=?
+        """, (1 if publish else 0, seed_id, kind, version))
+
+    return jsonify({"ok": True, "seed_id": seed_id, "version": version, "is_published": publish})
+
+@app.get("/api/seeds/<int:seed_id>/boxes")
+def api_list_seed_boxes(seed_id: int):
+    kind = (request.query_string.decode() and request.args.get("kind")) or "box_of_dirt"
+    rows = _query_all("""
+        SELECT id, seed_id, kind, title, version, is_published, doc_format, checksum, created_at, updated_at
+        FROM seed_artifacts
+        WHERE seed_id = ? AND kind = ?
+        ORDER BY version DESC
+    """, (seed_id, kind))
+    return jsonify(rows)

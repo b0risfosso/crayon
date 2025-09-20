@@ -63,7 +63,8 @@
       .panel .content { max-height: min(42vh, 420px); }
     }
       .left-rail { grid-template-rows: auto; grid-auto-rows: minmax(240px, 1fr); }
-    }
+    #boxHost iframe { width: 100%; height: 70vh; border: 1px solid color-mix(in oklab, CanvasText 14%, transparent);
+                     border-radius: .6rem; background: Canvas; }
   </style>
 </head>
 <body>
@@ -122,6 +123,16 @@
               <div id="protoWhy" style="white-space:pre-wrap; margin:.25rem 0;"></div>
             </div>
           </section>
+          <section id="boxSection" hidden style="margin-top:1rem;">
+            <div style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius:.6rem;
+                        padding:.8rem .9rem; background:color-mix(in oklab, Canvas 96%, CanvasText 4%);">
+              <h4 style="margin:.2rem 0 .6rem; font-size:1rem; font-weight:650;">Box of Dirt</h4>
+              <div id="boxError" class="muted" style="margin:.25rem 0 .5rem;"></div>
+              <div id="boxHost" style="min-height:60vh;">
+                <!-- will be populated with either innerHTML or an iframe[srcdoc] -->
+              </div>
+            </div>
+          </section>
         </article>
       </div>
     </section>
@@ -156,7 +167,15 @@
       listNarratives: '/api/narratives',
       listDimensions: (narrativeId) => `/api/narratives/${encodeURIComponent(narrativeId)}/dimensions`,
       listSeeds: (dimensionId) => `/api/dimensions/${encodeURIComponent(dimensionId)}/seeds`,
+      getSeedBox: (seedId) => `/api/seeds/${encodeURIComponent(seedId)}/box`,
     };
+
+    // Simple cache
+    const boxCache = new Map()
+
+    // Clear & render helpers
+    function clearBox(){ els.boxError.textContent = ''; els.boxHost.replaceChildren(); els.boxSection.hidden = true; }
+
 
     async function fetchJSON(url){
       const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
@@ -334,6 +353,40 @@
     }
 
     els.genProtoBtn.addEventListener('click', generatePrototype);
+
+    async function fetchSeedBox(seedId){
+  const res = await fetch(API.getSeedBox(seedId), { headers: { 'Accept': 'application/json' }});
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function renderBoxHTML(payload){
+  const html = (payload && payload.html) ? String(payload.html) : '';
+  els.boxSection.hidden = false;
+  if (!html) { els.boxError.textContent = 'No published box found for this seed.'; return; }
+
+  const looksFull = /<html[^>]*>/i.test(html) || /<!DOCTYPE/i.test(html);
+  els.boxHost.replaceChildren();
+  if (looksFull) {
+    const iframe = document.createElement('iframe');
+    iframe.title = 'Box of Dirt';
+    iframe.loading = 'lazy';
+    iframe.style.width = '100%';
+    iframe.style.height = '70vh';
+    iframe.style.border = '1px solid color-mix(in oklab, CanvasText 14%, transparent)';
+    iframe.style.borderRadius = '.6rem';
+    iframe.srcdoc = html;
+    els.boxHost.appendChild(iframe);
+    iframe.setAttribute('sandbox', 'allow-scripts'); // drop allow-same-origin unless you need it
+    const isFull = (data.doc_format === 'full');
+    if (isFull) { iframe.srcdoc = data.html; } else { container.innerHTML = data.html; }
+  } else {
+    const container = document.createElement('div');
+    container.innerHTML = html; // trusted content you authored
+    els.boxHost.appendChild(container);
+  }
+}
 
     // Boot
     loadDomains();

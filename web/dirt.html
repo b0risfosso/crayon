@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Seed Box Editor — Insert Box of Dirt HTML</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: Canvas; color: CanvasText;
+    }
+    header {
+      padding: .9rem 1rem;
+      border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, transparent);
+      display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+    }
+    header h1 { margin:0; font-size:1.05rem; font-weight:700; letter-spacing:.02em; }
+    main { padding: 1rem; display:grid; gap:1rem; max-width:1200px; margin:0 auto; }
+    .grid { display:grid; gap:1rem; }
+    .cols-2 { grid-template-columns: 420px 1fr; }
+    @media (max-width: 1000px){ .cols-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      border:1px solid color-mix(in oklab, CanvasText 14%, transparent);
+      border-radius:.6rem; background: color-mix(in oklab, Canvas 94%, CanvasText 6%);
+      box-shadow: 0 1px 0 rgba(0,0,0,.04) inset;
+    }
+    .card header { padding:.6rem .75rem; border-bottom:1px solid color-mix(in oklab, CanvasText 12%, transparent); }
+    .card header h2 { margin:0; font-size:.95rem; font-weight:650; }
+    .card .body { padding:.75rem; display:grid; gap:.6rem; }
+    label { font-size:.85rem; opacity:.9; display:block; margin-bottom:.25rem; }
+    select, input[type="text"], input[type="number"], textarea {
+      width:100%; padding:.55rem .6rem; border-radius:.5rem;
+      border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+      background: color-mix(in oklab, Canvas 96%, CanvasText 4%); color: inherit;
+    }
+    textarea { min-height: 320px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.9rem; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:.6rem; }
+    @media (max-width: 600px){ .row { grid-template-columns: 1fr; } }
+    .actions { display:flex; gap:.5rem; align-items:center; }
+    button {
+      padding:.55rem .8rem; border-radius:.5rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+      background: color-mix(in oklab, Canvas 92%, CanvasText 8%); color: inherit; cursor:pointer;
+    }
+    button[disabled]{ opacity:.6; cursor:not-allowed; }
+    .muted { font-size:.85rem; opacity:.75; }
+    .ok { color: color-mix(in oklab, CanvasText 20%, lime); }
+    .err { color: color-mix(in oklab, CanvasText 20%, red); }
+    .pill { display:inline-block; padding:.2rem .5rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+            border-radius:999px; font-size:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
+    iframe.preview { width:100%; height:70vh; border:1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius:.6rem; background:Canvas; }
+    .toolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .spacer { flex:1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Seed Box Editor — Insert Box of Dirt HTML</h1>
+    <div class="muted">Create draft or publish immediately • Preview included</div>
+  </header>
+
+  <main class="grid cols-2">
+    <!-- Left: Seed selection + HTML form -->
+    <section class="card" aria-labelledby="h-select">
+      <header><h2 id="h-select">Select Seed</h2></header>
+      <div class="body">
+        <div class="row">
+          <div>
+            <label for="domainSelect">Domain</label>
+            <select id="domainSelect"><option value="">Loading…</option></select>
+          </div>
+          <div>
+            <label for="dimensionSelect">Dimension</label>
+            <select id="dimensionSelect" disabled><option value="">Select a domain</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="seedSelect">Seed</label>
+            <select id="seedSelect" disabled><option value="">Select a dimension</option></select>
+          </div>
+          <div>
+            <label for="seedIdInput">Or enter Seed ID directly</label>
+            <input id="seedIdInput" type="number" placeholder="e.g., 123"/>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button id="loadCurrentBtn" disabled>Load current (latest/draft)</button>
+          <span id="selStatus" class="muted"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-compose">
+      <header><h2 id="h-compose">Compose Box of Dirt</h2></header>
+      <div class="body">
+        <div class="row">
+          <div>
+            <label for="titleInput">Title (optional)</label>
+            <input id="titleInput" type="text" placeholder="Display title for this artifact"/>
+          </div>
+          <div>
+            <label for="docFormat">Document Format</label>
+            <select id="docFormat">
+              <option value="auto">Auto-detect</option>
+              <option value="full">Full HTML (has &lt;html&gt;)</option>
+              <option value="body">Body-only snippet</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label for="htmlInput">HTML</label>
+          <textarea id="htmlInput" placeholder="Paste full page HTML or body-only markup here…"></textarea>
+          <div class="toolbar">
+            <input id="fileInput" type="file" accept=".html,.htm,text/html"/>
+            <button id="pasteBtn">Paste from clipboard</button>
+            <span id="htmlInfo" class="muted"></span>
+            <span class="spacer"></span>
+            <button id="previewBtn">Preview</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label><input type="checkbox" id="publishNow"/> Publish immediately</label>
+            <div class="muted">If unchecked, saves as a draft version.</div>
+          </div>
+          <div>
+            <div class="muted">Target endpoint: <span class="pill">POST /api/seeds/&lt;seed_id&gt;/box</span></div>
+            <div class="muted">Viewer endpoint: <span class="pill">GET /api/seeds/&lt;seed_id&gt;/box</span></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="saveBtn">Save</button>
+          <span id="saveStatus" class="muted"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Preview -->
+    <section class="card" aria-labelledby="h-preview">
+      <header><h2 id="h-preview">Preview</h2></header>
+      <div class="body">
+        <iframe id="previewFrame" class="preview" title="Box of Dirt Preview" sandbox="allow-scripts"></iframe>
+        <div class="muted">Full pages are shown as-is. Body-only is wrapped in a minimal site style for preview.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  (function(){
+    const els = {
+      domain: document.getElementById('domainSelect'),
+      dimension: document.getElementById('dimensionSelect'),
+      seed: document.getElementById('seedSelect'),
+      seedIdInput: document.getElementById('seedIdInput'),
+      loadCurrentBtn: document.getElementById('loadCurrentBtn'),
+      selStatus: document.getElementById('selStatus'),
+
+      title: document.getElementById('titleInput'),
+      docFormat: document.getElementById('docFormat'),
+      html: document.getElementById('htmlInput'),
+      fileInput: document.getElementById('fileInput'),
+      pasteBtn: document.getElementById('pasteBtn'),
+      previewBtn: document.getElementById('previewBtn'),
+      htmlInfo: document.getElementById('htmlInfo'),
+
+      publishNow: document.getElementById('publishNow'),
+      saveBtn: document.getElementById('saveBtn'),
+      saveStatus: document.getElementById('saveStatus'),
+
+      frame: document.getElementById('previewFrame'),
+    };
+
+    const API = {
+      narratives: '/api/narratives',
+      dims: (nid) => `/api/narratives/${encodeURIComponent(nid)}/dimensions`,
+      seeds: (did) => `/api/dimensions/${encodeURIComponent(did)}/seeds`,
+      getBox: (sid, draft) => `/api/seeds/${encodeURIComponent(sid)}/box${draft ? '?draft=1' : ''}`,
+      postBox: (sid) => `/api/seeds/${encodeURIComponent(sid)}/box`,
+    };
+
+    // Minimal site-styled CSS wrapper for body-only preview
+    const BODY_WRAPPER_STYLE = `
+      <style>
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+        h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+        h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
+        .grid { display: grid; gap: .8rem; }
+        .cols-2 { grid-template-columns: 1fr 1fr; }
+        .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+        .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
+        .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
+        .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+        .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+        .muted { opacity: .7; font-size: .9rem; }
+        .list-compact li { margin:.25rem 0; }
+        .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
+      </style>
+    `;
+
+    let cache = { narratives: [], dims: new Map(), seeds: new Map() };
+
+    function setStatus(el, msg, ok){
+      el.textContent = msg || '';
+      el.classList.remove('ok','err');
+      if (!msg) return;
+      el.classList.add(ok ? 'ok' : 'err');
+    }
+
+    async function fetchJSON(url){
+      const res = await fetch(url, { headers: { 'Accept':'application/json' }});
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+
+    // --- Load narratives/dimensions/seeds ---
+    async function loadNarratives(){
+      try{
+        const rows = await fetchJSON(API.narratives);
+        cache.narratives = rows;
+        els.domain.innerHTML = `<option value=\"\">Select…</option>` + rows.map(r => `<option value=\"${r.id}\">${escapeHTML(r.title)} (#${r.id})</option>`).join('');
+      }catch(e){
+        els.domain.innerHTML = `<option value=\"\">Failed to load narratives</option>`;
+      }
+    }
+    async function onDomainChange(){
+      const nid = els.domain.value;
+      els.dimension.disabled = !nid;
+      els.seed.disabled = true;
+      els.dimension.innerHTML = `<option value=\"\">${nid ? 'Loading…' : 'Select a domain'}</option>`;
+      els.seed.innerHTML = `<option value=\"\">Select a dimension</option>`;
+      if (!nid) return;
+      try{
+        const dims = await fetchJSON(API.dims(nid));
+        cache.dims.set(nid, dims);
+        els.dimension.innerHTML = `<option value=\"\">Select…</option>` + dims.map(d => `<option value=\"${d.id}\">${escapeHTML(d.title)} (#${d.id})</option>`).join('');
+      }catch(e){
+        els.dimension.innerHTML = `<option value=\"\">Failed to load dimensions</option>`;
+      }
+    }
+    async function onDimensionChange(){
+      const did = els.dimension.value;
+      els.seed.disabled = !did;
+      els.seed.innerHTML = `<option value=\"\">${did ? 'Loading…' : 'Select a dimension'}</option>`;
+      if (!did) return;
+      try{
+        const payload = await fetchJSON(API.seeds(did));
+        const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
+        cache.seeds.set(did, seeds);
+        els.seed.innerHTML = `<option value=\"\">Select…</option>` + seeds.map(s => `<option value=\"${s.id}\">${escapeHTML((s.problem||'Seed'))} (#${s.id})</option>`).join('');
+      }catch(e){
+        els.seed.innerHTML = `<option value=\"\">Failed to load seeds</option>`;
+      }
+    }
+    function currentSeedId(){
+      const fromSelect = els.seed.value && Number(els.seed.value);
+      const fromInput = els.seedIdInput.value && Number(els.seedIdInput.value);
+      return fromSelect || fromInput || null;
+    }
+
+    // --- Load current box (latest; prefers draft if exists) ---
+    async function loadCurrent(){
+      const sid = currentSeedId();
+      if (!sid){ setStatus(els.selStatus, 'Provide a Seed ID', false); return; }
+      setStatus(els.selStatus, 'Loading current box…', false);
+      try{
+        // Prefer latest (draft or published)
+        const data = await fetchJSON(API.getBox(sid, /*draft*/true));
+        setStatus(els.selStatus, `Loaded v${data.version} • ${data.is_published ? 'published' : 'draft'}`, true);
+        els.title.value = data.title || '';
+        // Decide format
+        const isFull = (data.doc_format === 'full') || /<!DOCTYPE|<html[^>]*>/i.test(data.html||'');
+        els.docFormat.value = isFull ? 'full' : 'body';
+        els.html.value = data.html || '';
+        updateHtmlInfo();
+        renderPreview();
+      }catch(e){
+        setStatus(els.selStatus, 'No artifact found (ok for new)', false);
+      }
+    }
+
+    // --- Save (draft or publish) ---
+    async function save(publish){
+      const sid = currentSeedId();
+      if (!sid){ setStatus(els.saveStatus, 'Provide a Seed ID', false); return; }
+      const html = (els.html.value || '').trim();
+      if (!html){ setStatus(els.saveStatus, 'HTML is required', false); return; }
+
+      // resolve doc_format
+      let fmt = els.docFormat.value;
+      if (fmt === 'auto'){
+        fmt = /<!DOCTYPE|<html[^>]*>/i.test(html) ? 'full' : 'body';
+      }
+      const body = {
+        html,
+        title: (els.title.value||'').trim() || null,
+        doc_format: fmt,
+        publish: !!publish
+      };
+
+      els.saveBtn.disabled = true;
+      setStatus(els.saveStatus, 'Saving…', false);
+      try{
+        const res = await fetch(API.postBox(sid), {
+          method:'POST',
+          headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok){
+          const txt = await res.text().catch(()=> '');
+          throw new Error(`HTTP ${res.status} ${txt}`);
+        }
+        const data = await res.json();
+        setStatus(els.saveStatus, `Saved v${data.version} • ${data.is_published ? 'published' : 'draft'}`, true);
+        // refresh preview (uses current textarea)
+        renderPreview();
+      }catch(e){
+        setStatus(els.saveStatus, e.message, false);
+      }finally{
+        els.saveBtn.disabled = false;
+      }
+    }
+
+    // --- Preview in iframe ---
+    function renderPreview(){
+      const html = els.html.value || '';
+      const fmtSel = els.docFormat.value;
+      const isFull = fmtSel === 'full' || (fmtSel === 'auto' && /<!DOCTYPE|<html[^>]*>/i.test(html));
+
+      if (isFull){
+        els.frame.srcdoc = html;
+      }else{
+        // Wrap body-only with a simple site style so layout looks right
+        const wrapped = `<!DOCTYPE html><html><head><meta charset="utf-8"/>${BODY_WRAPPER_STYLE}</head><body>${html}</body></html>`;
+        els.frame.srcdoc = wrapped;
+      }
+    }
+
+    // --- Utilities ---
+    function escapeHTML(s){
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[c]));
+        }
+    function updateHtmlInfo(){
+      const val = els.html.value || '';
+      const bytes = new Blob([val]).size;
+      const kb = (bytes/1024).toFixed(1);
+      const looksFull = /<!DOCTYPE|<html[^>]*>/i.test(val);
+      els.htmlInfo.textContent = `${kb} KB • ${looksFull ? 'full HTML' : 'body-only (likely)'}`;
+    }
+
+    // --- wiring ---
+    els.domain.addEventListener('change', onDomainChange);
+    els.dimension.addEventListener('change', onDimensionChange);
+    els.seed.addEventListener('change', ()=> {
+      setStatus(els.selStatus, '', false);
+      // mirror selected id to numeric field for clarity
+      els.seedIdInput.value = els.seed.value || '';
+    });
+    els.seedIdInput.addEventListener('input', ()=> setStatus(els.selStatus, '', false));
+    els.loadCurrentBtn.addEventListener('click', loadCurrent);
+    els.previewBtn.addEventListener('click', renderPreview);
+    els.html.addEventListener('input', updateHtmlInfo);
+    els.fileInput.addEventListener('change', async (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const txt = await f.text();
+      els.html.value = txt;
+      updateHtmlInfo();
+      renderPreview();
+    });
+    els.pasteBtn.addEventListener('click', async ()=>{
+      try{
+        const txt = await navigator.clipboard.readText();
+        els.html.value = txt;
+        updateHtmlInfo();
+        renderPreview();
+      }catch(e){
+        alert('Clipboard read failed.');
+      }
+    });
+
+    els.publishNow.addEventListener('change', ()=> {/* noop, read at save time */});
+    els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
+
+    // Enable/disable "Load current" based on seed id presence
+    const seedPresenceWatcher = () => {
+      const sid = currentSeedId();
+      els.loadCurrentBtn.disabled = !sid;
+    };
+    setInterval(seedPresenceWatcher, 400);
+
+    // Boot
+    loadNarratives();
+    updateHtmlInfo();
+    renderPreview();
+  })();
+  </script>
+</body>
+</html>
