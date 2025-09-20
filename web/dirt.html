@@ -94,6 +94,30 @@
       </div>
     </section>
 
+    <section class="card" aria-labelledby="h-context">
+        <header><h2 id="h-context">Selected Context</h2></header>
+        <div class="body" id="contextBody">
+          <div id="ctxDomain">
+            <div class="muted">Domain</div>
+            <div id="ctxDomainTitle">—</div>
+          </div>
+          <hr style="border:none; border-top:1px solid color-mix(in oklab, CanvasText 12%, transparent); margin:.5rem 0;">
+          <div id="ctxDimension">
+            <div class="muted">Dimension</div>
+            <div id="ctxDimTitle">—</div>
+            <div id="ctxDimDesc" class="muted" style="margin-top:.15rem;"></div>
+          </div>
+          <hr style="border:none; border-top:1px solid color-mix(in oklab, CanvasText 12%, transparent); margin:.5rem 0;">
+          <div id="ctxSeed">
+            <div class="muted">Seed</div>
+            <div id="ctxSeedA" style="white-space:pre-wrap;"></div>
+            <div id="ctxSeedB" style="white-space:pre-wrap; margin-top:.25rem;"></div>
+            <div id="ctxSeedL" style="white-space:pre-wrap; margin-top:.25rem;"></div>
+          </div>
+        </div>
+      </section>
+      
+
     <section class="card" aria-labelledby="h-compose">
       <header><h2 id="h-compose">Compose Box of Dirt</h2></header>
       <div class="body">
@@ -205,6 +229,14 @@
     protoEyes: document.getElementById('protoEyes'),
     protoWhy: document.getElementById('protoWhy'),
 
+    ctxDomainTitle: document.getElementById('ctxDomainTitle'),
+    ctxDimTitle: document.getElementById('ctxDimTitle'),
+    ctxDimDesc: document.getElementById('ctxDimDesc'),
+    ctxSeedA: document.getElementById('ctxSeedA'),
+    ctxSeedB: document.getElementById('ctxSeedB'),
+    ctxSeedL: document.getElementById('ctxSeedL'),
+
+
     };
 
     const API = {
@@ -272,6 +304,7 @@
         const dims = await fetchJSON(API.dims(nid));
         cache.dims.set(nid, dims);
         els.dimension.innerHTML = `<option value=\"\">Select…</option>` + dims.map(d => `<option value=\"${d.id}\">${escapeHTML(d.title)} (#${d.id})</option>`).join('');
+        renderContext();
       }catch(e){
         els.dimension.innerHTML = `<option value=\"\">Failed to load dimensions</option>`;
       }
@@ -286,6 +319,7 @@
         const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
         cache.seeds.set(did, seeds);
         els.seed.innerHTML = `<option value=\"\">Select…</option>` + seeds.map(s => `<option value=\"${s.id}\">${escapeHTML((s.problem||'Seed'))} (#${s.id})</option>`).join('');
+        renderContext();
       }catch(e){
         els.seed.innerHTML = `<option value=\"\">Failed to load seeds</option>`;
       }
@@ -437,6 +471,34 @@ async function generatePrototype(){
   }
 }
 
+function renderContext(){
+  // Domain
+  const nid = els.domain.value;
+  const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+  els.ctxDomainTitle.textContent = domainRow ? `${domainRow.title} (#${domainRow.id})` : '—';
+
+  // Dimension
+  const did = els.dimension.value;
+  const dims = cache.dims.get(nid) || [];
+  const dimRow = dims.find(d => String(d.id) === String(did));
+  els.ctxDimTitle.textContent = dimRow ? `${dimRow.title} (#${dimRow.id})` : '—';
+  els.ctxDimDesc.textContent = dimRow?.description ? String(dimRow.description) : '';
+
+  // Seed
+  const sid = els.seed.value;
+  const seeds = cache.seeds.get(did) || [];
+  const seedRow = seeds.find(s => String(s.id) === String(sid));
+
+  const A = seedRow?.problem || '';
+  const B = seedRow?.objective || '';
+  const L = seedRow?.solution || '';
+
+  els.ctxSeedA.textContent = A ? `A (Problem): ${A}` : '';
+  els.ctxSeedB.textContent = B ? `B (Objective): ${B}` : '';
+  els.ctxSeedL.textContent = L ? `Solution (Link): ${L}` : '';
+}
+
+
 
     // --- Preview in iframe ---
     function renderPreview(){
@@ -506,6 +568,17 @@ async function generatePrototype(){
     els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
     els.genProtoBtn.addEventListener('click', generatePrototype);
 
+    els.seed.addEventListener('change', ()=>{
+    setStatus(els.selStatus, '', false);
+    els.seedIdInput.value = els.seed.value || '';
+    renderContext();
+    });
+
+    els.seedIdInput.addEventListener('input', ()=>{
+    setStatus(els.selStatus, '', false);
+    // This input alone cannot resolve A/B/Link unless the seed is also in the dropdown.
+    renderContext();
+    });
 
     // Enable/disable "Load current" based on seed id presence
     const seedPresenceWatcher = () => {
@@ -518,6 +591,7 @@ async function generatePrototype(){
     loadNarratives();
     updateHtmlInfo();
     renderPreview();
+    renderContext(); // new
   })();
   </script>
 </body>
