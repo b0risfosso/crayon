@@ -150,6 +150,26 @@
         <div class="muted">Full pages are shown as-is. Body-only is wrapped in a minimal site style for preview.</div>
       </div>
     </section>
+
+    <section class="card" aria-labelledby="h-proto">
+        <header><h2 id="h-proto">Narrative Prototype</h2></header>
+        <div class="body">
+          <div class="actions">
+            <button id="genProtoBtn">Generate Prototype</button>
+            <span id="protoStatus" class="muted"></span>
+          </div>
+      
+          <div id="protoWrap" hidden style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent);
+               border-radius:.6rem; padding:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); display:grid; gap:.5rem;">
+            <div id="protoCore" style="white-space:pre-wrap;"></div>
+            <div id="protoBuild" style="white-space:pre-wrap;"></div>
+            <div id="protoTest" style="white-space:pre-wrap;"></div>
+            <div id="protoEyes"></div>
+            <div id="protoWhy" style="white-space:pre-wrap;"></div>
+          </div>
+        </div>
+      </section>
+      
   </main>
 
   <script>
@@ -175,6 +195,16 @@
       saveStatus: document.getElementById('saveStatus'),
 
       frame: document.getElementById('previewFrame'),
+
+      genProtoBtn: document.getElementById('genProtoBtn'),
+    protoStatus: document.getElementById('protoStatus'),
+    protoWrap: document.getElementById('protoWrap'),
+    protoCore: document.getElementById('protoCore'),
+    protoBuild: document.getElementById('protoBuild'),
+    protoTest: document.getElementById('protoTest'),
+    protoEyes: document.getElementById('protoEyes'),
+    protoWhy: document.getElementById('protoWhy'),
+
     };
 
     const API = {
@@ -329,6 +359,85 @@
       }
     }
 
+    // --- Prototype generation (moved here from viewer) ---
+async function generatePrototype(){
+  // We need: domain name, dimension name, and the selected seed's A/B/Link.
+  const nid = els.domain.value;
+  const did = els.dimension.value;
+  const sid = els.seed.value;
+
+  // Look up objects for labels
+  const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+  const dims = cache.dims.get(nid) || [];
+  const dimRow = dims.find(d => String(d.id) === String(did));
+
+  // Find the seed object in the current dimension cache (required to get A/B/Link text)
+  const seeds = cache.seeds.get(did) || [];
+  const seedRow = seeds.find(s => String(s.id) === String(sid));
+
+  // Basic validation
+  const errs = [];
+  if (!domainRow) errs.push('domain');
+  if (!dimRow) errs.push('dimension');
+  if (!seedRow) errs.push('seed');
+  if (errs.length){
+    els.protoStatus.textContent = `Select a ${errs.join(', ')} first.`;
+    els.protoWrap.hidden = true;
+    return;
+  }
+
+  // Build request payload
+  const payload = {
+    domain: domainRow.title || `Narrative ${domainRow.id}`,
+    dimension: dimRow.title || `Dimension ${dimRow.id}`,
+    seed: {
+      problem: seedRow.problem || '',
+      objective: seedRow.objective || '',
+      solution: seedRow.solution || ''
+    }
+  };
+
+  // Fire request
+  els.genProtoBtn.disabled = true;
+  els.protoStatus.textContent = 'Generating…';
+  els.protoWrap.hidden = true;
+
+  try {
+    const res = await fetch('/api/narrative-prototype', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const out = await res.json();
+
+    // Allow both shapes: {prototype: {...}} or direct
+    const p = out.prototype || out;
+
+    // Render
+    els.protoCore.innerText = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
+    els.protoBuild.innerText = p.minimal_build ? `Minimal Build — ${p.minimal_build}` : '';
+    els.protoTest.innerText = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
+    if (Array.isArray(p.first_eyes)) {
+      els.protoEyes.innerHTML = `<div style="font-weight:600;">First Eyes —</div>` +
+        `<ul style="margin:.25rem 0 .5rem .95rem; padding:0;">` +
+        p.first_eyes.map(x => `<li>${String(x)}</li>`).join('') + `</ul>`;
+    } else {
+      els.protoEyes.textContent = p.first_eyes ? `First Eyes — ${p.first_eyes}` : '';
+    }
+    els.protoWhy.innerText = p.why_box_of_dirt ? `Why This is a Box of Dirt — ${p.why_box_of_dirt}` : '';
+
+    els.protoWrap.hidden = false;
+    els.protoStatus.textContent = '';
+  } catch (e){
+    els.protoStatus.textContent = 'Error: ' + e.message;
+    els.protoWrap.hidden = true;
+  } finally {
+    els.genProtoBtn.disabled = false;
+  }
+}
+
+
     // --- Preview in iframe ---
     function renderPreview(){
       const html = els.html.value || '';
@@ -395,6 +504,8 @@
 
     els.publishNow.addEventListener('change', ()=> {/* noop, read at save time */});
     els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
+    els.genProtoBtn.addEventListener('click', generatePrototype);
+
 
     // Enable/disable "Load current" based on seed id presence
     const seedPresenceWatcher = () => {
