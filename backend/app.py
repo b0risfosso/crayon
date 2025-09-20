@@ -676,34 +676,65 @@ def api_list_seed_boxes(seed_id: int):
 
 @app.get("/boxes/<int:seed_id>")
 def public_box(seed_id: int):
-    # Optional: allow ?draft=1 for previewing drafts
+    """
+    Public, isolated viewer for a seed's Box of Dirt.
+    Query params:
+      - draft=1  -> show latest version regardless of publish state
+      - version=INT -> fetch specific version
+      - kind=... -> artifact kind (default 'box_of_dirt')
+    """
     want_draft = request.args.get("draft") in ("1", "true", "yes")
+    version = request.args.get("version")
+    kind = (request.args.get("kind") or "box_of_dirt").strip()
 
     with closing(connect()) as con:
-        # Expecting you have a seed_boxes table from earlier steps
-        row = con.execute("""
-          SELECT html, doc_format, title, is_published, version, updated_at
-          FROM seed_boxes
-          WHERE seed_id = ?
-            AND (? = 1 OR is_published = 1)
-          ORDER BY version DESC
-          LIMIT 1
-        """, (seed_id, 1 if want_draft else 0)).fetchone()
+        # sanity: seed exists
+        s = con.execute("SELECT 1 FROM narrative_seeds WHERE id=? LIMIT 1", (seed_id,)).fetchone()
+        if not s:
+            abort(404, description="Seed not found.")
+
+        if version:
+            row = con.execute("""
+                SELECT title, html, doc_format, version, is_published, checksum, updated_at
+                FROM seed_artifacts
+                WHERE seed_id=? AND kind=? AND version=?
+                LIMIT 1
+            """, (seed_id, kind, int(version))).fetchone()
+        else:
+            if want_draft:
+                row = con.execute("""
+                    SELECT title, html, doc_format, version, is_published, checksum, updated_at
+                    FROM seed_artifacts
+                    WHERE seed_id=? AND kind=?
+                    ORDER BY version DESC
+                    LIMIT 1
+                """, (seed_id, kind)).fetchone()
+            else:
+                row = con.execute("""
+                    SELECT title, html, doc_format, version, is_published, checksum, updated_at
+                    FROM seed_artifacts
+                    WHERE seed_id=? AND kind=? AND is_published=1
+                    ORDER BY version DESC
+                    LIMIT 1
+                """, (seed_id, kind)).fetchone()
 
     if not row:
-        abort(404, description="No box found for this seed.")
+        msg = "No published artifact found for this seed." if not want_draft else "No artifact found for this seed."
+        abort(404, description=msg)
 
     html = (row["html"] or "")
-    fmt = (row["doc_format"] or "").lower()
+    fmt = (row["doc_format"] or "full").lower()
+    looks_full = bool(re.search(r"<!DOCTYPE|<html[^>]*>", html, re.I) or fmt == "full")
 
-    looks_full = bool(re.search(r"<!DOCTYPE|<html[^>]*>", html, re.I)) or fmt == "full"
+    # ETag for caching
+    etag = row["checksum"] or None
+    if etag and request.headers.get("If-None-Match") == etag:
+        return ("", 304, {"ETag": etag})
 
     if looks_full:
-        # Return author-provided full HTML as-is
-        return Response(html, mimetype="text/html; charset=utf-8")
-
-    # Otherwise, wrap body-only snippet
-    wrapped = f"""<!DOCTYPE html>
+        resp = Response(html, mimetype="text/html; charset=utf-8")
+    else:
+        wrapped = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -715,4 +746,8 @@ def public_box(seed_id: int):
 {html}
 </body>
 </html>"""
-    return Response(wrapped, mimetype="text/html; charset=utf-8")
+        resp = Response(wrapped, mimetype="text/html; charset=utf-8")
+
+    if etag:
+        resp.headers["ETag"] = etag
+    return resp
