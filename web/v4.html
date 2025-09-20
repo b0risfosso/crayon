@@ -109,22 +109,6 @@
         <article id="seedView" hidden>
           <h3 class="seed-title" id="seedTitle"></h3>
           <div class="seed-body" id="seedBody"></div>
-          <div class="actions" style="margin-top: .75rem; display:flex; gap:.5rem; align-items:center;">
-            <button id="genProtoBtn" disabled style="padding:.55rem .8rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent); background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:not-allowed;">
-              Generate Prototype
-            </button>
-            <span id="protoStatus" style="font-size:.85rem; opacity:.7;"></span>
-          </div>
-          <section id="protoSection" hidden style="margin-top:1rem;">
-            <div class="proto-card" style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius:.6rem; padding: .8rem .9rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%);">
-              <h4 style="margin:.2rem 0 .6rem; font-size:1rem; font-weight:650;">Narrative Prototype</h4>
-              <div id="protoCore" style="white-space:pre-wrap; margin:.25rem 0;"></div>
-              <div id="protoBuild" style="white-space:pre-wrap; margin:.25rem 0;"></div>
-              <div id="protoTest" style="white-space:pre-wrap; margin:.25rem 0;"></div>
-              <div id="protoEyes" style="margin:.25rem 0;"></div>
-              <div id="protoWhy" style="white-space:pre-wrap; margin:.25rem 0;"></div>
-            </div>
-          </section>
           <section id="boxSection" hidden style="margin-top:1rem;">
             <div style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius:.6rem;
                         padding:.8rem .9rem; background:color-mix(in oklab, Canvas 96%, CanvasText 4%);">
@@ -154,14 +138,6 @@
       seedView: document.getElementById('seedView'),
       seedTitle: document.getElementById('seedTitle'),
       seedBody: document.getElementById('seedBody'),
-      genProtoBtn: document.getElementById('genProtoBtn'),
-      protoStatus: document.getElementById('protoStatus'),
-      protoSection: document.getElementById('protoSection'),
-      protoCore: document.getElementById('protoCore'),
-      protoBuild: document.getElementById('protoBuild'),
-      protoTest: document.getElementById('protoTest'),
-      protoEyes: document.getElementById('protoEyes'),
-      protoWhy: document.getElementById('protoWhy'),
       boxSection: document.getElementById('boxSection'),
       boxError: document.getElementById('boxError'),
       boxHost: document.getElementById('boxHost'),
@@ -246,10 +222,6 @@
       state.seed = seed || null;
       setBreadcrumbs();
       // reset prototype UI
-      els.protoSection.hidden = true;
-      els.protoStatus.textContent = '';
-      els.genProtoBtn.disabled = !seed;
-      els.genProtoBtn.style.cursor = seed ? 'pointer' : 'not-allowed';
 
       if (!seed){
         els.seedView.hidden = true; els.viewerEmpty.hidden = false; return;
@@ -311,58 +283,6 @@
     function onSelectSeed(seed, li){
       state.seed = seed; setBreadcrumbs(); setActive(els.seedsList, li); showSeed(seed);
     }
-
-    // Prototype generation
-    async function generatePrototype(){
-      if (!state.domain || !state.dimension || !state.seed) return;
-      els.genProtoBtn.disabled = true;
-      els.genProtoBtn.style.cursor = 'not-allowed';
-      els.protoStatus.textContent = 'Generating…';
-      els.protoSection.hidden = true;
-
-      const payload = {
-        domain: state.domain.title || state.domain.name || `Narrative ${state.domain.id}`,
-        dimension: state.dimension.title || state.dimension.name || `Dimension ${state.dimension.id}`,
-        seed: {
-          problem: state.seed.problem || state.seed.A || state.seed.a || state.seed.Problem || '',
-          objective: state.seed.objective || state.seed.B || state.seed.b || state.seed.Objective || '',
-          solution: state.seed.solution || state.seed.Solution || state.seed.link || state.seed.Link || ''
-        }
-      };
-
-      try {
-        const res = await fetch('/api/narrative-prototype', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const p = data.prototype || data; // tolerate either shape
-        // Render
-        els.protoCore.innerText = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
-        els.protoBuild.innerText = p.minimal_build ? `Minimal Build — ${p.minimal_build}` : '';
-        els.protoTest.innerText = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
-        if (Array.isArray(p.first_eyes)) {
-          els.protoEyes.innerHTML = `<div style="font-weight:600;">First Eyes —</div>` +
-            `<ul style="margin:.25rem 0 .5rem .95rem; padding:0;">` +
-            p.first_eyes.map(x => `<li>${String(x)}</li>`).join('') + `</ul>`;
-        } else {
-          els.protoEyes.textContent = p.first_eyes ? `First Eyes — ${p.first_eyes}` : '';
-        }
-        els.protoWhy.innerText = p.why_box_of_dirt ? `Why This is a Box of Dirt — ${p.why_box_of_dirt}` : '';
-
-        els.protoSection.hidden = false;
-        els.protoStatus.textContent = '';
-      } catch (e){
-        els.protoStatus.textContent = 'Error: ' + e.message;
-      } finally {
-        els.genProtoBtn.disabled = false;
-        els.genProtoBtn.style.cursor = 'pointer';
-      }
-    }
-
-    els.genProtoBtn.addEventListener('click', generatePrototype);
 
     async function fetchSeedBox(seedId){
   const res = await fetch(API.getSeedBox(seedId), { headers: { 'Accept': 'application/json' }});
