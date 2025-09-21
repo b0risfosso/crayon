@@ -122,11 +122,15 @@
       <h3 style="margin:0">Seed Assets</h3>
       <div class="controls" style="gap:8px">
         <button id="assetsRefresh" title="Fetch current SVGs for this seed">Refresh</button>
+        <button id="assetsSuggest" title="Generate a manifest payload from the SVGs that successfully load">
+            Suggest payload
+          </button>
         <span id="assetsCount" class="pill">0 files</span>
       </div>
     </div>
     <div class="muted">Shows SVGs found on the server for this seed (from <code>/api/assets/seed/{id}/svgs</code>).</div>
     <div id="assetsList" class="preview-grid" style="margin-top:10px"></div>
+    
   </section>
 
   <template id="panelTmpl">
@@ -172,6 +176,8 @@
   assetsRefresh: document.getElementById('assetsRefresh'),
   assetsList: document.getElementById('assetsList'),
   assetsCount: document.getElementById('assetsCount'),
+  assetsSuggest: document.getElementById('assetsSuggest'),
+
 };
 
 
@@ -365,37 +371,93 @@
       }, 300);
     });
   // ===== Assets viewer =====
-    function renderAssets(items) {
-      els.assetsList.innerHTML = '';
-      els.assetsCount.textContent = `${items.length} file${items.length===1?'':'s'}`;
-      for (const it of items) {
-        const card = document.createElement('div');
-        card.className = 'panel';
-        const img = document.createElement('img');
-        img.alt = it.name;
-        img.loading = 'lazy';
-        img.src = it.url;
-        const id = document.createElement('div'); id.className='panel-id'; id.style.fontWeight='600'; id.style.marginTop='6px'; id.textContent = it.name;
-        const meta = document.createElement('div'); meta.className='muted'; meta.style.fontSize='.8rem'; meta.textContent = `${(it.size||0)} bytes • ${it.mtime||''}`;
-        card.append(img, id, meta);
-        els.assetsList.appendChild(card);
-      }
-    }
-    async function fetchAssets() {
-      try {
-        const sid = Number(els.seedId.value);
-        if (!Number.isInteger(sid) || sid < 1) throw new Error('Enter Seed ID first');
-        const base = els.apiBase.value.replace(/\/$/, '');
-        const url = `${base}/api/assets/seed/${sid}/svgs`;
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(`Fetch ${r.status}`);
-        const data = await r.json();
-        renderAssets(data.items || []);
-        log(`Fetched ${data.items?.length||0} asset(s)`, 'ok');
-      } catch (e) { log(String(e.message || e), 'error'); }
-    }
+    // Track load status and remember last fetched items
+const assetStatus = new Map();   // url -> true | false | undefined
+let lastAssets = [];             // [{name,url,size,mtime}, ...]
+
+function renderAssets(items) {
+  lastAssets = items || [];
+  assetStatus.clear();
+
+  els.assetsList.innerHTML = '';
+  els.assetsCount.textContent = `${lastAssets.length} file${lastAssets.length===1?'':'s'}`;
+
+  for (const it of lastAssets) {
+    const card = document.createElement('div');
+    card.className = 'panel';
+
+    const img = document.createElement('img');
+    img.alt = it.name;
+    img.loading = 'lazy';
+
+    // default state before events fire
+    assetStatus.set(it.url, undefined);
+
+    img.addEventListener('load', () => assetStatus.set(it.url, true), { once: true });
+    img.addEventListener('error', () => assetStatus.set(it.url, false), { once: true });
+
+    img.src = it.url;
+
+    const id = document.createElement('div');
+    id.className='panel-id';
+    id.style.fontWeight='600';
+    id.style.marginTop='6px';
+    id.textContent = it.name;
+
+    const meta = document.createElement('div');
+    meta.className='muted';
+    meta.style.fontSize='.8rem';
+    meta.textContent = `${(it.size||0)} bytes • ${it.mtime||''}`;
+
+    card.append(img, id, meta);
+    els.assetsList.appendChild(card);
+  }
+}
     els.assetsRefresh?.addEventListener('click', fetchAssets);
     els.loadLatest.addEventListener('click', () => setTimeout(fetchAssets, 800));
+
+    function toPanelId(name) {
+  // filename → id (lowercase, underscores, no extension)
+  return name
+    .replace(/\.svg$/i,'')
+    .replace(/[^a-z0-9]+/gi,'_')
+    .replace(/^_+|_+$/g,'')
+    .toLowerCase() || 'panel';
+}
+
+function suggestPayloadFromLoaded() {
+  // Only keep images that actually loaded
+  const good = lastAssets.filter(it => assetStatus.get(it.url) === true);
+
+  // If none confirmed yet (e.g., network slow), fall back to all listed
+  const srcItems = (good.length ? good : lastAssets);
+  if (!good.length && lastAssets.length) {
+    log('No confirmed-loaded images yet; using all listed files instead', 'error');
+  }
+
+  const seen = new Set();
+  const panels = srcItems.map(it => {
+    let id = toPanelId(it.name);
+    let n = 1;
+    while (seen.has(id)) { id = `${id}_${n++}`; }
+    seen.add(id);
+
+    // alt is empty string to satisfy your validator; extra fields default to null
+    return { id, src: it.url, alt: "", title: null, description: null };
+  });
+
+  const payload = { panels };
+  els.payload.value = JSON.stringify(payload, null, 2);
+
+  try {
+    renderPreview(panels);
+    setStatus('Suggested payload generated ✓', true);
+  } catch (_) {}
+
+  log(`Suggested payload with ${panels.length} panel(s)`, 'ok');
+}
+
+els.assetsSuggest?.addEventListener('click', suggestPayloadFromLoaded);
 
 // ===== SVG Upload module (appends, safe to include once) =====
   (function(){
