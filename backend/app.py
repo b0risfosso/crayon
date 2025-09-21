@@ -13,6 +13,8 @@ import re
 import json
 from pathlib import Path
 from datetime import datetime, timezone
+from xai_sdk import Client as XAIClient
+from xai_sdk.chat import system as xai_system, user as xai_user
 
 app = Flask(__name__)
 
@@ -42,7 +44,7 @@ def bootstrap_schema():
         );
         """)
 
-        # ---- narrative_dimensions (+ targets_json check)
+        # ---- narrative_dimensions (+ targets_json check + provider)
         con.execute("""
         CREATE TABLE IF NOT EXISTS narrative_dimensions (
             id INTEGER PRIMARY KEY,
@@ -56,8 +58,15 @@ def bootstrap_schema():
         cols = [r["name"] for r in con.execute("PRAGMA table_info(narrative_dimensions)")]
         if "targets_json" not in cols:
             con.execute("ALTER TABLE narrative_dimensions ADD COLUMN targets_json TEXT")
+        if "provider" not in cols:
+            # store provenance of which LLM/provider generated/last updated this dim
+            con.execute("ALTER TABLE narrative_dimensions ADD COLUMN provider TEXT")
 
-        # ---- narrative_seeds
+        # helpful lookups
+        con.execute("""CREATE INDEX IF NOT EXISTS idx_dimensions_provider
+                       ON narrative_dimensions(provider);""")
+
+        # ---- narrative_seeds (+ provider)
         con.execute("""
         CREATE TABLE IF NOT EXISTS narrative_seeds (
             id INTEGER PRIMARY KEY,
@@ -69,6 +78,15 @@ def bootstrap_schema():
             FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE
         );
         """)
+        seed_cols = [r["name"] for r in con.execute("PRAGMA table_info(narrative_seeds)")]
+        if "provider" not in seed_cols:
+            con.execute("ALTER TABLE narrative_seeds ADD COLUMN provider TEXT")
+
+        # helpful lookups
+        con.execute("""CREATE INDEX IF NOT EXISTS idx_seeds_provider
+                       ON narrative_seeds(provider);""")
+        con.execute("""CREATE INDEX IF NOT EXISTS idx_seeds_dim_provider
+                       ON narrative_seeds(dimension_id, provider);""")
 
         # ---- seed_artifacts
         con.execute("""
@@ -112,18 +130,32 @@ def bootstrap_schema():
         con.execute("""CREATE INDEX IF NOT EXISTS idx_manifest_lookup
                        ON seed_manifests(seed_id, is_published, version);""")
 
-        # ---- helpful uniqueness
+        # ---- helpful uniqueness (unchanged)
         con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_title ON narratives(title);")
         con.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_dim_unique
                        ON narrative_dimensions(narrative_id, title);""")
+        # NOTE: we keep seed dedup independent of provider so exact duplicates don't multiply.
         con.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_dedup
                        ON narrative_seeds(dimension_id, problem, objective, solution);""")
+
 
 
 bootstrap_schema()
 
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+_xai_client = None
+def get_xai_client():
+    global _xai_client
+    if _xai_client is None:
+        if XAIClient is None:
+            raise RuntimeError("xai_sdk is not installed. `pip install xai-sdk`")
+        api_key = os.getenv("XAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("XAI_API_KEY not set")
+        _xai_client = XAIClient(api_key=api_key)
+    return _xai_client
 
 class NarrativeDimension(BaseModel):
     name: str = Field(..., description="Short title for the dimension")
@@ -183,7 +215,7 @@ Output format:
 [Number]. [Dimension Name] — [Thesis/Description]  
 Narrative Targets: [list of 3–6 examples]
 
-Generate 5–8 narrative dimensions unless otherwise requested.
+Generate 3–4 narrative dimensions unless otherwise requested.
 """
 
 SEED_SYS_MSG = """You are an assistant trained to generate Fantasiagenesis narrative seeds.
@@ -224,6 +256,11 @@ BODY_WRAPPER_STYLE = """
 </style>
 """
 
+def _provider_from(data: dict) -> str:
+    p = (data.get("provider") or "").strip().lower()
+    return p if p in {"xai", "openai"} else "openai"
+
+
 def get_or_create_narrative(con, domain_title: str) -> int:
     row = con.execute("SELECT id FROM narratives WHERE title = ?", (domain_title,)).fetchone()
     if row:
@@ -231,30 +268,39 @@ def get_or_create_narrative(con, domain_title: str) -> int:
     cur = con.execute("INSERT INTO narratives (title) VALUES (?)", (domain_title,))
     return cur.lastrowid
 
-def upsert_dimension(con, narrative_id: int, name: str, thesis: str, targets: list) -> int:
+def upsert_dimension(con, narrative_id: int, name: str, thesis: str, targets: list, provider: str | None = None) -> int:
     row = con.execute(
         "SELECT id FROM narrative_dimensions WHERE narrative_id=? AND title=?",
         (narrative_id, name)
     ).fetchone()
     targets_json = json.dumps(targets or [])
     if row:
-        con.execute(
-            "UPDATE narrative_dimensions SET description=?, targets_json=? WHERE id=?",
-            (thesis, targets_json, row["id"])
-        )
+        # When updating, also refresh provider if supplied
+        if provider:
+            con.execute(
+                "UPDATE narrative_dimensions SET description=?, targets_json=?, provider=? WHERE id=?",
+                (thesis, targets_json, provider, row["id"])
+            )
+        else:
+            con.execute(
+                "UPDATE narrative_dimensions SET description=?, targets_json=? WHERE id=?",
+                (thesis, targets_json, row["id"])
+            )
         return row["id"]
     cur = con.execute(
-        "INSERT INTO narrative_dimensions (narrative_id, title, description, targets_json) VALUES (?,?,?,?)",
-        (narrative_id, name, thesis, targets_json)
+        "INSERT INTO narrative_dimensions (narrative_id, title, description, targets_json, provider) VALUES (?,?,?,?,?)",
+        (narrative_id, name, thesis, targets_json, provider)
     )
     return cur.lastrowid
 
-def insert_seed(con, dimension_id: int, problem: str, objective: str, solution: str):
-    # dedup via unique index; ignore if exact duplicate
+
+def insert_seed(con, dimension_id: int, problem: str, objective: str, solution: str, provider: str | None = None):
+    # dedup via unique index; ignore if exact duplicate (provider is not part of the unique key)
     con.execute("""
-        INSERT OR IGNORE INTO narrative_seeds (dimension_id, problem, objective, solution)
-        VALUES (?,?,?,?)
-    """, (dimension_id, problem, objective, solution))
+        INSERT OR IGNORE INTO narrative_seeds (dimension_id, problem, objective, solution, provider)
+        VALUES (?,?,?,?,?)
+    """, (dimension_id, problem, objective, solution, provider))
+
 
 def find_dimension_id(con, narrative_id: int, dim_name: str):
     row = con.execute(
@@ -309,34 +355,92 @@ def _suffix_if_exists(p: Path) -> Path:
             return candidate
         i += 1
 
-# --- route ---
+# ---------- NEW: LLM adapters (OpenAI + xAI) ----------
+def llm_generate_dimensions_openai(domain: str, n: int | None):
+    count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
+    usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
+    parsed_resp = client.responses.parse(
+        model=os.getenv("OPENAI_MODEL", "gpt-5"),
+        input=[
+            {"role": "system", "content": DIM_SYS_MSG},
+            {"role": "user", "content": usr_msg},
+        ],
+        text_format=NarrativeDimensions,
+    )
+    return parsed_resp  # keep raw + parsed for uniform handling
+
+def llm_generate_dimensions_xai(domain: str, n: int | None):
+    xai = get_xai_client()
+    model = os.getenv("XAI_MODEL", "grok-4")
+    chat = xai.chat.create(model=model)
+    count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
+    usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
+    chat.append(xai_system(DIM_SYS_MSG))
+    chat.append(xai_user(usr_msg))
+    # xAI returns: (response, parsed_object or None)
+    response, parsed = chat.parse(NarrativeDimensions)
+    return response, parsed
+
+def llm_generate_seeds_openai(domain: str, dimension: str, description: str, targets: List[str]):
+    usr_msg = (
+        f"Domain: {domain}\n"
+        f"Dimension: {dimension}\n"
+        f"Description: {description}\n"
+        f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
+        "Create A→B narrative seeds in this dimension."
+    )
+    parsed_resp = client.responses.parse(
+        model=os.getenv("OPENAI_MODEL", "gpt-5"),
+        input=[
+            {"role": "system", "content": SEED_SYS_MSG},
+            {"role": "user", "content": usr_msg},
+        ],
+        text_format=NarrativeSeeds,
+    )
+    return parsed_resp
+
+def llm_generate_seeds_xai(domain: str, dimension: str, description: str, targets: List[str]):
+    xai = get_xai_client()
+    model = os.getenv("XAI_MODEL", "grok-4")
+    chat = xai.chat.create(model=model)
+    usr_msg = (
+        f"Domain: {domain}\n"
+        f"Dimension: {dimension}\n"
+        f"Description: {description}\n"
+        f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
+        "Create A→B narrative seeds in this dimension."
+    )
+    chat.append(xai_system(SEED_SYS_MSG))
+    chat.append(xai_user(usr_msg))
+    response, parsed = chat.parse(NarrativeSeeds)
+    return response, parsed
+
+
+
+# --- routes ---
 @app.post("/api/narrative-dimensions")
 def generate_narrative_dimensions():
     data = request.get_json(silent=True) or {}
     domain = (data.get("domain") or "").strip()
-    n = data.get("n")  # optional override 1..12
+    n = data.get("n")
+    provider = _provider_from(data)  # "openai" | "xai" (your helper)
 
     if not domain:
         return jsonify({"error": "Missing 'domain'"}), 400
 
-    count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
-    usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
-
     try:
-        parsed_resp = client.responses.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-5"),
-            input=[
-                {"role": "system", "content": DIM_SYS_MSG},
-                {"role": "user", "content": usr_msg},
-            ],
-            text_format=NarrativeDimensions,
-        )
+        if provider == "xai":
+            resp, parsed = llm_generate_dimensions_xai(domain, n)
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            raw_text = getattr(resp, "content", None)
+        else:
+            parsed_resp = llm_generate_dimensions_openai(domain, n)
+            parsed = parsed_resp.output_parsed
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            raw_text = parsed_resp.output_text
 
-        parsed = parsed_resp.output_parsed  # → NarrativeDimensions | None
         if parsed is not None:
             dims = parsed.model_dump()["dimensions"]
-
-            # === NEW: save to DB ===
             with closing(connect()) as con, con:
                 narrative_id = get_or_create_narrative(con, domain)
                 saved = []
@@ -346,21 +450,23 @@ def generate_narrative_dimensions():
                         narrative_id=narrative_id,
                         name=d["name"],
                         thesis=d["thesis"],
-                        targets=d.get("targets") or []
+                        targets=d.get("targets") or [],
+                        provider=provider
                     )
-                    saved.append({**d, "id": dim_id})
+                    saved.append({**d, "id": dim_id, "provider": provider})
 
             return jsonify({
                 "domain": domain,
-                "model": os.getenv("OPENAI_MODEL", "gpt-5"),
+                "provider": provider,
+                "model": model_name,
                 "dimensions": saved
             }), 200
 
-        # fallback: parsing failed
         return jsonify({
             "domain": domain,
-            "model": os.getenv("OPENAI_MODEL", "gpt-5"),
-            "raw": parsed_resp.output_text,
+            "provider": provider,
+            "model": model_name,
+            "raw": raw_text,
             "note": "Parsing returned None; inspect 'raw'.",
         }), 200
 
@@ -368,6 +474,7 @@ def generate_narrative_dimensions():
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
 
 
+# ---------- UPDATED: /api/narrative-seeds with provider switch ----------
 @app.post("/api/narrative-seeds")
 def generate_narrative_seeds():
     data = request.get_json(silent=True) or {}
@@ -375,65 +482,56 @@ def generate_narrative_seeds():
     dimension = (data.get("dimension") or "").strip()
     description = (data.get("description") or "").strip()
     targets = data.get("targets") or []
+    provider = _provider_from(data)
 
     if not (domain and dimension and description):
         return jsonify({"error": "Missing required fields: domain, dimension, description"}), 400
 
-    usr_msg = (
-        f"Domain: {domain}\n"
-        f"Dimension: {dimension}\n"
-        f"Description: {description}\n"
-        f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
-        "Create A→B narrative seeds in this dimension."
-    )
-
     try:
-        parsed_resp = client.responses.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-5"),
-            input=[
-                {"role": "system", "content": SEED_SYS_MSG},
-                {"role": "user", "content": usr_msg},
-            ],
-            text_format=NarrativeSeeds,
-        )
+        if provider == "xai":
+            resp, parsed = llm_generate_seeds_xai(domain, dimension, description, targets)
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            raw_text = getattr(resp, "content", None)
+        else:
+            parsed_resp = llm_generate_seeds_openai(domain, dimension, description, targets)
+            parsed = parsed_resp.output_parsed
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            raw_text = parsed_resp.output_text
 
-        parsed = parsed_resp.output_parsed  # -> NarrativeSeeds | None
         if not parsed:
-            # Return raw for debugging if parsing failed
             return jsonify({
                 "domain": domain,
                 "dimension": dimension,
-                "raw": parsed_resp.output_text,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
                 "note": "Parsing failed, see raw output."
             }), 200
 
-        seeds = parsed.model_dump()["seeds"]  # list of {problem, objective, solution}
+        seeds = parsed.model_dump()["seeds"]
 
-        # === Persist to DB ===
         with closing(connect()) as con, con:
-            # ensure domain exists
             narrative_id = get_or_create_narrative(con, domain)
-            # ensure/refresh the dimension row with description+targets from the request
             dim_id = upsert_dimension(
                 con,
                 narrative_id=narrative_id,
                 name=dimension,
                 thesis=description,
-                targets=targets
+                targets=targets,
+                provider=provider
             )
-            # insert seeds (dedup via UNIQUE index)
             for s in seeds:
                 insert_seed(
                     con,
                     dimension_id=dim_id,
                     problem=(s.get("problem") or "").strip(),
                     objective=(s.get("objective") or "").strip(),
-                    solution=(s.get("solution") or "").strip()
+                    solution=(s.get("solution") or "").strip(),
+                    provider=provider
                 )
 
-            # return latest seeds from DB (with ids/timestamps)
             rows = con.execute("""
-                SELECT id, problem, objective, solution, created_at
+                SELECT id, problem, objective, solution, provider, created_at
                 FROM narrative_seeds
                 WHERE dimension_id=?
                 ORDER BY id DESC
@@ -446,6 +544,7 @@ def generate_narrative_seeds():
                 "problem": r["problem"],
                 "objective": r["objective"],
                 "solution": r["solution"],
+                "provider": r["provider"],
                 "created_at": r["created_at"]
             } for r in rows
         ]
@@ -454,6 +553,8 @@ def generate_narrative_seeds():
             "domain": domain,
             "dimension": dimension,
             "dimension_id": dim_id,
+            "provider": provider,
+            "model": model_name,
             "seeds": seeds_out
         }), 200
 
@@ -488,13 +589,12 @@ def api_narratives():
 
 @app.get("/api/narratives/<int:narrative_id>/dimensions")
 def api_narrative_dimensions(narrative_id: int):
-    # Optional: 404 if the narrative doesn't exist
     exists = _query_all("SELECT 1 AS ok FROM narratives WHERE id = ? LIMIT 1", (narrative_id,))
     if not exists:
         abort(404, description="Narrative not found")
 
     dims = _query_all("""
-        SELECT id, narrative_id, title, description, created_at
+        SELECT id, narrative_id, title, description, provider, created_at
         FROM narrative_dimensions
         WHERE narrative_id = ?
         ORDER BY id ASC
@@ -505,13 +605,14 @@ def api_narrative_dimensions(narrative_id: int):
 @app.get("/api/dimensions/<int:dimension_id>/seeds")
 def api_dimension_seeds(dimension_id: int):
     rows = _query_all("""
-        SELECT id, problem, objective, solution, created_at
+        SELECT id, problem, objective, solution, provider, created_at
         FROM narrative_seeds
         WHERE dimension_id = ?
         ORDER BY id DESC
         LIMIT 200
     """, (dimension_id,))
     return jsonify({"ok": True, "dimension_id": dimension_id, "seeds": rows})
+
 
 
 @app.post("/api/narrative-prototype")

@@ -11,16 +11,15 @@
     form { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; align-items: center; }
     select { padding: .55rem .6rem; min-width: 22rem; border: 1px solid #ccc; border-radius: .5rem; }
     button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
+    button.secondary { background: #444; }
     .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
     .grid { display: grid; gap: .8rem; }
     details { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .75rem 1rem; background: rgba(0,0,0,.02); }
     summary { cursor: pointer; font-weight: 600; }
     .thesis { margin: .4rem 0 .3rem; font-style: italic; white-space: pre-wrap; }
-    .targets { margin: .25rem 0 .5rem 1.25rem; }
     .seedbox { border-top: 1px dashed #c8c8c8; margin-top: .5rem; padding-top: .5rem; }
     .seed-title { font-weight: 600; margin-bottom: .25rem; }
     .seed { margin: .35rem 0; padding: .5rem .6rem; border: 1px solid #e0e0e0; border-radius: .5rem; background: #fff; }
-    .seed small { display: block; opacity: .8; margin-top: .2rem; }
     .dim-error, .seed-error, .error { color: #b00020; white-space: pre-wrap; }
     .muted { opacity: .7; font-size: .9rem; }
     pre { background: #f6f6f6; padding: .75rem; border-radius: .5rem; overflow-x: auto; }
@@ -38,10 +37,8 @@
       <option value="">Loading domains…</option>
     </select>
     <button type="submit">Load</button>
-    <span id="reloadBtnWrap" class="row" style="display:none;">
-      <button id="reloadBtn" type="button" title="Reload dimensions & seeds">↻ Reload</button>
-      <span class="muted" id="loadedMeta"></span>
-    </span>
+    <button id="runGrokBtn" type="button" class="secondary" title="Generate dimensions & seeds with Grok (xAI)">Run Grok</button>
+    <span id="statusLine" class="muted"></span>
   </form>
 
   <div id="globalStatus" class="meta"></div>
@@ -50,11 +47,10 @@
   <script>
     const form = document.getElementById('form');
     const narrativeSelect = document.getElementById('narrativeSelect');
-    const reloadBtnWrap = document.getElementById('reloadBtnWrap');
-    const reloadBtn = document.getElementById('reloadBtn');
-    const loadedMeta = document.getElementById('loadedMeta');
+    const runGrokBtn = document.getElementById('runGrokBtn');
     const globalStatus = document.getElementById('globalStatus');
     const container = document.getElementById('container');
+    const statusLine = document.getElementById('statusLine');
 
     // ---------- utilities ----------
     function el(tag, opts = {}) {
@@ -75,14 +71,27 @@
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const resp = await fetch(url, { ...options, signal: controller.signal });
-        return resp;
-      } finally {
-        clearTimeout(id);
-      }
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally { clearTimeout(id); }
     }
     async function getJSON(url, timeoutMs = 180000) {
       const resp = await fetchWithTimeout(url, {}, timeoutMs);
+      let data;
+      try { data = await resp.json(); } catch {
+        throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
+      }
+      if (!resp.ok) {
+        const msg = (data && (data.error || data.detail)) ? `${data.error || ''} ${data.detail || ''}`.trim() : `HTTP ${resp.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    }
+    async function postJSON(url, body, timeoutMs = 180000) {
+      const resp = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }, timeoutMs);
       let data;
       try { data = await resp.json(); } catch {
         throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
@@ -108,8 +117,9 @@
 
     function renderDimensionCard(idx, dim) {
       const card = el('details');
-      const sum = el('summary', { text: `${idx + 1}. ${dim.title || 'Untitled'}` });
-      const thesis = el('div', { className: 'thesis', text: dim.description || '' });
+      const sum = el('summary', { text: `${idx + 1}. ${dim.title || dim.name || 'Untitled'}` });
+      const desc = dim.description || dim.thesis || '';
+      const thesis = el('div', { className: 'thesis', text: desc });
 
       const seedBox = el('div', { className: 'seedbox' });
       const seedHeader = el('div', { className: 'seed-title', text: 'Seeds' });
@@ -119,12 +129,15 @@
       seedBox.append(seedHeader, seedStatus, seedWrap);
       card.append(sum, thesis, seedBox);
 
-      card._seedFetch = () => fetchSeedsForDimension(dim.id, { seedStatus, seedWrap });
+      // For GET-based loading later
+      if (dim.id) {
+        card._seedFetch = () => fetchSeedsForDimensionGET(dim.id, { seedStatus, seedWrap });
+      }
       return card;
     }
 
-    // ---------- seeds ----------
-    async function fetchSeedsForDimension(dimensionId, ui, tries = 2) {
+    // ---------- Seeds (GET existing) ----------
+    async function fetchSeedsForDimensionGET(dimensionId, ui, tries = 2) {
       const { seedStatus, seedWrap } = ui;
       try {
         seedStatus.textContent = 'Loading seeds…';
@@ -132,34 +145,29 @@
         seedStatus.textContent = '';
 
         const seeds = Array.isArray(data?.seeds) ? data.seeds : [];
-        if (!seeds.length) {
-          seedStatus.textContent = 'No seeds found for this dimension.';
-          return;
-        }
+        if (!seeds.length) { seedStatus.textContent = 'No seeds found.'; return; }
         seeds.forEach(s => {
           const seed = el('div', { className: 'seed' });
-          const created = s.created_at ? `<small>Created: ${escapeHtml(s.created_at)}</small>` : '';
           seed.innerHTML =
             `<strong>A (Problem):</strong> ${escapeHtml(s.problem || '')}<br>` +
             `<strong>B (Objective):</strong> ${escapeHtml(s.objective || '')}<br>` +
             `<strong>Solution (Link):</strong> ${escapeHtml(s.solution || '')}` +
-            created;
+            (s.created_at ? `<br><small>${escapeHtml(s.created_at)}</small>` : '');
           seedWrap.appendChild(seed);
         });
       } catch (e) {
         if (tries > 0) {
           seedStatus.textContent = 'Retrying…';
           await new Promise(r => setTimeout(r, 1200));
-          return fetchSeedsForDimension(dimensionId, ui, tries - 1);
+          return fetchSeedsForDimensionGET(dimensionId, ui, tries - 1);
         }
         seedStatus.className = 'seed-error';
-        seedStatus.textContent = `Seed request failed: ${e.message || e}`;
+        seedStatus.textContent = `Seed fetch failed: ${e.message || e}`;
       }
     }
 
-    // ---------- dimensions for a narrative ----------
+    // ---------- Dimensions + seeds (GET existing view) ----------
     async function runForNarrative(narrative) {
-      const { id } = narrative;
       const ui = makeNarrativeSection(narrative);
       const { meta, err, grid } = ui;
 
@@ -168,7 +176,7 @@
       globalStatus.textContent = `Loading dimensions for “${narrative.title}”…`;
 
       try {
-        const dims = await getJSON(`/api/narratives/${id}/dimensions`);
+        const dims = await getJSON(`/api/narratives/${narrative.id}/dimensions`);
         grid.innerHTML = '';
         meta.innerHTML += ` · Dimensions: <span class="badge">${dims.length}</span>`;
 
@@ -178,26 +186,71 @@
           return card;
         });
 
-        // throttle seed fetches per narrative
+        // throttle seed fetches
         const MAX_CONCURRENCY = 2;
         let ptr = 0;
         async function worker() {
           while (ptr < cards.length) {
-            const myIdx = ptr++;
-            const card = cards[myIdx];
-            await card._seedFetch();
+            const card = cards[ptr++];
+            if (card._seedFetch) await card._seedFetch();
           }
         }
-        await Promise.all(
-          Array.from({ length: Math.min(MAX_CONCURRENCY, cards.length) }, () => worker())
-        );
-
+        await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENCY, cards.length) }, () => worker()));
         globalStatus.textContent = `Done. Loaded ${dims.length} dimension(s) for “${narrative.title}”.`;
       } catch (e) {
         grid.innerHTML = '';
         err.textContent = e.message || String(e);
         globalStatus.textContent = 'Failed to load dimensions.';
       }
+    }
+
+    // ---------- GROK (xAI) generation path ----------
+    async function runGrokForNarrative(narrative) {
+      // Generate dimensions via xAI
+      statusLine.textContent = 'Generating dimensions with Grok…';
+      const dimData = await postJSON('/api/narrative-dimensions', {
+        domain: narrative.title,
+        provider: 'xai'
+      });
+
+      const newDims = Array.isArray(dimData?.dimensions) ? dimData.dimensions : [];
+      if (!newDims.length) {
+        statusLine.textContent = 'Grok returned no dimensions.';
+        return;
+      }
+      statusLine.textContent = `Generated ${newDims.length} dimension(s). Generating seeds…`;
+
+      // Generate seeds for each dim (xAI), throttled
+      const MAX_CONCURRENCY = 2;
+      let i = 0, ok = 0, fail = 0;
+
+      async function seedWorker() {
+        while (i < newDims.length) {
+          const idx = i++;
+          const d = newDims[idx];
+          try {
+            await postJSON('/api/narrative-seeds', {
+              domain: narrative.title,
+              dimension: d.name,
+              description: d.thesis,
+              targets: d.targets || [],
+              provider: 'xai'
+            });
+            ok++;
+            statusLine.textContent = `Generating seeds… ${ok}/${newDims.length}`;
+          } catch (e) {
+            fail++;
+          }
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENCY, newDims.length) }, () => seedWorker()));
+
+      statusLine.textContent = `Grok done. Seeds created for ${ok}/${newDims.length} dimension(s). Reloading…`;
+
+      // Reload the canonical view from DB
+      container.innerHTML = '';
+      await runForNarrative(narrative);
+      statusLine.textContent = 'Done.';
     }
 
     // ---------- populate narratives dropdown ----------
@@ -207,15 +260,13 @@
         const rows = await getJSON('/api/narratives');
         narrativeSelect.innerHTML = '';
         if (!rows.length) {
-          const opt = el('option', { text: 'No domains available', attrs: { value: '' } });
-          narrativeSelect.appendChild(opt);
+          narrativeSelect.appendChild(el('option', { text: 'No domains available', attrs: { value: '' } }));
           globalStatus.textContent = 'No domains found.';
           return;
         }
         rows.forEach(n => {
           const label = n.title ? `${n.title} — #${n.id}` : `#${n.id}`;
-          const opt = el('option', { text: label, attrs: { value: String(n.id) } });
-          narrativeSelect.appendChild(opt);
+          narrativeSelect.appendChild(el('option', { text: label, attrs: { value: String(n.id) } }));
         });
         globalStatus.textContent = `Loaded ${rows.length} domain(s).`;
 
@@ -228,8 +279,7 @@
         }
       } catch (e) {
         narrativeSelect.innerHTML = '';
-        const opt = el('option', { text: `Error: ${e.message || e}`, attrs: { value: '' } });
-        narrativeSelect.appendChild(opt);
+        narrativeSelect.appendChild(el('option', { text: `Error: ${e.message || e}`, attrs: { value: '' } }));
         globalStatus.textContent = 'Failed to load domains.';
       }
     }
@@ -238,29 +288,38 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = narrativeSelect.value.trim();
-      if (!id) {
-        globalStatus.textContent = 'Please choose a domain.';
-        return;
-      }
+      if (!id) { globalStatus.textContent = 'Please choose a domain.'; return; }
 
       // Keep selection in URL
       const url = new URL(location.href);
       url.searchParams.set('narrative', id);
       history.replaceState(null, '', url.toString());
 
-      // Fetch the selected narrative’s basic info from the dropdown text
       const selectedText = narrativeSelect.options[narrativeSelect.selectedIndex]?.text || `#${id}`;
       const titleFromText = selectedText.replace(/\s*—\s*#\d+$/, '');
       const narrative = { id: Number(id), title: titleFromText, created_at: '' };
 
       container.innerHTML = '';
-      reloadBtnWrap.style.display = '';
-      loadedMeta.textContent = `Showing: ${selectedText}`;
+      statusLine.textContent = '';
       await runForNarrative(narrative);
     });
 
-    reloadBtn.addEventListener('click', () => {
-      form.dispatchEvent(new Event('submit'));
+    runGrokBtn.addEventListener('click', async () => {
+      const id = narrativeSelect.value.trim();
+      if (!id) { globalStatus.textContent = 'Please choose a domain first.'; return; }
+      const selectedText = narrativeSelect.options[narrativeSelect.selectedIndex]?.text || `#${id}`;
+      const titleFromText = selectedText.replace(/\s*—\s*#\d+$/, '');
+      const narrative = { id: Number(id), title: titleFromText, created_at: '' };
+
+      try {
+        runGrokBtn.disabled = true;
+        statusLine.textContent = 'Starting Grok…';
+        await runGrokForNarrative(narrative);
+      } catch (e) {
+        statusLine.textContent = `Grok failed: ${e.message || e}`;
+      } finally {
+        runGrokBtn.disabled = false;
+      }
     });
 
     // Init
