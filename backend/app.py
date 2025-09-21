@@ -12,6 +12,7 @@ import hashlib
 import re
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
@@ -1015,14 +1016,18 @@ def list_seed_svgs(seed_id: int):
     base = ASSETS_ROOT / f"seed_{seed_id}"
     if not base.exists():
         return jsonify({"items": []})
+
     items = []
     for p in sorted(base.glob("*.svg")):
         st = p.stat()
-        web = str(p).replace(str(ASSETS_ROOT), WEB_PREFIX).replace(os.sep, "/")
+        web = f"{WEB_PREFIX}/{p.relative_to(ASSETS_ROOT).as_posix()}"
+        mtime_utc = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)\
+                            .isoformat(timespec="seconds")\
+                            .replace("+00:00", "Z")
         items.append({
             "name": p.name,
-            "url": web,                       # used by manifest.html to render thumbnails
+            "url": web,
             "size": st.st_size,
-            "mtime": datetime.utcfromtimestamp(st.st_mtime).isoformat(timespec="seconds") + "Z",
+            "mtime": mtime_utc,
         })
     return jsonify({"items": items})
