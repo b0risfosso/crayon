@@ -413,6 +413,20 @@ function renderAssets(items) {
     els.assetsList.appendChild(card);
   }
 }
+async function fetchAssets() {
+try {
+const sid = Number(els.seedId.value);
+if (!Number.isInteger(sid) || sid < 1) throw new Error('Enter Seed ID first');
+const base = els.apiBase.value.replace(/\/$/, '');
+const url = `${base}/api/assets/seed/${sid}/svgs`;
+const r = await fetch(url);
+if (!r.ok) throw new Error(`Fetch ${r.status}`);
+const data = await r.json();
+renderAssets(data.items || []);
+log(`Fetched ${data.items?.length||0} asset(s)`, 'ok');
+} catch (e) { log(String(e.message || e), 'error'); }
+}
+els.assetsRefresh?.addEventListener('click', fetchAssets);
     els.assetsRefresh?.addEventListener('click', fetchAssets);
     els.loadLatest.addEventListener('click', () => setTimeout(fetchAssets, 800));
 
