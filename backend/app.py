@@ -10,6 +10,7 @@ import sqlite3, json, os
 from contextlib import closing
 import hashlib 
 import re
+import json
 
 app = Flask(__name__)
 
@@ -82,6 +83,32 @@ def bootstrap_schema():
             FOREIGN KEY (seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
         );
         """)
+
+        # --- Manifests: versioned, per-seed JSON describing panels ---
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS seed_manifests (
+        id INTEGER PRIMARY KEY,
+        seed_id INTEGER NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        updated TEXT NOT NULL,                     -- ISO8601 e.g. 2025-09-20T17:21:00Z
+        panels_json TEXT NOT NULL,                 -- JSON string for {"panels":[...]}
+        is_published INTEGER NOT NULL DEFAULT 0,   -- 0/1
+        checksum TEXT,                             -- sha256(panels_json) for cache/ETag
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
+    );
+    """)
+
+    # Unique per (seed_id, version); fast lookups for "latest published"
+    con.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_manifest_unique
+    ON seed_manifests(seed_id, version);
+    """)
+    con.execute("""
+    CREATE INDEX IF NOT EXISTS idx_manifest_lookup
+    ON seed_manifests(seed_id, is_published, version);
+    """)
 
         # Useful indexes
         con.execute("""
@@ -246,6 +273,9 @@ def find_dimension_id(con, narrative_id: int, dim_name: str):
         (narrative_id, dim_name)
     ).fetchone()
     return row["id"] if row else None
+
+def _sha256(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
 def _prototype_user_msg(domain: str, dimension: str, problem: str, objective: str, solution: str) -> str:
@@ -751,3 +781,154 @@ def public_box(seed_id: int):
     if etag:
         resp.headers["ETag"] = etag
     return resp
+
+
+@app.route("/api/seeds/<int:seed_id>/manifests", methods=["GET"])
+def list_or_get_manifest(seed_id: int):
+    """
+    GET /api/seeds/<seed_id>/manifests
+      ?version=N            -> exact version
+      ?published=1          -> latest published
+      (no params)           -> latest by (is_published DESC, version DESC)
+    """
+    version = request.args.get("version", type=int)
+    published = request.args.get("published", type=int)
+
+    with closing(connect()) as con:
+        if version is not None:
+            row = con.execute("""
+                SELECT * FROM seed_manifests
+                WHERE seed_id = ? AND version = ?
+                LIMIT 1
+            """, (seed_id, version)).fetchone()
+        elif published:
+            row = con.execute("""
+                SELECT * FROM seed_manifests
+                WHERE seed_id = ? AND is_published = 1
+                ORDER BY version DESC
+                LIMIT 1
+            """, (seed_id,)).fetchone()
+        else:
+            row = con.execute("""
+                SELECT * FROM seed_manifests
+                WHERE seed_id = ?
+                ORDER BY is_published DESC, version DESC
+                LIMIT 1
+            """, (seed_id,)).fetchone()
+
+        if not row:
+            return jsonify({"error":"manifest_not_found","seed_id":seed_id}), 404
+
+        out = dict(row)
+        # parse panels_json to object for convenience
+        out["panels"] = json.loads(out["panels_json"]).get("panels", [])
+        return jsonify({
+            "seed_id": out["seed_id"],
+            "version": out["version"],
+            "updated": out["updated"],
+            "is_published": bool(out["is_published"]),
+            "checksum": out["checksum"],
+            "panels": out["panels"]
+        })
+
+@app.route("/api/seeds/<int:seed_id>/manifests", methods=["POST"])
+def upsert_manifest(seed_id: int):
+    """
+    POST body (example):
+    {
+      "version": 1,
+      "updated": "2025-09-20T17:21:00Z",
+      "panels": [ {...}, ... ],
+      "publish": false   # optional
+    }
+    Upserts by (seed_id, version). If exists, updates fields; else inserts new.
+    """
+    try:
+        payload = request.get_json(force=True)
+    except Exception:
+        abort(400, description="Invalid JSON")
+
+    if not isinstance(payload, dict):
+        abort(400, description="Body must be a JSON object")
+
+    version = payload.get("version")
+    updated_iso = payload.get("updated")
+    panels = payload.get("panels")
+    publish = bool(payload.get("publish", False))
+
+    if not isinstance(version, int) or version < 1:
+        abort(400, description="'version' must be a positive integer")
+    if not isinstance(updated_iso, str):
+        abort(400, description="'updated' must be an ISO8601 string")
+    if not isinstance(panels, list):
+        abort(400, description="'panels' must be an array")
+
+    # Serialize panels_json in a stable order for checksum
+    panels_json = json.dumps({"panels": panels}, separators=(",", ":"), sort_keys=True)
+    checksum = _sha256(panels_json)
+
+    with closing(connect()) as con, con:
+        # Ensure seed exists (foreign key would catch on insert, but nicer message)
+        has_seed = con.execute("SELECT 1 FROM narrative_seeds WHERE id = ?", (seed_id,)).fetchone()
+        if not has_seed:
+            abort(404, description=f"seed {seed_id} not found")
+
+        # Upsert (requires SQLite 3.24+)
+        con.execute("""
+            INSERT INTO seed_manifests (seed_id, version, updated, panels_json, is_published, checksum)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(seed_id, version) DO UPDATE SET
+                updated = excluded.updated,
+                panels_json = excluded.panels_json,
+                checksum = excluded.checksum,
+                is_published = CASE
+                    WHEN excluded.is_published = 1 THEN 1
+                    ELSE seed_manifests.is_published
+                END,
+                updated_at = datetime('now')
+        """, (seed_id, version, updated_iso, panels_json, 1 if publish else 0, checksum))
+
+        # If publish=true, we keep other versions as-is (only latest flag on this row)
+
+    return jsonify({"ok": True, "seed_id": seed_id, "version": version, "published": publish, "checksum": checksum})
+
+@app.route("/api/seeds/<int:seed_id>/manifests/versions", methods=["GET"])
+def list_manifest_versions(seed_id: int):
+    """
+    List available versions for a seed (lightweight index).
+    """
+    with closing(connect()) as con:
+        rows = con.execute("""
+            SELECT version, is_published, updated, checksum
+            FROM seed_manifests
+            WHERE seed_id = ?
+            ORDER BY version DESC
+        """, (seed_id,)).fetchall()
+    return jsonify([{
+        "version": r["version"],
+        "is_published": bool(r["is_published"]),
+        "updated": r["updated"],
+        "checksum": r["checksum"]
+    } for r in rows])
+
+@app.route("/api/seeds/<int:seed_id>/manifests/publish", methods=["POST"])
+def publish_manifest(seed_id: int):
+    """
+    Body: { "version": N }
+    Marks that specific version as published (does not unpublish others).
+    """
+    data = request.get_json(force=True)
+    version = data.get("version")
+    if not isinstance(version, int):
+        abort(400, description="'version' must be int")
+
+    with closing(connect()) as con, con:
+        cur = con.execute("""
+            UPDATE seed_manifests
+            SET is_published = 1, updated_at = datetime('now')
+            WHERE seed_id = ? AND version = ?
+        """, (seed_id, version))
+        if cur.rowcount == 0:
+            abort(404, description="manifest version not found")
+
+    return jsonify({"ok": True, "seed_id": seed_id, "version": version, "published": True})

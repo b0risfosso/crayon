@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Seed Manifest Uploader • Fantasiagenesis</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    .meta { opacity: .8; font-size: .9rem; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 980px) { .grid { grid-template-columns: 360px 1fr; } }
+    .card { border: 1px solid color-mix(in oklab, CanvasText 10%, Canvas 90%); border-radius: 12px; padding: 14px; }
+    .row { display: grid; grid-template-columns: 140px 1fr; gap: 10px; align-items: center; margin-bottom: 10px; }
+    label { font-weight: 600; }
+    input[type="text"], input[type="number"], textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid color-mix(in oklab, CanvasText 12%, Canvas 88%); background: Canvas; color: CanvasText; }
+    textarea { min-height: 180px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: .9rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button { padding: 10px 14px; border-radius: 10px; border: 1px solid color-mix(in oklab, CanvasText 12%, Canvas 88%); background: color-mix(in oklab, Canvas 92%, CanvasText 8%); cursor: pointer; }
+    button.primary { background: color-mix(in oklab, CanvasText 12%, Canvas 88%); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .muted { opacity: .75; }
+    .drop { border: 2px dashed color-mix(in oklab, CanvasText 25%, Canvas 75%); border-radius: 12px; padding: 16px; text-align: center; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid color-mix(in oklab, CanvasText 15%, Canvas 85%); font-size: .8rem; }
+    .ok { color: #177245; }
+    .bad { color: #a40014; }
+    .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .panel { border: 1px solid color-mix(in oklab, CanvasText 12%, Canvas 88%); border-radius: 10px; padding: 8px; }
+    .panel img { width: 100%; height: 160px; object-fit: contain; background: color-mix(in oklab, Canvas 94%, CanvasText 6%); border-radius: 8px; }
+    .log { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: .9rem; border: 1px dashed color-mix(in oklab, CanvasText 20%, Canvas 80%); padding: 10px; border-radius: 8px; max-height: 220px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Seed Manifest Uploader</h1>
+  <div class="meta">Create / validate / preview a manifest and POST it to your API.</div>
+
+  <div class="grid">
+
+    <!-- Left: Form -->
+    <section class="card" id="formCard">
+      <div class="row">
+        <label for="apiBase">API Base</label>
+        <input id="apiBase" type="text" placeholder="http://localhost:8000" />
+      </div>
+      <div class="row">
+        <label for="seedId">Seed ID</label>
+        <input id="seedId" type="number" min="1" placeholder="1234" />
+      </div>
+      <div class="row">
+        <label for="version">Version</label>
+        <input id="version" type="number" min="1" placeholder="1" />
+      </div>
+      <div class="row">
+        <label for="updated">Updated (ISO)</label>
+        <input id="updated" type="text" placeholder="2025-09-20T17:21:00Z" />
+      </div>
+      <div class="row">
+        <label for="publish">Publish?</label>
+        <div>
+          <input id="publish" type="checkbox" /> <span class="muted">Mark this version as published</span>
+        </div>
+      </div>
+
+      <h3>Payload</h3>
+      <div class="drop" id="dropJson">
+        <div><strong>Drop a manifest.json</strong> here or use the buttons below</div>
+        <div class="muted">We only need the <code>panels</code> array; seed/version/updated are taken from the form.</div>
+      </div>
+      <div class="controls" style="margin-top: 10px">
+        <input id="fileJson" type="file" accept="application/json" />
+        <button id="loadLatest">Load latest from API</button>
+        <button id="fillNow">Set updated to now</button>
+        <button id="suggestVersion">Suggest next version</button>
+      </div>
+      <textarea id="payload" placeholder='{"panels":[{"id":"p0","src":"p0.svg","alt":"..."}]}'></textarea>
+      <div class="controls" style="margin-top: 10px">
+        <button class="primary" id="validateBtn">Validate</button>
+        <button id="downloadBtn" title="Download normalized JSON">Download JSON</button>
+        <button id="submitBtn">POST to /api/seeds/:id/manifests</button>
+      </div>
+      <div id="status" class="muted" style="margin-top: 8px"></div>
+    </section>
+
+    <!-- Right: Preview & Logs -->
+    <section class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom: 8px;">
+        <h3 style="margin:0">Preview</h3>
+        <span id="panelCount" class="pill">0 panels</span>
+      </div>
+      <div id="preview" class="preview-grid"></div>
+      <h3 style="margin-top: 16px;">Logs</h3>
+      <div id="log" class="log"></div>
+    </section>
+  </div>
+
+  <template id="panelTmpl">
+    <div class="panel">
+      <img alt="" />
+      <div style="font-weight:600;margin-top:6px" class="panel-id"></div>
+      <div class="muted panel-alt"></div>
+      <div class="muted" style="font-size:.8rem;margin-top:4px">src: <span class="panel-src"></span></div>
+    </div>
+  </template>
+
+  <script>
+    const els = {
+      apiBase: document.getElementById('apiBase'),
+      seedId: document.getElementById('seedId'),
+      version: document.getElementById('version'),
+      updated: document.getElementById('updated'),
+      publish: document.getElementById('publish'),
+      payload: document.getElementById('payload'),
+      validateBtn: document.getElementById('validateBtn'),
+      submitBtn: document.getElementById('submitBtn'),
+      downloadBtn: document.getElementById('downloadBtn'),
+      fileJson: document.getElementById('fileJson'),
+      dropJson: document.getElementById('dropJson'),
+      loadLatest: document.getElementById('loadLatest'),
+      suggestVersion: document.getElementById('suggestVersion'),
+      fillNow: document.getElementById('fillNow'),
+      status: document.getElementById('status'),
+      log: document.getElementById('log'),
+      preview: document.getElementById('preview'),
+      panelCount: document.getElementById('panelCount'),
+      tmpl: document.getElementById('panelTmpl'),
+    };
+
+    // Defaults
+    els.apiBase.value = localStorage.getItem('manifest.apiBase') || location.origin;
+    els.updated.value = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+    function log(line, kind) {
+      const t = new Date().toISOString().split('T')[1].replace('Z','');
+      const prefix = kind === 'error' ? '✖' : kind === 'ok' ? '✔' : '•';
+      els.log.textContent += `[${t}] ${prefix} ${line}\n`;
+      els.log.scrollTop = els.log.scrollHeight;
+    }
+
+    function setStatus(text, ok=false) {
+      els.status.textContent = text;
+      els.status.className = ok ? 'ok' : 'bad';
+    }
+
+    function parsePayload() {
+      try {
+        const raw = els.payload.value.trim();
+        if (!raw) return { panels: [] };
+        const obj = JSON.parse(raw);
+        if (Array.isArray(obj)) return { panels: obj }; // allow bare array
+        return obj;
+      } catch (e) {
+        throw new Error('Invalid JSON in payload: ' + e.message);
+      }
+    }
+
+    function normalize(obj) {
+      // Keep only required parts; stable key order
+      const panels = Array.isArray(obj.panels) ? obj.panels.map(p => ({
+        id: String(p.id || ''),
+        src: String(p.src || ''),
+        alt: String(p.alt || ''),
+      })) : [];
+      return { panels };
+    }
+
+    function validateAll() {
+      const seedId = Number(els.seedId.value);
+      const version = Number(els.version.value);
+      const updated = els.updated.value.trim();
+      if (!Number.isInteger(seedId) || seedId < 1) throw new Error('Seed ID must be a positive integer');
+      if (!Number.isInteger(version) || version < 1) throw new Error('Version must be a positive integer');
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(updated)) throw new Error('Updated must be ISO8601 like 2025-09-20T17:21:00Z');
+
+      const obj = normalize(parsePayload());
+      if (!Array.isArray(obj.panels) || obj.panels.length === 0) throw new Error('Payload must include a non-empty panels array');
+
+      const ids = new Set();
+      for (const [i,p] of obj.panels.entries()) {
+        if (!p.id) throw new Error(`Panel ${i} missing id`);
+        if (ids.has(p.id)) throw new Error(`Duplicate panel id: ${p.id}`);
+        ids.add(p.id);
+        if (!p.src) throw new Error(`Panel ${p.id} missing src`);
+        if (typeof p.alt !== 'string') throw new Error(`Panel ${p.id} missing/invalid alt`);
+      }
+      return { seedId, version, updated, publish: !!els.publish.checked, payload: obj };
+    }
+
+    function renderPreview(panels) {
+      els.preview.innerHTML = '';
+      els.panelCount.textContent = `${panels.length} panel${panels.length===1?'':'s'}`;
+      for (const p of panels) {
+        const n = els.tmpl.content.firstElementChild.cloneNode(true);
+        n.querySelector('img').src = p.src;
+        n.querySelector('img').alt = p.alt || p.id;
+        n.querySelector('.panel-id').textContent = p.id;
+        n.querySelector('.panel-alt').textContent = p.alt || '';
+        n.querySelector('.panel-src').textContent = p.src;
+        els.preview.appendChild(n);
+      }
+    }
+
+    // File/drag-n-drop
+    els.fileJson.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      els.payload.value = text;
+      log(`Loaded JSON file: ${file.name}`);
+    });
+
+    ;['dragenter','dragover'].forEach(ev => els.dropJson.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation(); els.dropJson.style.background = 'color-mix(in oklab, Canvas 90%, CanvasText 10%)';
+    }));
+    ;['dragleave','drop'].forEach(ev => els.dropJson.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation(); els.dropJson.style.background = '';
+    }));
+    els.dropJson.addEventListener('drop', async (e) => {
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      els.payload.value = text;
+      log(`Dropped JSON file: ${file.name}`);
+    });
+
+    // Buttons
+    els.fillNow.addEventListener('click', () => {
+      els.updated.value = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    });
+
+    els.suggestVersion.addEventListener('click', async () => {
+      try {
+        const seedId = Number(els.seedId.value);
+        if (!Number.isInteger(seedId) || seedId < 1) throw new Error('Enter Seed ID first');
+        const url = `${els.apiBase.value.replace(/\/$/,'')}/api/seeds/${seedId}/manifests/versions`;
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('Fetch failed');
+        const arr = await r.json();
+        const max = arr.reduce((m, x) => Math.max(m, Number(x.version)||0), 0);
+        els.version.value = String(max + 1 || 1);
+        log(`Suggested next version: ${els.version.value}`, 'ok');
+      } catch (e) { log(String(e), 'error'); }
+    });
+
+    els.loadLatest.addEventListener('click', async () => {
+      try {
+        const seedId = Number(els.seedId.value);
+        if (!Number.isInteger(seedId) || seedId < 1) throw new Error('Enter Seed ID first');
+        const url = `${els.apiBase.value.replace(/\/$/,'')}/api/seeds/${seedId}/manifests?published=1`;
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`Fetch ${r.status}`);
+        const obj = await r.json();
+        els.version.value = obj.version;
+        els.updated.value = obj.updated;
+        els.payload.value = JSON.stringify({ panels: obj.panels || [] }, null, 2);
+        renderPreview(obj.panels || []);
+        log('Loaded latest published manifest', 'ok');
+      } catch (e) { log(String(e), 'error'); }
+    });
+
+    els.validateBtn.addEventListener('click', () => {
+      try {
+        const { payload } = validateAll();
+        renderPreview(payload.panels);
+        setStatus('Valid ✓', true);
+        log('Validation passed', 'ok');
+      } catch (e) {
+        setStatus(String(e.message || e), false);
+        log(String(e.message || e), 'error');
+      }
+    });
+
+    els.downloadBtn.addEventListener('click', () => {
+      try {
+        const { payload } = validateAll();
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'manifest.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (e) { log(String(e.message || e), 'error'); }
+    });
+
+    els.submitBtn.addEventListener('click', async () => {
+      els.submitBtn.disabled = true;
+      try {
+        const seedId = Number(els.seedId.value);
+        const { version, updated, publish, payload } = validateAll();
+        const body = JSON.stringify({ version, updated, panels: payload.panels, publish });
+        const url = `${els.apiBase.value.replace(/\/$/,'')}/api/seeds/${seedId}/manifests`;
+        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data?.error || JSON.stringify(data) || r.statusText);
+        setStatus('Uploaded ✓', true);
+        log(`Uploaded manifest v${version} for seed ${seedId}`, 'ok');
+      } catch (e) {
+        setStatus(String(e.message || e), false);
+        log(String(e.message || e), 'error');
+      } finally {
+        els.submitBtn.disabled = false;
+      }
+    });
+
+    // Persist API base across sessions
+    els.apiBase.addEventListener('change', () => {
+      localStorage.setItem('manifest.apiBase', els.apiBase.value);
+    });
+
+    // Live preview as you type
+    let typingTimer; 
+    els.payload.addEventListener('input', () => {
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(() => {
+        try { const obj = normalize(parsePayload()); renderPreview(obj.panels); } catch {}
+      }, 300);
+    });
+  </script>
+</body>
+</html>
