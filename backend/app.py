@@ -26,7 +26,7 @@ def connect():
 
 def bootstrap_schema():
     with closing(connect()) as con, con:
-        # Ensure narratives table exists (you already have this, but harmless)
+        # ---- narratives
         con.execute("""
         CREATE TABLE IF NOT EXISTS narratives (
             id INTEGER PRIMARY KEY,
@@ -37,7 +37,7 @@ def bootstrap_schema():
         );
         """)
 
-        # Dimensions table (you already have this)
+        # ---- narrative_dimensions (+ targets_json check)
         con.execute("""
         CREATE TABLE IF NOT EXISTS narrative_dimensions (
             id INTEGER PRIMARY KEY,
@@ -45,17 +45,14 @@ def bootstrap_schema():
             title TEXT NOT NULL,
             description TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            -- optional new column added separately below
             FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE
         );
         """)
-
-        # Add targets_json to narrative_dimensions if missing
         cols = [r["name"] for r in con.execute("PRAGMA table_info(narrative_dimensions)")]
         if "targets_json" not in cols:
             con.execute("ALTER TABLE narrative_dimensions ADD COLUMN targets_json TEXT")
 
-        # Seeds table
+        # ---- narrative_seeds
         con.execute("""
         CREATE TABLE IF NOT EXISTS narrative_seeds (
             id INTEGER PRIMARY KEY,
@@ -68,71 +65,55 @@ def bootstrap_schema():
         );
         """)
 
-        # === Box-of-Dirt artifacts tied to seeds ===
+        # ---- seed_artifacts
         con.execute("""
         CREATE TABLE IF NOT EXISTS seed_artifacts (
             id INTEGER PRIMARY KEY,
             seed_id INTEGER NOT NULL,
-            kind TEXT NOT NULL DEFAULT 'box_of_dirt',      -- future-proof: other artifact kinds later
+            kind TEXT NOT NULL DEFAULT 'box_of_dirt',
             title TEXT,
-            html TEXT NOT NULL,                             -- full-page HTML or body-only HTML
-            doc_format TEXT NOT NULL DEFAULT 'full'         -- 'full' or 'body'
-                CHECK (doc_format IN ('full','body')),
-            version INTEGER NOT NULL DEFAULT 1,             -- monotonically increasing per (seed_id, kind)
-            is_published INTEGER NOT NULL DEFAULT 0,        -- 0/1
-            checksum TEXT,                                  -- sha256(html) for cache/ETag
+            html TEXT NOT NULL,
+            doc_format TEXT NOT NULL DEFAULT 'full' CHECK (doc_format IN ('full','body')),
+            version INTEGER NOT NULL DEFAULT 1,
+            is_published INTEGER NOT NULL DEFAULT 0,
+            checksum TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY (seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
         );
         """)
+        con.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_artifacts_unique
+                       ON seed_artifacts(seed_id, kind, version);""")
+        con.execute("""CREATE INDEX IF NOT EXISTS idx_seed_artifacts_lookup
+                       ON seed_artifacts(seed_id, kind, is_published, version);""")
 
-        # --- Manifests: versioned, per-seed JSON describing panels ---
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS seed_manifests (
-        id INTEGER PRIMARY KEY,
-        seed_id INTEGER NOT NULL,
-        version INTEGER NOT NULL DEFAULT 1,
-        updated TEXT NOT NULL,                     -- ISO8601 e.g. 2025-09-20T17:21:00Z
-        panels_json TEXT NOT NULL,                 -- JSON string for {"panels":[...]}
-        is_published INTEGER NOT NULL DEFAULT 0,   -- 0/1
-        checksum TEXT,                             -- sha256(panels_json) for cache/ETag
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
-    );
-    """)
+        # ---- manifests
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS seed_manifests (
+            id INTEGER PRIMARY KEY,
+            seed_id INTEGER NOT NULL,
+            version INTEGER NOT NULL DEFAULT 1,
+            updated TEXT NOT NULL,
+            panels_json TEXT NOT NULL,
+            is_published INTEGER NOT NULL DEFAULT 0,
+            checksum TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
+        );
+        """)
+        con.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_manifest_unique
+                       ON seed_manifests(seed_id, version);""")
+        con.execute("""CREATE INDEX IF NOT EXISTS idx_manifest_lookup
+                       ON seed_manifests(seed_id, is_published, version);""")
 
-    # Unique per (seed_id, version); fast lookups for "latest published"
-    con.execute("""
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_manifest_unique
-    ON seed_manifests(seed_id, version);
-    """)
-    con.execute("""
-    CREATE INDEX IF NOT EXISTS idx_manifest_lookup
-    ON seed_manifests(seed_id, is_published, version);
-    """)
+        # ---- helpful uniqueness
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_title ON narratives(title);")
+        con.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_dim_unique
+                       ON narrative_dimensions(narrative_id, title);""")
+        con.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_dedup
+                       ON narrative_seeds(dimension_id, problem, objective, solution);""")
 
-        # Useful indexes
-        con.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_artifacts_unique
-        ON seed_artifacts(seed_id, kind, version);
-        """)
-        con.execute("""
-        CREATE INDEX IF NOT EXISTS idx_seed_artifacts_lookup
-        ON seed_artifacts(seed_id, kind, is_published, version);
-        """)
-
-        # Helpful uniqueness to avoid dup spam
-        con.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_title ON narratives(title);
-        """)
-        con.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_dim_unique ON narrative_dimensions(narrative_id, title);
-        """)
-        con.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_dedup ON narrative_seeds(dimension_id, problem, objective, solution);
-        """)
 
 bootstrap_schema()
 
