@@ -54,6 +54,21 @@
     iframe.preview { width:100%; height:70vh; border:1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius:.6rem; background:Canvas; }
     .toolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     .spacer { flex:1; }
+
+    .codeblock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: .9rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  border: 1px solid color-mix(in oklab, CanvasText 14%, transparent);
+  background: color-mix(in oklab, Canvas 98%, CanvasText 2%);
+  border-radius: .5rem;
+  padding: .75rem;
+  max-height: 55vh;
+  overflow: auto;
+  user-select: text;
+}
   </style>
 </head>
 <body>
@@ -193,6 +208,20 @@
           </div>
         </div>
       </section>
+
+      <section class="card" aria-labelledby="h-source">
+        <header><h2 id="h-source">Source (latest/draft)</h2></header>
+        <div class="body">
+          <div class="toolbar">
+            <button id="refreshSourceBtn">Refresh</button>
+            <button id="copySourceBtn">Copy</button>
+            <span id="sourceStatus" class="muted"></span>
+            <span class="spacer"></span>
+            <span id="sourceMeta" class="muted"></span>
+          </div>
+          <pre id="sourceCode" class="codeblock" tabindex="0"></pre>
+        </div>
+      </section>
       
   </main>
 
@@ -235,6 +264,12 @@
     ctxSeedA: document.getElementById('ctxSeedA'),
     ctxSeedB: document.getElementById('ctxSeedB'),
     ctxSeedL: document.getElementById('ctxSeedL'),
+
+    sourceCode: document.getElementById('sourceCode'),
+copySourceBtn: document.getElementById('copySourceBtn'),
+refreshSourceBtn: document.getElementById('refreshSourceBtn'),
+sourceStatus: document.getElementById('sourceStatus'),
+sourceMeta: document.getElementById('sourceMeta'),
 
 
     };
@@ -344,6 +379,9 @@
         const isFull = (data.doc_format === 'full') || /<!DOCTYPE|<html[^>]*>/i.test(data.html||'');
         els.docFormat.value = isFull ? 'full' : 'body';
         els.html.value = data.html || '';
+        els.sourceCode.textContent = data.html || '';
+        els.sourceMeta.textContent = `v${data.version} • ${data.is_published ? 'published' : 'draft'} • ${data.doc_format || 'full'}`;
+        setStatus(els.sourceStatus, 'OK', true);
         updateHtmlInfo();
         renderPreview();
       }catch(e){
@@ -471,6 +509,40 @@ async function generatePrototype(){
   }
 }
 
+async function loadSource(draft=true){
+  const sid = currentSeedId();
+  if (!sid){
+    setStatus(els.sourceStatus, 'Provide a Seed ID', false);
+    els.sourceCode.textContent = '';
+    els.sourceMeta.textContent = '';
+    return;
+  }
+  setStatus(els.sourceStatus, 'Loading source…', false);
+  try{
+    const data = await fetchJSON(API.getBox(sid, draft));
+    // Display raw HTML as text, not rendered
+    els.sourceCode.textContent = data.html || '';
+    els.sourceMeta.textContent = `v${data.version} • ${data.is_published ? 'published' : 'draft'} • ${data.doc_format || 'full'}`;
+    setStatus(els.sourceStatus, 'OK', true);
+  }catch(e){
+    els.sourceCode.textContent = '';
+    els.sourceMeta.textContent = '';
+    setStatus(els.sourceStatus, 'No artifact found', false);
+  }
+}
+
+async function copySource(){
+  try{
+    const txt = els.sourceCode.textContent || '';
+    if (!txt){ throw new Error('Nothing to copy'); }
+    await navigator.clipboard.writeText(txt);
+    setStatus(els.sourceStatus, 'Copied', true);
+  }catch(e){
+    setStatus(els.sourceStatus, e.message, false);
+  }
+}
+
+
 function renderContext(){
   // Domain
   const nid = els.domain.value;
@@ -578,6 +650,17 @@ function renderContext(){
     setStatus(els.selStatus, '', false);
     // This input alone cannot resolve A/B/Link unless the seed is also in the dropdown.
     renderContext();
+    });
+
+    els.copySourceBtn.addEventListener('click', copySource);
+    els.refreshSourceBtn.addEventListener('click', ()=> loadSource(false));
+
+    // When seed dropdown changes, clear the source (or auto-load if you prefer)
+    els.seed.addEventListener('change', ()=>{
+    // ... you already mirror the id/etc
+    els.sourceCode.textContent = '';
+    els.sourceMeta.textContent = '';
+    setStatus(els.sourceStatus, '', false);
     });
 
     // Enable/disable "Load current" based on seed id presence
