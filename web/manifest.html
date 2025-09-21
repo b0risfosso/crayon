@@ -92,6 +92,28 @@
       <h3 style="margin-top: 16px;">Logs</h3>
       <div id="log" class="log"></div>
     </section>
+
+    <!-- Upload SVGs -->
+    <section class="card" id="uploadCard">
+      <h3 style="margin-top:0">Upload Panel SVGs</h3>
+      <div class="muted">Target on server: <code>/var/www/data/assets/panels/</code>. Optionally save under <code>seed_{seedId}/</code>.</div>
+      <div class="row" style="margin-top:10px">
+        <label>Seed subfolder?</label>
+        <div>
+          <input id="useSeedFolder" type="checkbox" /> <span class="muted">Use <code>seed_{seedId}</code> subfolder</span>
+        </div>
+      </div>
+      <div class="drop" id="dropSvgs">
+        <div><strong>Drop .svg files</strong> here or pick below</div>
+        <div class="muted">SHA-256 is computed client-side. Duplicate names will be auto-suffixed unless overwrite is allowed.</div>
+      </div>
+      <div class="controls" style="margin-top:10px">
+        <input id="fileSvgs" type="file" accept="image/svg+xml,.svg" multiple />
+        <label class="muted"><input id="allowOverwrite" type="checkbox" /> allow overwrite</label>
+        <button id="uploadBtn">Upload</button>
+      </div>
+      <div id="uploadList" class="log" style="max-height:260px"></div>
+    </section>
   </div>
 
   <template id="panelTmpl">
@@ -104,26 +126,14 @@
   </template>
 
   <script>
-    const els = {
-      apiBase: document.getElementById('apiBase'),
-      seedId: document.getElementById('seedId'),
-      version: document.getElementById('version'),
-      updated: document.getElementById('updated'),
-      publish: document.getElementById('publish'),
-      payload: document.getElementById('payload'),
-      validateBtn: document.getElementById('validateBtn'),
-      submitBtn: document.getElementById('submitBtn'),
-      downloadBtn: document.getElementById('downloadBtn'),
-      fileJson: document.getElementById('fileJson'),
-      dropJson: document.getElementById('dropJson'),
-      loadLatest: document.getElementById('loadLatest'),
-      suggestVersion: document.getElementById('suggestVersion'),
-      fillNow: document.getElementById('fillNow'),
-      status: document.getElementById('status'),
-      log: document.getElementById('log'),
-      preview: document.getElementById('preview'),
-      panelCount: document.getElementById('panelCount'),
-      tmpl: document.getElementById('panelTmpl'),
+    const els = {$1
+      // Upload UI additions
+      ,dropSvgs: document.getElementById('dropSvgs')
+      ,fileSvgs: document.getElementById('fileSvgs')
+      ,uploadBtn: document.getElementById('uploadBtn')
+      ,uploadList: document.getElementById('uploadList')
+      ,useSeedFolder: document.getElementById('useSeedFolder')
+      ,allowOverwrite: document.getElementById('allowOverwrite')
     };
 
     // Defaults
@@ -315,6 +325,65 @@
         try { const obj = normalize(parsePayload()); renderPreview(obj.panels); } catch {}
       }, 300);
     });
+  // ===== SVG Upload module (appends, safe to include once) =====
+  (function(){
+    if (!window.__manifestUploadBound) {
+      window.__manifestUploadBound = true;
+      const { dropSvgs, fileSvgs, uploadBtn, uploadList, useSeedFolder, allowOverwrite, apiBase, seedId } = els;
+
+      async function sha256(buf) {
+        const hash = await crypto.subtle.digest('SHA-256', buf);
+        return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      }
+      function addUploadLine(name, msg) {
+        uploadList.textContent += `${name}: ${msg}
+`;
+        uploadList.scrollTop = uploadList.scrollHeight;
+      }
+      function collectFiles(list) {
+        const arr = Array.from(list || []).filter(f => /\.svg$/i.test(f.name));
+        if (arr.length === 0) addUploadLine('—','no .svg files found');
+        return arr;
+      }
+      ['dragenter','dragover'].forEach(ev => dropSvgs?.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropSvgs.style.background = 'color-mix(in oklab, Canvas 90%, CanvasText 10%)'; }));
+      ['dragleave','drop'].forEach(ev => dropSvgs?.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropSvgs.style.background = ''; }));
+      dropSvgs?.addEventListener('drop', (e) => {
+        const files = collectFiles(e.dataTransfer.files);
+        fileSvgs.files = e.dataTransfer.files; // mirror selection
+        addUploadLine('drop', `${files.length} file(s) queued`);
+      });
+
+      uploadBtn?.addEventListener('click', async () => {
+        try {
+          const sid = Number(seedId.value);
+          if (!Number.isInteger(sid) || sid < 1) throw new Error('Enter Seed ID first');
+          const list = collectFiles(fileSvgs.files);
+          if (list.length === 0) throw new Error('Pick some .svg files');
+          const base = apiBase.value.replace(/\/$/, '');
+          const useFolder = !!useSeedFolder.checked;
+          const overwrite = !!allowOverwrite.checked;
+          for (const file of list) {
+            const buf = await file.arrayBuffer();
+            const sum = await sha256(buf);
+            const form = new FormData();
+            form.append('file', new Blob([buf], { type: 'image/svg+xml' }), file.name);
+            form.append('seed_id', String(sid));
+            form.append('use_seed_folder', useFolder ? '1' : '0');
+            form.append('allow_overwrite', overwrite ? '1' : '0');
+            form.append('checksum', sum);
+
+            const r = await fetch(`${base}/api/uploads/panels`, { method: 'POST', body: form });
+            const data = await r.json().catch(()=>({}));
+            if (!r.ok) throw new Error(`${file.name}: ${data?.error || r.statusText}`);
+            addUploadLine(file.name, `OK → ${data.path} (sha256=${sum.slice(0,8)}…)`);
+          }
+        } catch (e) {
+          addUploadLine('error', String(e.message || e));
+        }
+      });
+    }
+  })();
   </script>
 </body>
 </html>
+

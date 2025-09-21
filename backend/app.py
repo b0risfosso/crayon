@@ -16,6 +16,9 @@ app = Flask(__name__)
 
 DB_PATH = "/var/www/site/data/narratives_data.db"  # keep consistent with your setup
 
+PANELS_ROOT = Path("/var/www/data/assets/panels")  # target on disk
+SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
+
 def connect():
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
@@ -299,6 +302,26 @@ def _artifact_next_version(con, seed_id: int, kind: str = "box_of_dirt") -> int:
 def _seed_exists(con, seed_id: int) -> bool:
     r = con.execute("SELECT 1 FROM narrative_seeds WHERE id=? LIMIT 1", (seed_id,)).fetchone()
     return bool(r)
+
+def _safe_filename(name: str) -> str:
+    # strip path, normalize, and collapse bad chars to '-'
+    base = os.path.basename(name).strip()
+    base = SAFE_NAME.sub("-", base)
+    # enforce .svg
+    if not base.lower().endswith(".svg"):
+        base = base + ".svg"
+    return base
+
+def _suffix_if_exists(p: Path) -> Path:
+    if not p.exists():
+        return p
+    stem, ext = p.stem, p.suffix
+    i = 1
+    while True:
+        candidate = p.with_name(f"{stem}.{i}{ext}")
+        if not candidate.exists():
+            return candidate
+        i += 1
 
 # --- route ---
 @app.post("/api/narrative-dimensions")
@@ -932,3 +955,71 @@ def publish_manifest(seed_id: int):
             abort(404, description="manifest version not found")
 
     return jsonify({"ok": True, "seed_id": seed_id, "version": version, "published": True})
+
+@app.post("/api/uploads/panels")
+def upload_panels():
+    """
+    Multipart form:
+      file: the .svg
+      seed_id: int (required for subfolder toggle)
+      use_seed_folder: '1'/'0' (optional)
+      allow_overwrite: '1'/'0' (optional)
+      checksum: sha256 hex of file (optional; verified if provided)
+    Returns: { path: "/assets/panels[/seed_123]/name.svg" }
+    """
+    f = request.files.get("file")
+    if not f:
+        abort(400, description="missing file")
+    filename = _safe_filename(f.filename or "panel.svg")
+    if not filename.lower().endswith(".svg"):
+        abort(400, description="only .svg allowed")
+
+    # Light content sniff: reject huge or obviously wrong types
+    f.stream.seek(0, os.SEEK_END)
+    size = f.stream.tell()
+    f.stream.seek(0)
+    if size > 20 * 1024 * 1024:  # 20 MB limit
+        abort(413, description="file too large")
+
+    head = f.stream.read(256).decode("utf-8", errors="ignore")
+    f.stream.seek(0)
+    if "<svg" not in head.lower():
+        abort(400, description="not an svg payload")
+
+    # Resolve destination
+    use_seed = request.form.get("use_seed_folder") in ("1", "true", "True")
+    allow_overwrite = request.form.get("allow_overwrite") in ("1", "true", "True")
+    subdir = PANELS_ROOT
+    if use_seed:
+        try:
+            sid = int(request.form.get("seed_id", "0"))
+            if sid < 1:
+                raise ValueError
+        except ValueError:
+            abort(400, description="invalid seed_id for seed subfolder")
+        subdir = PANELS_ROOT / f"seed_{sid}"
+    subdir.mkdir(parents=True, exist_ok=True)
+
+    dest = subdir / filename
+    if dest.exists() and not allow_overwrite:
+        dest = _suffix_if_exists(dest)
+
+    # Save to a temp then move (atomic-ish)
+    tmp = dest.with_suffix(dest.suffix + ".uploading")
+    f.save(tmp)
+    os.replace(tmp, dest)
+
+    # Optional checksum verify
+    want = (request.form.get("checksum") or "").lower()
+    if want:
+        buf = dest.read_bytes()
+        got = hashlib.sha256(buf).hexdigest()
+        if got != want:
+            # remove bad file to be safe
+            try: dest.unlink()
+            except Exception: pass
+            abort(400, description="checksum mismatch")
+
+    # Public web path (must be served by nginx location below)
+    web_path = str(dest).replace(str(PANELS_ROOT), "/assets/panels").replace(os.sep, "/")
+    return jsonify({"path": web_path})
