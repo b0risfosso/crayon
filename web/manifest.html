@@ -126,35 +126,11 @@
   </template>
 
   <script>
-      const els = {
-    apiBase: document.getElementById('apiBase'),
-    seedId: document.getElementById('seedId'),
-    version: document.getElementById('version'),
-    updated: document.getElementById('updated'),
-    publish: document.getElementById('publish'),
-    payload: document.getElementById('payload'),
-    validateBtn: document.getElementById('validateBtn'),
-    submitBtn: document.getElementById('submitBtn'),
-    downloadBtn: document.getElementById('downloadBtn'),
-    fileJson: document.getElementById('fileJson'),
-    dropJson: document.getElementById('dropJson'),
-    loadLatest: document.getElementById('loadLatest'),
-    suggestVersion: document.getElementById('suggestVersion'),
-    fillNow: document.getElementById('fillNow'),
-    status: document.getElementById('status'),
-    log: document.getElementById('log'),
-    preview: document.getElementById('preview'),
-    panelCount: document.getElementById('panelCount'),
-    tmpl: document.getElementById('panelTmpl'),
-
-    // SVG upload UI
-    dropSvgs: document.getElementById('dropSvgs'),
-    fileSvgs: document.getElementById('fileSvgs'),
-    uploadBtn: document.getElementById('uploadBtn'),
-    uploadList: document.getElementById('uploadList'),
-    useSeedFolder: document.getElementById('useSeedFolder'),
-    allowOverwrite: document.getElementById('allowOverwrite'),
-  };
+    const els = {$1
+      ,assetsRefresh: document.getElementById('assetsRefresh')
+      ,assetsList: document.getElementById('assetsList')
+      ,assetsCount: document.getElementById('assetsCount')
+    };
 
     // Defaults
     els.apiBase.value = localStorage.getItem('manifest.apiBase') || location.origin;
@@ -332,10 +308,6 @@
       }
     });
 
-    ['dragover','drop'].forEach(ev =>
-  window.addEventListener(ev, e => { e.preventDefault(); }, false)
-);
-
     // Persist API base across sessions
     els.apiBase.addEventListener('change', () => {
       localStorage.setItem('manifest.apiBase', els.apiBase.value);
@@ -349,7 +321,39 @@
         try { const obj = normalize(parsePayload()); renderPreview(obj.panels); } catch {}
       }, 300);
     });
-  // ===== SVG Upload module (appends, safe to include once) =====
+  // ===== Assets viewer =====
+    function renderAssets(items) {
+      els.assetsList.innerHTML = '';
+      els.assetsCount.textContent = `${items.length} file${items.length===1?'':'s'}`;
+      for (const it of items) {
+        const card = document.createElement('div');
+        card.className = 'panel';
+        const img = document.createElement('img');
+        img.alt = it.name;
+        img.loading = 'lazy';
+        img.src = it.url;
+        const id = document.createElement('div'); id.className='panel-id'; id.style.fontWeight='600'; id.style.marginTop='6px'; id.textContent = it.name;
+        const meta = document.createElement('div'); meta.className='muted'; meta.style.fontSize='.8rem'; meta.textContent = `${(it.size||0)} bytes • ${it.mtime||''}`;
+        card.append(img, id, meta);
+        els.assetsList.appendChild(card);
+      }
+    }
+    async function fetchAssets() {
+      try {
+        const sid = Number(els.seedId.value);
+        if (!Number.isInteger(sid) || sid < 1) throw new Error('Enter Seed ID first');
+        const base = els.apiBase.value.replace(/\/$/, '');
+        const url = `${base}/api/assets/seed/${sid}/svgs`;
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`Fetch ${r.status}`);
+        const data = await r.json();
+        renderAssets(data.items || []);
+        log(`Fetched ${data.items?.length||0} asset(s)`, 'ok');
+      } catch (e) { log(String(e.message || e), 'error'); }
+    }
+    els.assetsRefresh?.addEventListener('click', fetchAssets);
+
+// ===== SVG Upload module (appends, safe to include once) =====
   (function(){
     if (!window.__manifestUploadBound) {
       window.__manifestUploadBound = true;
@@ -410,4 +414,3 @@
   </script>
 </body>
 </html>
-

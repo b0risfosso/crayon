@@ -17,7 +17,10 @@ app = Flask(__name__)
 
 DB_PATH = "/var/www/site/data/narratives_data.db"  # keep consistent with your setup
 
-PANELS_ROOT = Path("/var/www/data/assets/panels")  # target on disk
+PANELS_ROOT = Path("/var/www/site/data/assets/panels")  # target on disk
+ASSETS_ROOT = Path("/var/www/site/data/assets/panels")   # << per your ask
+WEB_PREFIX  = "/assets/panels"                            # serve as: /assets/seed_{id}/...
+
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 def connect():
@@ -1005,3 +1008,21 @@ def upload_panels():
     # Public web path (must be served by nginx location below)
     web_path = str(dest).replace(str(PANELS_ROOT), "/assets/panels").replace(os.sep, "/")
     return jsonify({"path": web_path})
+
+
+@app.get("/api/assets/seed/<int:seed_id>/svgs")
+def list_seed_svgs(seed_id: int):
+    base = ASSETS_ROOT / f"seed_{seed_id}"
+    if not base.exists():
+        return jsonify({"items": []})
+    items = []
+    for p in sorted(base.glob("*.svg")):
+        st = p.stat()
+        web = str(p).replace(str(ASSETS_ROOT), WEB_PREFIX).replace(os.sep, "/")
+        items.append({
+            "name": p.name,
+            "url": web,                       # used by manifest.html to render thumbnails
+            "size": st.st_size,
+            "mtime": datetime.utcfromtimestamp(st.st_mtime).isoformat(timespec="seconds") + "Z",
+        })
+    return jsonify({"items": items})
