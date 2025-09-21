@@ -126,11 +126,41 @@
   </template>
 
   <script>
-    const els = {$1
-      ,assetsRefresh: document.getElementById('assetsRefresh')
-      ,assetsList: document.getElementById('assetsList')
-      ,assetsCount: document.getElementById('assetsCount')
-    };
+    const els = {
+  apiBase: document.getElementById('apiBase'),
+  seedId: document.getElementById('seedId'),
+  version: document.getElementById('version'),
+  updated: document.getElementById('updated'),
+  publish: document.getElementById('publish'),
+  payload: document.getElementById('payload'),
+  validateBtn: document.getElementById('validateBtn'),
+  submitBtn: document.getElementById('submitBtn'),
+  downloadBtn: document.getElementById('downloadBtn'),
+  fileJson: document.getElementById('fileJson'),
+  dropJson: document.getElementById('dropJson'),
+  loadLatest: document.getElementById('loadLatest'),
+  suggestVersion: document.getElementById('suggestVersion'),
+  fillNow: document.getElementById('fillNow'),
+  status: document.getElementById('status'),
+  log: document.getElementById('log'),
+  preview: document.getElementById('preview'),
+  panelCount: document.getElementById('panelCount'),
+  tmpl: document.getElementById('panelTmpl'),
+
+  // SVG upload
+  dropSvgs: document.getElementById('dropSvgs'),
+  fileSvgs: document.getElementById('fileSvgs'),
+  uploadBtn: document.getElementById('uploadBtn'),
+  uploadList: document.getElementById('uploadList'),
+  useSeedFolder: document.getElementById('useSeedFolder'),
+  allowOverwrite: document.getElementById('allowOverwrite'),
+
+  // Assets viewer
+  assetsRefresh: document.getElementById('assetsRefresh'),
+  assetsList: document.getElementById('assetsList'),
+  assetsCount: document.getElementById('assetsCount'),
+};
+
 
     // Defaults
     els.apiBase.value = localStorage.getItem('manifest.apiBase') || location.origin;
