@@ -25,6 +25,7 @@
     pre { background: #f6f6f6; padding: .75rem; border-radius: .5rem; overflow-x: auto; }
     .row { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
     .badge { font-size:.8rem; padding:.15rem .45rem; border:1px solid #ddd; border-radius:.4rem; }
+    #statusLog { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
   </style>
 </head>
 <body>
@@ -37,20 +38,22 @@
       <option value="">Loading domains…</option>
     </select>
     <button type="submit">Load</button>
-    <button id="runGrokBtn" type="button" class="secondary" title="Generate dimensions & seeds with Grok (xAI)">Run Grok</button>
+    <button id="runAllBtn" type="button" class="secondary" title="Run Grok + Gemini + DeepSeek sequentially">Run (All Providers)</button>
     <span id="statusLine" class="muted"></span>
   </form>
 
   <div id="globalStatus" class="meta"></div>
   <div id="container"></div>
+  <div id="statusLog" class="meta"></div>
 
   <script>
     const form = document.getElementById('form');
     const narrativeSelect = document.getElementById('narrativeSelect');
-    const runGrokBtn = document.getElementById('runGrokBtn');
+    const runAllBtn = document.getElementById('runAllBtn');
     const globalStatus = document.getElementById('globalStatus');
     const container = document.getElementById('container');
     const statusLine = document.getElementById('statusLine');
+    const statusLog = document.getElementById('statusLog');
 
     // ---------- utilities ----------
     function el(tag, opts = {}) {
@@ -102,6 +105,11 @@
       }
       return data;
     }
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    function log(line) {
+      if (!line) return;
+      statusLog.textContent += (statusLog.textContent ? "\n" : "") + line;
+    }
 
     // ---------- UI builders ----------
     function makeNarrativeSection(narrative) {
@@ -129,7 +137,6 @@
       seedBox.append(seedHeader, seedStatus, seedWrap);
       card.append(sum, thesis, seedBox);
 
-      // For GET-based loading later
       if (dim.id) {
         card._seedFetch = () => fetchSeedsForDimensionGET(dim.id, { seedStatus, seedWrap });
       }
@@ -152,13 +159,14 @@
             `<strong>A (Problem):</strong> ${escapeHtml(s.problem || '')}<br>` +
             `<strong>B (Objective):</strong> ${escapeHtml(s.objective || '')}<br>` +
             `<strong>Solution (Link):</strong> ${escapeHtml(s.solution || '')}` +
+            (s.provider ? `<br><small>provider: ${escapeHtml(s.provider)}</small>` : '') +
             (s.created_at ? `<br><small>${escapeHtml(s.created_at)}</small>` : '');
           seedWrap.appendChild(seed);
         });
       } catch (e) {
         if (tries > 0) {
           seedStatus.textContent = 'Retrying…';
-          await new Promise(r => setTimeout(r, 1200));
+          await sleep(1200);
           return fetchSeedsForDimensionGET(dimensionId, ui, tries - 1);
         }
         seedStatus.className = 'seed-error';
@@ -204,52 +212,75 @@
       }
     }
 
-    // ---------- GROK (xAI) generation path ----------
-    async function runGrokForNarrative(narrative) {
-      // Generate dimensions via xAI
-      statusLine.textContent = 'Generating dimensions with Grok…';
+    // ---------- Provider runners ----------
+    async function runOneProvider(provider, narrativeTitle) {
+      log(`▶ ${provider}: generating dimensions…`);
+      statusLine.textContent = `Generating dimensions with ${provider}…`;
       const dimData = await postJSON('/api/narrative-dimensions', {
-        domain: narrative.title,
-        provider: 'xai'
+        domain: narrativeTitle,
+        provider
       });
+      const dims = Array.isArray(dimData?.dimensions) ? dimData.dimensions : [];
+      log(`   ${provider}: ${dims.length} dimension(s) created.`);
 
-      const newDims = Array.isArray(dimData?.dimensions) ? dimData.dimensions : [];
-      if (!newDims.length) {
-        statusLine.textContent = 'Grok returned no dimensions.';
-        return;
-      }
-      statusLine.textContent = `Generated ${newDims.length} dimension(s). Generating seeds…`;
+      if (!dims.length) return { dims: 0, seedsOk: 0, seedsFail: 0 };
 
-      // Generate seeds for each dim (xAI), throttled
+      // generate seeds for each dimension
       const MAX_CONCURRENCY = 2;
       let i = 0, ok = 0, fail = 0;
 
       async function seedWorker() {
-        while (i < newDims.length) {
+        while (i < dims.length) {
           const idx = i++;
-          const d = newDims[idx];
+          const d = dims[idx];
           try {
             await postJSON('/api/narrative-seeds', {
-              domain: narrative.title,
+              domain: narrativeTitle,
               dimension: d.name,
               description: d.thesis,
               targets: d.targets || [],
-              provider: 'xai'
+              provider
             });
             ok++;
-            statusLine.textContent = `Generating seeds… ${ok}/${newDims.length}`;
+            statusLine.textContent = `Generating ${provider} seeds… ${ok}/${dims.length}`;
           } catch (e) {
             fail++;
+            log(`   ${provider}: seed error on "${d.name}": ${e.message || e}`);
           }
         }
       }
-      await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENCY, newDims.length) }, () => seedWorker()));
+      await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENCY, dims.length) }, () => seedWorker()));
+      log(`✔ ${provider}: seeds created for ${ok}/${dims.length} dimension(s)${fail ? `, ${fail} failed` : ''}.`);
+      return { dims: dims.length, seedsOk: ok, seedsFail: fail };
+    }
 
-      statusLine.textContent = `Grok done. Seeds created for ${ok}/${newDims.length} dimension(s). Reloading…`;
+    async function runAllProvidersSequential(narrative) {
+      statusLog.textContent = '';
+      const providers = ['xai', 'gemini', 'deepseek'];
+      const summary = [];
 
-      // Reload the canonical view from DB
+      for (const p of providers) {
+        try {
+          const r = await runOneProvider(p, narrative.title);
+          summary.push({ provider: p, ...r });
+          // brief pause between providers (optional)
+          await sleep(400);
+        } catch (e) {
+          log(`✖ ${p}: failed — ${e.message || e}`);
+          summary.push({ provider: p, dims: 0, seedsOk: 0, seedsFail: 0, error: String(e) });
+        }
+      }
+
+      // Reload canonical view
+      statusLine.textContent = 'Reloading view from DB…';
       container.innerHTML = '';
       await runForNarrative(narrative);
+
+      // Print summary
+      const s = summary.map(x =>
+        `${x.provider}: dims=${x.dims}, seeds_ok=${x.seedsOk}, seeds_fail=${x.seedsFail}${x.error ? `, error=${x.error}` : ''}`
+      ).join('\n');
+      log(`\n=== Summary ===\n${s}`);
       statusLine.textContent = 'Done.';
     }
 
@@ -301,10 +332,11 @@
 
       container.innerHTML = '';
       statusLine.textContent = '';
+      statusLog.textContent = '';
       await runForNarrative(narrative);
     });
 
-    runGrokBtn.addEventListener('click', async () => {
+    runAllBtn.addEventListener('click', async () => {
       const id = narrativeSelect.value.trim();
       if (!id) { globalStatus.textContent = 'Please choose a domain first.'; return; }
       const selectedText = narrativeSelect.options[narrativeSelect.selectedIndex]?.text || `#${id}`;
@@ -312,13 +344,15 @@
       const narrative = { id: Number(id), title: titleFromText, created_at: '' };
 
       try {
-        runGrokBtn.disabled = true;
-        statusLine.textContent = 'Starting Grok…';
-        await runGrokForNarrative(narrative);
+        runAllBtn.disabled = true;
+        statusLine.textContent = 'Starting…';
+        statusLog.textContent = '';
+        await runAllProvidersSequential(narrative);
       } catch (e) {
-        statusLine.textContent = `Grok failed: ${e.message || e}`;
+        statusLine.textContent = `Run failed: ${e.message || e}`;
+        log(`Run failed: ${e.message || e}`);
       } finally {
-        runGrokBtn.disabled = false;
+        runAllBtn.disabled = false;
       }
     });
 

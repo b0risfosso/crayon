@@ -15,6 +15,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from xai_sdk import Client as XAIClient
 from xai_sdk.chat import system as xai_system, user as xai_user
+from google import genai
 
 app = Flask(__name__)
 
@@ -142,6 +143,35 @@ def bootstrap_schema():
 
 bootstrap_schema()
 
+_gemini_client = None
+def get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        if genai is None:
+            raise RuntimeError("google-genai not installed. `pip install google-genai`")
+        # The SDK reads GOOGLE_API_KEY from the environment.
+        if not os.getenv("GOOGLE_API_KEY"):
+            raise RuntimeError("GOOGLE_API_KEY not set")
+        _gemini_client = genai.Client()
+    return _gemini_client
+
+# --- DeepSeek client (same API as OpenAI) ---
+_deepseek_client = None
+def get_deepseek_client():
+    global _deepseek_client
+    if _deepseek_client is None:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise RuntimeError("DEEPSEEK_API_KEY not set")
+        _deepseek_client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com"
+        )
+    return _deepseek_client
+
+def _deepseek_model():
+    return os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
@@ -258,7 +288,8 @@ BODY_WRAPPER_STYLE = """
 
 def _provider_from(data: dict) -> str:
     p = (data.get("provider") or "").strip().lower()
-    return p if p in {"xai", "openai"} else "openai"
+    return p if p in {"openai", "xai", "gemini", "deepseek"} else "openai"
+
 
 
 def get_or_create_narrative(con, domain_title: str) -> int:
@@ -355,7 +386,92 @@ def _suffix_if_exists(p: Path) -> Path:
             return candidate
         i += 1
 
-# ---------- NEW: LLM adapters (OpenAI + xAI) ----------
+# ---------- NEW: LLM adapters (OpenAI + xAI + Gemini + Deepseek) ----------
+def llm_generate_dimensions_deepseek(domain: str, n: int | None):
+    client = get_deepseek_client()
+    count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
+    usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
+    parsed_resp = client.responses.parse(
+        model=_deepseek_model(),
+        input=[
+            {"role": "system", "content": DIM_SYS_MSG},
+            {"role": "user", "content": usr_msg},
+        ],
+        text_format=NarrativeDimensions,
+    )
+    return parsed_resp
+
+
+def llm_generate_seeds_deepseek(domain: str, dimension: str, description: str, targets: list[str]):
+    client = get_deepseek_client()
+    usr_msg = (
+        f"Domain: {domain}\n"
+        f"Dimension: {dimension}\n"
+        f"Description: {description}\n"
+        f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
+        "Create A→B narrative seeds in this dimension."
+    )
+    parsed_resp = client.responses.parse(
+        model=_deepseek_model(),
+        input=[
+            {"role": "system", "content": SEED_SYS_MSG},
+            {"role": "user", "content": usr_msg},
+        ],
+        text_format=NarrativeSeeds,
+    )
+    return parsed_resp
+
+
+def _gemini_model():
+    return os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+def llm_generate_dimensions_gemini(domain: str, n: int | None):
+    client = get_gemini_client()
+    count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
+    usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
+    # For Gemini, we pass a single prompt string; include your DIM_SYS_MSG
+    prompt = f"{DIM_SYS_MSG}\n\n{usr_msg}"
+    resp = client.models.generate_content(
+        model=_gemini_model(),
+        contents=prompt,
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": NarrativeDimensions,  # Pydantic schema
+        },
+    )
+    # resp.parsed -> NarrativeDimensions | list[NarrativeDimensions] depending on schema
+    parsed = resp.parsed
+    # If the SDK returns a list (rare when schema is singular), normalize:
+    if isinstance(parsed, list) and parsed and isinstance(parsed[0], NarrativeDimensions):
+        parsed = parsed[0]
+    return resp, parsed
+
+
+def llm_generate_seeds_gemini(domain: str, dimension: str, description: str, targets: List[str]):
+    client = get_gemini_client()
+    usr_msg = (
+        f"Domain: {domain}\n"
+        f"Dimension: {dimension}\n"
+        f"Description: {description}\n"
+        f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
+        "Create A→B narrative seeds in this dimension."
+    )
+    prompt = f"{SEED_SYS_MSG}\n\n{usr_msg}"
+    resp = client.models.generate_content(
+        model=_gemini_model(),
+        contents=prompt,
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": NarrativeSeeds,  # Pydantic schema
+        },
+    )
+    parsed = resp.parsed
+    if isinstance(parsed, list) and parsed and isinstance(parsed[0], NarrativeSeeds):
+        parsed = parsed[0]
+    return resp, parsed
+
+
+
 def llm_generate_dimensions_openai(domain: str, n: int | None):
     count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
     usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
@@ -433,6 +549,15 @@ def generate_narrative_dimensions():
             resp, parsed = llm_generate_dimensions_xai(domain, n)
             model_name = os.getenv("XAI_MODEL", "grok-4")
             raw_text = getattr(resp, "content", None)
+        elif provider == "gemini":
+            resp, parsed = llm_generate_dimensions_gemini(domain, n)
+            model_name = _gemini_model()
+            raw_text = getattr(resp, "text", None)
+        elif provider == "deepseek":
+            parsed_resp = llm_generate_dimensions_deepseek(domain, n)
+            parsed = parsed_resp.output_parsed
+            model_name = _deepseek_model()
+            raw_text = parsed_resp.output_text
         else:
             parsed_resp = llm_generate_dimensions_openai(domain, n)
             parsed = parsed_resp.output_parsed
@@ -492,6 +617,15 @@ def generate_narrative_seeds():
             resp, parsed = llm_generate_seeds_xai(domain, dimension, description, targets)
             model_name = os.getenv("XAI_MODEL", "grok-4")
             raw_text = getattr(resp, "content", None)
+        elif provider == "gemini":
+            resp, parsed = llm_generate_seeds_gemini(domain, dimension, description, targets)
+            model_name = _gemini_model()
+            raw_text = getattr(resp, "text", None)
+        elif provider == "deepseek":
+            parsed_resp = llm_generate_seeds_deepseek(domain, dimension, description, targets)
+            parsed = parsed_resp.output_parsed
+            model_name = _deepseek_model()
+            raw_text = parsed_resp.output_text
         else:
             parsed_resp = llm_generate_seeds_openai(domain, dimension, description, targets)
             parsed = parsed_resp.output_parsed
