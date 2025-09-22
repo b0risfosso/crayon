@@ -17,7 +17,7 @@ from xai_sdk import Client as XAIClient
 from xai_sdk.chat import system as xai_system, user as xai_user
 from google import genai
 
-app = Flask(__name__)
+
 
 DB_PATH = "/var/www/site/data/narratives_data.db"  # keep consistent with your setup
 
@@ -188,6 +188,15 @@ def _deepseek_model():
 
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+def _get_llm():
+    if OpenAI is None:
+        raise RuntimeError("openai client not installed")
+    api_key  = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("LLM API key missing")
+    client = OpenAI(api_key=api_key)
+    return client
 
 _xai_client = None
 def get_xai_client():
@@ -1596,27 +1605,39 @@ def list_seed_svgs(seed_id: int):
         })
     return jsonify({"items": items})
 
-@app.post("/api/box-of-dirt", response_class=PlainTextResponse)
-def generate_box_of_dirt(req: BoxOfDirtRequest):
-    # Build the single user message: prompt + INPUT block
-    input_block = compose_input_block(req.domain, req.dimension, req.seed, req.prototype, req.thesis)
-    full_prompt = f"{BOX_OF_DIRT_PROMPT}\n{input_block}"
+@app.route("/api/box-of-dirt", methods=["POST"])
+def box_of_dirt():
+    data = request.get_json(silent=True) or {}
+    domain     = (data.get("domain") or "").strip()
+    dimension  = (data.get("dimension") or "").strip()
+    seed       = (data.get("seed") or "").strip()
+    prototype  = (data.get("prototype") or "").strip()
+    thesis     = (data.get("thesis") or "").strip()
+
+    if not (domain and dimension and seed and prototype):
+        return jsonify({"error": "domain, dimension, seed, prototype are required"}), 400
+
+    parts = [
+        "INPUT (paste your case here; the model will parse it)",
+        "Domain", domain,
+        "Dimension", dimension
+    ]
+    if thesis:
+        parts.append(thesis)
+    parts += ["Seed", seed, "Prototype", prototype]
+    full_prompt = f"{BOX_OF_DIRT_PROMPT}\n" + "\n".join(parts)
 
     try:
-        completion = client.chat.completions.create(
-            model="gpt-5-mini-2025-08-07",
-            temperature=0.2,
-            messages=[{"role": "user", "content": full_prompt}],
+        client = _get_llm()
+        res = client.chat.completions.create(
+            model="gpt-5-mini-2025-08-07", temperature=0.2,
+            messages=[{"role":"user","content": full_prompt}]
         )
-        html = completion.choices[0].message.content or ""
-        # The model is instructed to return raw HTML; still guard against accidental fences
-        html = html.strip()
+        html = (res.choices[0].message.content or "").strip()
         if html.startswith("```"):
-            # Strip Markdown fences if the model disobeys
-            html = html.strip("`").strip()
-        if "<!DOCTYPE html" not in html:
-            # Defensive: ensure caller receives HTML; otherwise surface a helpful error
-            raise ValueError("Model did not return HTML document.")
-        return PlainTextResponse(content=html, media_type="text/html; charset=utf-8")
+            # strip accidental markdown fences
+            html = html.strip("`")
+            html = html.split("\n", 1)[-1] if "\n" in html else html
+        return Response(html, mimetype="text/html; charset=utf-8")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+        return jsonify({"error": f"generation failed: {e}"}), 500
