@@ -1630,7 +1630,7 @@ def box_of_dirt():
     try:
         client = _get_llm()
         res = client.chat.completions.create(
-            model="gpt-5-mini-2025-08-07", temperature=0.2,
+            model="gpt-5-mini-2025-08-07",
             messages=[{"role":"user","content": full_prompt}]
         )
         html = (res.choices[0].message.content or "").strip()
