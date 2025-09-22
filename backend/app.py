@@ -27,6 +27,20 @@ WEB_PREFIX  = "/assets/panels"                            # serve as: /assets/se
 
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL | re.IGNORECASE)
+
+def _extract_json_text(s: str) -> str:
+    if not s:
+        return ""
+    m = _JSON_FENCE_RE.search(s)
+    if m:
+        return m.group(1).strip()
+    return s.strip()
+
+def _pydantic_from_json(model_cls, text: str):
+    # Try exact JSON → model; if failure, raise to caller
+    return model_cls.model_validate_json(text)
+
 def connect():
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
@@ -391,15 +405,49 @@ def llm_generate_dimensions_deepseek(domain: str, n: int | None):
     client = get_deepseek_client()
     count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
     usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
-    parsed_resp = client.responses.parse(
-        model=_deepseek_model(),
-        input=[
-            {"role": "system", "content": DIM_SYS_MSG},
-            {"role": "user", "content": usr_msg},
-        ],
-        text_format=NarrativeDimensions,
+
+    # Build a strict system message asking for JSON only
+    sys_prompt = (
+        "You are a structured generator. "
+        "Return ONLY a JSON document that strictly matches the provided schema. "
+        "No prose, no markdown fences unless asked; just JSON.\n\n"
+        "Schema name: NarrativeDimensions\n"
+        "fields:\n"
+        "- dimensions: list of objects with fields {name:str, thesis:str, targets:list[str]}\n"
+        "Constraints: 5–8 items unless explicitly overridden."
     )
-    return parsed_resp
+
+    user_prompt = f"{DIM_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
+
+    completion = client.chat.completions.create(
+        model=_deepseek_model(),
+        messages=[
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.7,
+        # If DeepSeek supports response_format, you can try:
+        # response_format={"type": "json_object"},
+    )
+    content = completion.choices[0].message.content or ""
+    json_text = _extract_json_text(content)
+
+    try:
+        parsed = _pydantic_from_json(NarrativeDimensions, json_text)
+    except Exception as e:
+        # surface raw text for debugging by caller (routes)
+        class _Shim: pass
+        shim = _Shim()
+        shim.output_parsed = None
+        shim.output_text = content
+        return shim  # emulate "parsed_resp" object with fields used by routes
+
+    # Return an object that mimics OpenAI .responses.parse shape used in routes
+    class _ParsedResp:
+        def __init__(self, parsed_obj, raw_text):
+            self.output_parsed = parsed_obj
+            self.output_text = raw_text
+    return _ParsedResp(parsed, json_text)
 
 
 def llm_generate_seeds_deepseek(domain: str, dimension: str, description: str, targets: list[str]):
@@ -411,15 +459,44 @@ def llm_generate_seeds_deepseek(domain: str, dimension: str, description: str, t
         f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
         "Create A→B narrative seeds in this dimension."
     )
-    parsed_resp = client.responses.parse(
-        model=_deepseek_model(),
-        input=[
-            {"role": "system", "content": SEED_SYS_MSG},
-            {"role": "user", "content": usr_msg},
-        ],
-        text_format=NarrativeSeeds,
+
+    sys_prompt = (
+        "You are a structured generator. "
+        "Return ONLY a JSON document that strictly matches the provided schema. "
+        "No prose, no markdown fences; just JSON.\n\n"
+        "Schema name: NarrativeSeeds\n"
+        "fields:\n"
+        "- seeds: list of objects with fields {problem:str, objective:str, solution:str}\n"
+        "Constraints: 3–5 seeds."
     )
-    return parsed_resp
+    user_prompt = f"{SEED_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
+
+    completion = client.chat.completions.create(
+        model=_deepseek_model(),
+        messages=[
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.7,
+        # response_format={"type": "json_object"},  # optional if supported
+    )
+    content = completion.choices[0].message.content or ""
+    json_text = _extract_json_text(content)
+
+    try:
+        parsed = _pydantic_from_json(NarrativeSeeds, json_text)
+    except Exception:
+        class _Shim: pass
+        shim = _Shim()
+        shim.output_parsed = None
+        shim.output_text = content
+        return shim
+
+    class _ParsedResp:
+        def __init__(self, parsed_obj, raw_text):
+            self.output_parsed = parsed_obj
+            self.output_text = raw_text
+    return _ParsedResp(parsed, json_text)
 
 
 def _gemini_model():
