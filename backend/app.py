@@ -17,7 +17,7 @@ from xai_sdk import Client as XAIClient
 from xai_sdk.chat import system as xai_system, user as xai_user
 from google import genai
 
-
+app = Flask(__name__)
 
 DB_PATH = "/var/www/site/data/narratives_data.db"  # keep consistent with your setup
 
