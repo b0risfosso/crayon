@@ -2,7 +2,7 @@ import os
 from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request, Response
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from openai import OpenAI, OpenAIError
 # app.py (top-level, after Flask app creation)
@@ -224,6 +224,239 @@ class NarrativePrototype(BaseModel):
     first_eyes: List[str] = Field(..., description="Who sees it first")
     why_box_of_dirt: str = Field(..., description="Why it's minimal, disposable, growth-inviting")
 
+class BoxOfDirtRequest(BaseModel):
+    domain: str
+    dimension: str
+    seed: str         # raw multiline text containing A/B/Solution lines
+    prototype: str    # raw multiline text (Core Intent, Minimal Build, Panels, etc.)
+    thesis: Optional[str] = None  # optional dimension thesis
+
+
+BOX_OF_DIRT_PROMPT = """LLM PROMPT (copy below this line and use as-is):
+You are a front-end generator. Produce a single, self-contained HTML page that presents a “Box of Dirt” narrative prototype based on the INPUT provided at the end of this prompt.
+Output rules (must follow)
+Output only raw HTML (no Markdown fences, no commentary).
+The HTML must be standalone: inline CSS, optional minimal inline JS, no external fonts, images, or network requests.
+Use accessible, clean markup and a compact, modern look. Support dark/light with :root { color-scheme: light dark; }.
+If the Prototype describes toggles/buttons/sliders, include non-functional controls that visually flip canned states (no backend).
+Use the content exactly as given; you may lightly normalize punctuation/quotes, but do not invent metrics or claims beyond the INPUT.
+Title pattern: <Dimension Name> — Box of Dirt (<Domain Name>). Do not include any internal IDs in the title.
+Page layout (sections)
+Header
+Title as above.
+Domain + Dimension line.
+Optional thesis (if provided with the Dimension).
+Seed Card
+Show A (Problem), B (Objective), and Solution (Link).
+A small note: “All numbers are mocked/prefilled; no backend.”
+Core Intent
+One concise paragraph from Prototype → “Core Intent — …”.
+Minimal Build / Storyboard
+If the Prototype has a “Minimal Build — Title: …”, show that subtitle.
+If Scenes/Panels are enumerated (e.g., “Panel 1 — …”, “Scene 3 — …”), render each as a card:
+A mini header (e.g., “Panel 2 — Magnet and Motor Design Choices”).
+Body with bullets or short paragraphs.
+For visual cues, insert .placeholder boxes (no images).
+If toggles/sliders/states are described, add a top Controls section with non-functional UI that drives pre-scripted text changes only (no live calculations). Never fetch data.
+Metrics / Dials (optional)
+If the Prototype lists KPIs/outcomes, render them in small metric rows (labels on left, values right).
+Load-Bearing Test
+“What to show” bullets.
+Validating Reactions / Red Flags
+Two columns: “Validating reactions we want” and “Red flags (invalidate)”.
+First Eyes
+A bullet list of the stakeholder groups.
+Why This is a Box of Dirt
+Bulleted points for Minimal / Disposable / Growth-inviting.
+Footnote
+“Prototype storyboard for discussion; all content is illustrative.”
+Style guide (use this exact CSS skeleton)
+Keep class names and structure so pages are consistent across runs.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title><!-- INSERT TITLE --></title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 24px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; }
+h1 { font-size: 1.6rem; margin: 0 0 .35rem; }
+h2 { font-size: 1.15rem; margin: 1rem 0 .6rem; }
+h3 { font-size: 1rem; margin: .2rem 0 .45rem; }
+p  { margin: .45rem 0; }
+.small { font-size:.9rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+.muted { opacity:.75; }
+.thesis { font-style: italic; margin:.3rem 0 .8rem; }
+.badge, .pill { display:inline-block; padding:.18rem .5rem; border:1px solid rgba(0,0,0,.18); border-radius:.45rem; font-size:.78rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
+.pill { border-radius:999px; }
+.card  { border:1px solid rgba(0,0,0,.18); border-radius:.65rem; background: color-mix(in oklab, Canvas 94%, CanvasText 6%); padding:.9rem 1rem; }
+.panel { border:1px solid rgba(0,0,0,.16); border-radius:.6rem; padding:.8rem; background: Canvas; }
+.grid  { display:grid; gap:.9rem; }
+.cols-2 { grid-template-columns: 1fr 1fr; }
+.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+@media (max-width: 1000px){ .cols-2,.cols-3,.cols-4 { grid-template-columns: 1fr; } }
+.row { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; }
+.spacer { flex:1; }
+.btn { padding:.5rem .8rem; border:1px solid rgba(0,0,0,.2); background: color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer; }
+.btn[disabled]{ opacity:.55; cursor:not-allowed; }
+.placeholder { border:1px dashed rgba(0,0,0,.28); border-radius:.5rem; display:grid; place-items:center; min-height: 120px; font-size:.92rem; opacity:.75; }
+.metrics { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:.4rem .8rem; }
+.metrics div { display:flex; justify-content:space-between; gap:.5rem; }
+.metrics .k { opacity:.75; }
+.scene { border:1px solid rgba(0,0,0,.16); border-radius:.6rem; padding:.7rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
+.scene h4 { margin:.2rem 0 .4rem; font-size:.98rem; }
+.scene .cap { margin-top:.45rem; font-size:.9rem; opacity:.8; }
+.controls { border:1px solid rgba(0,0,0,.16); border-radius:.6rem; padding:.7rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
+label.opt { display:flex; align-items:center; gap:.5rem; }
+input[type="range"] { width: 220px; }
+</style>
+</head>
+<body>
+  <!-- HEADER (title + domain/dimension + thesis) -->
+  <header>
+    <h1><!-- DIMENSION --> — Box of Dirt (<!-- DOMAIN -->)</h1>
+    <div class="muted">Domain: <strong><!-- DOMAIN --></strong> • Dimension: <strong><!-- DIMENSION --></strong></div>
+    <!-- optional thesis -->
+    <!-- <p class="thesis">DIMENSION THESIS</p> -->
+    <div class="card">
+      <p><strong>A (Problem):</strong> <!-- A_TEXT --></p>
+      <p><strong>B (Objective):</strong> <!-- B_TEXT --></p>
+      <p><strong>Solution (Link):</strong> <!-- SOLUTION_TEXT --></p>
+      <p class="muted small">All numbers are mocked/prefilled for narrative exploration. No backend.</p>
+    </div>
+  </header>
+
+  <!-- CORE INTENT -->
+  <section class="panel">
+    <h2>Core Intent</h2>
+    <p><!-- CORE_INTENT --></p>
+  </section>
+
+  <!-- OPTIONAL CONTROLS (only if Prototype mentions toggles/sliders; otherwise omit this block) -->
+  <!--
+  <section class="controls">
+    <h2>Controls (mocked)</h2>
+    <div class="row">
+      <label class="opt"><input type="checkbox"/> Toggle A</label>
+      <label class="opt"><input type="checkbox"/> Toggle B</label>
+      <label class="opt">Slider C <span class="mono">50</span><input type="range" min="0" max="100" value="50"/></label>
+      <button class="btn">Preset: Baseline</button>
+      <button class="btn">Preset: Scenario</button>
+    </div>
+    <p class="muted small">Controls are non-functional and advance pre-scripted states only.</p>
+  </section>
+  -->
+
+  <!-- MINIMAL BUILD / STORYBOARD -->
+  <section class="panel">
+    <h2>Minimal Build</h2>
+    <p class="small"><span class="pill">Storyboard</span> <!-- If provided, include the Prototype’s Minimal Build title/label here --></p>
+  </section>
+
+  <!-- SCENES / PANELS (repeat per item from Prototype) -->
+  <section class="grid cols-2">
+    <!-- Repeat a .scene card per “Panel X — …” or “Scene X — …” from the INPUT -->
+    <!-- Example scene shell; duplicate as needed and fill content -->
+    <!--
+    <div class="scene">
+      <h4>Panel 1 — TITLE</h4>
+      <div class="placeholder">[Visual description from Prototype]</div>
+      <ul class="small">
+        <li>Bullet 1…</li>
+        <li>Bullet 2…</li>
+      </ul>
+      <p class="cap">Caption or note…</p>
+    </div>
+    -->
+  </section>
+
+  <!-- OPTIONAL METRICS / OUTCOME CARDS -->
+  <!--
+  <section class="panel">
+    <h2>Outcome Snapshot (prefilled)</h2>
+    <div class="metrics">
+      <div><span class="k">Throughput</span><span class="mono">+22%</span></div>
+      <div><span class="k">Lead time</span><span class="mono">−10 wks</span></div>
+      <div><span class="k">CO₂e</span><span class="mono">−15%</span></div>
+    </div>
+  </section>
+  -->
+
+  <!-- LOAD-BEARING TEST -->
+  <section class="panel">
+    <h2>Load-Bearing Test — What to show</h2>
+    <ul class="small">
+      <!-- BULLETS FROM PROTOTYPE -->
+    </ul>
+  </section>
+
+  <!-- VALIDATIONS / RED FLAGS -->
+  <section class="grid cols-2">
+    <div class="panel">
+      <h2>Validating reactions we want</h2>
+      <ul class="small"><!-- bullets --></ul>
+    </div>
+    <div class="panel">
+      <h2>Red flags (invalidate)</h2>
+      <ul class="small"><!-- bullets --></ul>
+    </div>
+  </section>
+
+  <!-- FIRST EYES -->
+  <section class="panel">
+    <h2>First Eyes</h2>
+    <ul class="small"><!-- list from Prototype --></ul>
+  </section>
+
+  <!-- WHY BOX OF DIRT -->
+  <section class="panel">
+    <h2>Why This is a Box of Dirt</h2>
+    <ul class="small">
+      <!-- Convert the Prototype’s rationale into bullets: Minimal / Disposable / Growth-inviting -->
+    </ul>
+    <p class="muted small">Prototype storyboard for discussion only; replace with measured data if piloted.</p>
+  </section>
+
+  <!-- (Optional) tiny inline JS only if you added mock controls to flip canned text -->
+  <script>
+  // If you included controls, you may wire minimal, no-network state flips here.
+  // Keep it strictly cosmetic (e.g., toggling CSS classes or swapping prewritten text).
+  </script>
+</body>
+</html>
+How to map INPUT → page
+Replace <!-- DOMAIN -->, <!-- DIMENSION -->, and optional thesis.
+Insert Seed text into the Seed Card (A/B/Solution).
+Place Prototype “Core Intent” verbatim in the Core Intent section.
+Under “Minimal Build,” add the minimal build’s title/label (e.g., “Title: …”), then build one .scene card per described “Panel/Scene” with bullets and captions.
+Populate Load-Bearing Test, Validations, First Eyes, and Why sections using Prototype text.
+If Prototype mentions sliders/toggles/presets, include the Controls block (non-functional).
+INPUT (paste your case here; the model will parse it)
+Domain
+[Domain Name (ignore any #IDs)]
+Dimension
+[Dimension Name (ignore any #IDs)]
+[Optional Dimension Thesis sentence/paragraph]
+Seed
+A (Problem): [text]
+B (Objective): [text]
+Solution (Link): [text]
+Prototype
+Core Intent — [text]
+Minimal Build — [title + description]
+[Then any Panels/Scenes with headings and bullets]
+Load-Bearing Test — [bullets]
+Validating reactions we want — [bullets]
+Red flags (invalidate) — [bullets]
+First Eyes — [bulleted roles]
+Why This is a Box of Dirt — [paragraph; the model will bulletize Minimal / Disposable / Growth-inviting]
+"""
+
+
 PROTOTYPE_SYS_MSG = """You are a narrative prototyper.
 Your task is to translate narrative seeds into narrative prototypes.
 A narrative prototype — also called a "box of dirt" — is a minimal, disposable artifact
@@ -299,6 +532,25 @@ BODY_WRAPPER_STYLE = """
   .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
 </style>
 """
+
+def compose_input_block(domain: str, dimension: str, seed: str, prototype: str, thesis: Optional[str]) -> str:
+    parts = [
+        "INPUT (paste your case here; the model will parse it)",
+        "Domain",
+        domain.strip(),
+        "Dimension",
+        dimension.strip()
+    ]
+    if thesis and thesis.strip():
+        parts.append(thesis.strip())
+    parts.extend([
+        "Seed",
+        seed.strip(),
+        "Prototype",
+        prototype.strip()
+    ])
+    return "\n".join(parts)
+
 
 def _provider_from(data: dict) -> str:
     p = (data.get("provider") or "").strip().lower()
@@ -1343,3 +1595,28 @@ def list_seed_svgs(seed_id: int):
             "mtime": mtime_utc,
         })
     return jsonify({"items": items})
+
+@app.post("/api/box-of-dirt", response_class=PlainTextResponse)
+def generate_box_of_dirt(req: BoxOfDirtRequest):
+    # Build the single user message: prompt + INPUT block
+    input_block = compose_input_block(req.domain, req.dimension, req.seed, req.prototype, req.thesis)
+    full_prompt = f"{BOX_OF_DIRT_PROMPT}\n{input_block}"
+
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-5-mini-2025-08-07",
+            temperature=0.2,
+            messages=[{"role": "user", "content": full_prompt}],
+        )
+        html = completion.choices[0].message.content or ""
+        # The model is instructed to return raw HTML; still guard against accidental fences
+        html = html.strip()
+        if html.startswith("```"):
+            # Strip Markdown fences if the model disobeys
+            html = html.strip("`").strip()
+        if "<!DOCTYPE html" not in html:
+            # Defensive: ensure caller receives HTML; otherwise surface a helpful error
+            raise ValueError("Model did not return HTML document.")
+        return PlainTextResponse(content=html, media_type="text/html; charset=utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")

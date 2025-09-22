@@ -280,7 +280,9 @@ sourceMeta: document.getElementById('sourceMeta'),
       seeds: (did) => `/api/dimensions/${encodeURIComponent(did)}/seeds`,
       getBox: (sid, draft) => `/api/seeds/${encodeURIComponent(sid)}/box${draft ? '?draft=1' : ''}`,
       postBox: (sid) => `/api/seeds/${encodeURIComponent(sid)}/box`,
+      
     };
+    API.generateBox = '/api/box-of-dirt';
 
     // Minimal site-styled CSS wrapper for body-only preview
     const BODY_WRAPPER_STYLE = `
@@ -304,6 +306,74 @@ sourceMeta: document.getElementById('sourceMeta'),
     `;
 
     let cache = { narratives: [], dims: new Map(), seeds: new Map() };
+
+        // Helpers to normalize and compose payloads
+    function stripHashId(name){
+    // turns "The Cost of Care (#2332)" → "The Cost of Care"
+    return String(name||'').replace(/\s*\(#\d+\)\s*$/, '');
+    }
+    function composeSeedText(seedRow){
+    const A = seedRow?.problem ? `A (Problem): ${seedRow.problem}` : '';
+    const B = seedRow?.objective ? `B (Objective): ${seedRow.objective}` : '';
+    const L = seedRow?.solution ? `Solution (Link): ${seedRow.solution}` : '';
+    return [A,B,L].filter(Boolean).join('\n');
+    }
+    function composePrototypeText(p){
+    const lines = [];
+    if (p.core_intent) lines.push(`Core Intent — ${p.core_intent}`);
+    if (p.minimal_build) lines.push(`Minimal Build — ${p.minimal_build}`);
+
+    // Panels / Scenes (accept several possible shapes)
+    const panels = Array.isArray(p.panels) ? p.panels
+                : Array.isArray(p.scenes) ? p.scenes
+                : Array.isArray(p.storyboard) ? p.storyboard
+                : [];
+    panels.forEach((item, i) => {
+        if (typeof item === 'string'){
+        lines.push(`Panel ${i+1} — ${item}`);
+        } else if (item && (item.title || item.heading)){
+        const title = item.title || item.heading || `Panel ${i+1}`;
+        lines.push(`Panel ${i+1} — ${title}`);
+        const bullets = Array.isArray(item.bullets) ? item.bullets
+                    : Array.isArray(item.points) ? item.points
+                    : [];
+        bullets.forEach(b => lines.push(`- ${b}`));
+        if (item.caption) lines.push(item.caption);
+        }
+    });
+
+    if (p.load_bearing_test){
+        lines.push(`Load-Bearing Test — ${p.load_bearing_test}`);
+    }
+    if (p.validating_reactions){
+        // accept string or array
+        if (Array.isArray(p.validating_reactions)){
+        lines.push('Validating reactions we want —');
+        p.validating_reactions.forEach(x => lines.push(`- ${x}`));
+        } else {
+        lines.push(`Validating reactions we want — ${p.validating_reactions}`);
+        }
+    }
+    if (p.red_flags){
+        if (Array.isArray(p.red_flags)){
+        lines.push('Red flags (invalidate) —');
+        p.red_flags.forEach(x => lines.push(`- ${x}`));
+        } else {
+        lines.push(`Red flags (invalidate) — ${p.red_flags}`);
+        }
+    }
+    if (p.first_eyes){
+        if (Array.isArray(p.first_eyes)){
+        lines.push('First Eyes —');
+        p.first_eyes.forEach(x => lines.push(`- ${x}`));
+        } else {
+        lines.push(`First Eyes — ${p.first_eyes}`);
+        }
+    }
+    if (p.why_box_of_dirt) lines.push(`Why This is a Box of Dirt — ${p.why_box_of_dirt}`);
+
+    return lines.join('\n');
+    }
 
     function setStatus(el, msg, ok){
       el.textContent = msg || '';
@@ -432,22 +502,17 @@ sourceMeta: document.getElementById('sourceMeta'),
     }
 
     // --- Prototype generation (moved here from viewer) ---
-async function generatePrototype(){
-  // We need: domain name, dimension name, and the selected seed's A/B/Link.
+    async function generatePrototypeAndBuild(){
   const nid = els.domain.value;
   const did = els.dimension.value;
   const sid = els.seed.value;
 
-  // Look up objects for labels
   const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
   const dims = cache.dims.get(nid) || [];
   const dimRow = dims.find(d => String(d.id) === String(did));
-
-  // Find the seed object in the current dimension cache (required to get A/B/Link text)
   const seeds = cache.seeds.get(did) || [];
   const seedRow = seeds.find(s => String(s.id) === String(sid));
 
-  // Basic validation
   const errs = [];
   if (!domainRow) errs.push('domain');
   if (!dimRow) errs.push('dimension');
@@ -458,38 +523,33 @@ async function generatePrototype(){
     return;
   }
 
-  // Build request payload
-  const payload = {
-    domain: domainRow.title || `Narrative ${domainRow.id}`,
-    dimension: dimRow.title || `Dimension ${dimRow.id}`,
-    seed: {
-      problem: seedRow.problem || '',
-      objective: seedRow.objective || '',
-      solution: seedRow.solution || ''
-    }
-  };
-
-  // Fire request
+  // 1) Generate Prototype JSON
   els.genProtoBtn.disabled = true;
   els.protoStatus.textContent = 'Generating…';
   els.protoWrap.hidden = true;
 
-  try {
-    const res = await fetch('/api/narrative-prototype', {
+  try{
+    const protoRes = await fetch('/api/narrative-prototype', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+      body: JSON.stringify({
+        domain: stripHashId(domainRow.title || `Narrative ${domainRow.id}`),
+        dimension: stripHashId(dimRow.title || `Dimension ${dimRow.id}`),
+        seed: {
+          problem: seedRow.problem || '',
+          objective: seedRow.objective || '',
+          solution: seedRow.solution || ''
+        }
+      })
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const out = await res.json();
-
-    // Allow both shapes: {prototype: {...}} or direct
+    if (!protoRes.ok) throw new Error(`HTTP ${protoRes.status}`);
+    const out = await protoRes.json();
     const p = out.prototype || out;
 
-    // Render
-    els.protoCore.innerText = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
+    // Render the summary box as before
+    els.protoCore.innerText  = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
     els.protoBuild.innerText = p.minimal_build ? `Minimal Build — ${p.minimal_build}` : '';
-    els.protoTest.innerText = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
+    els.protoTest.innerText  = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
     if (Array.isArray(p.first_eyes)) {
       els.protoEyes.innerHTML = `<div style="font-weight:600;">First Eyes —</div>` +
         `<ul style="margin:.25rem 0 .5rem .95rem; padding:0;">` +
@@ -498,13 +558,46 @@ async function generatePrototype(){
       els.protoEyes.textContent = p.first_eyes ? `First Eyes — ${p.first_eyes}` : '';
     }
     els.protoWhy.innerText = p.why_box_of_dirt ? `Why This is a Box of Dirt — ${p.why_box_of_dirt}` : '';
-
     els.protoWrap.hidden = false;
     els.protoStatus.textContent = '';
-  } catch (e){
+
+    // 2) Compose the INPUTs for the Box-of-Dirt HTML endpoint
+    const domainName = stripHashId(domainRow.title || '');
+    const dimensionName = stripHashId(dimRow.title || '');
+    const thesis = dimRow?.description ? String(dimRow.description) : null;
+
+    const seedText = composeSeedText(seedRow);
+    const prototypeText = composePrototypeText(p);
+
+    // 3) Call your /generate/box-of-dirt (returns RAW HTML)
+    const bodRes = await fetch(API.generateBox, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Accept':'text/html' },
+      body: JSON.stringify({
+        domain: domainName,
+        dimension: dimensionName,
+        thesis: thesis,
+        seed: seedText,
+        prototype: prototypeText
+      })
+    });
+    if (!bodRes.ok){
+      const t = await bodRes.text().catch(()=> '');
+      throw new Error(`Box-of-Dirt generation failed: HTTP ${bodRes.status} ${t}`);
+    }
+    const html = await bodRes.text();
+
+    // 4) Inject into editor + preview
+    els.html.value = html;
+    els.docFormat.value = 'full';
+    updateHtmlInfo();
+    renderPreview();
+    setStatus(els.selStatus, 'Generated Box of Dirt HTML from Prototype', true);
+
+  }catch(e){
     els.protoStatus.textContent = 'Error: ' + e.message;
     els.protoWrap.hidden = true;
-  } finally {
+  }finally{
     els.genProtoBtn.disabled = false;
   }
 }
@@ -638,7 +731,7 @@ function renderContext(){
 
     els.publishNow.addEventListener('change', ()=> {/* noop, read at save time */});
     els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
-    els.genProtoBtn.addEventListener('click', generatePrototype);
+    els.genProtoBtn.addEventListener('click', generatePrototypeAndBuild);
 
     els.seed.addEventListener('change', ()=>{
     setStatus(els.selStatus, '', false);
