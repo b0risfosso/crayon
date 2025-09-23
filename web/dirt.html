@@ -698,9 +698,9 @@ async function generateArtifactsAndPage() {
     // Step 3: Render HTML page
     els.artifactsStatus.textContent = 'Generating HTML page…';
     const pageRes = await fetch(API.renderArtifact, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json','Accept':'application/json' },
-      body: JSON.stringify({ artifact_yaml })
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+        body: JSON.stringify({ artifact_yaml, artifacts_markdown: md })
     });
     if (!pageRes.ok) throw new Error(`Render HTTP ${pageRes.status}`);
     const out = await pageRes.json();

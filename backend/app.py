@@ -2066,13 +2066,28 @@ def box_of_dirt_artifacts():
 def render_seed():
     payload = request.get_json(silent=True) or {}
     artifact_yaml = payload.get("artifact_yaml", "")
+    artifacts_md  = payload.get("artifacts_markdown", "")
     model = payload.get("model")
-    temperature = payload.get("temperature", 0.1)
+    temperature = float(payload.get("temperature", 0.1))
+
     if not artifact_yaml or "domain:" not in artifact_yaml:
         return jsonify({"error": "artifact_yaml is required and must include YAML content."}), 400
     try:
-        html = generate_seed_html(artifact_yaml, model=model, temperature=float(temperature))
+        # tell the model about the markdown so it can fill the arrays
+        prompt = build_user_prompt(artifact_yaml, artifacts_md)
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        resp = client.chat.completions.create(
+            model=os.environ.get("OPENAI_MODEL","gpt-5"),
+            messages=[{"role":"system","content": SYSTEM_INSTRUCTIONS},
+                      {"role":"user","content": prompt}],
+            temperature=temperature,
+        )
+        txt = (resp.choices[0].message.content or "")
+        html = extract_html_codeblock(txt) or txt
+        if not html.strip().startswith("<!DOCTYPE html"):
+            raise ValueError("Model did not return an HTML document.")
         return jsonify({"html": html})
     except Exception as e:
         return jsonify({"error": f"{e}"}), 500
+
 
