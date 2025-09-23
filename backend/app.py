@@ -2050,7 +2050,7 @@ def box_of_dirt_artifacts():
     except Exception as e:
         return jsonify({"error": f"artifacts generation failed: {e}"}), 500
 
-@app.post("/render-seed")
+@app.route("/api/render-artifact", methods=["POST"], strict_slashes=False)
 def render_seed():
     payload = request.get_json(silent=True) or {}
     artifact_yaml = payload.get("artifact_yaml", "")
@@ -2063,3 +2063,4 @@ def render_seed():
         return jsonify({"html": html})
     except Exception as e:
         return jsonify({"error": f"{e}"}), 500
+
