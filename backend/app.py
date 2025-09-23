@@ -347,9 +347,11 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
   <p class="subtitle">{{thesis}}</p>
   <div class="toolbar">
     <button class="btn" id="printBtn">Export / Print</button>
+    <button class="btn" id="toggleAllBtn">Expand All</button>
     <span class="sep"></span>
-    <span class="pill">{{page_meta.header_pill}}</span>
+    <span class="pill">weather management/engineering • Seed</span>
   </div>
+
 </header>
 
 <main>
@@ -455,6 +457,8 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
     {btn:'tab-safety-btn', panel:'tab-safety'},
     {btn:'tab-next-btn', panel:'tab-next'},
   ];
+  const toggleBtn = document.getElementById('toggleAllBtn');
+  let expanded = true;
   function selectTab(id){
     tabs.forEach(t=>{
       const b=document.getElementById(t.btn), p=document.getElementById(t.panel);
@@ -474,6 +478,13 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
       if(e.key==='Home'){e.preventDefault();list[0].focus();}
       if(e.key==='End'){e.preventDefault();list[list.length-1].focus();}
     });
+  });
+   toggleBtn.addEventListener('click', () => {
+    expanded = !expanded;
+    document.querySelectorAll('details.card').forEach(d => {
+      d.open = expanded;
+    });
+    toggleBtn.textContent = expanded ? 'Collapse All' : 'Expand All';
   });
   selectTab('tab-real-btn');
 </script>
