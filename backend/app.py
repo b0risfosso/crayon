@@ -321,6 +321,7 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
   .grid{display:grid;gap:12px}
   .cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:grid;gap:10px}
+  .card-title{margin:0;font-size:1rem;font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--line)}
   .owner{font-size:.85rem;opacity:.85}
   .section{border-left:4px solid var(--accent);padding-left:12px;margin-top:6px;display:grid;gap:8px}
   .tabs{display:flex;gap:8px;flex-wrap:wrap}
@@ -328,10 +329,7 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
   .tab-btn[aria-selected="true"]{background:var(--chip-bg)}
   .tabpanel{display:none}
   .tabpanel.active{display:grid;gap:14px}
-  details{border:1px solid var(--line);border-radius:12px;background:var(--card)}
-  summary{padding:12px;cursor:pointer;list-style:none;user-select:none;font-weight:700;border-bottom:1px solid var(--line)}
-  summary::-webkit-details-marker{display:none}
-  .details-body{padding:12px;display:grid;gap:10px}
+  /* removed details/summary collapse styles */
   .safety{border:1px dashed var(--line);border-left:5px solid var(--warn);background:color-mix(in oklab,var(--warn) 7%,transparent);border-radius:var(--radius);padding:14px;display:grid;gap:8px}
   .status-warn{color:var(--warn);font-weight:700}
   .status-ok{color:var(--ok);font-weight:700}
@@ -396,14 +394,14 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
     <div class="cards">
       <!-- Repeat for each real_artifacts item -->
       {{#each real_artifacts}}
-      <details class="card" {{#if @first}}open{{/if}}>
-        <summary>{{title}}</summary>
+      <div class="card">
+        <h3 class="card-title">{{title}}</h3>
         <div class="details-body">
           <div class="owner"><strong>Owner:</strong> {{owner}}</div>
           <p>{{description}}</p>
           {{#if notes}}<p class="note">{{notes}}</p>{{/if}}
         </div>
-      </details>
+      </div>
       {{/each}}
     </div>
   </section>
@@ -412,15 +410,15 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
     <div class="grid">
       <!-- Repeat for each box_of_dirt item -->
       {{#each box_of_dirt}}
-      <details class="card" {{#if @first}}open{{/if}}>
-        <summary>{{title}}</summary>
+      <div class="card">
+        <h3 class="card-title">{{title}}</h3>
         <div class="details-body">
           <div class="owner"><strong>Owner:</strong> {{owner}}</div>
           <ul>
             {{#each bullets}}<li><span class="chip">{{this}}</span></li>{{/each}}
           </ul>
         </div>
-      </details>
+      </div>
       {{/each}}
     </div>
   </section>
