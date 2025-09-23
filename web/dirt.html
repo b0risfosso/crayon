@@ -222,6 +222,23 @@
           <pre id="sourceCode" class="codeblock" tabindex="0"></pre>
         </div>
       </section>
+
+      <section class="card">
+        <header><h2>empty</h2></header>
+      </section>
+      
+
+      <section class="card" aria-labelledby="h-artifacts">
+        <header><h2 id="h-artifacts">Deployment & Box-of-Dirt Artifacts</h2></header>
+        <div class="body">
+          <div class="actions">
+            <button id="genArtifactsBtn">Generate Artifacts (Markdown)</button>
+            <span id="artifactsStatus" class="muted"></span>
+          </div>
+          <pre id="artifactsMd" class="codeblock" tabindex="0" style="min-height:180px;"></pre>
+        </div>
+      </section>
+      
       
   </main>
 
@@ -266,13 +283,17 @@
     ctxSeedL: document.getElementById('ctxSeedL'),
 
     sourceCode: document.getElementById('sourceCode'),
-copySourceBtn: document.getElementById('copySourceBtn'),
-refreshSourceBtn: document.getElementById('refreshSourceBtn'),
-sourceStatus: document.getElementById('sourceStatus'),
-sourceMeta: document.getElementById('sourceMeta'),
+    copySourceBtn: document.getElementById('copySourceBtn'),
+    refreshSourceBtn: document.getElementById('refreshSourceBtn'),
+    sourceStatus: document.getElementById('sourceStatus'),
+    sourceMeta: document.getElementById('sourceMeta'),
 
 
     };
+
+    els.genArtifactsBtn = document.getElementById('genArtifactsBtn');
+    els.artifactsStatus = document.getElementById('artifactsStatus');
+    els.artifactsMd = document.getElementById('artifactsMd');
 
     const API = {
       narratives: '/api/narratives',
@@ -283,6 +304,7 @@ sourceMeta: document.getElementById('sourceMeta'),
       
     };
     API.generateBox = '/api/box-of-dirt';
+    API.bodArtifacts = '/api/box-of-dirt/artifacts';
 
     // Minimal site-styled CSS wrapper for body-only preview
     const BODY_WRAPPER_STYLE = `
@@ -602,6 +624,60 @@ sourceMeta: document.getElementById('sourceMeta'),
   }
 }
 
+async function generateArtifacts(){
+  const nid = els.domain.value;
+  const did = els.dimension.value;
+  const sid = els.seed.value;
+
+  const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+  const dims = cache.dims.get(nid) || [];
+  const dimRow = dims.find(d => String(d.id) === String(did));
+  const seeds = cache.seeds.get(did) || [];
+  const seedRow = seeds.find(s => String(s.id) === String(sid));
+
+  const missing = [];
+  if (!domainRow) missing.push("domain");
+  if (!dimRow) missing.push("dimension");
+  if (!seedRow) missing.push("seed");
+  if (missing.length){
+    document.getElementById('artifactsStatus').textContent = `Select a ${missing.join(", ")} first.`;
+    return;
+  }
+
+  // Build the 3-line seed
+  const seedThree = [
+    seedRow?.problem ? `A (Problem): ${seedRow.problem}` : "",
+    seedRow?.objective ? `B (Objective): ${seedRow.objective}` : "",
+    seedRow?.solution ? `Solution (Link): ${seedRow.solution}` : "",
+  ].filter(Boolean).join("\n");
+
+  const body = {
+    domain: (domainRow.title || "").replace(/\s*\(#\d+\)\s*$/, ""),
+    dimension: (dimRow.title || "").replace(/\s*\(#\d+\)\s*$/, ""),
+    seed: seedThree
+  };
+
+  const status = document.getElementById('artifactsStatus');
+  const outEl = document.getElementById('artifactsMd');
+  status.textContent = 'Generating…';
+  outEl.textContent = '';
+
+  try{
+    const res = await fetch(API.bodArtifacts, {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Accept':'text/markdown'},
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const md = await res.text();
+    outEl.textContent = md;     // show raw Markdown (no client parser needed)
+    status.textContent = 'OK';
+  }catch(e){
+    status.textContent = 'Error: ' + e.message;
+  }
+}
+
+
 async function loadSource(draft=true){
   const sid = currentSeedId();
   if (!sid){
@@ -732,6 +808,7 @@ function renderContext(){
     els.publishNow.addEventListener('change', ()=> {/* noop, read at save time */});
     els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
     els.genProtoBtn.addEventListener('click', generatePrototypeAndBuild);
+    els.genArtifactsBtn.addEventListener('click', generateArtifacts);
 
     els.seed.addEventListener('change', ()=>{
     setStatus(els.selStatus, '', false);

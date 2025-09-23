@@ -241,6 +241,23 @@ class BoxOfDirtRequest(BaseModel):
     thesis: Optional[str] = None  # optional dimension thesis
 
 
+BOX_OF_DIRT_ARTIFACTS_SYSTEM = """You are an expert systems designer and productizer. Given a short topic (domain), a framing label (dimension), and a concise seed (problem / objective / solution), produce two clearly organized lists:
+(A) Real, deployable artifacts — the things that must exist in the real world for the proposed solution to operate reliably at production scale. These are physical, legal, governance, digital, operational and financial artifacts (hardware, software, permits, contracts, supply chain, QA, monitoring, workforce, regulatory artifacts, etc.).
+(B) Box-of-dirt artifacts — the minimal, safe prototypes and deliverables that can be created immediately (words, diagrams, JSON/SQL schema, mock UI, simulations, checklists, slide decks). These are explicitly non-actionable if the seed touches restricted domains — they should be documents, mockups, safe simulators, or governance artifacts only.
+Rules and constraints:
+Produce no step-by-step wet-lab protocols, experimental parameters, recipes, or instructions that enable the construction or misuse of biological agents, weapons, illegal hacking tools, or other harmful capabilities.
+For any domain with potential biosafety/chemical/security risk, explicitly replace actionable operational detail with higher-level system artifacts and policy/regulatory templates. Always include a short safety guardrail paragraph.
+For each artifact (both A and B) include:
+A short name/title (one line).
+A 1–2 sentence description of what it is and why it’s required.
+For box-of-dirt artifacts (B) add 2–4 immediate prototype actions: tangible files or items to create now (e.g., feedstock_schema.json, marketplace_schema.sql, single-page HTML mock, Monte Carlo notebook).
+An owner (role or team) who would be responsible for it.
+Limit each list to 8–12 high-value items, prioritized (top items most critical). Keep each artifact entry concise.
+At the end, provide 3 short, concrete next steps the requester can do in the next 48–72 hours (no external approvals required).
+Output must be in Markdown with headings (A) Real artifacts and (B) Box-of-dirt prototypes. Use bullet lists with short sub-bullets. Do not ask clarifying questions — make best-effort assumptions from the seed.
+Tone: practical, direct, and action-oriented."""
+
+
 BOX_OF_DIRT_PROMPT = """LLM PROMPT (copy below this line and use as-is):
 You are a front-end generator. Produce a single, self-contained HTML page that presents a “Box of Dirt” narrative prototype based on the INPUT provided at the end of this prompt.
 Output rules (must follow)
@@ -560,6 +577,55 @@ def compose_input_block(domain: str, dimension: str, seed: str, prototype: str, 
     ])
     return "\n".join(parts)
 
+def _compose_three_line_seed(seed_str, problem, objective, solution):
+    seed_str = (seed_str or "").strip()
+    if seed_str:
+        # assume caller already formatted the 3 lines
+        return seed_str
+    # build from fields (tolerates empties)
+    parts = []
+    if problem:   parts.append(f"A (Problem): {problem.strip()}")
+    if objective: parts.append(f"B (Objective): {objective.strip()}")
+    if solution:  parts.append(f"Solution (Link): {solution.strip()}")
+    return "\n".join(parts)
+
+def _make_artifacts_user_msg(domain, dimension, seed_three_line):
+    instruction = (
+        "Produce (A) and (B) as described by the System prompt. Focus on practical deployment artifacts first; "
+        "then list immediate \"box-of-dirt\" prototypes I can build today (documents, schemas, mock UI, safe simulators). "
+        "Follow the System rules about safety and artifact structure. End with exactly 3 next steps the requester can do in 48–72 hours."
+    )
+    output_format = (
+        "OUTPUT FORMAT (how to structure the assistant's reply)\n"
+        "Use this structure exactly. Each artifact entry should be short and uniform.\n"
+        "(A) Real, deployable artifacts\n"
+        "Artifact name — 1–2 sentence description (what it is and why required).\n"
+        "Owner: Role/team\n"
+        "Notes: 1–2 short constraints/standards/regulatory anchors (if relevant)\n"
+        "(Repeat for 8–12 items.)\n"
+        "(B) Box-of-dirt artifacts you can build right now\n"
+        "Prototype name — 1–2 sentence description (what it produces and who it’s for).\n"
+        "Immediate prototypes:\n"
+        "file_or_artifact_name.ext — short description (what you'll produce in that file)\n"
+        "another_file.ext — short description\n"
+        "Owner: Role/team\n"
+        "(Repeat for 8–12 items.)\n"
+        "Safety guardrails\n"
+        "One short paragraph if the domain is safety-sensitive, otherwise one line: \"No special safety issues.\"\n"
+        "3 Next steps (48–72 hours)\n"
+        "Short, concrete action (e.g., \"Create feedstock_schema.json with fields X,Y,Z.\")\n"
+        "Short, concrete action\n"
+        "Short, concrete action"
+    )
+    return (
+        f"USER (prompt template)\n"
+        f"Domain: {domain}\n"
+        f"Dimension: {dimension}\n"
+        f"Seed: {seed_three_line}\n"
+        f"Instruction to assistant (paste below exactly after the 3 fields above):\n"
+        f"{instruction}\n"
+        f"{output_format}"
+    )
 
 def _provider_from(data: dict) -> str:
     p = (data.get("provider") or "").strip().lower()
@@ -1641,3 +1707,41 @@ def box_of_dirt():
         return Response(html, mimetype="text/html; charset=utf-8")
     except Exception as e:
         return jsonify({"error": f"generation failed: {e}"}), 500
+
+
+@app.route("/api/box-of-dirt/artifacts", methods=["POST"])
+def box_of_dirt_artifacts():
+    data = request.get_json(silent=True) or {}
+    domain    = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+
+    # Accept either `seed` (3-line) or components:
+    seed_three = _compose_three_line_seed(
+        data.get("seed"),
+        data.get("seed_problem"),
+        data.get("seed_objective"),
+        data.get("seed_solution"),
+    )
+
+    if not (domain and dimension and seed_three):
+        return jsonify({"error":"domain, dimension, and seed (3-line or components) are required"}), 400
+
+    user_msg = _make_artifacts_user_msg(domain, dimension, seed_three)
+
+    try:
+        client = _get_llm()
+        res = client.chat.completions.create(
+            model="gpt-5-mini-2025-08-07",
+            messages=[
+                {"role":"system", "content": BOX_OF_DIRT_ARTIFACTS_SYSTEM},
+                {"role":"user",   "content": user_msg},
+            ],
+        )
+        md = (res.choices[0].message.content or "").strip()
+        # In case a model adds code fences, strip them to keep pure Markdown text
+        if md.startswith("```"):
+            md = md.strip("`")
+            md = md.split("\n", 1)[-1] if "\n" in md else md
+        return Response(md, mimetype="text/markdown; charset=utf-8")
+    except Exception as e:
+        return jsonify({"error": f"artifacts generation failed: {e}"}), 500
