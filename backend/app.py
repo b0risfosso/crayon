@@ -925,7 +925,6 @@ def generate_seed_html(artifact_yaml: str, model: Optional[str] = None, temperat
         resp = client.chat.completions.create(
             model="gpt-5-nano-2025-08-07",
             messages=messages,
-            temperature=temperature,
         )
         txt = resp.choices[0].message.content or ""
         html = extract_html_codeblock(txt) or txt  # fall back if model didn't fence (shouldn't happen)
