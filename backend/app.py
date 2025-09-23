@@ -873,11 +873,24 @@ def _provider_from(data: dict) -> str:
     p = (data.get("provider") or "").strip().lower()
     return p if p in {"openai", "xai", "gemini", "deepseek"} else "openai"
 
-def build_user_prompt(artifact_yaml: str) -> str:
+def build_user_prompt(artifact_yaml: str, artifacts_md: str | None = None) -> str:
+    md_note = ""
+    if artifacts_md and artifacts_md.strip():
+        md_note = (
+            "\n\n----------------------------------------\n"
+            "ARTIFACTS (MARKDOWN)\n"
+            "(A) Real artifacts and (B) Box-of-dirt prototypes are provided below in Markdown.\n"
+            "Parse them into the YAML fields real_artifacts[], box_of_dirt[], and next_steps[].\n"
+            "Each real_artifacts item: {title, owner, description, notes?}\n"
+            "Each box_of_dirt item: {title, owner, bullets[]}\n"
+            "Infer 3 next steps from the final section if present; otherwise omit gracefully.\n\n"
+            + artifacts_md.strip()
+        )
     return f"""----------------------------------------
 ARTIFACT (YAML)
 # Replace everything under this line with your content.
 {artifact_yaml}
+{md_note}
 
 ----------------------------------------
 RENDERING REQUIREMENTS:
@@ -923,7 +936,7 @@ def generate_seed_html(artifact_yaml: str, model: Optional[str] = None, temperat
     ]
     try:
         resp = client.chat.completions.create(
-            model="gpt-5-nano-2025-08-07",
+            model="gpt-5-mini-2025-08-07",
             messages=messages,
         )
         txt = resp.choices[0].message.content or ""
