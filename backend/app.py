@@ -2077,10 +2077,9 @@ def render_seed():
         prompt = build_user_prompt(artifact_yaml, artifacts_md)
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         resp = client.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL","gpt-5"),
+            model="gpt-5-mini-2025-08-07",
             messages=[{"role":"system","content": SYSTEM_INSTRUCTIONS},
                       {"role":"user","content": prompt}],
-            temperature=temperature,
         )
         txt = (resp.choices[0].message.content or "")
         html = extract_html_codeblock(txt) or txt
