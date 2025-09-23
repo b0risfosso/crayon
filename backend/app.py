@@ -240,6 +240,248 @@ class BoxOfDirtRequest(BaseModel):
     prototype: str    # raw multiline text (Core Intent, Minimal Build, Panels, etc.)
     thesis: Optional[str] = None  # optional dimension thesis
 
+class RenderSeedRequest(BaseModel):
+    artifact_yaml: str
+    model: Optional[str] = None
+    temperature: Optional[float] = 0.1
+
+class RenderSeedResponse(BaseModel):
+    html: str
+
+
+
+# --- LLM wiring ---
+
+SYSTEM_INSTRUCTIONS = """SYSTEM INSTRUCTIONS (do not repeat back):
+You are a code generator. Transform the provided Artifact into a SINGLE self-contained HTML file (one <html> document with inline <style> and <script>) in the “Fantasiagenesis” style shown in prior examples:
+- Clean, responsive, print-friendly.
+- Header with title + thesis, a toolbar (Print button and a “pill” chip).
+- Meta grid for Domain & Dimension.
+- “Seed” with A (Problem), B (Objective), Solution (Link) and a short scope note.
+- Four-tab layout:
+  1) Real, deployable artifacts — each as a <details> “card” with Owner and Notes.
+  2) Box-of-dirt (build now) — each as a <details> “card” with file chips / bullet list.
+  3) Safety guardrails — highlight constraints and what’s intentionally excluded.
+  4) 3 Next steps (48–72 hours) — checkbox tasks.
+- Accessible tabs (ARIA) with keyboard nav (Left/Right/Home/End).
+- No external fonts, libraries, images, or network calls.
+- NOTE: Do NOT include any “Expand/Collapse All” controls or related JavaScript.
+
+CRITICAL OUTPUT RULES:
+- OUTPUT ONLY one fenced code block marked ```html with the complete file. No extra commentary.
+- Use the boilerplate CSS/JS provided here verbatim for consistency (minus any expand/collapse code).
+- If some fields are missing, omit gracefully.
+- Never invent operational/unsafe details; if the Artifact contains safety-sensitive domains, preserve and emphasize the guardrails text and keep content non-operational.
+- Use HTML entities for special characters (e.g., &amp;).
+"""
+
+# Keep this boilerplate EXACT (only text nodes and repeated sections may change in model output)
+HTML_BOILERPLATE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{page_meta.page_title}}</title>
+<meta name="color-scheme" content="light dark" />
+<style>
+  :root{
+    --bg: Canvas; --fg: CanvasText;
+    --muted: color-mix(in oklab, var(--fg) 65%, transparent);
+    --line: color-mix(in oklab, var(--fg) 14%, transparent);
+    --accent: color-mix(in oklab, var(--fg) 22%, transparent);
+    --card: color-mix(in oklab, var(--bg) 95%, var(--fg) 5%);
+    --ok:#1a7f37; --warn:#b7791f; --danger:#b42318;
+    --chip-bg: color-mix(in oklab, var(--fg) 8%, transparent);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);color:var(--fg)}
+  body{margin:0;font:15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"}
+  header{padding:20px clamp(16px,4vw,28px);border-bottom:1px solid var(--line);display:grid;gap:8px}
+  .badge{display:inline-flex;gap:.4rem;align-items:center;padding:.2rem .6rem;border-radius:999px;background:var(--chip-bg);font-weight:600;font-size:.8rem}
+  .title{font-size:clamp(1.2rem,2.4vw,1.6rem);margin:2px 0 0;font-weight:800;letter-spacing:.01em}
+  .subtitle{opacity:.85;font-size:.95rem}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:.5rem .8rem;cursor:pointer;font-weight:700}
+  .btn:hover{background:var(--chip-bg)}
+  .pill{border:1px solid var(--line);border-radius:999px;padding:.15rem .55rem;font-size:.8rem}
+  .sep{flex:1}
+  main{padding:22px clamp(16px,4vw,28px);display:grid;gap:20px;max-width:1100px;margin:0 auto}
+  .meta{display:grid;gap:12px;grid-template-columns:repeat(12,minmax(0,1fr))}
+  .meta>section{grid-column:span 12;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+  @media (min-width:900px){.meta>.col-4{grid-column:span 4}.meta>.col-8{grid-column:span 8}}
+  h2{font-size:1.05rem;margin:.1rem 0 .6rem;letter-spacing:.01em}
+  h3{font-size:1rem;margin:.1rem 0 .4rem;letter-spacing:.01em}
+  .kv{display:grid;gap:8px}
+  .kv .row{display:flex;gap:.6rem;align-items:flex-start}
+  .kv .key{width:170px;opacity:.7;font-weight:600}
+  .chip{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem .55rem;border-radius:999px;background:var(--chip-bg);font-size:.8rem}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+  .note{font-size:.9rem;opacity:.85}
+  .grid{display:grid;gap:12px}
+  .cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:grid;gap:10px}
+  .owner{font-size:.85rem;opacity:.85}
+  .section{border-left:4px solid var(--accent);padding-left:12px;margin-top:6px;display:grid;gap:8px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab-btn{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:.4rem .75rem;cursor:pointer;font-weight:700}
+  .tab-btn[aria-selected="true"]{background:var(--chip-bg)}
+  .tabpanel{display:none}
+  .tabpanel.active{display:grid;gap:14px}
+  details{border:1px solid var(--line);border-radius:12px;background:var(--card)}
+  summary{padding:12px;cursor:pointer;list-style:none;user-select:none;font-weight:700;border-bottom:1px solid var(--line)}
+  summary::-webkit-details-marker{display:none}
+  .details-body{padding:12px;display:grid;gap:10px}
+  .safety{border:1px dashed var(--line);border-left:5px solid var(--warn);background:color-mix(in oklab,var(--warn) 7%,transparent);border-radius:var(--radius);padding:14px;display:grid;gap:8px}
+  .status-warn{color:var(--warn);font-weight:700}
+  .status-ok{color:var(--ok);font-weight:700}
+  .tasks{display:grid;gap:8px}
+  .task{display:flex;gap:.6rem;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+  .task input{margin-top:.25rem}
+  footer{padding:26px clamp(16px,4vw,28px);border-top:1px solid var(--line);opacity:.8}
+</style>
+</head>
+<body>
+
+<header>
+  <div><span class="badge">Fantasiagenesis • Seed</span></div>
+  <h1 class="title">{{page_meta.header_title}}</h1>
+  <p class="subtitle">{{thesis}}</p>
+  <div class="toolbar">
+    <button class="btn" id="printBtn">Export / Print</button>
+    <span class="sep"></span>
+    <span class="pill">{{page_meta.header_pill}}</span>
+  </div>
+</header>
+
+<main>
+  <div class="meta">
+    <section class="col-4">
+      <h2>Domain</h2>
+      <div class="kv">
+        <div class="row"><div class="key">Label</div><div class="val"><span class="chip">{{domain.label}}</span></div></div>
+        <div class="row"><div class="key">ID</div><div class="val mono">{{domain.id}}</div></div>
+      </div>
+    </section>
+    <section class="col-8">
+      <h2>Dimension</h2>
+      <div class="kv">
+        <div class="row"><div class="key">Label</div><div class="val"><span class="chip">{{dimension.label}}</span></div></div>
+        <div class="row"><div class="key">ID</div><div class="val mono">{{dimension.id}}</div></div>
+        <div class="row"><div class="key">Thesis</div><div class="val">{{thesis}}</div></div>
+      </div>
+    </section>
+    <section class="col-12">
+      <h2>Seed</h2>
+      <div class="grid">
+        <div class="section"><h3>A — Problem</h3><p>{{seed.problem}}</p></div>
+        <div class="section"><h3>B — Objective</h3><p>{{seed.objective}}</p></div>
+        <div class="section">
+          <h3>Solution (Link)</h3>
+          <p>{{seed.solution_link}}</p>
+          <p class="note"><strong>Scope note:</strong> {{seed.scope_note}}</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Artifacts">
+    <button class="tab-btn" role="tab" aria-selected="true" aria-controls="tab-real" id="tab-real-btn">Real, deployable artifacts</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-bod" id="tab-bod-btn">Box-of-dirt (build now)</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-safety" id="tab-safety-btn">Safety guardrails</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-next" id="tab-next-btn">{{next_steps_title}}</button>
+  </div>
+
+  <section id="tab-real" class="tabpanel active" role="tabpanel" aria-labelledby="tab-real-btn">
+    <div class="cards">
+      <!-- Repeat for each real_artifacts item -->
+      {{#each real_artifacts}}
+      <details class="card" {{#if @first}}open{{/if}}>
+        <summary>{{title}}</summary>
+        <div class="details-body">
+          <div class="owner"><strong>Owner:</strong> {{owner}}</div>
+          <p>{{description}}</p>
+          {{#if notes}}<p class="note">{{notes}}</p>{{/if}}
+        </div>
+      </details>
+      {{/each}}
+    </div>
+  </section>
+
+  <section id="tab-bod" class="tabpanel" role="tabpanel" aria-labelledby="tab-bod-btn">
+    <div class="grid">
+      <!-- Repeat for each box_of_dirt item -->
+      {{#each box_of_dirt}}
+      <details class="card" {{#if @first}}open{{/if}}>
+        <summary>{{title}}</summary>
+        <div class="details-body">
+          <div class="owner"><strong>Owner:</strong> {{owner}}</div>
+          <ul>
+            {{#each bullets}}<li><span class="chip">{{this}}</span></li>{{/each}}
+          </ul>
+        </div>
+      </details>
+      {{/each}}
+    </div>
+  </section>
+
+  <section id="tab-safety" class="tabpanel" role="tabpanel" aria-labelledby="tab-safety-btn">
+    <div class="safety">
+      <h3>Safety guardrails</h3>
+      <p>{{safety_guardrails}}</p>
+      <p class="note">Status: <span class="status-warn">Guardrails enforced</span></p>
+    </div>
+  </section>
+
+  <section id="tab-next" class="tabpanel" role="tabpanel" aria-labelledby="tab-next-btn">
+    <div class="grid">
+      <h2>{{next_steps_title}}</h2>
+      <div class="tasks">
+        {{#each next_steps}}
+        <label class="task"><input type="checkbox" /><div>{{this}}</div></label>
+        {{/each}}
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div>Fantasiagenesis • Box of Dirt • <span class="mono">{{page_meta.footer_seed_id}}</span></div>
+  <div class="note">Planning scaffold; intentionally excludes hazardous operational detail.</div>
+</footer>
+
+<script>
+  const tabs = [
+    {btn:'tab-real-btn', panel:'tab-real'},
+    {btn:'tab-bod-btn', panel:'tab-bod'},
+    {btn:'tab-safety-btn', panel:'tab-safety'},
+    {btn:'tab-next-btn', panel:'tab-next'},
+  ];
+  function selectTab(id){
+    tabs.forEach(t=>{
+      const b=document.getElementById(t.btn), p=document.getElementById(t.panel);
+      const active=(t.btn===id);
+      b.setAttribute('aria-selected', active?'true':'false');
+      p.classList.toggle('active', active);
+    });
+  }
+  tabs.forEach(t=>{
+    document.getElementById(t.btn).addEventListener('click', ()=>selectTab(t.btn));
+  });
+  document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+  document.querySelectorAll('.tab-btn').forEach((btn,idx,list)=>{
+    btn.addEventListener('keydown',(e)=>{
+      if(e.key==='ArrowRight'){e.preventDefault();list[(idx+1)%list.length].focus();}
+      if(e.key==='ArrowLeft'){e.preventDefault();list[(idx-1+list.length)%list.length].focus();}
+      if(e.key==='Home'){e.preventDefault();list[0].focus();}
+      if(e.key==='End'){e.preventDefault();list[list.length-1].focus();}
+    });
+  });
+  selectTab('tab-real-btn');
+</script>
+</body>
+</html>"""
+
 
 BOX_OF_DIRT_ARTIFACTS_SYSTEM = """You are an expert systems designer and productizer. Given a short topic (domain), a framing label (dimension), and a concise seed (problem / objective / solution), produce two clearly organized lists:
 (A) Real, deployable artifacts — the things that must exist in the real world for the proposed solution to operate reliably at production scale. These are physical, legal, governance, digital, operational and financial artifacts (hardware, software, permits, contracts, supply chain, QA, monitoring, workforce, regulatory artifacts, etc.).
@@ -631,6 +873,68 @@ def _provider_from(data: dict) -> str:
     p = (data.get("provider") or "").strip().lower()
     return p if p in {"openai", "xai", "gemini", "deepseek"} else "openai"
 
+def build_user_prompt(artifact_yaml: str) -> str:
+    return f"""----------------------------------------
+ARTIFACT (YAML)
+# Replace everything under this line with your content.
+{artifact_yaml}
+
+----------------------------------------
+RENDERING REQUIREMENTS:
+- Map Artifact fields to the layout:
+  - Header: header_title, thesis; toolbar with Print and header_pill.
+  - Meta: Domain (label, id) and Dimension (label, id, thesis).
+  - Seed: problem, objective, solution_link, scope_note.
+  - “Real, deployable artifacts”: iterate real_artifacts; each becomes a <details class="card"> with <summary>{{{{title}}}}</summary> and body with Owner, description, notes.
+  - “Box-of-dirt”: iterate box_of_dirt; each becomes a <details class="card"> with bullets rendered as chip-styled list items.
+  - Safety guardrails: paragraph(s) from safety_guardrails emphasized in a warning/info panel.
+  - Next steps: next_steps_title and a list of checkbox tasks from next_steps.
+- Use the exact boilerplate CSS + JS below. You may only change text nodes and repeated sections; keep class names and behavior.
+
+----------------------------------------
+HTML BOILERPLATE TO USE:
+(Embed this structure and fill with the Artifact’s data. Keep styles/scripts the same; only inject content. No expand/collapse controls.)
+
+{HTML_BOILERPLATE}
+
+----------------------------------------
+WHEN YOU’RE READY:
+1) Replace the sample YAML under ARTIFACT with your content.
+2) Generate exactly one ```html code block with the final page.
+"""
+
+def extract_html_codeblock(text: str) -> Optional[str]:
+    """
+    Extracts content inside the first ```html ... ``` fenced block.
+    Returns the inner HTML or None if not found.
+    """
+    m = re.search(r"```html\s*(.+?)\s*```", text, flags=re.DOTALL | re.IGNORECASE)
+    return m.group(1) if m else None
+
+def generate_seed_html(artifact_yaml: str, model: Optional[str] = None, temperature: float = 0.1) -> str:
+    """
+    Calls the LLM with the Fantasiagenesis HTML generator system prompt and returns raw HTML.
+    """
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    chosen_model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    messages = [
+        {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+        {"role": "user", "content": build_user_prompt(artifact_yaml)},
+    ]
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-5-nano-2025-08-07",
+            messages=messages,
+            temperature=temperature,
+        )
+        txt = resp.choices[0].message.content or ""
+        html = extract_html_codeblock(txt) or txt  # fall back if model didn't fence (shouldn't happen)
+        if not html.strip().startswith("<!DOCTYPE html"):
+            # Guard against accidental non-HTML responses
+            raise ValueError("Model did not return an HTML document.")
+        return html
+    except Exception as e:
+        raise RuntimeError(f"LLM generation failed: {e}") from e
 
 
 def get_or_create_narrative(con, domain_title: str) -> int:
@@ -1745,3 +2049,17 @@ def box_of_dirt_artifacts():
         return Response(md, mimetype="text/markdown; charset=utf-8")
     except Exception as e:
         return jsonify({"error": f"artifacts generation failed: {e}"}), 500
+
+@app.post("/render-seed")
+def render_seed():
+    payload = request.get_json(silent=True) or {}
+    artifact_yaml = payload.get("artifact_yaml", "")
+    model = payload.get("model")
+    temperature = payload.get("temperature", 0.1)
+    if not artifact_yaml or "domain:" not in artifact_yaml:
+        return jsonify({"error": "artifact_yaml is required and must include YAML content."}), 400
+    try:
+        html = generate_seed_html(artifact_yaml, model=model, temperature=float(temperature))
+        return jsonify({"html": html})
+    except Exception as e:
+        return jsonify({"error": f"{e}"}), 500

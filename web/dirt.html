@@ -294,6 +294,7 @@
     els.genArtifactsBtn = document.getElementById('genArtifactsBtn');
     els.artifactsStatus = document.getElementById('artifactsStatus');
     els.artifactsMd = document.getElementById('artifactsMd');
+    els.genArtifactsBtn.textContent = 'Generate Artifact HTML';
 
     const API = {
       narratives: '/api/narratives',
@@ -305,6 +306,7 @@
     };
     API.generateBox = '/api/box-of-dirt';
     API.bodArtifacts = '/api/box-of-dirt/artifacts';
+    API.renderArtifact = '/api/render-artifact';
 
     // Minimal site-styled CSS wrapper for body-only preview
     const BODY_WRAPPER_STYLE = `
@@ -624,56 +626,100 @@
   }
 }
 
-async function generateArtifacts(){
+async function generateArtifactsAndPage() {
   const nid = els.domain.value;
   const did = els.dimension.value;
-  const sid = els.seed.value;
+  const sid = els.seed.value || els.seedIdInput.value;
 
   const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
-  const dims = cache.dims.get(nid) || [];
-  const dimRow = dims.find(d => String(d.id) === String(did));
-  const seeds = cache.seeds.get(did) || [];
-  const seedRow = seeds.find(s => String(s.id) === String(sid));
+  const dims      = cache.dims.get(nid) || [];
+  const dimRow    = dims.find(d => String(d.id) === String(did));
+  const seeds     = cache.seeds.get(did) || [];
+  const seedRow   = seeds.find(s => String(s.id) === String(sid));
 
   const missing = [];
   if (!domainRow) missing.push("domain");
   if (!dimRow) missing.push("dimension");
   if (!seedRow) missing.push("seed");
-  if (missing.length){
-    document.getElementById('artifactsStatus').textContent = `Select a ${missing.join(", ")} first.`;
+  if (missing.length) {
+    els.artifactsStatus.textContent = `Select a ${missing.join(", ")} first.`;
+    els.artifactsStatus.classList.remove('ok'); els.artifactsStatus.classList.add('err');
     return;
   }
 
-  // Build the 3-line seed
-  const seedThree = [
-    seedRow?.problem ? `A (Problem): ${seedRow.problem}` : "",
-    seedRow?.objective ? `B (Objective): ${seedRow.objective}` : "",
-    seedRow?.solution ? `Solution (Link): ${seedRow.solution}` : "",
-  ].filter(Boolean).join("\n");
+  const domain    = stripHashId(domainRow.title || '');
+  const dimension = stripHashId(dimRow.title || '');
+  const seedThree = composeSeedText(seedRow);
 
-  const body = {
-    domain: (domainRow.title || "").replace(/\s*\(#\d+\)\s*$/, ""),
-    dimension: (dimRow.title || "").replace(/\s*\(#\d+\)\s*$/, ""),
-    seed: seedThree
-  };
+  els.artifactsStatus.textContent = 'Generating artifacts…';
+  els.artifactsMd.textContent = '';
+  els.genArtifactsBtn.disabled = true;
 
-  const status = document.getElementById('artifactsStatus');
-  const outEl = document.getElementById('artifactsMd');
-  status.textContent = 'Generating…';
-  outEl.textContent = '';
-
-  try{
-    const res = await fetch(API.bodArtifacts, {
+  try {
+    // Step 1: Generate artifacts (Markdown)
+    const artRes = await fetch(API.bodArtifacts, {
       method:'POST',
       headers:{'Content-Type':'application/json', 'Accept':'text/markdown'},
-      body: JSON.stringify(body)
+      body: JSON.stringify({ domain, dimension, seed: seedThree })
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const md = await res.text();
-    outEl.textContent = md;     // show raw Markdown (no client parser needed)
-    status.textContent = 'OK';
-  }catch(e){
-    status.textContent = 'Error: ' + e.message;
+    if (!artRes.ok) throw new Error(`Artifacts HTTP ${artRes.status}`);
+    const md = await artRes.text();
+    els.artifactsMd.textContent = md;
+
+    // Step 2: Build YAML payload for render-artifact, include Markdown as hint
+    const artifact_yaml = [
+      'domain:',
+      `  label: "${domain}"`,
+      `  id: "#${domainRow.id}"`,
+      'dimension:',
+      `  label: "${dimension}"`,
+      `  id: "#${dimRow.id}"`,
+      `thesis: "${(dimRow.description||'').replace(/"/g,'\\"')}"`,
+      'seed:',
+      `  problem: "${(seedRow.problem||'').replace(/"/g,'\\"')}"`,
+      `  objective: "${(seedRow.objective||'').replace(/"/g,'\\"')}"`,
+      `  solution_link: "${(seedRow.solution||'').replace(/"/g,'\\"')}"`,
+      `  scope_note: ""`,
+      'real_artifacts: []',
+      'box_of_dirt: []',
+      'safety_guardrails: |',
+      '  Standard research ethics, data-licensing, and permitting apply.',
+      `next_steps_title: "3 Next steps (48–72 hours)"`,
+      'next_steps: []',
+      'page_meta:',
+      `  page_title: "Fantasiagenesis — ${dimension}"`,
+      `  header_title: "${dimension}"`,
+      `  header_pill: "${domain} • Seed"`,
+      `  footer_seed_id: "seed:${sid}"`,
+      'artifacts_markdown: |',
+      ...md.split('\n').map(line=>'  '+line)
+    ].join('\n');
+
+    // Step 3: Render HTML page
+    els.artifactsStatus.textContent = 'Generating HTML page…';
+    const pageRes = await fetch(API.renderArtifact, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json','Accept':'application/json' },
+      body: JSON.stringify({ artifact_yaml })
+    });
+    if (!pageRes.ok) throw new Error(`Render HTTP ${pageRes.status}`);
+    const out = await pageRes.json();
+    const html = out.html || '';
+    if (!html.trim()) throw new Error('Empty HTML');
+
+    // Step 4: Inject HTML into editor + preview
+    els.html.value = html;
+    els.docFormat.value = 'full';
+    updateHtmlInfo();
+    renderPreview();
+
+    els.artifactsStatus.textContent = 'OK — artifacts + HTML generated';
+    els.artifactsStatus.classList.add('ok');
+  } catch(e) {
+    els.artifactsStatus.textContent = 'Error: '+e.message;
+    els.artifactsStatus.classList.remove('ok'); els.artifactsStatus.classList.add('err');
+  } finally {
+    els.genArtifactsBtn.disabled = false;
   }
 }
 
@@ -808,7 +854,7 @@ function renderContext(){
     els.publishNow.addEventListener('change', ()=> {/* noop, read at save time */});
     els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
     els.genProtoBtn.addEventListener('click', generatePrototypeAndBuild);
-    els.genArtifactsBtn.addEventListener('click', generateArtifacts);
+    els.genArtifactsBtn.addEventListener('click', generateArtifactsAndPage);
 
     els.seed.addEventListener('change', ()=>{
     setStatus(els.selStatus, '', false);
