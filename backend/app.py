@@ -2056,7 +2056,7 @@ def box_of_dirt_artifacts():
     try:
         client = _get_llm()
         res = client.chat.completions.create(
-            model="gpt-5-mini-2025-08-07",
+            model="gpt-5",
             messages=[
                 {"role":"system", "content": BOX_OF_DIRT_ARTIFACTS_SYSTEM},
                 {"role":"user",   "content": user_msg},
