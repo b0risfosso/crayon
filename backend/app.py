@@ -259,8 +259,8 @@ You are a code generator. Transform the provided Artifact into a SINGLE self-con
 - Meta grid for Domain & Dimension.
 - “Seed” with A (Problem), B (Objective), Solution (Link) and a short scope note.
 - Four-tab layout:
-  1) Real, deployable artifacts — each as a <details> “card” with Owner and Notes.
-  2) Box-of-dirt (build now) — each as a <details> “card” with file chips / bullet list.
+  1) Real, deployable artifacts — each as a <div> “card” with Owner and Notes.
+  2) Box-of-dirt (build now) — each as a <div> “card” with file chips / bullet list.
   3) Safety guardrails — highlight constraints and what’s intentionally excluded.
   4) 3 Next steps (48–72 hours) — checkbox tasks.
 - Accessible tabs (ARIA) with keyboard nav (Left/Right/Home/End).
@@ -347,11 +347,9 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
   <p class="subtitle">{{thesis}}</p>
   <div class="toolbar">
     <button class="btn" id="printBtn">Export / Print</button>
-    <button class="btn" id="toggleAllBtn">Expand All</button>
     <span class="sep"></span>
-    <span class="pill">weather management/engineering • Seed</span>
+    <span class="pill">{{page_meta.header_pill}}</span>
   </div>
-
 </header>
 
 <main>
@@ -457,8 +455,6 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
     {btn:'tab-safety-btn', panel:'tab-safety'},
     {btn:'tab-next-btn', panel:'tab-next'},
   ];
-  const toggleBtn = document.getElementById('toggleAllBtn');
-  let expanded = true;
   function selectTab(id){
     tabs.forEach(t=>{
       const b=document.getElementById(t.btn), p=document.getElementById(t.panel);
@@ -478,13 +474,6 @@ HTML_BOILERPLATE = r"""<!DOCTYPE html>
       if(e.key==='Home'){e.preventDefault();list[0].focus();}
       if(e.key==='End'){e.preventDefault();list[list.length-1].focus();}
     });
-  });
-   toggleBtn.addEventListener('click', () => {
-    expanded = !expanded;
-    document.querySelectorAll('details.card').forEach(d => {
-      d.open = expanded;
-    });
-    toggleBtn.textContent = expanded ? 'Collapse All' : 'Expand All';
   });
   selectTab('tab-real-btn');
 </script>
@@ -907,8 +896,8 @@ RENDERING REQUIREMENTS:
   - Header: header_title, thesis; toolbar with Print and header_pill.
   - Meta: Domain (label, id) and Dimension (label, id, thesis).
   - Seed: problem, objective, solution_link, scope_note.
-  - “Real, deployable artifacts”: iterate real_artifacts; each becomes a <details class="card"> with <summary>{{{{title}}}}</summary> and body with Owner, description, notes.
-  - “Box-of-dirt”: iterate box_of_dirt; each becomes a <details class="card"> with bullets rendered as chip-styled list items.
+  - “Real, deployable artifacts”: iterate real_artifacts; each becomes a <div class="card"> with <h3>{{{{title}}}}</h3> and body with Owner, description, notes.
+  - “Box-of-dirt”: iterate box_of_dirt; each becomes a <div class="card"> with bullets rendered as chip-styled list items.
   - Safety guardrails: paragraph(s) from safety_guardrails emphasized in a warning/info panel.
   - Next steps: next_steps_title and a list of checkbox tasks from next_steps.
 - Use the exact boilerplate CSS + JS below. You may only change text nodes and repeated sections; keep class names and behavior.
@@ -2056,7 +2045,7 @@ def box_of_dirt_artifacts():
     try:
         client = _get_llm()
         res = client.chat.completions.create(
-            model="gpt-5",
+            model="gpt-5-mini-2025-08-07",
             messages=[
                 {"role":"system", "content": BOX_OF_DIRT_ARTIFACTS_SYSTEM},
                 {"role":"user",   "content": user_msg},
