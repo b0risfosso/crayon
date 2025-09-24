@@ -16,6 +16,9 @@ from datetime import datetime, timezone
 from xai_sdk import Client as XAIClient
 from xai_sdk.chat import system as xai_system, user as xai_user
 from google import genai
+import uuid
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -25,9 +28,13 @@ PANELS_ROOT = Path("/var/www/site/data/assets/panels")  # target on disk
 ASSETS_ROOT = Path("/var/www/site/data/assets/panels")   # << per your ask
 WEB_PREFIX  = "/assets/panels"                            # serve as: /assets/seed_{id}/...
 
+BULK_JOBS = {}  # job_id -> { created_at, n, done, ok, fail, items: [ {seed_id, status, error, version} ], started_at, finished_at }
+BULK_JOBS_LOCK = threading.Lock()
+
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL | re.IGNORECASE)
+
 
 def _extract_json_text(s: str) -> str:
     if not s:
@@ -40,6 +47,31 @@ def _extract_json_text(s: str) -> str:
 def _pydantic_from_json(model_cls, text: str):
     # Try exact JSON → model; if failure, raise to caller
     return model_cls.model_validate_json(text)
+
+def _call_internal(method: str, path: str, *, json=None, accept='application/json'):
+    """
+    Call our own Flask routes in-process using test_client.
+    Returns (status_code, response_text_or_json).
+    - If Accept is application/json, we parse JSON; otherwise we return text.
+    """
+    with app.test_client() as c:
+        headers = {'Accept': accept}
+        if method.upper() == 'POST':
+            rv = c.post(path, json=json, headers=headers)
+        elif method.upper() == 'GET':
+            rv = c.get(path, headers=headers)
+        else:
+            raise RuntimeError(f'Unsupported method {method}')
+
+        if accept == 'application/json':
+            try:
+                return rv.status_code, rv.get_json()
+            except Exception:
+                return rv.status_code, None
+        else:
+            return rv.status_code, rv.get_data(as_text=True)
+
+
 
 def connect():
     con = sqlite3.connect(DB_PATH)
@@ -1428,6 +1460,133 @@ def _query_all(sql, params=()):
         con.close()
 
 
+def _pick_random_seed_ids(n: int):
+    rows = _query_all("SELECT id FROM narrative_seeds ORDER BY RANDOM() LIMIT ?", (n,))
+    # adapt to your row factory
+    return [r['id'] if isinstance(r, dict) else r[0] for r in rows]
+
+
+def _seed_context(seed_id: int):
+    """
+    Fetch domain/dimension + seed fields and compose the canonical A/B/Link block.
+    No parsing tricks; we build directly from columns.
+    """
+    row = _query_one("""
+        SELECT s.id AS seed_id, s.problem, s.objective, s.solution,
+               d.id AS dim_id, d.title AS dim_title, d.description AS dim_desc,
+               n.id AS narrative_id, n.title AS narrative_title
+        FROM narrative_seeds s
+        JOIN narrative_dimensions d ON d.id = s.dimension_id
+        JOIN narratives n ON n.id = d.narrative_id
+        WHERE s.id = ? LIMIT 1
+    """, (seed_id,))
+    if not row:
+        return None
+
+    # normalize dict access
+    g = row if isinstance(row, dict) else {
+        "seed_id": row[0], "problem": row[1], "objective": row[2], "solution": row[3],
+        "dim_id": row[4], "dim_title": row[5], "dim_desc": row[6],
+        "narrative_id": row[7], "narrative_title": row[8],
+    }
+
+    problem   = (g.get("problem") or "").strip()
+    objective = (g.get("objective") or "").strip()
+    solution  = (g.get("solution") or "").strip()
+
+    seed_three = "\n".join([
+        f"A (Problem): {problem}",
+        f"B (Objective): {objective}",
+        f"Solution (Link): {solution}",
+    ]).strip()
+
+    return {
+        "seed_id": g["seed_id"],
+        "domain": g["narrative_title"],    # domain label
+        "dimension": g["dim_title"],       # dimension label
+        "thesis": g.get("dim_desc") or "", # dimension description
+        "seed_three": seed_three,
+    }
+
+def _bulk_worker(job_id: str, seed_ids: list[int]):
+    with BULK_JOBS_LOCK:
+        job = BULK_JOBS.get(job_id)
+        if not job:
+            return
+        job["started_at"] = datetime.utcnow().isoformat()
+
+    ok = fail = 0
+    items = []
+
+    for sid in seed_ids:
+        status = "started"
+        error = None
+        version = None
+
+        try:
+            ctx = _seed_context(sid)
+            if not ctx:
+                raise RuntimeError(f"Seed {sid} not found")
+
+            # 1) Generate artifacts (Markdown) from your backend
+            #    POST /api/box-of-dirt/artifacts  (Accept: text/markdown)
+            art_payload = {
+                "domain": ctx["domain"],
+                "dimension": ctx["dimension"],
+                "seed": ctx["seed_three"],
+            }
+            sc_md, md = _call_internal('POST', '/api/box-of-dirt/artifacts',
+                                       json=art_payload, accept='text/markdown')
+            if sc_md != 200 or not md or not md.strip():
+                raise RuntimeError(f"artifacts failed ({sc_md})")
+
+            # 2) Render full HTML page from artifacts Markdown
+            #    POST /api/render-artifact
+            #    We feed ONLY the markdown as requested; no hand-built YAML.
+            sc_html, out = _call_internal('POST', '/api/render-artifact',
+                                          json={"artifacts_markdown": md},
+                                          accept='application/json')
+            if sc_html != 200 or not isinstance(out, dict) or not (out.get("html") or "").strip():
+                raise RuntimeError(f"render-artifact failed ({sc_html})")
+            html = out["html"]
+
+            # 3) Publish to this seed’s box as a full page
+            pub_payload = {
+                "html": html,
+                "doc_format": "full",
+                "title": None,
+                "publish": True
+            }
+            sc_pub, pub_out = _call_internal('POST', f"/api/seeds/{sid}/box",
+                                             json=pub_payload, accept='application/json')
+            if sc_pub != 200 or not isinstance(pub_out, dict):
+                raise RuntimeError(f"publish failed ({sc_pub})")
+            version = pub_out.get("version")
+
+            status = "ok"
+            ok += 1
+
+        except Exception as e:
+            status = "error"
+            error = str(e)
+            fail += 1
+
+        items.append({"seed_id": sid, "status": status, "error": error, "version": version})
+
+        with BULK_JOBS_LOCK:
+            j = BULK_JOBS.get(job_id)
+            if j:
+                j["items"] = items
+                j["ok"] = ok
+                j["fail"] = fail
+
+    with BULK_JOBS_LOCK:
+        j = BULK_JOBS.get(job_id)
+        if j:
+            j["done"] = True
+            j["finished_at"] = datetime.utcnow().isoformat()
+
+
 @app.get("/api/narratives")
 def api_narratives():
     rows = _query_all("""
@@ -2088,3 +2247,42 @@ def render_seed():
         return jsonify({"error": f"{e}"}), 500
 
 
+@app.post("/api/box-of-dirt/bulk")
+def api_bulk_start():
+    data = request.get_json(silent=True) or {}
+    try:
+        n = int(data.get("n", 0))
+    except Exception:
+        n = 0
+    if n <= 0:
+        return jsonify({"ok": False, "error": "n must be a positive integer"}), 400
+
+    seed_ids = _pick_random_seed_ids(n)
+    if not seed_ids:
+        return jsonify({"ok": False, "error": "no seeds available"}), 400
+
+    job_id = uuid.uuid4().hex
+    with BULK_JOBS_LOCK:
+        BULK_JOBS[job_id] = {
+            "job_id": job_id,
+            "created_at": datetime.utcnow().isoformat(),
+            "n": len(seed_ids),
+            "done": False,
+            "ok": 0,
+            "fail": 0,
+            "items": []
+        }
+
+    t = threading.Thread(target=_bulk_worker, args=(job_id, seed_ids), daemon=True)
+    t.start()
+
+    return jsonify({"ok": True, "job_id": job_id, "n": len(seed_ids)}), 200
+
+
+@app.get("/api/box-of-dirt/bulk/<job_id>")
+def api_bulk_status(job_id):
+    with BULK_JOBS_LOCK:
+        job = BULK_JOBS.get(job_id)
+    if not job:
+        return jsonify({"ok": False, "error": "job not found"}), 404
+    return jsonify({"ok": True, **job}), 200

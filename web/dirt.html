@@ -223,8 +223,24 @@
         </div>
       </section>
 
-      <section class="card">
-        <header><h2>empty</h2></header>
+      <section class="card" aria-labelledby="h-bulk">
+        <header><h2 id="h-bulk">Bulk Random Publish</h2></header>
+        <div class="body">
+          <div class="row">
+            <div>
+              <label for="bulkCount">How many random seeds?</label>
+              <input id="bulkCount" type="number" min="1" step="1" placeholder="e.g., 10"/>
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <div class="actions">
+                <button id="runBulkBtn">Run in backend</button>
+                <span id="bulkStatus" class="muted"></span>
+              </div>
+            </div>
+          </div>
+          <div class="muted" id="bulkHint"></div>
+        </div>
       </section>
       
 
@@ -307,6 +323,11 @@
     API.generateBox = '/api/box-of-dirt';
     API.bodArtifacts = '/api/box-of-dirt/artifacts';
     API.renderArtifact = '/api/render-artifact';
+
+    const runBulkBtn = document.getElementById('runBulkBtn');
+    const bulkCount  = document.getElementById('bulkCount');
+    const bulkStatus = document.getElementById('bulkStatus');
+    const bulkHint   = document.getElementById('bulkHint');
 
     // Minimal site-styled CSS wrapper for body-only preview
     const BODY_WRAPPER_STYLE = `
@@ -422,6 +443,37 @@
         els.domain.innerHTML = `<option value=\"\">Failed to load narratives</option>`;
       }
     }
+
+    async function startBulkJob(){
+      const n = Number(bulkCount.value || 0);
+      if (!Number.isInteger(n) || n <= 0){
+        bulkStatus.textContent = 'Enter a positive integer.'; 
+        bulkStatus.classList.add('err');
+        return;
+      }
+      bulkStatus.textContent = 'Starting…';
+      bulkStatus.classList.remove('err');
+
+      try{
+        const res = await fetch('/api/box-of-dirt/bulk', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify({ n })
+        });
+        if(!res.ok){
+          const t = await res.text().catch(()=> '');
+          throw new Error(`HTTP ${res.status} ${t}`);
+        }
+        const out = await res.json();
+        bulkStatus.textContent = `Job started: ${out.job_id}`;
+        bulkHint.textContent = `You can close this page. Check status at GET /api/box-of-dirt/bulk/${out.job_id}`;
+      }catch(e){
+        bulkStatus.textContent = e.message;
+        bulkStatus.classList.add('err');
+      }
+    }
+
+
     async function onDomainChange(){
       const nid = els.domain.value;
       els.dimension.disabled = !nid;
@@ -855,6 +907,8 @@ function renderContext(){
     els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
     els.genProtoBtn.addEventListener('click', generatePrototypeAndBuild);
     els.genArtifactsBtn.addEventListener('click', generateArtifactsAndPage);
+
+    if (runBulkBtn) runBulkBtn.addEventListener('click', startBulkJob);
 
     els.seed.addEventListener('change', ()=>{
     setStatus(els.selStatus, '', false);
