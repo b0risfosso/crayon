@@ -1469,44 +1469,52 @@ def _pick_random_seed_ids(n: int):
 def _seed_context(seed_id: int):
     """
     Fetch domain/dimension + seed fields and compose the canonical A/B/Link block.
-    No parsing tricks; we build directly from columns.
+    Uses _query_all to avoid relying on a missing _query_one helper.
     """
-    row = _query_one("""
+    rows = _query_all("""
         SELECT s.id AS seed_id, s.problem, s.objective, s.solution,
                d.id AS dim_id, d.title AS dim_title, d.description AS dim_desc,
                n.id AS narrative_id, n.title AS narrative_title
         FROM narrative_seeds s
         JOIN narrative_dimensions d ON d.id = s.dimension_id
         JOIN narratives n ON n.id = d.narrative_id
-        WHERE s.id = ? LIMIT 1
+        WHERE s.id = ?
+        LIMIT 1
     """, (seed_id,))
-    if not row:
+    if not rows:
         return None
+    row = rows[0]
 
-    # normalize dict access
-    g = row if isinstance(row, dict) else {
-        "seed_id": row[0], "problem": row[1], "objective": row[2], "solution": row[3],
-        "dim_id": row[4], "dim_title": row[5], "dim_desc": row[6],
-        "narrative_id": row[7], "narrative_title": row[8],
-    }
+    # row may be dict-like or tuple-like; normalize
+    if isinstance(row, dict):
+        problem   = (row.get("problem") or "").strip()
+        objective = (row.get("objective") or "").strip()
+        solution  = (row.get("solution") or "").strip()
+        ctx = {
+            "seed_id": row["seed_id"],
+            "domain": row["narrative_title"],
+            "dimension": row["dim_title"],
+            "thesis": row.get("dim_desc") or "",
+        }
+    else:
+        # tuple fallback (index order must match SELECT)
+        problem   = (row[1] or "").strip()
+        objective = (row[2] or "").strip()
+        solution  = (row[3] or "").strip()
+        ctx = {
+            "seed_id": row[0],
+            "domain": row[8],
+            "dimension": row[5],
+            "thesis": row[6] or "",
+        }
 
-    problem   = (g.get("problem") or "").strip()
-    objective = (g.get("objective") or "").strip()
-    solution  = (g.get("solution") or "").strip()
-
-    seed_three = "\n".join([
+    ctx["seed_three"] = "\n".join([
         f"A (Problem): {problem}",
         f"B (Objective): {objective}",
         f"Solution (Link): {solution}",
     ]).strip()
+    return ctx
 
-    return {
-        "seed_id": g["seed_id"],
-        "domain": g["narrative_title"],    # domain label
-        "dimension": g["dim_title"],       # dimension label
-        "thesis": g.get("dim_desc") or "", # dimension description
-        "seed_three": seed_three,
-    }
 
 def _bulk_worker(job_id: str, seed_ids: list[int]):
     with BULK_JOBS_LOCK:
