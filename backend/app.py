@@ -901,7 +901,8 @@ def _make_artifacts_user_msg(domain, dimension, seed_three_line):
 
 def _provider_from(data: dict) -> str:
     p = (data.get("provider") or "").strip().lower()
-    return p if p in {"openai", "xai", "gemini", "deepseek"} else "openai"
+    return p if p in {"openai", "openai_web", "xai", "gemini", "deepseek"} else "openai"
+
 
 def build_user_prompt(artifact_yaml: str, artifacts_md: str | None = None) -> str:
     md_note = ""
@@ -1073,7 +1074,108 @@ def _suffix_if_exists(p: Path) -> Path:
             return candidate
         i += 1
 
-# ---------- NEW: LLM adapters (OpenAI + xAI + Gemini + Deepseek) ----------
+# ---------- NEW: LLM adapters (OpenAI + xAI + Gemini + Deepseek + OpenAI websearch) ----------
+# ---------- NEW: OpenAI with web_search tool ----------
+def llm_generate_dimensions_openai_web(domain: str, n: int | None):
+    """
+    Use OpenAI 'responses.create' with the web_search tool to generate NarrativeDimensions JSON.
+    """
+    client = _get_llm()
+    count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
+    usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
+
+    # Ask for strict JSON that matches the Pydantic schema
+    sys_prompt = (
+        "You are a structured generator. Use web search as needed to ground the space. "
+        "Return ONLY a JSON document that strictly matches the provided schema. No prose, no markdown fences.\n\n"
+        "Schema name: NarrativeDimensions\n"
+        "fields:\n"
+        "- dimensions: list of objects with fields {name:str, thesis:str, targets:list[str]}\n"
+        "Constraints: 5–8 items unless explicitly overridden."
+    )
+
+    # Include your existing guidance for what a 'dimension' looks like
+    user_prompt = f"{DIM_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
+
+    resp = client.responses.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-5"),
+        tools=[{"type": "web_search"}],
+        input=[
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.7,
+    )
+
+    raw = resp.output_text or ""
+    json_text = _extract_json_text(raw)
+    try:
+        parsed = _pydantic_from_json(NarrativeDimensions, json_text)
+    except Exception:
+        class _Shim: pass
+        shim = _Shim()
+        shim.output_parsed = None
+        shim.output_text = raw
+        return shim
+
+    class _ParsedResp:
+        def __init__(self, parsed_obj, raw_text):
+            self.output_parsed = parsed_obj
+            self.output_text = raw_text
+    return _ParsedResp(parsed, raw)
+
+
+def llm_generate_seeds_openai_web(domain: str, dimension: str, description: str, targets: List[str]):
+    """
+    Use OpenAI 'responses.create' with the web_search tool to generate NarrativeSeeds JSON.
+    """
+    client = _get_llm()
+    usr_msg = (
+        f"Domain: {domain}\n"
+        f"Dimension: {dimension}\n"
+        f"Description: {description}\n"
+        f"Narrative Targets: {targets if targets else 'None provided'}\n\n"
+        "Create A→B narrative seeds in this dimension."
+    )
+
+    sys_prompt = (
+        "You are a structured generator. Use web search as needed to ground claims and examples. "
+        "Return ONLY a JSON document that strictly matches the provided schema. No prose, no markdown fences.\n\n"
+        "Schema name: NarrativeSeeds\n"
+        "fields:\n"
+        "- seeds: list of objects with fields {problem:str, objective:str, solution:str}\n"
+        "Constraints: 3–5 seeds."
+    )
+
+    user_prompt = f"{SEED_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
+
+    resp = client.responses.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-5"),
+        tools=[{"type": "web_search"}],
+        input=[
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.7,
+    )
+
+    raw = resp.output_text or ""
+    json_text = _extract_json_text(raw)
+    try:
+        parsed = _pydantic_from_json(NarrativeSeeds, json_text)
+    except Exception:
+        class _Shim: pass
+        shim = _Shim()
+        shim.output_parsed = None
+        shim.output_text = raw
+        return shim
+
+    class _ParsedResp:
+        def __init__(self, parsed_obj, raw_text):
+            self.output_parsed = parsed_obj
+            self.output_text = raw_text
+    return _ParsedResp(parsed, raw)
+
 def llm_generate_dimensions_deepseek(domain: str, n: int | None):
     client = get_deepseek_client()
     count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
@@ -1308,6 +1410,11 @@ def generate_narrative_dimensions():
             parsed = parsed_resp.output_parsed
             model_name = _deepseek_model()
             raw_text = parsed_resp.output_text
+        elif provider == "openai_web":
+            parsed_resp = llm_generate_dimensions_openai_web(domain, n)
+            parsed = parsed_resp.output_parsed
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            raw_text = parsed_resp.output_text
         else:
             parsed_resp = llm_generate_dimensions_openai(domain, n)
             parsed = parsed_resp.output_parsed
@@ -1375,6 +1482,11 @@ def generate_narrative_seeds():
             parsed_resp = llm_generate_seeds_deepseek(domain, dimension, description, targets)
             parsed = parsed_resp.output_parsed
             model_name = _deepseek_model()
+            raw_text = parsed_resp.output_text
+        elif provider == "openai_web":
+            parsed_resp = llm_generate_seeds_openai_web(domain, dimension, description, targets)
+            parsed = parsed_resp.output_parsed
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
             raw_text = parsed_resp.output_text
         else:
             parsed_resp = llm_generate_seeds_openai(domain, dimension, description, targets)
