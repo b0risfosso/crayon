@@ -6,16 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root { color-scheme: light dark; }
-    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1100px; }
     h1 { font-size: 1.6rem; margin-bottom: .5rem; }
-    form { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; }
-    input[type="text"] { padding: .6rem .7rem; min-width: 22rem; border: 1px solid #ccc; border-radius: .5rem; }
+    form { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; align-items: center; }
+    textarea { padding: .6rem .7rem; min-width: 28rem; width: min(90vw, 48rem); border: 1px solid #ccc; border-radius: .5rem; }
     button { padding: .6rem .9rem; border: 0; border-radius: .5rem; cursor: pointer; background: #0b5cff; color: #fff; }
+    button.secondary { background: #444; }
     .meta { font-size: .9rem; opacity: .85; margin: .25rem 0 1rem; }
     .grid { display: grid; gap: .8rem; }
     details { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .75rem 1rem; background: rgba(0,0,0,.02); }
     summary { cursor: pointer; font-weight: 600; }
-    .thesis { margin: .4rem 0 .3rem; font-style: italic; }
+    .thesis { margin: .4rem 0 .3rem; font-style: italic; white-space: pre-wrap; }
     .targets { margin: .25rem 0 .5rem 1.25rem; }
     .seedbox { border-top: 1px dashed #c8c8c8; margin-top: .5rem; padding-top: .5rem; }
     .seed-title { font-weight: 600; margin-bottom: .25rem; }
@@ -24,32 +25,45 @@
     .dim-error, .seed-error, .error { color: #b00020; white-space: pre-wrap; }
     .muted { opacity: .7; font-size: .9rem; }
     pre { background: #f6f6f6; padding: .75rem; border-radius: .5rem; overflow-x: auto; }
+    .row { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .badge { font-size:.8rem; padding:.15rem .45rem; border:1px solid #ddd; border-radius:.4rem; }
+    .provider-block { border:1px solid #e2e2e2; border-radius:.6rem; padding: .6rem .8rem; background: rgba(0,0,0,.02); }
+    .provider-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.4rem; }
+    .provider-name { font-weight:600; }
+    .provider-status { font-size:.9rem; opacity:.8; }
+    .provider-grid { display:grid; gap:.7rem; }
+    .pro-sep { height:.5rem; }
+    .domain-head { display:flex; align-items:center; gap:.6rem; }
   </style>
 </head>
 <body>
   <h1>Imagine</h1>
 
   <form id="form">
-    <input id="domain" type="text" placeholder="Single domain (optional)">
-    <textarea id="domains" rows="4" placeholder="Or multiple domains — one per line"></textarea>
-    <button type="submit">Generate</button>
+    <textarea id="domains" rows="4" placeholder="Enter one or more domains — one per line"></textarea>
+    <button type="submit">Generate (All Providers)</button>
   </form>
 
   <div id="globalStatus" class="meta"></div>
-  <div id="container"></div> 
+  <div id="container"></div>
+
   <script>
     const form = document.getElementById('form');
-    const singleDomainInput = document.getElementById('domain');
     const multiDomainsInput = document.getElementById('domains');
     const globalStatus = document.getElementById('globalStatus');
     const container = document.getElementById('container');
-  
+
+    const PROVIDERS = ['openai', 'xai', 'gemini', 'deepseek'];
+    const MAX_DIM_CONCURRENCY = 2; // per provider, per domain
+    const MAX_SEED_CONCURRENCY = 2; // per provider, per domain
+
     // ---------- utilities ----------
     function el(tag, opts = {}) {
       const node = document.createElement(tag);
       if (opts.className) node.className = opts.className;
       if ('text' in opts) node.textContent = opts.text;
       if ('html' in opts) node.innerHTML = opts.html;
+      if (opts.attrs) Object.entries(opts.attrs).forEach(([k,v]) => node.setAttribute(k,v));
       return node;
     }
     function escapeHtml(s) {
@@ -61,84 +75,112 @@
     async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        return await fetch(url, { ...options, signal: controller.signal });
-      } finally { clearTimeout(id); }
+      try { return await fetch(url, { ...options, signal: controller.signal }); }
+      finally { clearTimeout(id); }
     }
-  
+    async function postJSON(url, body, timeoutMs = 180000) {
+      const resp = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }, timeoutMs);
+      let data;
+      try { data = await resp.json(); } catch {
+        throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
+      }
+      if (!resp.ok) {
+        const msg = (data && (data.error || data.detail)) ? `${data.error || ''} ${data.detail || ''}`.trim() : `HTTP ${resp.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    }
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
     // ---------- per-domain UI ----------
     function makeDomainSection(domain) {
       const section = el('section');
-      const h2 = el('h2', { text: domain });
+      const h2 = el('h2');
+      const head = el('div', { className:'domain-head' });
+      head.append(el('span', { text: domain }));
+      h2.append(head);
+
       const meta = el('div', { className: 'meta' });
       const err = el('div', { className: 'error' });
-      const grid = el('div', { className: 'grid' });
-      section.append(h2, meta, err, grid);
+
+      // provider containers
+      const providersWrap = el('div', { className: 'grid' });
+
+      section.append(h2, meta, err, providersWrap);
       container.appendChild(section);
-      return { section, meta, err, grid };
+      return { section, meta, err, providersWrap };
     }
-  
-    function renderDimensionCard(idx, dim, domain) {
+
+    function makeProviderBlock(provider) {
+      const block = el('div', { className: 'provider-block' });
+      const head = el('div', { className: 'provider-head' });
+      const badge = el('span', { className: 'badge', text: provider });
+      const name = el('span', { className: 'provider-name', text: 'Dimensions' });
+      const status = el('span', { className: 'provider-status', text: 'Waiting…' });
+      const grid = el('div', { className: 'provider-grid' });
+
+      head.append(badge, name, el('span', { className: 'muted', text: '·' }), status);
+      block.append(head, grid);
+      return { block, status, grid };
+    }
+
+    function renderDimensionCard(idx, dim, domain, provider) {
       const card = el('details');
-      const sum = el('summary', { text: `${idx + 1}. ${dim.name || 'Untitled'}` });
-      const thesis = el('div', { className: 'thesis', text: dim.thesis || '' });
-  
+      const title = dim.title || dim.name || 'Untitled';
+      const sum = el('summary', { text: `${idx + 1}. ${title}` });
+
+      const thesisText = dim.description || dim.thesis || '';
+      const thesis = el('div', { className: 'thesis', text: thesisText });
+
       const targetsList = el('ul', { className: 'targets' });
       (Array.isArray(dim.targets) ? dim.targets : []).forEach(t => {
         targetsList.appendChild(el('li', { text: t }));
       });
-  
+
       const seedBox = el('div', { className: 'seedbox' });
-      const seedHeader = el('div', { className: 'seed-title', text: 'Seeds' });
+      const seedHeader = el('div', { className: 'seed-title', html: `Seeds <span class="badge">${provider}</span>` });
       const seedStatus = el('div', { className: 'muted', text: 'Waiting…' });
       const seedWrap = el('div');
-  
+
       seedBox.append(seedHeader, seedStatus, seedWrap);
       card.append(sum, thesis, targetsList, seedBox);
-  
-      // stash for queued run
+
+      // payload for creating seeds (POST)
       card._seedPayload = {
         domain,
-        dimension: dim.name,
-        description: dim.thesis,
-        targets: dim.targets
+        dimension: dim.name || dim.title || '',
+        description: thesisText,
+        targets: Array.isArray(dim.targets) ? dim.targets : [],
+        provider
       };
       card._seedUI = { seedStatus, seedWrap };
-  
+
       return card;
     }
-  
-    // ---------- seeds ----------
-    async function fetchSeedsForDimension(payload, ui, tries = 2) {
+
+    // ---------- seeds (create via provider) ----------
+    async function createSeedsForDimension(payload, ui, tries = 2) {
       const { seedStatus, seedWrap } = ui;
       try {
-        seedStatus.textContent = 'Loading seeds…';
-        const resp = await fetchWithTimeout('/api/narrative-seeds', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }, 180000);
-  
-        let data; try { data = await resp.json(); } catch {
-          throw new Error(`Non-JSON response from /api/narrative-seeds (status ${resp.status})`);
-        }
-  
+        seedStatus.textContent = 'Generating seeds…';
+        const data = await postJSON('/api/narrative-seeds', payload, 180000);
         seedStatus.textContent = '';
-        if (!resp.ok || data.error) {
-          throw new Error(data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`);
-        }
-  
+
+        // Display what came back (same shape as your existing imagine flow)
         if (Array.isArray(data.seeds)) {
-          if (!data.seeds.length) {
-            seedStatus.textContent = 'No seeds returned.';
-            return;
-          }
+          if (!data.seeds.length) { seedStatus.textContent = 'No seeds returned.'; return; }
           data.seeds.forEach(s => {
             const seed = el('div', { className: 'seed' });
             seed.innerHTML =
               `<strong>A (Problem):</strong> ${escapeHtml(s.problem || '')}<br>` +
               `<strong>B (Objective):</strong> ${escapeHtml(s.objective || '')}<br>` +
-              `<strong>Solution (Link):</strong> ${escapeHtml(s.solution || '')}`;
+              `<strong>Solution (Link):</strong> ${escapeHtml(s.solution || '')}` +
+              (s.provider ? `<br><small>provider: ${escapeHtml(s.provider)}</small>` : '') +
+              (s.created_at ? `<br><small>${escapeHtml(s.created_at)}</small>` : '');
             seedWrap.appendChild(seed);
           });
         } else if (data.raw) {
@@ -153,102 +195,102 @@
       } catch (e) {
         if (tries > 0) {
           seedStatus.textContent = 'Retrying…';
-          await new Promise(r => setTimeout(r, 1500));
-          return fetchSeedsForDimension(payload, ui, tries - 1);
+          await sleep(1200);
+          return createSeedsForDimension(payload, ui, tries - 1);
         }
         seedStatus.className = 'seed-error';
         seedStatus.textContent = `Seed request failed: ${e.message || e}`;
       }
     }
-  
-    // ---------- dimensions (for one domain) ----------
-    async function runForDomain(domain, ui) {
-      const { meta, err, grid } = ui;
-      err.textContent = '';
-      meta.textContent = '';
-      grid.innerHTML = 'Loading dimensions…';
-  
-      const resp = await fetchWithTimeout('/api/narrative-dimensions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain })
-      }, 180000);
-  
-      let data;
-      try { data = await resp.json(); } catch {
-        grid.innerHTML = '';
-        err.textContent = `Non-JSON response (status ${resp.status})`;
+
+    // ---------- one provider run for a domain (streaming UI) ----------
+    async function runProviderForDomain(domain, provider, providerUI) {
+      const { status, grid } = providerUI;
+      status.textContent = 'Generating dimensions…';
+
+      let dimData;
+      try {
+        dimData = await postJSON('/api/narrative-dimensions', { domain, provider }, 180000);
+      } catch (e) {
+        status.textContent = `Failed: ${e.message || e}`;
         return;
       }
-  
-      if (!resp.ok || data.error) {
-        grid.innerHTML = '';
-        err.textContent = data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `HTTP ${resp.status}`;
-        return;
-      }
-  
-      if (Array.isArray(data.dimensions)) {
-        grid.innerHTML = '';
-        meta.textContent = `Model: ${data.model ?? '—'} · Count: ${data.dimensions.length}`;
-        const cards = data.dimensions.map((dim, idx) => {
-          const card = renderDimensionCard(idx, dim, data.domain || domain);
-          grid.appendChild(card);
-          return card;
-        });
-  
-        // Throttle seed calls per domain
-        const MAX_CONCURRENCY = 2;
-        let ptr = 0;
-        async function worker() {
-          while (ptr < cards.length) {
-            const myIndex = ptr++;
-            const card = cards[myIndex];
-            await fetchSeedsForDimension(card._seedPayload, card._seedUI);
+
+      const dims = Array.isArray(dimData?.dimensions) ? dimData.dimensions : [];
+      status.textContent = `Dimensions: ${dims.length}`;
+
+      if (!dims.length) return;
+
+      // Render dimension cards immediately
+      const cards = dims.map((dim, idx) => {
+        const card = renderDimensionCard(idx, dim, dimData.domain || domain, provider);
+        grid.appendChild(card);
+        return card;
+      });
+
+      // Now generate seeds with throttling, updating as each finishes
+      let i = 0, ok = 0, fail = 0;
+      async function seedWorker() {
+        while (i < cards.length) {
+          const my = i++;
+          const card = cards[my];
+          try {
+            await createSeedsForDimension(card._seedPayload, card._seedUI);
+            ok++;
+            status.textContent = `Seeds: ${ok}/${cards.length}${fail ? ` (${fail} failed)` : ''}`;
+          } catch {
+            fail++;
+            status.textContent = `Seeds: ${ok}/${cards.length} (${fail} failed)`;
           }
         }
-        await Promise.all(
-          Array.from({ length: Math.min(MAX_CONCURRENCY, cards.length) }, () => worker())
-        );
-      } else if (data.raw) {
-        meta.textContent = `Model: ${data.model ?? '—'} (raw text shown; parsing failed)`;
-        const pre = el('pre'); pre.textContent = data.raw;
-        grid.replaceChildren(pre);
-      } else {
-        const pre = el('pre'); pre.textContent = JSON.stringify(data, null, 2);
-        grid.replaceChildren(pre);
       }
+      await Promise.all(
+        Array.from({ length: Math.min(MAX_SEED_CONCURRENCY, cards.length) }, () => seedWorker())
+      );
+      status.textContent = `Done — dims ${cards.length}, seeds ${ok}/${cards.length}${fail ? `, ${fail} failed` : ''}`;
     }
-  
-    // ---------- orchestrator for multiple domains (sequential) ----------
+
+    // ---------- orchestrator for multiple domains ----------
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       container.innerHTML = '';
       globalStatus.textContent = '';
-  
-      // Collect domains
-      const listFromTextarea = (multiDomainsInput.value || '')
+
+      const domains = (multiDomainsInput.value || '')
         .split('\n')
         .map(s => s.trim())
         .filter(Boolean);
-  
-      const single = (singleDomainInput.value || '').trim();
-      const domains = listFromTextarea.length ? listFromTextarea : (single ? [single] : []);
-  
-      if (domains.length === 0) {
+
+      if (!domains.length) {
         globalStatus.textContent = 'Please enter at least one domain.';
         return;
       }
-  
-      // Run sequentially to avoid overload
-      for (let i = 0; i < domains.length; i++) {
-        const domain = domains[i];
-        globalStatus.textContent = `Processing ${i + 1} of ${domains.length}: ${domain}`;
+
+      // Process domains sequentially to avoid overload; providers run sequentially per domain too,
+      // but each provider streams its own UI (dims first, then seeds).
+      for (let di = 0; di < domains.length; di++) {
+        const domain = domains[di];
+        globalStatus.textContent = `Processing ${di + 1} of ${domains.length}: ${domain}`;
+
         const ui = makeDomainSection(domain);
-        await runForDomain(domain, ui);
+
+        // Create provider blocks up-front (so the page fills immediately)
+        const providerBlocks = {};
+        for (const p of PROVIDERS) {
+          const pb = makeProviderBlock(p);
+          ui.providersWrap.appendChild(pb.block);
+          ui.providersWrap.appendChild(el('div', { className: 'pro-sep' }));
+          providerBlocks[p] = pb;
+        }
+
+        // Run providers sequentially so you don't stampede your backends.
+        for (const p of PROVIDERS) {
+          await runProviderForDomain(domain, p, providerBlocks[p]);
+        }
       }
+
       globalStatus.textContent = `Done. Processed ${domains.length} domain(s).`;
     });
-  </script>  
-  
+  </script>
 </body>
 </html>
