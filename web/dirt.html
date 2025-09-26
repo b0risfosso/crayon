@@ -131,6 +131,36 @@
           </div>
         </div>
       </section>
+
+      <section class="card" aria-labelledby="h-proto">
+        <header><h2 id="h-proto">Narrative Prototype</h2></header>
+        <div class="body">
+          <div class="actions">
+            <button id="genProtoBtn">Generate Prototype</button>
+            <span id="protoStatus" class="muted"></span>
+          </div>
+      
+          <div id="protoWrap" hidden style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent);
+               border-radius:.6rem; padding:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); display:grid; gap:.5rem;">
+            <div id="protoCore" style="white-space:pre-wrap;"></div>
+            <div id="protoBuild" style="white-space:pre-wrap;"></div>
+            <div id="protoTest" style="white-space:pre-wrap;"></div>
+            <div id="protoEyes"></div>
+            <div id="protoWhy" style="white-space:pre-wrap;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-artifacts">
+        <header><h2 id="h-artifacts">Deployment & Box-of-Dirt Artifacts</h2></header>
+        <div class="body">
+          <div class="actions">
+            <button id="genArtifactsBtn">Generate Artifacts (Markdown)</button>
+            <span id="artifactsStatus" class="muted"></span>
+          </div>
+          <pre id="artifactsMd" class="codeblock" tabindex="0" style="min-height:180px;"></pre>
+        </div>
+      </section>
       
 
     <section class="card" aria-labelledby="h-compose">
@@ -190,25 +220,6 @@
       </div>
     </section>
 
-    <section class="card" aria-labelledby="h-proto">
-        <header><h2 id="h-proto">Narrative Prototype</h2></header>
-        <div class="body">
-          <div class="actions">
-            <button id="genProtoBtn">Generate Prototype</button>
-            <span id="protoStatus" class="muted"></span>
-          </div>
-      
-          <div id="protoWrap" hidden style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent);
-               border-radius:.6rem; padding:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); display:grid; gap:.5rem;">
-            <div id="protoCore" style="white-space:pre-wrap;"></div>
-            <div id="protoBuild" style="white-space:pre-wrap;"></div>
-            <div id="protoTest" style="white-space:pre-wrap;"></div>
-            <div id="protoEyes"></div>
-            <div id="protoWhy" style="white-space:pre-wrap;"></div>
-          </div>
-        </div>
-      </section>
-
       <section class="card" aria-labelledby="h-source">
         <header><h2 id="h-source">Source (latest/draft)</h2></header>
         <div class="body">
@@ -240,18 +251,6 @@
             </div>
           </div>
           <div class="muted" id="bulkHint"></div>
-        </div>
-      </section>
-      
-
-      <section class="card" aria-labelledby="h-artifacts">
-        <header><h2 id="h-artifacts">Deployment & Box-of-Dirt Artifacts</h2></header>
-        <div class="body">
-          <div class="actions">
-            <button id="genArtifactsBtn">Generate Artifacts (Markdown)</button>
-            <span id="artifactsStatus" class="muted"></span>
-          </div>
-          <pre id="artifactsMd" class="codeblock" tabindex="0" style="min-height:180px;"></pre>
         </div>
       </section>
       
