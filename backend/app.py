@@ -1104,7 +1104,6 @@ def llm_generate_dimensions_openai_web(domain: str, n: int | None):
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=0.7,
     )
 
     raw = resp.output_text or ""
@@ -1156,7 +1155,6 @@ def llm_generate_seeds_openai_web(domain: str, dimension: str, description: str,
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=0.7,
     )
 
     raw = resp.output_text or ""
