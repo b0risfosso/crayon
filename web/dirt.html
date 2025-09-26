@@ -427,33 +427,94 @@
       el.classList.add(ok ? 'ok' : 'err');
     }
 
+    // REPLACE your maybeDeepLink with this:
     async function maybeDeepLink() {
       const params = new URLSearchParams(location.search);
-      const nid = params.get('nid');
-      const did = params.get('did');
-      const sid = params.get('sid');
+      let nid = params.get('nid');
+      let did = params.get('did');
+      let sid = params.get('sid');
 
-      if (!nid) return;
-
-      // Select domain
-      els.domain.value = String(nid);
-      await onDomainChange(); // loads dimensions
-
-      if (did) {
-        els.dimension.value = String(did);
-        await onDimensionChange(); // loads seeds
+      // If nid is missing but we have did or sid, try to resolve the hierarchy.
+      if (!nid && did) {
+        nid = await resolveNarrativeIdByDimensionId(did);
+      }
+      if ((!nid || !did) && sid) {
+        const found = await resolveDimensionAndNarrativeBySeedId(sid);
+        if (found) {
+          nid = nid || found.nid;
+          did = did || found.did;
+        }
       }
 
+      // If we still don't know nid, bail gracefully.
+      if (!nid) return;
+
+      // Select domain (loads dimensions)
+      els.domain.value = String(nid);
+      await onDomainChange();
+
+      // Select dimension (loads seeds)
+      if (did) {
+        els.dimension.value = String(did);
+        await onDimensionChange();
+      }
+
+      // Select seed
       if (sid) {
         els.seed.value = String(sid);
         els.seedIdInput.value = String(sid);
       }
 
       renderContext();
-      // enable "Load current" if we have a seed id
-      const current = currentSeedId();
-      els.loadCurrentBtn.disabled = !current;
+      els.loadCurrentBtn.disabled = !currentSeedId();
     }
+
+    // ADD these helpers anywhere near your other helpers:
+
+    async function resolveNarrativeIdByDimensionId(did) {
+      // Look through all narratives and fetch their dimensions until we find did.
+      for (const n of (cache.narratives || [])) {
+        try {
+          let dims = cache.dims.get(String(n.id));
+          if (!dims) {
+            dims = await fetchJSON(`/api/narratives/${encodeURIComponent(n.id)}/dimensions`);
+            cache.dims.set(String(n.id), dims);
+          }
+          if (Array.isArray(dims) && dims.some(d => String(d.id) === String(did))) {
+            return String(n.id);
+          }
+        } catch (e) {
+          // skip and continue
+        }
+      }
+      return null;
+    }
+
+    async function resolveDimensionAndNarrativeBySeedId(sid) {
+      // Slow path: if only sid is given, search dims→seeds for a match.
+      for (const n of (cache.narratives || [])) {
+        let dims = cache.dims.get(String(n.id));
+        if (!dims) {
+          try {
+            dims = await fetchJSON(`/api/narratives/${encodeURIComponent(n.id)}/dimensions`);
+            cache.dims.set(String(n.id), dims);
+          } catch (e) { continue; }
+        }
+        for (const d of (dims || [])) {
+          try {
+            const payload = await fetchJSON(`/api/dimensions/${encodeURIComponent(d.id)}/seeds`);
+            const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
+            if (seeds.some(s => String(s.id) === String(sid))) {
+              return { nid: String(n.id), did: String(d.id) };
+            }
+          } catch (e) {
+            // continue
+          }
+        }
+      }
+      return null;
+    }
+
 
 
     async function fetchJSON(url){
