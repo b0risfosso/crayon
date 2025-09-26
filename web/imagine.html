@@ -36,6 +36,8 @@
     .provider-grid { display:grid; gap:.7rem; }
     .pro-sep { height:.5rem; }
     .domain-head { display:flex; align-items:center; gap:.6rem; }
+    a.seedlink { text-decoration: none; color: inherit; display:block; }
+    a.seedlink:hover .seed { outline: 2px solid #9bbcff; outline-offset: 2px; }
   </style>
 </head>
 <body>
@@ -149,6 +151,33 @@
       return data;
     }
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    // ADD next to fetchWithTimeout/postJSON
+    async function getJSON(url, timeoutMs = 180000) {
+      const resp = await fetchWithTimeout(url, {}, timeoutMs);
+      let data;
+      try { data = await resp.json(); } catch {
+        throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
+      }
+      if (!resp.ok) {
+        const msg = (data && (data.error || data.detail)) ? `${data.error || ''} ${data.detail || ''}`.trim() : `HTTP ${resp.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    // Narrative title → id cache so we can deep link dirt.html with IDs
+    const narrativeIdByTitle = new Map();
+    async function ensureNarrativesCache() {
+      if (narrativeIdByTitle.size) return;
+      const rows = await getJSON('/api/narratives');
+      rows.forEach(r => {
+        if (r && r.title) narrativeIdByTitle.set(r.title, r.id);
+      });
+    }
+    function getNarrativeIdForTitle(title) {
+      return narrativeIdByTitle.get(title) || null;
+    }
+
 
     // ---------- per-domain UI ----------
     function makeDomainSection(domain) {
@@ -210,12 +239,17 @@
       };
       card._seedUI = { seedStatus, seedWrap };
 
+      card._dimId = dim.id || null;          // <-- dimension id from backend
+      card._narrativeId = null;              // <-- filled later in runProviderForDomain
       return card;
     }
 
     // ---------- seeds (create via provider) ----------
-    async function createSeedsForDimension(payload, ui, tries = 2) {
+    async function createSeedsForDimension(payload, ui, extras, tries = 2) {
       const { seedStatus, seedWrap } = ui;
+      const { narrativeId, dimensionId } = extras || {};
+      const seedsRendered = [];
+
       try {
         seedStatus.textContent = 'Generating seeds…';
         const data = await postJSON('/api/narrative-seeds', payload, 180000);
@@ -223,7 +257,12 @@
 
         if (Array.isArray(data.seeds)) {
           if (!data.seeds.length) { seedStatus.textContent = 'No seeds returned.'; return; }
+
           data.seeds.forEach(s => {
+            // Build anchor to dirt.html with whatever we have; upgrade to sid later if missing
+            const href = linkHref(narrativeId, dimensionId, s.id || null);
+            const a = el('a', { className: 'seedlink', attrs: { href, target: '_blank', rel: 'noopener' } });
+
             const seed = el('div', { className: 'seed' });
             seed.innerHTML =
               `<strong>A (Problem):</strong> ${escapeHtml(s.problem || '')}<br>` +
@@ -231,8 +270,22 @@
               `<strong>Solution (Link):</strong> ${escapeHtml(s.solution || '')}` +
               (s.provider ? `<br><small>provider: ${escapeHtml(s.provider)}</small>` : '') +
               (s.created_at ? `<br><small>${escapeHtml(s.created_at)}</small>` : '');
-            seedWrap.appendChild(seed);
+
+            // Keep raw fields for post-match if id was not returned
+            seed.dataset.problem = (s.problem || '');
+            seed.dataset.objective = (s.objective || '');
+            seed.dataset.solution = (s.solution || '');
+            seed.dataset.hasId = s.id ? '1' : '0';
+
+            a.appendChild(seed);
+            seedWrap.appendChild(a);
+            seedsRendered.push(a);
           });
+
+          // If any seed ids were missing, reconcile against canonical GET list
+          if (dimensionId && seedsRendered.some(a => a.firstChild?.dataset?.hasId === '0')) {
+            await reconcileSeedLinks(narrativeId, dimensionId, seedsRendered);
+          }
         } else if (data.raw) {
           const pre = el('pre'); pre.textContent = data.raw;
           seedWrap.appendChild(pre);
@@ -246,12 +299,13 @@
         if (tries > 0) {
           seedStatus.textContent = 'Retrying…';
           await sleep(1200);
-          return createSeedsForDimension(payload, ui, tries - 1);
+          return createSeedsForDimension(payload, ui, extras, tries - 1);
         }
         seedStatus.className = 'seed-error';
         seedStatus.textContent = `Seed request failed: ${e.message || e}`;
       }
     }
+
 
     // ---------- one provider run for a domain ----------
     async function runProviderForDomain(domain, provider, providerUI) {
@@ -270,8 +324,12 @@
       status.textContent = `Dimensions: ${dims.length}`;
       if (!dims.length) return;
 
+      // Resolve narrative id (by title) once
+      const narrativeId = getNarrativeIdForTitle(dimData.domain || domain);
+
       const cards = dims.map((dim, idx) => {
         const card = renderDimensionCard(idx, dim, dimData.domain || domain, provider);
+        card._narrativeId = narrativeId || null;
         grid.appendChild(card);
         return card;
       });
@@ -282,7 +340,11 @@
           const idx = i++;
           const card = cards[idx];
           try {
-            await createSeedsForDimension(card._seedPayload, card._seedUI);
+            await createSeedsForDimension(
+              card._seedPayload,
+              card._seedUI,
+              { narrativeId: card._narrativeId, dimensionId: card._dimId }
+            );
             ok++;
             status.textContent = `Seeds: ${ok}/${cards.length}${fail ? ` (${fail} failed)` : ''}`;
           } catch {
@@ -296,6 +358,7 @@
       );
       status.textContent = `Done — dims ${cards.length}, seeds ${ok}/${cards.length}${fail ? `, ${fail} failed` : ''}`;
     }
+
 
     // ---------- orchestrator ----------
     form.addEventListener('submit', async (e) => {
@@ -316,6 +379,9 @@
         globalStatus.textContent = 'Please select at least one provider.';
         return;
       }
+
+        // NEW: load narratives once so we can deep-link with IDs
+      try { await ensureNarrativesCache(); } catch { /* non-fatal */ }
 
       for (let di = 0; di < domains.length; di++) {
         const domain = domains[di];
@@ -340,6 +406,41 @@
 
       globalStatus.textContent = `Done. Processed ${domains.length} domain(s).`;
     });
+
+    function linkHref(nid, did, sid) {
+      const p = new URLSearchParams();
+      if (nid) p.set('nid', String(nid));
+      if (did) p.set('did', String(did));
+      if (sid) p.set('sid', String(sid));
+      return `dirt.html${p.toString() ? `?${p.toString()}` : ''}`;
+    }
+    function norm(s) {
+      return String(s || '').replace(/\s+/g,' ').trim().toLowerCase();
+    }
+    async function reconcileSeedLinks(narrativeId, dimensionId, anchors) {
+      try {
+        const data = await getJSON(`/api/dimensions/${encodeURIComponent(dimensionId)}/seeds`);
+        const list = Array.isArray(data?.seeds) ? data.seeds : [];
+        const byKey = new Map(list.map(row => {
+          const k = [row.problem, row.objective, row.solution].map(norm).join('||');
+          return [k, row.id];
+        }));
+
+        anchors.forEach(a => {
+          const seed = a.firstChild;
+          if (!seed || seed.dataset.hasId === '1') return; // already has id
+          const k = [seed.dataset.problem, seed.dataset.objective, seed.dataset.solution].map(norm).join('||');
+          const sid = byKey.get(k);
+          if (sid) {
+            a.setAttribute('href', linkHref(narrativeId, dimensionId, sid));
+            seed.dataset.hasId = '1';
+          }
+        });
+      } catch {
+        // If GET fails, leave links at nid/did level.
+      }
+    }
+
 
     // initialize “Select all” state (already checked) to non-indeterminate
     allProvidersCb.indeterminate = false;

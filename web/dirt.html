@@ -427,6 +427,35 @@
       el.classList.add(ok ? 'ok' : 'err');
     }
 
+    async function maybeDeepLink() {
+      const params = new URLSearchParams(location.search);
+      const nid = params.get('nid');
+      const did = params.get('did');
+      const sid = params.get('sid');
+
+      if (!nid) return;
+
+      // Select domain
+      els.domain.value = String(nid);
+      await onDomainChange(); // loads dimensions
+
+      if (did) {
+        els.dimension.value = String(did);
+        await onDimensionChange(); // loads seeds
+      }
+
+      if (sid) {
+        els.seed.value = String(sid);
+        els.seedIdInput.value = String(sid);
+      }
+
+      renderContext();
+      // enable "Load current" if we have a seed id
+      const current = currentSeedId();
+      els.loadCurrentBtn.disabled = !current;
+    }
+
+
     async function fetchJSON(url){
       const res = await fetch(url, { headers: { 'Accept':'application/json' }});
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -941,7 +970,7 @@ function renderContext(){
     setInterval(seedPresenceWatcher, 400);
 
     // Boot
-    loadNarratives();
+    loadNarratives().then(maybeDeepLink);
     updateHtmlInfo();
     renderPreview();
     renderContext(); // new
