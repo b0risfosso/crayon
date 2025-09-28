@@ -51,24 +51,22 @@
     .err { color: color-mix(in oklab, CanvasText 20%, red); }
     .pill { display:inline-block; padding:.2rem .5rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
             border-radius:999px; font-size:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
-    iframe.preview { width:100%; height:70vh; border:1px solid color-mix(in oklab, CanvasText 14%, transparent); border-radius:.6rem; background:Canvas; }
     .toolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     .spacer { flex:1; }
-
     .codeblock {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: .9rem;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  border: 1px solid color-mix(in oklab, CanvasText 14%, transparent);
-  background: color-mix(in oklab, Canvas 98%, CanvasText 2%);
-  border-radius: .5rem;
-  padding: .75rem;
-  max-height: 55vh;
-  overflow: auto;
-  user-select: text;
-}
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: .9rem;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      border: 1px solid color-mix(in oklab, CanvasText 14%, transparent);
+      background: color-mix(in oklab, Canvas 98%, CanvasText 2%);
+      border-radius: .5rem;
+      padding: .75rem;
+      max-height: 55vh;
+      overflow: auto;
+      user-select: text;
+    }
   </style>
 </head>
 <body>
@@ -78,7 +76,7 @@
   </header>
 
   <main class="grid cols-2">
-    <!-- Left: Seed selection + HTML form -->
+    <!-- Left: Seed selection -->
     <section class="card" aria-labelledby="h-select">
       <header><h2 id="h-select">Select Seed</h2></header>
       <div class="body">
@@ -103,158 +101,65 @@
           </div>
         </div>
         <div class="toolbar">
-          <button id="loadCurrentBtn" disabled>Load current (latest/draft)</button>
           <span id="selStatus" class="muted"></span>
         </div>
       </div>
     </section>
 
+    <!-- Right: Selected Context -->
     <section class="card" aria-labelledby="h-context">
-        <header><h2 id="h-context">Selected Context</h2></header>
-        <div class="body" id="contextBody">
-          <div id="ctxDomain">
-            <div class="muted">Domain</div>
-            <div id="ctxDomainTitle">—</div>
-          </div>
-          <hr style="border:none; border-top:1px solid color-mix(in oklab, CanvasText 12%, transparent); margin:.5rem 0;">
-          <div id="ctxDimension">
-            <div class="muted">Dimension</div>
-            <div id="ctxDimTitle">—</div>
-            <div id="ctxDimDesc" class="muted" style="margin-top:.15rem;"></div>
-          </div>
-          <hr style="border:none; border-top:1px solid color-mix(in oklab, CanvasText 12%, transparent); margin:.5rem 0;">
-          <div id="ctxSeed">
-            <div class="muted">Seed</div>
-            <div id="ctxSeedA" style="white-space:pre-wrap;"></div>
-            <div id="ctxSeedB" style="white-space:pre-wrap; margin-top:.25rem;"></div>
-            <div id="ctxSeedL" style="white-space:pre-wrap; margin-top:.25rem;"></div>
-          </div>
+      <header><h2 id="h-context">Selected Context</h2></header>
+      <div class="body" id="contextBody">
+        <div id="ctxDomain">
+          <div class="muted">Domain</div>
+          <div id="ctxDomainTitle">—</div>
         </div>
-      </section>
-
-      <section class="card" aria-labelledby="h-proto">
-        <header><h2 id="h-proto">Narrative Prototype</h2></header>
-        <div class="body">
-          <div class="actions">
-            <button id="genProtoBtn">Generate Prototype</button>
-            <span id="protoStatus" class="muted"></span>
-          </div>
-      
-          <div id="protoWrap" hidden style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent);
-               border-radius:.6rem; padding:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); display:grid; gap:.5rem;">
-            <div id="protoCore" style="white-space:pre-wrap;"></div>
-            <div id="protoBuild" style="white-space:pre-wrap;"></div>
-            <div id="protoTest" style="white-space:pre-wrap;"></div>
-            <div id="protoEyes"></div>
-            <div id="protoWhy" style="white-space:pre-wrap;"></div>
-          </div>
+        <hr style="border:none; border-top:1px solid color-mix(in oklab, CanvasText 12%, transparent); margin:.5rem 0;">
+        <div id="ctxDimension">
+          <div class="muted">Dimension</div>
+          <div id="ctxDimTitle">—</div>
+          <div id="ctxDimDesc" class="muted" style="margin-top:.15rem;"></div>
         </div>
-      </section>
-
-      <section class="card" aria-labelledby="h-artifacts">
-        <header><h2 id="h-artifacts">Deployment & Box-of-Dirt Artifacts</h2></header>
-        <div class="body">
-          <div class="actions">
-            <button id="genArtifactsBtn">Generate Artifacts (Markdown)</button>
-            <span id="artifactsStatus" class="muted"></span>
-          </div>
-          <pre id="artifactsMd" class="codeblock" tabindex="0" style="min-height:180px;"></pre>
+        <hr style="border:none; border-top:1px solid color-mix(in oklab, CanvasText 12%, transparent); margin:.5rem 0;">
+        <div id="ctxSeed">
+          <div class="muted">Seed</div>
+          <div id="ctxSeedA" style="white-space:pre-wrap;"></div>
+          <div id="ctxSeedB" style="white-space:pre-wrap; margin-top:.25rem;"></div>
+          <div id="ctxSeedL" style="white-space:pre-wrap; margin-top:.25rem;"></div>
         </div>
-      </section>
-      
+      </div>
+    </section>
 
-    <section class="card" aria-labelledby="h-compose">
-      <header><h2 id="h-compose">Compose Box of Dirt</h2></header>
+    <!-- Narrative Prototype -->
+    <section class="card" aria-labelledby="h-proto">
+      <header><h2 id="h-proto">Narrative Prototype</h2></header>
       <div class="body">
-        <div class="row">
-          <div>
-            <label for="titleInput">Title (optional)</label>
-            <input id="titleInput" type="text" placeholder="Display title for this artifact"/>
-          </div>
-          <div>
-            <label for="docFormat">Document Format</label>
-            <select id="docFormat">
-              <option value="auto">Auto-detect</option>
-              <option value="full">Full HTML (has &lt;html&gt;)</option>
-              <option value="body">Body-only snippet</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label for="htmlInput">HTML</label>
-          <textarea id="htmlInput" placeholder="Paste full page HTML or body-only markup here…"></textarea>
-          <div class="toolbar">
-            <input id="fileInput" type="file" accept=".html,.htm,text/html"/>
-            <button id="pasteBtn">Paste from clipboard</button>
-            <span id="htmlInfo" class="muted"></span>
-            <span class="spacer"></span>
-            <button id="previewBtn">Preview</button>
-          </div>
-        </div>
-
-        <div class="row">
-          <div>
-            <label><input type="checkbox" id="publishNow"/> Publish immediately</label>
-            <div class="muted">If unchecked, saves as a draft version.</div>
-          </div>
-          <div>
-            <div class="muted">Target endpoint: <span class="pill">POST /api/seeds/&lt;seed_id&gt;/box</span></div>
-            <div class="muted">Viewer endpoint: <span class="pill">GET /api/seeds/&lt;seed_id&gt;/box</span></div>
-          </div>
-        </div>
-
         <div class="actions">
-          <button id="saveBtn">Save</button>
-          <span id="saveStatus" class="muted"></span>
+          <button id="genProtoBtn">Generate Prototype</button>
+          <span id="protoStatus" class="muted"></span>
+        </div>
+        <div id="protoWrap" hidden style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent);
+             border-radius:.6rem; padding:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); display:grid; gap:.5rem;">
+          <div id="protoCore" style="white-space:pre-wrap;"></div>
+          <div id="protoBuild" style="white-space:pre-wrap;"></div>
+          <div id="protoTest" style="white-space:pre-wrap;"></div>
+          <div id="protoEyes"></div>
+          <div id="protoWhy" style="white-space:pre-wrap;"></div>
         </div>
       </div>
     </section>
 
-    <!-- Right: Preview -->
-    <section class="card" aria-labelledby="h-preview">
-      <header><h2 id="h-preview">Preview</h2></header>
+    <!-- Deployment & Artifacts -->
+    <section class="card" aria-labelledby="h-artifacts">
+      <header><h2 id="h-artifacts">Deployment & Box-of-Dirt Artifacts</h2></header>
       <div class="body">
-        <iframe id="previewFrame" class="preview" title="Box of Dirt Preview" sandbox="allow-scripts"></iframe>
-        <div class="muted">Full pages are shown as-is. Body-only is wrapped in a minimal site style for preview.</div>
+        <div class="actions">
+          <button id="genArtifactsBtn">Generate Artifacts (Markdown)</button>
+          <span id="artifactsStatus" class="muted"></span>
+        </div>
+        <pre id="artifactsMd" class="codeblock" tabindex="0" style="min-height:180px;"></pre>
       </div>
     </section>
-
-      <section class="card" aria-labelledby="h-source">
-        <header><h2 id="h-source">Source (latest/draft)</h2></header>
-        <div class="body">
-          <div class="toolbar">
-            <button id="refreshSourceBtn">Refresh</button>
-            <button id="copySourceBtn">Copy</button>
-            <span id="sourceStatus" class="muted"></span>
-            <span class="spacer"></span>
-            <span id="sourceMeta" class="muted"></span>
-          </div>
-          <pre id="sourceCode" class="codeblock" tabindex="0"></pre>
-        </div>
-      </section>
-
-      <section class="card" aria-labelledby="h-bulk">
-        <header><h2 id="h-bulk">Bulk Random Publish</h2></header>
-        <div class="body">
-          <div class="row">
-            <div>
-              <label for="bulkCount">How many random seeds?</label>
-              <input id="bulkCount" type="number" min="1" step="1" placeholder="e.g., 10"/>
-            </div>
-            <div>
-              <label>&nbsp;</label>
-              <div class="actions">
-                <button id="runBulkBtn">Run in backend</button>
-                <span id="bulkStatus" class="muted"></span>
-              </div>
-            </div>
-          </div>
-          <div class="muted" id="bulkHint"></div>
-        </div>
-      </section>
-      
-      
   </main>
 
   <script>
@@ -264,214 +169,120 @@
       dimension: document.getElementById('dimensionSelect'),
       seed: document.getElementById('seedSelect'),
       seedIdInput: document.getElementById('seedIdInput'),
-      loadCurrentBtn: document.getElementById('loadCurrentBtn'),
       selStatus: document.getElementById('selStatus'),
 
-      title: document.getElementById('titleInput'),
-      docFormat: document.getElementById('docFormat'),
-      html: document.getElementById('htmlInput'),
-      fileInput: document.getElementById('fileInput'),
-      pasteBtn: document.getElementById('pasteBtn'),
-      previewBtn: document.getElementById('previewBtn'),
-      htmlInfo: document.getElementById('htmlInfo'),
-
-      publishNow: document.getElementById('publishNow'),
-      saveBtn: document.getElementById('saveBtn'),
-      saveStatus: document.getElementById('saveStatus'),
-
-      frame: document.getElementById('previewFrame'),
-
+      // Prototype
       genProtoBtn: document.getElementById('genProtoBtn'),
-    protoStatus: document.getElementById('protoStatus'),
-    protoWrap: document.getElementById('protoWrap'),
-    protoCore: document.getElementById('protoCore'),
-    protoBuild: document.getElementById('protoBuild'),
-    protoTest: document.getElementById('protoTest'),
-    protoEyes: document.getElementById('protoEyes'),
-    protoWhy: document.getElementById('protoWhy'),
+      protoStatus: document.getElementById('protoStatus'),
+      protoWrap: document.getElementById('protoWrap'),
+      protoCore: document.getElementById('protoCore'),
+      protoBuild: document.getElementById('protoBuild'),
+      protoTest: document.getElementById('protoTest'),
+      protoEyes: document.getElementById('protoEyes'),
+      protoWhy: document.getElementById('protoWhy'),
 
-    ctxDomainTitle: document.getElementById('ctxDomainTitle'),
-    ctxDimTitle: document.getElementById('ctxDimTitle'),
-    ctxDimDesc: document.getElementById('ctxDimDesc'),
-    ctxSeedA: document.getElementById('ctxSeedA'),
-    ctxSeedB: document.getElementById('ctxSeedB'),
-    ctxSeedL: document.getElementById('ctxSeedL'),
+      // Context
+      ctxDomainTitle: document.getElementById('ctxDomainTitle'),
+      ctxDimTitle: document.getElementById('ctxDimTitle'),
+      ctxDimDesc: document.getElementById('ctxDimDesc'),
+      ctxSeedA: document.getElementById('ctxSeedA'),
+      ctxSeedB: document.getElementById('ctxSeedB'),
+      ctxSeedL: document.getElementById('ctxSeedL'),
 
-    sourceCode: document.getElementById('sourceCode'),
-    copySourceBtn: document.getElementById('copySourceBtn'),
-    refreshSourceBtn: document.getElementById('refreshSourceBtn'),
-    sourceStatus: document.getElementById('sourceStatus'),
-    sourceMeta: document.getElementById('sourceMeta'),
-
-
+      // Artifacts
+      genArtifactsBtn: document.getElementById('genArtifactsBtn'),
+      artifactsStatus: document.getElementById('artifactsStatus'),
+      artifactsMd: document.getElementById('artifactsMd'),
     };
-
-    els.genArtifactsBtn = document.getElementById('genArtifactsBtn');
-    els.artifactsStatus = document.getElementById('artifactsStatus');
-    els.artifactsMd = document.getElementById('artifactsMd');
-    els.genArtifactsBtn.textContent = 'Generate Artifact HTML';
 
     const API = {
       narratives: '/api/narratives',
       dims: (nid) => `/api/narratives/${encodeURIComponent(nid)}/dimensions`,
       seeds: (did) => `/api/dimensions/${encodeURIComponent(did)}/seeds`,
-      getBox: (sid, draft) => `/api/seeds/${encodeURIComponent(sid)}/box${draft ? '?draft=1' : ''}`,
-      postBox: (sid) => `/api/seeds/${encodeURIComponent(sid)}/box`,
-      
     };
     API.generateBox = '/api/box-of-dirt';
     API.bodArtifacts = '/api/box-of-dirt/artifacts';
-    API.renderArtifact = '/api/render-artifact';
-
-    const runBulkBtn = document.getElementById('runBulkBtn');
-    const bulkCount  = document.getElementById('bulkCount');
-    const bulkStatus = document.getElementById('bulkStatus');
-    const bulkHint   = document.getElementById('bulkHint');
-
-    // Minimal site-styled CSS wrapper for body-only preview
-    const BODY_WRAPPER_STYLE = `
-      <style>
-        :root { color-scheme: light dark; }
-        body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1000px; }
-        h1 { font-size: 1.6rem; margin-bottom: .5rem; }
-        h2 { font-size: 1.2rem; margin: 1.2rem 0 .6rem; }
-        .grid { display: grid; gap: .8rem; }
-        .cols-2 { grid-template-columns: 1fr 1fr; }
-        .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-        @media (max-width: 800px){ .cols-2, .cols-3 { grid-template-columns: 1fr; } }
-        .placeholder { height: 120px; border: 1px dashed #c8c8c8; border-radius: .5rem; display: grid; place-items: center; color: #666; background: #fff; }
-        .card { border: 1px solid #d0d0d0; border-radius: .6rem; padding: .9rem 1rem; background: #fff; }
-        .card h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
-        .thesis { margin: .4rem 0 .3rem; font-style: italic; }
-        .muted { opacity: .7; font-size: .9rem; }
-        .list-compact li { margin:.25rem 0; }
-        .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
-      </style>
-    `;
 
     let cache = { narratives: [], dims: new Map(), seeds: new Map() };
 
-        // Helpers to normalize and compose payloads
+    // Helpers
     function stripHashId(name){
-    // turns "The Cost of Care (#2332)" → "The Cost of Care"
-    return String(name||'').replace(/\s*\(#\d+\)\s*$/, '');
+      return String(name||'').replace(/\s*\(#\d+\)\s*$/, '');
     }
     function composeSeedText(seedRow){
-    const A = seedRow?.problem ? `A (Problem): ${seedRow.problem}` : '';
-    const B = seedRow?.objective ? `B (Objective): ${seedRow.objective}` : '';
-    const L = seedRow?.solution ? `Solution (Link): ${seedRow.solution}` : '';
-    return [A,B,L].filter(Boolean).join('\n');
+      const A = seedRow?.problem ? `A (Problem): ${seedRow.problem}` : '';
+      const B = seedRow?.objective ? `B (Objective): ${seedRow.objective}` : '';
+      const L = seedRow?.solution ? `Solution (Link): ${seedRow.solution}` : '';
+      return [A,B,L].filter(Boolean).join('\n');
     }
     function composePrototypeText(p){
-    const lines = [];
-    if (p.core_intent) lines.push(`Core Intent — ${p.core_intent}`);
-    if (p.minimal_build) lines.push(`Minimal Build — ${p.minimal_build}`);
+      const lines = [];
+      if (p.core_intent) lines.push(`Core Intent — ${p.core_intent}`);
+      if (p.minimal_build) lines.push(`Minimal Build — ${p.minimal_build}`);
 
-    // Panels / Scenes (accept several possible shapes)
-    const panels = Array.isArray(p.panels) ? p.panels
-                : Array.isArray(p.scenes) ? p.scenes
-                : Array.isArray(p.storyboard) ? p.storyboard
-                : [];
-    panels.forEach((item, i) => {
+      const panels = Array.isArray(p.panels) ? p.panels
+                  : Array.isArray(p.scenes) ? p.scenes
+                  : Array.isArray(p.storyboard) ? p.storyboard
+                  : [];
+      panels.forEach((item, i) => {
         if (typeof item === 'string'){
-        lines.push(`Panel ${i+1} — ${item}`);
+          lines.push(`Panel ${i+1} — ${item}`);
         } else if (item && (item.title || item.heading)){
-        const title = item.title || item.heading || `Panel ${i+1}`;
-        lines.push(`Panel ${i+1} — ${title}`);
-        const bullets = Array.isArray(item.bullets) ? item.bullets
-                    : Array.isArray(item.points) ? item.points
-                    : [];
-        bullets.forEach(b => lines.push(`- ${b}`));
-        if (item.caption) lines.push(item.caption);
+          const title = item.title || item.heading || `Panel ${i+1}`;
+          lines.push(`Panel ${i+1} — ${title}`);
+          const bullets = Array.isArray(item.bullets) ? item.bullets
+                        : Array.isArray(item.points) ? item.points
+                        : [];
+          bullets.forEach(b => lines.push(`- ${b}`));
+          if (item.caption) lines.push(item.caption);
         }
-    });
+      });
 
-    if (p.load_bearing_test){
+      if (p.load_bearing_test){
         lines.push(`Load-Bearing Test — ${p.load_bearing_test}`);
-    }
-    if (p.validating_reactions){
-        // accept string or array
+      }
+      if (p.validating_reactions){
         if (Array.isArray(p.validating_reactions)){
-        lines.push('Validating reactions we want —');
-        p.validating_reactions.forEach(x => lines.push(`- ${x}`));
+          lines.push('Validating reactions we want —');
+          p.validating_reactions.forEach(x => lines.push(`- ${x}`));
         } else {
-        lines.push(`Validating reactions we want — ${p.validating_reactions}`);
+          lines.push(`Validating reactions we want — ${p.validating_reactions}`);
         }
-    }
-    if (p.red_flags){
+      }
+      if (p.red_flags){
         if (Array.isArray(p.red_flags)){
-        lines.push('Red flags (invalidate) —');
-        p.red_flags.forEach(x => lines.push(`- ${x}`));
+          lines.push('Red flags (invalidate) —');
+          p.red_flags.forEach(x => lines.push(`- ${x}`));
         } else {
-        lines.push(`Red flags (invalidate) — ${p.red_flags}`);
+          lines.push(`Red flags (invalidate) — ${p.red_flags}`);
         }
-    }
-    if (p.first_eyes){
+      }
+      if (p.first_eyes){
         if (Array.isArray(p.first_eyes)){
-        lines.push('First Eyes —');
-        p.first_eyes.forEach(x => lines.push(`- ${x}`));
+          lines.push('First Eyes —');
+          p.first_eyes.forEach(x => lines.push(`- ${x}`));
         } else {
-        lines.push(`First Eyes — ${p.first_eyes}`);
+          lines.push(`First Eyes — ${p.first_eyes}`);
         }
-    }
-    if (p.why_box_of_dirt) lines.push(`Why This is a Box of Dirt — ${p.why_box_of_dirt}`);
+      }
+      if (p.why_box_of_dirt) lines.push(`Why This is a Box of Dirt — ${p.why_box_of_dirt}`);
 
-    return lines.join('\n');
+      return lines.join('\n');
     }
-
     function setStatus(el, msg, ok){
       el.textContent = msg || '';
       el.classList.remove('ok','err');
       if (!msg) return;
       el.classList.add(ok ? 'ok' : 'err');
     }
-
-    // REPLACE your maybeDeepLink with this:
-    async function maybeDeepLink() {
-      const params = new URLSearchParams(location.search);
-      let nid = params.get('nid');
-      let did = params.get('did');
-      let sid = params.get('sid');
-
-      // If nid is missing but we have did or sid, try to resolve the hierarchy.
-      if (!nid && did) {
-        nid = await resolveNarrativeIdByDimensionId(did);
-      }
-      if ((!nid || !did) && sid) {
-        const found = await resolveDimensionAndNarrativeBySeedId(sid);
-        if (found) {
-          nid = nid || found.nid;
-          did = did || found.did;
-        }
-      }
-
-      // If we still don't know nid, bail gracefully.
-      if (!nid) return;
-
-      // Select domain (loads dimensions)
-      els.domain.value = String(nid);
-      await onDomainChange();
-
-      // Select dimension (loads seeds)
-      if (did) {
-        els.dimension.value = String(did);
-        await onDimensionChange();
-      }
-
-      // Select seed
-      if (sid) {
-        els.seed.value = String(sid);
-        els.seedIdInput.value = String(sid);
-      }
-
-      renderContext();
-      els.loadCurrentBtn.disabled = !currentSeedId();
+    async function fetchJSON(url){
+      const res = await fetch(url, { headers: { 'Accept':'application/json' }});
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
     }
 
-    // ADD these helpers anywhere near your other helpers:
-
+    // Deep-link helpers (kept; they no longer toggle load-current)
     async function resolveNarrativeIdByDimensionId(did) {
-      // Look through all narratives and fetch their dimensions until we find did.
       for (const n of (cache.narratives || [])) {
         try {
           let dims = cache.dims.get(String(n.id));
@@ -482,15 +293,11 @@
           if (Array.isArray(dims) && dims.some(d => String(d.id) === String(did))) {
             return String(n.id);
           }
-        } catch (e) {
-          // skip and continue
-        }
+        } catch (e) {}
       }
       return null;
     }
-
     async function resolveDimensionAndNarrativeBySeedId(sid) {
-      // Slow path: if only sid is given, search dims→seeds for a match.
       for (const n of (cache.narratives || [])) {
         let dims = cache.dims.get(String(n.id));
         if (!dims) {
@@ -506,92 +313,79 @@
             if (seeds.some(s => String(s.id) === String(sid))) {
               return { nid: String(n.id), did: String(d.id) };
             }
-          } catch (e) {
-            // continue
-          }
+          } catch (e) {}
         }
       }
       return null;
     }
+    async function maybeDeepLink() {
+      const params = new URLSearchParams(location.search);
+      let nid = params.get('nid');
+      let did = params.get('did');
+      let sid = params.get('sid');
 
+      if (!nid && did) nid = await resolveNarrativeIdByDimensionId(did);
+      if ((!nid || !did) && sid) {
+        const found = await resolveDimensionAndNarrativeBySeedId(sid);
+        if (found) { nid = nid || found.nid; did = did || found.did; }
+      }
+      if (!nid) return;
 
-
-    async function fetchJSON(url){
-      const res = await fetch(url, { headers: { 'Accept':'application/json' }});
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      els.domain.value = String(nid);
+      await onDomainChange();
+      if (did) {
+        els.dimension.value = String(did);
+        await onDimensionChange();
+      }
+      if (sid) {
+        els.seed.value = String(sid);
+        els.seedIdInput.value = String(sid);
+      }
+      renderContext();
     }
 
-    // --- Load narratives/dimensions/seeds ---
+    // Load data
     async function loadNarratives(){
       try{
         const rows = await fetchJSON(API.narratives);
         cache.narratives = rows;
-        els.domain.innerHTML = `<option value=\"\">Select…</option>` + rows.map(r => `<option value=\"${r.id}\">${escapeHTML(r.title)} (#${r.id})</option>`).join('');
+        els.domain.innerHTML = `<option value="">Select…</option>` +
+          rows.map(r => `<option value="${r.id}">${escapeHTML(r.title)} (#${r.id})</option>`).join('');
       }catch(e){
-        els.domain.innerHTML = `<option value=\"\">Failed to load narratives</option>`;
+        els.domain.innerHTML = `<option value="">Failed to load narratives</option>`;
       }
     }
-
-    async function startBulkJob(){
-      const n = Number(bulkCount.value || 0);
-      if (!Number.isInteger(n) || n <= 0){
-        bulkStatus.textContent = 'Enter a positive integer.'; 
-        bulkStatus.classList.add('err');
-        return;
-      }
-      bulkStatus.textContent = 'Starting…';
-      bulkStatus.classList.remove('err');
-
-      try{
-        const res = await fetch('/api/box-of-dirt/bulk', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json','Accept':'application/json'},
-          body: JSON.stringify({ n })
-        });
-        if(!res.ok){
-          const t = await res.text().catch(()=> '');
-          throw new Error(`HTTP ${res.status} ${t}`);
-        }
-        const out = await res.json();
-        bulkStatus.textContent = `Job started: ${out.job_id}`;
-        bulkHint.textContent = `You can close this page. Check status at GET /api/box-of-dirt/bulk/${out.job_id}`;
-      }catch(e){
-        bulkStatus.textContent = e.message;
-        bulkStatus.classList.add('err');
-      }
-    }
-
-
     async function onDomainChange(){
       const nid = els.domain.value;
       els.dimension.disabled = !nid;
       els.seed.disabled = true;
-      els.dimension.innerHTML = `<option value=\"\">${nid ? 'Loading…' : 'Select a domain'}</option>`;
-      els.seed.innerHTML = `<option value=\"\">Select a dimension</option>`;
+      els.dimension.innerHTML = `<option value="">${nid ? 'Loading…' : 'Select a domain'}</option>`;
+      els.seed.innerHTML = `<option value="">Select a dimension</option>`;
       if (!nid) return;
       try{
         const dims = await fetchJSON(API.dims(nid));
         cache.dims.set(nid, dims);
-        els.dimension.innerHTML = `<option value=\"\">Select…</option>` + dims.map(d => `<option value=\"${d.id}\">${escapeHTML(d.title)} (#${d.id})</option>`).join('');
+        els.dimension.innerHTML = `<option value="">Select…</option>` +
+          dims.map(d => `<option value="${d.id}">${escapeHTML(d.title)} (#${d.id})</option>`).join('');
         renderContext();
       }catch(e){
-        els.dimension.innerHTML = `<option value=\"\">Failed to load dimensions</option>`;
+        els.dimension.innerHTML = `<option value="">Failed to load dimensions</option>`;
       }
     }
     async function onDimensionChange(){
       const did = els.dimension.value;
       els.seed.disabled = !did;
-      els.seed.innerHTML = `<option value=\"\">${did ? 'Loading…' : 'Select a dimension'}</option>`;
+      els.seed.innerHTML = `<option value="">${did ? 'Loading…' : 'Select a dimension'}</option>`;
       if (!did) return;
       try{
         const payload = await fetchJSON(API.seeds(did));
         const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
         cache.seeds.set(did, seeds);
-        els.seed.innerHTML = `<option value=\"\">Select…</option>` + seeds.map(s => `<option value=\"${s.id}\">${escapeHTML((s.problem||'Seed'))} (#${s.id})</option>`).join('');
+        els.seed.innerHTML = `<option value="">Select…</option>` +
+          seeds.map(s => `<option value="${s.id}">${escapeHTML((s.problem||'Seed'))} (#${s.id})</option>`).join('');
         renderContext();
       }catch(e){
-        els.seed.innerHTML = `<option value=\"\">Failed to load seeds</option>`;
+        els.seed.innerHTML = `<option value="">Failed to load seeds</option>`;
       }
     }
     function currentSeedId(){
@@ -600,440 +394,191 @@
       return fromSelect || fromInput || null;
     }
 
-    // --- Load current box (latest; prefers draft if exists) ---
-    async function loadCurrent(){
-      const sid = currentSeedId();
-      if (!sid){ setStatus(els.selStatus, 'Provide a Seed ID', false); return; }
-      setStatus(els.selStatus, 'Loading current box…', false);
-      try{
-        // Prefer latest (draft or published)
-        const data = await fetchJSON(API.getBox(sid, /*draft*/true));
-        setStatus(els.selStatus, `Loaded v${data.version} • ${data.is_published ? 'published' : 'draft'}`, true);
-        els.title.value = data.title || '';
-        // Decide format
-        const isFull = (data.doc_format === 'full') || /<!DOCTYPE|<html[^>]*>/i.test(data.html||'');
-        els.docFormat.value = isFull ? 'full' : 'body';
-        els.html.value = data.html || '';
-        els.sourceCode.textContent = data.html || '';
-        els.sourceMeta.textContent = `v${data.version} • ${data.is_published ? 'published' : 'draft'} • ${data.doc_format || 'full'}`;
-        setStatus(els.sourceStatus, 'OK', true);
-        updateHtmlInfo();
-        renderPreview();
-      }catch(e){
-        setStatus(els.selStatus, 'No artifact found (ok for new)', false);
-      }
-    }
-
-    // --- Save (draft or publish) ---
-    async function save(publish){
-      const sid = currentSeedId();
-      if (!sid){ setStatus(els.saveStatus, 'Provide a Seed ID', false); return; }
-      const html = (els.html.value || '').trim();
-      if (!html){ setStatus(els.saveStatus, 'HTML is required', false); return; }
-
-      // resolve doc_format
-      let fmt = els.docFormat.value;
-      if (fmt === 'auto'){
-        fmt = /<!DOCTYPE|<html[^>]*>/i.test(html) ? 'full' : 'body';
-      }
-      const body = {
-        html,
-        title: (els.title.value||'').trim() || null,
-        doc_format: fmt,
-        publish: !!publish
-      };
-
-      els.saveBtn.disabled = true;
-      setStatus(els.saveStatus, 'Saving…', false);
-      try{
-        const res = await fetch(API.postBox(sid), {
-          method:'POST',
-          headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
-          body: JSON.stringify(body)
-        });
-        if (!res.ok){
-          const txt = await res.text().catch(()=> '');
-          throw new Error(`HTTP ${res.status} ${txt}`);
-        }
-        const data = await res.json();
-        setStatus(els.saveStatus, `Saved v${data.version} • ${data.is_published ? 'published' : 'draft'}`, true);
-        // refresh preview (uses current textarea)
-        renderPreview();
-      }catch(e){
-        setStatus(els.saveStatus, e.message, false);
-      }finally{
-        els.saveBtn.disabled = false;
-      }
-    }
-
-    // --- Prototype generation (moved here from viewer) ---
+    // Prototype generation (no longer injects HTML editor/preview)
     async function generatePrototypeAndBuild(){
-  const nid = els.domain.value;
-  const did = els.dimension.value;
-  const sid = els.seed.value;
+      const nid = els.domain.value;
+      const did = els.dimension.value;
+      const sid = els.seed.value;
 
-  const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
-  const dims = cache.dims.get(nid) || [];
-  const dimRow = dims.find(d => String(d.id) === String(did));
-  const seeds = cache.seeds.get(did) || [];
-  const seedRow = seeds.find(s => String(s.id) === String(sid));
+      const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+      const dims = cache.dims.get(nid) || [];
+      const dimRow = dims.find(d => String(d.id) === String(did));
+      const seeds = cache.seeds.get(did) || [];
+      const seedRow = seeds.find(s => String(s.id) === String(sid));
 
-  const errs = [];
-  if (!domainRow) errs.push('domain');
-  if (!dimRow) errs.push('dimension');
-  if (!seedRow) errs.push('seed');
-  if (errs.length){
-    els.protoStatus.textContent = `Select a ${errs.join(', ')} first.`;
-    els.protoWrap.hidden = true;
-    return;
-  }
+      const errs = [];
+      if (!domainRow) errs.push('domain');
+      if (!dimRow) errs.push('dimension');
+      if (!seedRow) errs.push('seed');
+      if (errs.length){
+        els.protoStatus.textContent = `Select a ${errs.join(', ')} first.`;
+        els.protoWrap.hidden = true;
+        return;
+      }
 
-  // 1) Generate Prototype JSON
-  els.genProtoBtn.disabled = true;
-  els.protoStatus.textContent = 'Generating…';
-  els.protoWrap.hidden = true;
+      els.genProtoBtn.disabled = true;
+      els.protoStatus.textContent = 'Generating…';
+      els.protoWrap.hidden = true;
 
-  try{
-    const protoRes = await fetch('/api/narrative-prototype', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
-      body: JSON.stringify({
-        domain: stripHashId(domainRow.title || `Narrative ${domainRow.id}`),
-        dimension: stripHashId(dimRow.title || `Dimension ${dimRow.id}`),
-        seed: {
-          problem: seedRow.problem || '',
-          objective: seedRow.objective || '',
-          solution: seedRow.solution || ''
+      try{
+        const protoRes = await fetch('/api/narrative-prototype', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+          body: JSON.stringify({
+            domain: stripHashId(domainRow.title || `Narrative ${domainRow.id}`),
+            dimension: stripHashId(dimRow.title || `Dimension ${dimRow.id}`),
+            seed: {
+              problem: seedRow.problem || '',
+              objective: seedRow.objective || '',
+              solution: seedRow.solution || ''
+            }
+          })
+        });
+        if (!protoRes.ok) throw new Error(`HTTP ${protoRes.status}`);
+        const out = await protoRes.json();
+        const p = out.prototype || out;
+
+        // Render summary
+        els.protoCore.innerText  = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
+        els.protoBuild.innerText = p.minimal_build ? `Minimal Build — ${p.minimal_build}` : '';
+        els.protoTest.innerText  = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
+        if (Array.isArray(p.first_eyes)) {
+          els.protoEyes.innerHTML = `<div style="font-weight:600;">First Eyes —</div>` +
+            `<ul style="margin:.25rem 0 .5rem .95rem; padding:0;">` +
+            p.first_eyes.map(x => `<li>${String(x)}</li>`).join('') + `</ul>`;
+        } else {
+          els.protoEyes.textContent = p.first_eyes ? `First Eyes — ${p.first_eyes}` : '';
         }
-      })
-    });
-    if (!protoRes.ok) throw new Error(`HTTP ${protoRes.status}`);
-    const out = await protoRes.json();
-    const p = out.prototype || out;
+        els.protoWhy.innerText = p.why_box_of_dirt ? `Why This is a Box of Dirt — ${p.why_box_of_dirt}` : '';
+        els.protoWrap.hidden = false;
+        els.protoStatus.textContent = '';
 
-    // Render the summary box as before
-    els.protoCore.innerText  = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
-    els.protoBuild.innerText = p.minimal_build ? `Minimal Build — ${p.minimal_build}` : '';
-    els.protoTest.innerText  = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
-    if (Array.isArray(p.first_eyes)) {
-      els.protoEyes.innerHTML = `<div style="font-weight:600;">First Eyes —</div>` +
-        `<ul style="margin:.25rem 0 .5rem .95rem; padding:0;">` +
-        p.first_eyes.map(x => `<li>${String(x)}</li>`).join('') + `</ul>`;
-    } else {
-      els.protoEyes.textContent = p.first_eyes ? `First Eyes — ${p.first_eyes}` : '';
-    }
-    els.protoWhy.innerText = p.why_box_of_dirt ? `Why This is a Box of Dirt — ${p.why_box_of_dirt}` : '';
-    els.protoWrap.hidden = false;
-    els.protoStatus.textContent = '';
+        // Compose inputs for optional downstream generation (no injection)
+        const domainName = stripHashId(domainRow.title || '');
+        const dimensionName = stripHashId(dimRow.title || '');
+        const thesis = dimRow?.description ? String(dimRow.description) : null;
+        const seedText = composeSeedText(seedRow);
+        const prototypeText = composePrototypeText(p);
 
-    // 2) Compose the INPUTs for the Box-of-Dirt HTML endpoint
-    const domainName = stripHashId(domainRow.title || '');
-    const dimensionName = stripHashId(dimRow.title || '');
-    const thesis = dimRow?.description ? String(dimRow.description) : null;
-
-    const seedText = composeSeedText(seedRow);
-    const prototypeText = composePrototypeText(p);
-
-    // 3) Call your /generate/box-of-dirt (returns RAW HTML)
-    const bodRes = await fetch(API.generateBox, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json', 'Accept':'text/html' },
-      body: JSON.stringify({
-        domain: domainName,
-        dimension: dimensionName,
-        thesis: thesis,
-        seed: seedText,
-        prototype: prototypeText
-      })
-    });
-    if (!bodRes.ok){
-      const t = await bodRes.text().catch(()=> '');
-      throw new Error(`Box-of-Dirt generation failed: HTTP ${bodRes.status} ${t}`);
-    }
-    const html = await bodRes.text();
-
-    // 4) Inject into editor + preview
-    els.html.value = html;
-    els.docFormat.value = 'full';
-    updateHtmlInfo();
-    renderPreview();
-    setStatus(els.selStatus, 'Generated Box of Dirt HTML from Prototype', true);
-
-  }catch(e){
-    els.protoStatus.textContent = 'Error: ' + e.message;
-    els.protoWrap.hidden = true;
-  }finally{
-    els.genProtoBtn.disabled = false;
-  }
-}
-
-async function generateArtifactsAndPage() {
-  const nid = els.domain.value;
-  const did = els.dimension.value;
-  const sid = els.seed.value || els.seedIdInput.value;
-
-  const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
-  const dims      = cache.dims.get(nid) || [];
-  const dimRow    = dims.find(d => String(d.id) === String(did));
-  const seeds     = cache.seeds.get(did) || [];
-  const seedRow   = seeds.find(s => String(s.id) === String(sid));
-
-  const missing = [];
-  if (!domainRow) missing.push("domain");
-  if (!dimRow) missing.push("dimension");
-  if (!seedRow) missing.push("seed");
-  if (missing.length) {
-    els.artifactsStatus.textContent = `Select a ${missing.join(", ")} first.`;
-    els.artifactsStatus.classList.remove('ok'); els.artifactsStatus.classList.add('err');
-    return;
-  }
-
-  const domain    = stripHashId(domainRow.title || '');
-  const dimension = stripHashId(dimRow.title || '');
-  const seedThree = composeSeedText(seedRow);
-
-  els.artifactsStatus.textContent = 'Generating artifacts…';
-  els.artifactsMd.textContent = '';
-  els.genArtifactsBtn.disabled = true;
-
-  try {
-    // Step 1: Generate artifacts (Markdown)
-    const artRes = await fetch(API.bodArtifacts, {
-      method:'POST',
-      headers:{'Content-Type':'application/json', 'Accept':'text/markdown'},
-      body: JSON.stringify({ domain, dimension, seed: seedThree })
-    });
-    if (!artRes.ok) throw new Error(`Artifacts HTTP ${artRes.status}`);
-    const md = await artRes.text();
-    els.artifactsMd.textContent = md;
-
-    // Step 2: Build YAML payload for render-artifact, include Markdown as hint
-    const artifact_yaml = [
-      'domain:',
-      `  label: "${domain}"`,
-      `  id: "#${domainRow.id}"`,
-      'dimension:',
-      `  label: "${dimension}"`,
-      `  id: "#${dimRow.id}"`,
-      `thesis: "${(dimRow.description||'').replace(/"/g,'\\"')}"`,
-      'seed:',
-      `  problem: "${(seedRow.problem||'').replace(/"/g,'\\"')}"`,
-      `  objective: "${(seedRow.objective||'').replace(/"/g,'\\"')}"`,
-      `  solution_link: "${(seedRow.solution||'').replace(/"/g,'\\"')}"`,
-      `  scope_note: ""`,
-      'real_artifacts: []',
-      'box_of_dirt: []',
-      'safety_guardrails: |',
-      '  Standard research ethics, data-licensing, and permitting apply.',
-      `next_steps_title: "3 Next steps (48–72 hours)"`,
-      'next_steps: []',
-      'page_meta:',
-      `  page_title: "Fantasiagenesis — ${dimension}"`,
-      `  header_title: "${dimension}"`,
-      `  header_pill: "${domain} • Seed"`,
-      `  footer_seed_id: "seed:${sid}"`,
-      'artifacts_markdown: |',
-      ...md.split('\n').map(line=>'  '+line)
-    ].join('\n');
-
-    // Step 3: Render HTML page
-    els.artifactsStatus.textContent = 'Generating HTML page…';
-    const pageRes = await fetch(API.renderArtifact, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
-        body: JSON.stringify({ artifact_yaml, artifacts_markdown: md })
-    });
-    if (!pageRes.ok) throw new Error(`Render HTTP ${pageRes.status}`);
-    const out = await pageRes.json();
-    const html = out.html || '';
-    if (!html.trim()) throw new Error('Empty HTML');
-
-    // Step 4: Inject HTML into editor + preview
-    els.html.value = html;
-    els.docFormat.value = 'full';
-    updateHtmlInfo();
-    renderPreview();
-
-    els.artifactsStatus.textContent = 'OK — artifacts + HTML generated';
-    els.artifactsStatus.classList.add('ok');
-  } catch(e) {
-    els.artifactsStatus.textContent = 'Error: '+e.message;
-    els.artifactsStatus.classList.remove('ok'); els.artifactsStatus.classList.add('err');
-  } finally {
-    els.genArtifactsBtn.disabled = false;
-  }
-}
-
-
-async function loadSource(draft=true){
-  const sid = currentSeedId();
-  if (!sid){
-    setStatus(els.sourceStatus, 'Provide a Seed ID', false);
-    els.sourceCode.textContent = '';
-    els.sourceMeta.textContent = '';
-    return;
-  }
-  setStatus(els.sourceStatus, 'Loading source…', false);
-  try{
-    const data = await fetchJSON(API.getBox(sid, draft));
-    // Display raw HTML as text, not rendered
-    els.sourceCode.textContent = data.html || '';
-    els.sourceMeta.textContent = `v${data.version} • ${data.is_published ? 'published' : 'draft'} • ${data.doc_format || 'full'}`;
-    setStatus(els.sourceStatus, 'OK', true);
-  }catch(e){
-    els.sourceCode.textContent = '';
-    els.sourceMeta.textContent = '';
-    setStatus(els.sourceStatus, 'No artifact found', false);
-  }
-}
-
-async function copySource(){
-  try{
-    const txt = els.sourceCode.textContent || '';
-    if (!txt){ throw new Error('Nothing to copy'); }
-    await navigator.clipboard.writeText(txt);
-    setStatus(els.sourceStatus, 'Copied', true);
-  }catch(e){
-    setStatus(els.sourceStatus, e.message, false);
-  }
-}
-
-
-function renderContext(){
-  // Domain
-  const nid = els.domain.value;
-  const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
-  els.ctxDomainTitle.textContent = domainRow ? `${domainRow.title} (#${domainRow.id})` : '—';
-
-  // Dimension
-  const did = els.dimension.value;
-  const dims = cache.dims.get(nid) || [];
-  const dimRow = dims.find(d => String(d.id) === String(did));
-  els.ctxDimTitle.textContent = dimRow ? `${dimRow.title} (#${dimRow.id})` : '—';
-  els.ctxDimDesc.textContent = dimRow?.description ? String(dimRow.description) : '';
-
-  // Seed
-  const sid = els.seed.value;
-  const seeds = cache.seeds.get(did) || [];
-  const seedRow = seeds.find(s => String(s.id) === String(sid));
-
-  const A = seedRow?.problem || '';
-  const B = seedRow?.objective || '';
-  const L = seedRow?.solution || '';
-
-  els.ctxSeedA.textContent = A ? `A (Problem): ${A}` : '';
-  els.ctxSeedB.textContent = B ? `B (Objective): ${B}` : '';
-  els.ctxSeedL.textContent = L ? `Solution (Link): ${L}` : '';
-}
-
-
-
-    // --- Preview in iframe ---
-    function renderPreview(){
-      const html = els.html.value || '';
-      const fmtSel = els.docFormat.value;
-      const isFull = fmtSel === 'full' || (fmtSel === 'auto' && /<!DOCTYPE|<html[^>]*>/i.test(html));
-
-      if (isFull){
-        els.frame.srcdoc = html;
-      }else{
-        // Wrap body-only with a simple site style so layout looks right
-        const wrapped = `<!DOCTYPE html><html><head><meta charset="utf-8"/>${BODY_WRAPPER_STYLE}</head><body>${html}</body></html>`;
-        els.frame.srcdoc = wrapped;
+        // If you still want raw HTML from backend, you could call API.generateBox here,
+        // but we no longer inject it anywhere on this page.
+        /* Example (commented):
+        await fetch(API.generateBox, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Accept':'text/html' },
+          body: JSON.stringify({ domain: domainName, dimension: dimensionName, thesis, seed: seedText, prototype: prototypeText })
+        });
+        */
+      }catch(e){
+        els.protoStatus.textContent = 'Error: ' + e.message;
+        els.protoWrap.hidden = true;
+      }finally{
+        els.genProtoBtn.disabled = false;
       }
     }
 
-    // --- Utilities ---
-    function escapeHTML(s){
-        return String(s).replace(/[&<>"']/g, c => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[c]));
-        }
-    function updateHtmlInfo(){
-      const val = els.html.value || '';
-      const bytes = new Blob([val]).size;
-      const kb = (bytes/1024).toFixed(1);
-      const looksFull = /<!DOCTYPE|<html[^>]*>/i.test(val);
-      els.htmlInfo.textContent = `${kb} KB • ${looksFull ? 'full HTML' : 'body-only (likely)'}`;
+    async function generateArtifactsAndPage() {
+      const nid = els.domain.value;
+      const did = els.dimension.value;
+      const sid = els.seed.value || els.seedIdInput.value;
+
+      const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+      const dims      = cache.dims.get(nid) || [];
+      const dimRow    = dims.find(d => String(d.id) === String(did));
+      const seeds     = cache.seeds.get(did) || [];
+      const seedRow   = seeds.find(s => String(s.id) === String(sid));
+
+      const missing = [];
+      if (!domainRow) missing.push("domain");
+      if (!dimRow) missing.push("dimension");
+      if (!seedRow) missing.push("seed");
+      if (missing.length) {
+        els.artifactsStatus.textContent = `Select a ${missing.join(", ")} first.`;
+        els.artifactsStatus.classList.remove('ok'); els.artifactsStatus.classList.add('err');
+        return;
+      }
+
+      const domain    = stripHashId(domainRow.title || '');
+      const dimension = stripHashId(dimRow.title || '');
+      const seedThree = composeSeedText(seedRow);
+
+      els.artifactsStatus.textContent = 'Generating artifacts…';
+      els.artifactsMd.textContent = '';
+      els.genArtifactsBtn.disabled = true;
+
+      try {
+        // Generate artifacts (Markdown) only
+        const artRes = await fetch(API.bodArtifacts, {
+          method:'POST',
+          headers:{'Content-Type':'application/json', 'Accept':'text/markdown'},
+          body: JSON.stringify({ domain, dimension, seed: seedThree })
+        });
+        if (!artRes.ok) throw new Error(`Artifacts HTTP ${artRes.status}`);
+        const md = await artRes.text();
+        els.artifactsMd.textContent = md;
+
+        els.artifactsStatus.textContent = 'OK — artifacts generated';
+        els.artifactsStatus.classList.add('ok');
+      } catch(e) {
+        els.artifactsStatus.textContent = 'Error: '+e.message;
+        els.artifactsStatus.classList.remove('ok'); els.artifactsStatus.classList.add('err');
+      } finally {
+        els.genArtifactsBtn.disabled = false;
+      }
     }
 
-    // --- wiring ---
+    function renderContext(){
+      const nid = els.domain.value;
+      const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+      els.ctxDomainTitle.textContent = domainRow ? `${domainRow.title} (#${domainRow.id})` : '—';
+
+      const did = els.dimension.value;
+      const dims = cache.dims.get(nid) || [];
+      const dimRow = dims.find(d => String(d.id) === String(did));
+      els.ctxDimTitle.textContent = dimRow ? `${dimRow.title} (#${dimRow.id})` : '—';
+      els.ctxDimDesc.textContent = dimRow?.description ? String(dimRow.description) : '';
+
+      const sid = els.seed.value;
+      const seeds = cache.seeds.get(did) || [];
+      const seedRow = seeds.find(s => String(s.id) === String(sid));
+
+      const A = seedRow?.problem || '';
+      const B = seedRow?.objective || '';
+      const L = seedRow?.solution || '';
+
+      els.ctxSeedA.textContent = A ? `A (Problem): ${A}` : '';
+      els.ctxSeedB.textContent = B ? `B (Objective): ${B}` : '';
+      els.ctxSeedL.textContent = L ? `Solution (Link): ${L}` : '';
+    }
+
+    function escapeHTML(s){
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[c]));
+    }
+
+    // Wiring
     els.domain.addEventListener('change', onDomainChange);
     els.dimension.addEventListener('change', onDimensionChange);
-    els.seed.addEventListener('change', ()=> {
+    els.seed.addEventListener('change', ()=>{
       setStatus(els.selStatus, '', false);
-      // mirror selected id to numeric field for clarity
       els.seedIdInput.value = els.seed.value || '';
+      renderContext();
     });
-    els.seedIdInput.addEventListener('input', ()=> setStatus(els.selStatus, '', false));
-    els.loadCurrentBtn.addEventListener('click', loadCurrent);
-    els.previewBtn.addEventListener('click', renderPreview);
-    els.html.addEventListener('input', updateHtmlInfo);
-    els.fileInput.addEventListener('change', async (e)=>{
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      const txt = await f.text();
-      els.html.value = txt;
-      updateHtmlInfo();
-      renderPreview();
+    els.seedIdInput.addEventListener('input', ()=>{
+      setStatus(els.selStatus, '', false);
+      renderContext();
     });
-    els.pasteBtn.addEventListener('click', async ()=>{
-      try{
-        const txt = await navigator.clipboard.readText();
-        els.html.value = txt;
-        updateHtmlInfo();
-        renderPreview();
-      }catch(e){
-        alert('Clipboard read failed.');
-      }
-    });
-
-    els.publishNow.addEventListener('change', ()=> {/* noop, read at save time */});
-    els.saveBtn.addEventListener('click', ()=> save(/*publish*/ els.publishNow.checked));
     els.genProtoBtn.addEventListener('click', generatePrototypeAndBuild);
     els.genArtifactsBtn.addEventListener('click', generateArtifactsAndPage);
 
-    if (runBulkBtn) runBulkBtn.addEventListener('click', startBulkJob);
-
-    els.seed.addEventListener('change', ()=>{
-    setStatus(els.selStatus, '', false);
-    els.seedIdInput.value = els.seed.value || '';
-    renderContext();
-    });
-
-    els.seedIdInput.addEventListener('input', ()=>{
-    setStatus(els.selStatus, '', false);
-    // This input alone cannot resolve A/B/Link unless the seed is also in the dropdown.
-    renderContext();
-    });
-
-    els.copySourceBtn.addEventListener('click', copySource);
-    els.refreshSourceBtn.addEventListener('click', ()=> loadSource(false));
-
-    // When seed dropdown changes, clear the source (or auto-load if you prefer)
-    els.seed.addEventListener('change', ()=>{
-    // ... you already mirror the id/etc
-    els.sourceCode.textContent = '';
-    els.sourceMeta.textContent = '';
-    setStatus(els.sourceStatus, '', false);
-    });
-
-    // Enable/disable "Load current" based on seed id presence
-    const seedPresenceWatcher = () => {
-      const sid = currentSeedId();
-      els.loadCurrentBtn.disabled = !sid;
-    };
-    setInterval(seedPresenceWatcher, 400);
-
     // Boot
     loadNarratives().then(maybeDeepLink);
-    updateHtmlInfo();
-    renderPreview();
-    renderContext(); // new
+    renderContext();
   })();
   </script>
 </body>
