@@ -265,15 +265,6 @@
           <h3 id="nextStepsTitle">Next steps (48–72 hours)</h3>
           <div class="box-scroll" id="nextStepsBox"><!-- filled by JS --></div>
         </div>
-
-        <!-- Debug panel (when ok === false or error present) -->
-        <div id="artifactsDebug" hidden class="box-section" style="margin-top:.6rem;">
-          <h3>Debug Output</h3>
-          <div class="box-scroll">
-            <div id="artifactsDebugNote" class="muted" style="margin-bottom:.35rem;"></div>
-            <pre id="artifactsDebugRaw" class="codeblock" tabindex="0" style="max-height:220px;"></pre>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -424,9 +415,6 @@
       guardrailsBox: document.getElementById('guardrailsBox'),
       nextStepsTitle: document.getElementById('nextStepsTitle'),
       nextStepsBox: document.getElementById('nextStepsBox'),
-      artifactsDebug: document.getElementById('artifactsDebug'),
-      artifactsDebugNote: document.getElementById('artifactsDebugNote'),
-      artifactsDebugRaw: document.getElementById('artifactsDebugRaw'),
 
       // Validation
       valStatus: document.getElementById('valStatus'),
@@ -1063,7 +1051,6 @@
       clearHTML(els.bodItemsBox);
       clearHTML(els.guardrailsBox);
       clearHTML(els.nextStepsBox);
-      if (els.artifactsDebug) els.artifactsDebug.hidden = true;
       els.genArtifactsBtn.disabled = true;
 
       try{
@@ -1090,31 +1077,16 @@
         if (!res.ok){
           const msg = data?.error || `HTTP ${res.status}`;
           setStatus(els.artifactsStatus, msg, false);
-          if (els.artifactsDebug){
-            els.artifactsDebugNote.textContent = data?.detail ? String(data.detail) : '—';
-            els.artifactsDebugRaw.textContent = text || '';
-            els.artifactsDebug.hidden = false;
-          }
           return;
         }
 
         if (data?.error){
           setStatus(els.artifactsStatus, data.error, false);
-          if (els.artifactsDebug){
-            els.artifactsDebugNote.textContent = data.detail ? String(data.detail) : '—';
-            els.artifactsDebugRaw.textContent = text || '';
-            els.artifactsDebug.hidden = false;
-          }
           return;
         }
 
         if (data?.ok === false){
           setStatus(els.artifactsStatus, 'Model output could not be parsed (showing raw).', false);
-          if (els.artifactsDebug){
-            els.artifactsDebugNote.textContent = data?.note || '—';
-            els.artifactsDebugRaw.textContent = data?.raw || text || '';
-            els.artifactsDebug.hidden = true; // you can set to false if you want to show the raw panel
-          }
           return;
         }
 
@@ -1330,45 +1302,52 @@
 
     function renderRisks(payload){
       const v = payload?.assessment || payload?.risks || payload;
-      // Failures
-      const failBox = els.riskFailures;
-      if (failBox){
-        const failures = Array.isArray(v?.failures) ? v.failures : [];
-        failBox.innerHTML = failures.length ? failures.map(f=>{
+      const failures = Array.isArray(v?.failures) ? v.failures : [];
+
+      // Failures + their monitoring
+      if (els.riskFailures){
+        els.riskFailures.innerHTML = failures.length ? failures.map(f=>{
           const name = `<div style="font-weight:650;">${escapeHTML(f.name||'')}</div>`;
           const mk = (label, arr) => (Array.isArray(arr)&&arr.length)
             ? `<div><strong>${label}:</strong><ul>${arr.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ul></div>` : '';
           const impact = f.impact ? `<div><strong>Impact:</strong> ${escapeHTML(f.impact)}</div>` : '';
           const counters = mk('Countermeasures', f.countermeasures);
           const symptoms = mk('Symptoms', f.symptoms);
-          return `<div style="margin:.6rem 0;">${name}${impact}${symptoms}${counters}</div>`;
+
+          // Monitoring per failure
+          const m = f.monitoring || {};
+          const metrics = Array.isArray(m.metrics) ? m.metrics : [];
+          const actions = Array.isArray(m.triggered_actions) ? m.triggered_actions : [];
+          const metricsHTML = metrics.length ? `<div style="margin-top:.4rem;"><strong>Metrics:</strong><ul>${
+            metrics.map(x=>{
+              const line = `<strong>${escapeHTML(x.metric||'')}</strong>`;
+              const why  = x.rationale ? ` — <span class="muted">${escapeHTML(x.rationale)}</span>` : '';
+              const thr  = (x.yellow||x.red)
+                ? `<div class="box-kv">Thresholds: yellow=${escapeHTML(String(x.yellow||''))}, red=${escapeHTML(String(x.red||''))}</div>` : '';
+              return `<li>${line}${why}${thr}</li>`;
+            }).join('')
+          }</ul></div>` : '';
+
+          const actionsHTML = actions.length ? `<div style="margin-top:.3rem;"><strong>Triggered Actions:</strong><ul>${
+            actions.map(a=>{
+              const t = `<strong>${escapeHTML(a.action||'')}</strong>`;
+              const owner = a.owner ? ` — <span class="muted">owner: ${escapeHTML(a.owner)}</span>` : '';
+              const notes = a.notes ? `<div class="box-kv">${escapeHTML(a.notes)}</div>` : '';
+              return `<li>${t}${owner}${notes}</li>`;
+            }).join('')
+          }</ul></div>` : '';
+
+          return `<div style="margin:.6rem 0;">
+            ${name}${impact}${symptoms}${counters}
+            ${metricsHTML}${actionsHTML}
+          </div>`;
         }).join('') : '<div class="muted">No failures</div>';
       }
-      // Monitoring
-      const monBox = els.riskMonitoring;
-      if (monBox){
-        const m = v?.monitoring || {};
-        const metrics = Array.isArray(m.metrics) ? m.metrics : [];
-        const actions = Array.isArray(m.triggered_actions) ? m.triggered_actions : [];
-        const metricsHTML = metrics.length ? `<div><strong>Metrics:</strong><ul>${
-          metrics.map(x=>{
-            const line = `<strong>${escapeHTML(x.metric||'')}</strong>`;
-            const why  = x.rationale ? ` — <span class="muted">${escapeHTML(x.rationale)}</span>` : '';
-            const thr  = (x.yellow||x.red) ? `<div class="box-kv">Thresholds: yellow=${escapeHTML(String(x.yellow||''))}, red=${escapeHTML(String(x.red||''))}</div>` : '';
-            return `<li>${line}${why}${thr}</li>`;
-          }).join('')}
-        </ul></div>` : '<div class="muted">No metrics</div>';
-        const actionsHTML = actions.length ? `<div style="margin-top:.4rem;"><strong>Triggered Actions:</strong><ul>${
-          actions.map(a=>{
-            const t = `<strong>${escapeHTML(a.action||'')}</strong>`;
-            const owner = a.owner ? ` — <span class="muted">owner: ${escapeHTML(a.owner)}</span>` : '';
-            const notes = a.notes ? `<div class="box-kv">${escapeHTML(a.notes)}</div>` : '';
-            return `<li>${t}${owner}${notes}</li>`;
-          }).join('')}
-        </ul></div>` : '';
-        monBox.innerHTML = metricsHTML + actionsHTML;
-      }
+
+      // Optional: clear the separate monitoring box if you have one
+      if (els.riskMonitoring){ els.riskMonitoring.innerHTML = '<div class="muted">Shown per failure ↑</div>'; }
     }
+
 
     async function runRisks(){
       const t = requiredTripletOrStatus(els.riskStatus); if (!t) return;
