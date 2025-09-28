@@ -1060,32 +1060,45 @@
     }
 
     function renderArchetype(payload){
-      const v = payload?.playbook || payload;
+      // accept any of these shapes
+      const v = payload?.archetype_playbook ?? payload?.playbook ?? payload;
+
       // classification
       const cls = v?.classification;
-      els.archClass.innerHTML = cls
-        ? `<strong>Archetype:</strong> ${escapeHTML(cls.archetype||'')} — <span class="muted">${escapeHTML(cls.why||'')}</span>`
-        : '';
+      if (els.archClass) {
+        els.archClass.innerHTML = cls
+          ? `<strong>Archetype:</strong> ${escapeHTML(cls.archetype || '')} — <span class="muted">${escapeHTML(cls.why || '')}</span>`
+          : '';
+      }
+
       // phases
       const phases = Array.isArray(v?.phases) ? v.phases : [];
-      els.archPretty.innerHTML = phases.map(p=>{
-        const name = escapeHTML(p.name||'');
-        const horizon = p.horizon ? `<div class="box-kv"><strong>Horizon:</strong> ${escapeHTML(p.horizon)}</div>` : '';
-        const mk = (label, arr) => (Array.isArray(arr)&&arr.length)
-          ? `<div><strong>${label}:</strong><ul>${arr.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ul></div>` : '';
-        return `<div class="box-section"><h3>${name}</h3>${horizon}
-          <div class="box-scroll">
-            ${p.goal ? `<div><strong>Goal:</strong> ${escapeHTML(p.goal)}</div>`:''}
-            ${mk('Milestones', p.milestones)}
-            ${mk('Outputs', p.outputs)}
-            ${mk('Indicators', p.indicators)}
-            ${mk('Decision Gates', p.decision_gates)}
-          </div>
-        </div>`;
-      }).join('') || '<div class="muted">No phases</div>';
+      if (els.archPretty) {
+        els.archPretty.innerHTML = phases.length ? phases.map(p=>{
+          const name = escapeHTML(p.name || '');
+          const horizon = p.horizon ? `<div class="box-kv"><strong>Horizon:</strong> ${escapeHTML(p.horizon)}</div>` : '';
+          const mk = (label, arr) => (Array.isArray(arr) && arr.length)
+            ? `<div><strong>${label}:</strong><ul>${arr.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ul></div>` : '';
+          return `<div class="box-section"><h3>${name}</h3>${horizon}
+            <div class="box-scroll">
+              ${p.goal ? `<div><strong>Goal:</strong> ${escapeHTML(p.goal)}</div>` : ''}
+              ${mk('Milestones', p.milestones)}
+              ${mk('Outputs', p.outputs)}
+              ${mk('Indicators', p.indicators)}
+              ${mk('Decision Gates', p.decision_gates)}
+            </div>
+          </div>`;
+        }).join('') : '<div class="muted">No phases</div>';
+      }
+
       // north star
-      els.archNorthBody.innerHTML = v?.north_star ? escapeHTML(v.north_star) : '<div class="muted">—</div>';
+      if (els.archNorthBody) {
+        els.archNorthBody.innerHTML = v?.north_star
+          ? escapeHTML(v.north_star)
+          : '<div class="muted">—</div>';
+      }
     }
+
 
     async function runArchetype(){
       const t = requiredTripletOrStatus(els.archStatus); if (!t) return;
@@ -1099,7 +1112,7 @@
         const j = await res.json().catch(()=>null);
         if (!res.ok || j?.error){ setStatus(els.archStatus, j?.error||`HTTP ${res.status}`, false); return; }
         setStatus(els.archStatus, 'OK', true);
-        renderArchetype(j?.playbook ?? j);
+        renderArchetype(j?.archetype_playbook ?? j?.playbook ?? j);
       }catch(e){ setStatus(els.archStatus, e.message, false); }
     }
 
