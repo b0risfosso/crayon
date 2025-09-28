@@ -257,7 +257,6 @@
       runValidationBtn: document.getElementById('runValidationBtn'),
       valRunNote: document.getElementById('valRunNote'),
       valPretty: document.getElementById('valPretty'),
-      valRaw: document.getElementById('valRaw'),
     };
 
     const API = {
@@ -560,37 +559,6 @@
       }
     }
 
-    // === Validation card logic ===
-    function getSelectedRows(){
-      const nid = els.domain.value;
-      const did = els.dimension.value;
-      const sid = els.seed.value;
-      const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
-      const dims = cache.dims.get(nid) || [];
-      const dimRow = dims.find(d => String(d.id) === String(did));
-      const seeds = cache.seeds.get(did) || [];
-      const seedRow = seeds.find(s => String(s.id) === String(sid));
-      return { domainRow, dimRow, seedRow };
-    }
-
-    function prefillValidationFromSelection(){
-      const { domainRow, dimRow, seedRow } = getSelectedRows();
-      let missing = [];
-      if (!domainRow) missing.push('domain');
-      if (!dimRow) missing.push('dimension');
-      if (!seedRow) missing.push('seed');
-      if (missing.length){
-        setStatus(els.valStatus, `Select a ${missing.join(', ')} first.`, false);
-        return;
-      }
-      setStatus(els.valStatus, '', false);
-      els.valDomain.value    = stripHashId(domainRow.title || '');
-      els.valDimension.value = stripHashId(dimRow.title || '');
-      els.valProblem.value   = seedRow.problem   || '';
-      els.valObjective.value = seedRow.objective || '';
-      els.valSolution.value  = seedRow.solution  || '';
-    }
-
     // --- Pretty renderer: three scrollable sections (no raw JSON) ---
     function renderValidationPretty(payload){
       const v = (payload && payload.validation) || {};
@@ -712,7 +680,14 @@
       setStatus(els.valStatus, 'Running…', false);
       els.runValidationBtn.disabled = true;
       els.valRunNote.textContent = '';
-      els.valPretty.innerHTML = '';
+      
+      const clear = sel => {
+        const el = document.querySelector(sel);
+        if (el) el.innerHTML = '';
+      };
+      clear('#valProblem .val-content');
+      clear('#valObjective .val-content');
+      clear('#valSolution .val-content');
 
       try{
         const res = await fetch('/api/narrative-validation', {
@@ -724,6 +699,7 @@
         const text = await res.text();
         let payload = null;
         try { payload = JSON.parse(text); } catch(e){}
+
 
         if (!res.ok){
           setStatus(els.valStatus, `HTTP ${res.status}`, false);
