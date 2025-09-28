@@ -1912,11 +1912,6 @@ def api_bulk_status(job_id):
     return jsonify({"ok": True, **job}), 200
 
 
-# app.py (add a new route)
-
-from prompts import VALIDATION_SYS_MSG  # already importing other prompts
-# (Pydantic models already imported above)
-
 @app.post("/api/narrative-validation")
 def api_narrative_validation():
     data = request.get_json(silent=True) or {}
