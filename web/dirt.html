@@ -285,10 +285,6 @@
           <div class="box-section" id="embEyes"><h3>Eyes</h3><div class="box-scroll"></div></div>
           <div class="box-section" id="embEars"><h3>Ears</h3><div class="box-scroll"></div></div>
           <div class="box-section" id="embHands"><h3>Hands</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embNose"><h3>Nose</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embMouth"><h3>Mouth</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embSkin"><h3>Skin</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embForces"><h3>Forces</h3><div class="box-scroll"></div></div>
         </div>
       </div>
     </section>
@@ -975,9 +971,7 @@
     function renderEmbodied(payload){
       const v = payload?.embodied || payload?.map || payload;
       const keys = [
-        ['embEyes', v?.eyes], ['embEars', v?.ears], ['embHands', v?.hands],
-        ['embNose', v?.nose], ['embMouth', v?.mouth], ['embSkin', v?.skin],
-        ['embForces', v?.forces],
+        ['embEyes', v?.eyes], ['embEars', v?.ears], ['embHands', v?.hands]
       ];
       for (const [id, arr] of keys){
         const box = document.querySelector(`#${id} .box-scroll`);
@@ -994,7 +988,7 @@
     async function runEmbodied(){
       const t = requiredTripletOrStatus(els.embStatus); if (!t) return;
       setStatus(els.embStatus, 'Running…', false);
-      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll','#embNose .box-scroll','#embMouth .box-scroll','#embSkin .box-scroll','#embForces .box-scroll'].forEach(clearBoxScroll);
+      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll'].forEach(clearBoxScroll);
       try{
         const res = await fetch(API.embodied, {
           method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
