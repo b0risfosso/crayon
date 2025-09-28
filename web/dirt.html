@@ -169,41 +169,20 @@
       <header><h2 id="h-validate">Real-World Validation</h2></header>
       <div class="body">
         <div class="actions small">
-          <button id="loadFromSelectionBtn" title="Prefill fields from the current Domain/Dimension/Seed">Load from selection</button>
           <span class="muted">POST <span class="pill">/api/narrative-validation</span></span>
           <span id="valStatus" class="muted"></span>
         </div>
-
-        <div class="row">
-          <div>
-            <label for="valDomain">Domain</label>
-            <input id="valDomain" type="text" placeholder="Domain label"/>
-          </div>
-          <div>
-            <label for="valDimension">Dimension</label>
-            <input id="valDimension" type="text" placeholder="Dimension label"/>
-          </div>
-        </div>
-
-        <div>
-          <label for="valProblem">Problem</label>
-          <textarea id="valProblem" placeholder="A (Problem)…"></textarea>
-        </div>
-        <div>
-          <label for="valObjective">Objective</label>
-          <textarea id="valObjective" placeholder="B (Objective)…"></textarea>
-        </div>
-        <div>
-          <label for="valSolution">Solution (Link)</label>
-          <textarea id="valSolution" placeholder="Solution (Link)…"></textarea>
-        </div>
-
+    
+        <!-- Optional: live summary of what's about to be validated -->
+        <div id="valSummary" class="muted small" style="line-height:1.4;"></div>
+    
         <div class="actions">
           <button id="runValidationBtn">Run Validation</button>
           <span id="valRunNote" class="muted"></span>
         </div>
-
+    
         <div id="valPretty" class="threecol" style="margin-top:.25rem;"></div>
+    
         <div>
           <label class="muted" for="valRaw">Raw JSON</label>
           <pre id="valRaw" class="codeblock" tabindex="0" style="min-height:140px;"></pre>
@@ -245,13 +224,8 @@
       artifactsMd: document.getElementById('artifactsMd'),
 
       // Validation
-      loadFromSelectionBtn: document.getElementById('loadFromSelectionBtn'),
       valStatus: document.getElementById('valStatus'),
-      valDomain: document.getElementById('valDomain'),
-      valDimension: document.getElementById('valDimension'),
-      valProblem: document.getElementById('valProblem'),
-      valObjective: document.getElementById('valObjective'),
-      valSolution: document.getElementById('valSolution'),
+      valSummary: document.getElementById('valSummary'),
       runValidationBtn: document.getElementById('runValidationBtn'),
       valRunNote: document.getElementById('valRunNote'),
       valPretty: document.getElementById('valPretty'),
@@ -633,14 +607,64 @@
       els.valPretty.innerHTML = blocks.map(([t,a]) => sectionHTML(t,a)).join('');
     }
 
-    async function runValidation(){
-      const domain    = (els.valDomain.value || '').trim();
-      const dimension = (els.valDimension.value || '').trim();
-      const problem   = (els.valProblem.value || '').trim();
-      const objective = (els.valObjective.value || '').trim();
-      const solution  = (els.valSolution.value || '').trim();
-      const provider  = 'openai_web';
+    function getSelectedRows(){
+      const nid = els.domain.value;
+      const did = els.dimension.value;
+      const sid = els.seed.value;
 
+      const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+      const dims = cache.dims.get(nid) || [];
+      const dimRow = dims.find(d => String(d.id) === String(did));
+      const seeds = cache.seeds.get(did) || [];
+      const seedRow = seeds.find(s => String(s.id) === String(sid));
+
+      return { nid, did, sid, domainRow, dimRow, seedRow };
+    }
+
+    function renderValSummary(domainRow, dimRow, seedRow){
+      if (!els.valSummary) return;
+      if (!domainRow || !dimRow || !seedRow){
+        els.valSummary.textContent = 'Select a domain, dimension, and seed.';
+        return;
+      }
+      const domain = stripHashId(domainRow.title || '');
+      const dimension = stripHashId(dimRow.title || '');
+      const A = seedRow.problem || '';
+      const B = seedRow.objective || '';
+      const L = seedRow.solution || '';
+
+      els.valSummary.innerHTML =
+        `<div><strong>Domain:</strong> ${escapeHTML(domain)} (#${domainRow.id})</div>` +
+        `<div><strong>Dimension:</strong> ${escapeHTML(dimension)} (#${dimRow.id})</div>` +
+        (A ? `<div><strong>Problem:</strong> ${escapeHTML(A)}</div>` : '') +
+        (B ? `<div><strong>Objective:</strong> ${escapeHTML(B)}</div>` : '') +
+        (L ? `<div><strong>Solution:</strong> ${escapeHTML(L)}</div>` : '');
+    }
+
+
+    async function runValidation(){
+      const { domainRow, dimRow, seedRow } = getSelectedRows();
+
+      if (!domainRow || !dimRow || !seedRow) {
+        setStatus(els.valStatus, 'Select a domain, dimension, and seed first.', false);
+        els.valPretty.innerHTML = '';
+        els.valRaw.textContent = '';
+        renderValSummary(domainRow, dimRow, seedRow);
+        return;
+      }
+
+      const domain    = stripHashId(domainRow.title || '');
+      const dimension = stripHashId(dimRow.title || '');
+      const problem   = (seedRow.problem   || '').trim();
+      const objective = (seedRow.objective || '').trim();
+      const solution  = (seedRow.solution  || '').trim();
+
+      renderValSummary(domainRow, dimRow, seedRow);
+
+      // provider is fixed to openai_web per your spec
+      const provider = 'openai_web';
+
+      // Basic validation
       const missing = [];
       if (!domain)    missing.push('domain');
       if (!dimension) missing.push('dimension');
@@ -659,14 +683,15 @@
       els.valPretty.innerHTML = '';
 
       try{
-        const res = await fetch(API.validate, {
+        const res = await fetch('/api/narrative-validation', {
           method: 'POST',
           headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
           body: JSON.stringify({ domain, dimension, problem, objective, solution, provider })
         });
+
         const text = await res.text();
         let payload = null;
-        try { payload = JSON.parse(text); } catch(e){ /* keep raw */ }
+        try { payload = JSON.parse(text); } catch(e){}
 
         els.valRaw.textContent = prettyJSON(text);
 
@@ -743,7 +768,6 @@
     els.genArtifactsBtn.addEventListener('click', generateArtifactsAndPage);
 
     // Validation events
-    els.loadFromSelectionBtn.addEventListener('click', prefillValidationFromSelection);
     els.runValidationBtn.addEventListener('click', runValidation);
 
     // Boot
