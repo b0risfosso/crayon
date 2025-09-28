@@ -682,7 +682,6 @@
       if (!domainRow || !dimRow || !seedRow) {
         setStatus(els.valStatus, 'Select a domain, dimension, and seed first.', false);
         els.valPretty.innerHTML = '';
-        els.valRaw.textContent = '';
         renderValSummary(domainRow, dimRow, seedRow);
         return;
       }
@@ -713,7 +712,6 @@
       setStatus(els.valStatus, 'Running…', false);
       els.runValidationBtn.disabled = true;
       els.valRunNote.textContent = '';
-      els.valRaw.textContent = '';
       els.valPretty.innerHTML = '';
 
       try{
@@ -726,8 +724,6 @@
         const text = await res.text();
         let payload = null;
         try { payload = JSON.parse(text); } catch(e){}
-
-        els.valRaw.textContent = prettyJSON(text);
 
         if (!res.ok){
           setStatus(els.valStatus, `HTTP ${res.status}`, false);

@@ -28,6 +28,7 @@ from prompts import (
     DIM_SYS_MSG,
     SEED_SYS_MSG,
     VALIDATION_SYS_MSG,
+    STAKEHOLDERS_SYS_MSG,
 )
 
 app = Flask(__name__)
@@ -308,6 +309,18 @@ class ValidationBundle(BaseModel):
     objective_measurement: List[MetricItem] = Field(..., description="Metrics + datasets measuring progress to objective")
     solution_justification: List[MetricItem] = Field(..., description="Metrics + datasets justifying solution efficacy")
 
+class StakeholderExample(BaseModel):
+    name: str = Field(..., description="Entity or role (e.g., Ministry of Health, ACLED, Local Chiefs, Airport Ops)")
+    category: Optional[str] = Field(None, description="Type: government, NGO, private, academic, community, etc.")
+    role: Optional[str] = Field(None, description="Their function or leverage in the narrative")
+    why: str = Field(..., description="Brief reason this stakeholder matters here")
+
+class StakeholderMap(BaseModel):
+    primary: List[StakeholderExample] = Field(..., description="Directly responsible/affected")
+    secondary: List[StakeholderExample] = Field(..., description="Indirect/influencers")
+    end_users_beneficiaries: List[StakeholderExample] = Field(..., description="Problem-bearers & solution beneficiaries")
+    external_contextual: List[StakeholderExample] = Field(..., description="International/funders/oversight/market forces")
+
 
 
 
@@ -579,6 +592,13 @@ def _validation_user_message(domain: str, dimension: str, problem: str, objectiv
     return VALIDATION_USER_TEMPLATE.format(
         domain=domain, dimension=dimension, problem=problem, objective=objective, solution=solution
     )
+
+def _stakeholders_user_message(domain: str, dimension: str, problem: str, objective: str, solution: str) -> str:
+    from prompts import STAKEHOLDERS_USER_TEMPLATE
+    return STAKEHOLDERS_USER_TEMPLATE.format(
+        domain=domain, dimension=dimension, problem=problem, objective=objective, solution=solution
+    )
+
 
 # ---------- NEW: LLM adapters (OpenAI + xAI + Gemini + Deepseek + OpenAI websearch) ----------
 # ---------- NEW: OpenAI with web_search tool ----------
@@ -1998,7 +2018,7 @@ def api_narrative_validation():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             # Use web_search tool to help the model ground datasets
             sys_prompt = VALIDATION_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. Do not add commentary."
             user_prompt = (
@@ -2023,7 +2043,7 @@ def api_narrative_validation():
 
         else:  # provider == "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -2061,3 +2081,139 @@ def api_narrative_validation():
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
 
+
+@app.post("/api/narrative-stakeholders")
+def api_narrative_stakeholders():
+    data = request.get_json(silent=True) or {}
+
+    domain    = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    problem   = (data.get("problem") or "").strip()
+    objective = (data.get("objective") or "").strip()
+    solution  = (data.get("solution") or "").strip()
+    provider  = _provider_from(data)  # existing helper
+
+    missing = [k for k,v in {
+        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
+    }.items() if not v]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    user_msg = _stakeholders_user_message(domain, dimension, problem, objective, solution)
+
+    try:
+        model_name = None
+        raw_text = None
+        parsed = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON with keys: primary, secondary, end_users_beneficiaries, external_contextual. No prose."))
+            schema_hint = (
+                "Schema:\n"
+                "{\n"
+                "  primary: [{name, category?, role?, why}],\n"
+                "  secondary: [{...}],\n"
+                "  end_users_beneficiaries: [{...}],\n"
+                "  external_contextual: [{...}]\n"
+                "}"
+            )
+            chat.append(xai_user(user_msg + "\n\n" + schema_hint))
+            response, parsed_obj = chat.parse(StakeholderMap)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            prompt = STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema." + "\n\n" + user_msg
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": StakeholderMap,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            sys_prompt = STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON with keys primary, secondary, end_users_beneficiaries, external_contextual. No prose."
+            user_prompt = user_msg
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)  # your existing helper
+            try:
+                parsed = StakeholderMap.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            sys_prompt = STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\nSchema keys: primary, secondary, end_users_beneficiaries, external_contextual. Each item: {name, category?, role?, why}."
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type": "web_search"}],  # lets the model ground org names if it wants
+                input=[
+                    {"role":"system","content": sys_prompt},
+                    {"role":"user","content": user_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = StakeholderMap.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
+                    {"role":"user","content": (
+                        user_msg + "\n\n"
+                        "Return an object with keys: primary, secondary, end_users_beneficiaries, external_contextual.\n"
+                        "Each value is an array of {name, category?, role?, why}."
+                    )},
+                ],
+                text_format=StakeholderMap,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
+            }), 200
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain": domain,
+            "dimension": dimension,
+            "stakeholders": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500

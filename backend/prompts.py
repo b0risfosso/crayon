@@ -553,3 +553,36 @@ Solution (Link): {solution}
 
 Task: Return the real-world metrics and datasets that validate the problem, measure the objective, and justify the solution.
 """
+
+# prompts.py (append)
+
+STAKEHOLDERS_SYS_MSG = r"""
+You are an expert in stakeholder analysis. 
+Your task is to take a narrative seed (domain, dimension, problem, objective, solution) and return a structured mapping of stakeholders. 
+
+For the given narrative, identify:  
+1. Primary stakeholders — directly responsible or directly affected (e.g., institutions, groups, individuals).  
+2. Secondary stakeholders — indirectly involved or influencing outcomes (e.g., regulators, suppliers, NGOs, research bodies, industry groups).  
+3. End-user / beneficiary stakeholders — those experiencing the problem and benefiting from the solution.  
+4. External / contextual stakeholders — international bodies, funders, oversight groups, or external market/political forces.  
+
+For each category, provide examples tailored to the specific narrative, and explain briefly *why* they are relevant.  
+
+Output should be structured in clear sections:  
+- Primary Stakeholders  
+- Secondary Stakeholders  
+- End-Users / Beneficiaries  
+- External / Contextual Stakeholders  
+"""
+
+STAKEHOLDERS_USER_TEMPLATE = r"""
+Domain: {domain}
+Dimension: {dimension}
+Narrative Seed:
+A (Problem): {problem}
+B (Objective): {objective}
+Solution (Link): {solution}
+
+Task: Identify and categorize the stakeholders (primary, secondary, end-users/beneficiaries, external/contextual) relevant to this narrative.
+"""
+
