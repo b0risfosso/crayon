@@ -20,10 +20,7 @@ import uuid
 import threading
 import time
 from prompts import (
-    SYSTEM_INSTRUCTIONS,
-    HTML_BOILERPLATE,
     BOX_OF_DIRT_ARTIFACTS_SYSTEM,
-    BOX_OF_DIRT_PROMPT,
     PROTOTYPE_SYS_MSG,
     DIM_SYS_MSG,
     SEED_SYS_MSG,
