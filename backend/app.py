@@ -2350,11 +2350,10 @@ def api_narrative_embodied():
             xai = get_xai_client()
             model_name = os.getenv("XAI_MODEL", "grok-4")
             chat = xai.chat.create(model=model_name)
-            chat.append(xai_system(EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys: eyes, ears, hands, nose, mouth, skin, forces. No prose."))
+            chat.append(xai_system(EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys: eyes, ears, hands. No prose."))
             schema_hint = (
                 "Schema:\n"
-                "{ eyes:[{cue, why?}], ears:[{cue, why?}], hands:[{cue, why?}], "
-                "nose:[{cue, why?}], mouth:[{cue, why?}], skin:[{cue, why?}], forces:[{cue, why?}] }"
+                "{ eyes:[{cue, why?}], ears:[{cue, why?}], hands:[{cue, why?}] }"
             )
             chat.append(xai_user(user_msg + "\n\n" + schema_hint))
             response, parsed_obj = chat.parse(EmbodiedMap)
