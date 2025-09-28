@@ -70,6 +70,34 @@
     .threecol { display:grid; gap:.6rem; grid-template-columns: 1fr 1fr 1fr; }
     @media (max-width: 1100px){ .threecol { grid-template-columns: 1fr; } }
     .small { font-size:.85rem; }
+    .validation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: .75rem;
+    }
+    .val-section {
+      border: 1px solid color-mix(in oklab, CanvasText 14%, transparent);
+      border-radius: .6rem;
+      background: color-mix(in oklab, Canvas 96%, CanvasText 4%);
+      padding: .75rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .val-section h3 {
+      margin: 0 0 .5rem 0;
+      font-size: .95rem;
+      font-weight: 650;
+    }
+    .val-content {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 240px; /* lock height */
+      font-size: .85rem;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 1100px){ .validation-grid { grid-template-columns: 1fr; } }
+
   </style>
 </head>
 <body>
@@ -181,12 +209,12 @@
           <span id="valRunNote" class="muted"></span>
         </div>
     
-        <div id="valPretty" class="threecol" style="margin-top:.25rem;"></div>
-    
-        <div>
-          <label class="muted" for="valRaw">Raw JSON</label>
-          <pre id="valRaw" class="codeblock" tabindex="0" style="min-height:140px;"></pre>
+        <div id="valPretty" class="validation-grid">
+          <div class="val-section" id="valProblem"><h3>Problem Validation</h3><div class="val-content"></div></div>
+          <div class="val-section" id="valObjective"><h3>Objective Measurement</h3><div class="val-content"></div></div>
+          <div class="val-section" id="valSolution"><h3>Solution Justification</h3><div class="val-content"></div></div>
         </div>
+  
       </div>
     </section>
   </main>
@@ -563,49 +591,55 @@
       els.valSolution.value  = seedRow.solution  || '';
     }
 
+    // --- Pretty renderer: three scrollable sections (no raw JSON) ---
     function renderValidationPretty(payload){
-      // payload.validation = { problem_validation:[], objective_measurement:[], solution_justification:[] }
-      const v = payload && payload.validation;
-      els.valPretty.innerHTML = '';
-      if (!v) return;
-
-      const blocks = [
-        ['Problem Validation', v.problem_validation],
-        ['Objective Measurement', v.objective_measurement],
-        ['Solution Justification', v.solution_justification],
-      ];
-
-      const sectionHTML = (title, arr=[]) => {
-        if (!Array.isArray(arr) || arr.length === 0) {
-          return `<div class="card"><div class="body"><div class="muted">${title}</div><div class="muted">No items.</div></div></div>`;
-        }
-        const items = arr.map(item => {
-          const metric = escapeHTML(item.metric || '');
-          const desc = item.description ? `<div class="muted small" style="margin:.15rem 0 .25rem;">${escapeHTML(item.description)}</div>` : '';
-          const datasets = Array.isArray(item.datasets) ? item.datasets : [];
-          const dsList = datasets.map(ds => {
-            const name = escapeHTML(ds.name || '');
-            const org = escapeHTML(ds.organization || '');
-            const notes = ds.notes ? ` — <span class="muted">${escapeHTML(ds.notes)}</span>` : '';
-            const url = ds.url ? `<div class="muted small">${escapeHTML(ds.url)}</div>` : '';
-            return `<li><strong>${name}</strong> <span class="muted">(${org})</span>${notes}${url}</li>`;
-          }).join('');
-          return `<li style="margin:.4rem 0;">
-            <div><strong>${metric}</strong></div>
-            ${desc}
-            ${dsList ? `<ul style="margin:.25rem 0 .25rem 1rem; padding:0;">${dsList}</ul>` : ''}
-          </li>`;
-        }).join('');
-        return `<div class="card">
-          <div class="body">
-            <div style="font-weight:650;">${title}</div>
-            <ul style="margin:.25rem 0 0 1rem; padding:0;">${items}</ul>
-          </div>
-        </div>`;
-      };
-
-      els.valPretty.innerHTML = blocks.map(([t,a]) => sectionHTML(t,a)).join('');
+      const v = (payload && payload.validation) || {};
+      // Ensure containers exist (valProblem/valObjective/valSolution each has .val-content)
+      fillValSection('valProblem',   v.problem_validation);
+      fillValSection('valObjective', v.objective_measurement);
+      fillValSection('valSolution',  v.solution_justification);
     }
+
+    function fillValSection(sectionId, items){
+      const wrap = document.querySelector(`#${sectionId} .val-content`);
+      if (!wrap) return;
+
+      if (!Array.isArray(items) || items.length === 0){
+        wrap.innerHTML = `<div class="muted">No entries</div>`;
+        return;
+      }
+
+      const html = items.map(item => {
+        const metric = escapeHTML(item?.metric || '');
+        const desc   = item?.description ? `<div class="muted">${escapeHTML(item.description)}</div>` : '';
+
+        const ds = Array.isArray(item?.datasets) ? item.datasets : [];
+        const dsHTML = ds.map(d => {
+          const name = escapeHTML(d?.name || '');
+          const org  = escapeHTML(d?.organization || '');
+          const notes= d?.notes ? ` — <span class="muted">${escapeHTML(d.notes)}</span>` : '';
+          const url  = d?.url ? ` — <a href="${escapeAttr(d.url)}" target="_blank" rel="noopener">${escapeHTML(d.url)}</a>` : '';
+          return `<li><strong>${name}</strong> <span class="muted">(${org})</span>${notes}${url}</li>`;
+        }).join('');
+
+        return `
+          <div class="metric" style="margin:.55rem 0; word-break: break-word;">
+            <div style="font-weight:650;">${metric}</div>
+            ${desc}
+            ${dsHTML ? `<ul style="margin:.35rem 0 0 1rem; padding:0;">${dsHTML}</ul>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      wrap.innerHTML = html;
+    }
+
+    // Small escaper for href/src attributes
+    function escapeAttr(s){
+      return String(s || '').replace(/"/g, '&quot;');
+    }
+
+
 
     function getSelectedRows(){
       const nid = els.domain.value;
