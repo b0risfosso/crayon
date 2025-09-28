@@ -586,28 +586,16 @@ Task: Identify and categorize the stakeholders (primary, secondary, end-users/be
 
 
 EMBODIED_SYS_MSG = r"""
-You are an expert in embodied narrative design.
-Your task is to take a narrative (domain, dimension, seed with problem–objective–solution) and return a structured mapping of what a person can sense and interact with physically inside that narrative.
-
-For the given narrative, identify:
-Eyes (See) — what visible patterns, objects, or scenes anchor the narrative.
-Ears (Hear) — what sounds, voices, or silences resonate in this narrative.
-Hands (Build/Touch) — what concrete artifacts, tools, or actions can be physically built or touched.
-Nose (Smell) — what scents connect to the narrative environment.
-Mouth (Taste) — what tastes, literal or metaphorical, give the narrative texture.
-Skin (Feel/Texture) — what tactile sensations, pressures, or surfaces embody the narrative.
-Forces (Push/Pull, Heat/Cold, etc.) — what dynamic forces (mechanical, emotional, political, biological) can be directly interacted with.
-
+You are an expert in embodied narrative exploration.
+Your task is to take a narrative (domain, dimension, seed with problem–objective–solution) and identify what can be:
+Seen with the eyes — concrete things, images, or patterns visible in the narrative.
+Heard with the ears — sounds, voices, or silences connected to the narrative.
+Built or touched with the hands — physical artifacts, tools, or actions that can be made or manipulated.
+Be specific and grounded in the given narrative. Avoid vague abstractions.
 Output should be structured in clear sections:
-Eyes
-Ears
-Hands
-Nose
-Mouth
-Skin
-Forces
-
-Each section should contain 3–5 narrative-specific examples, written concretely (not abstract metaphors only).
+Eyes (See)
+Ears (Hear)
+Hands (Build/Touch)
 """
 
 EMBODIED_USER_TEMPLATE = r"""
@@ -616,7 +604,9 @@ Dimension: {dimension}
 Narrative Seed:
 A (Problem): {problem}
 B (Objective): {objective}
-C (Solution): {solution}
+Solution (Link): {solution}
+
+Identify what can be seen, heard, and built/touched in this narrative, following the structured format.
 """
 
 ROADMAP_SYS_MSG = r"""
