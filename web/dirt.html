@@ -37,10 +37,10 @@
       border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
       background: color-mix(in oklab, Canvas 96%, CanvasText 4%); color: inherit;
     }
-    textarea { min-height: 320px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.9rem; }
+    textarea { min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.9rem; }
     .row { display:grid; grid-template-columns: 1fr 1fr; gap:.6rem; }
     @media (max-width: 600px){ .row { grid-template-columns: 1fr; } }
-    .actions { display:flex; gap:.5rem; align-items:center; }
+    .actions { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     button {
       padding:.55rem .8rem; border-radius:.5rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
       background: color-mix(in oklab, Canvas 92%, CanvasText 8%); color: inherit; cursor:pointer;
@@ -67,6 +67,9 @@
       overflow: auto;
       user-select: text;
     }
+    .threecol { display:grid; gap:.6rem; grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 1100px){ .threecol { grid-template-columns: 1fr; } }
+    .small { font-size:.85rem; }
   </style>
 </head>
 <body>
@@ -160,6 +163,53 @@
         <pre id="artifactsMd" class="codeblock" tabindex="0" style="min-height:180px;"></pre>
       </div>
     </section>
+
+    <!-- NEW: Real-World Validation -->
+    <section class="card" aria-labelledby="h-validate">
+      <header><h2 id="h-validate">Real-World Validation</h2></header>
+      <div class="body">
+        <div class="actions small">
+          <button id="loadFromSelectionBtn" title="Prefill fields from the current Domain/Dimension/Seed">Load from selection</button>
+          <span class="muted">POST <span class="pill">/api/narrative-validation</span></span>
+          <span id="valStatus" class="muted"></span>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="valDomain">Domain</label>
+            <input id="valDomain" type="text" placeholder="Domain label"/>
+          </div>
+          <div>
+            <label for="valDimension">Dimension</label>
+            <input id="valDimension" type="text" placeholder="Dimension label"/>
+          </div>
+        </div>
+
+        <div>
+          <label for="valProblem">Problem</label>
+          <textarea id="valProblem" placeholder="A (Problem)…"></textarea>
+        </div>
+        <div>
+          <label for="valObjective">Objective</label>
+          <textarea id="valObjective" placeholder="B (Objective)…"></textarea>
+        </div>
+        <div>
+          <label for="valSolution">Solution (Link)</label>
+          <textarea id="valSolution" placeholder="Solution (Link)…"></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="runValidationBtn">Run Validation</button>
+          <span id="valRunNote" class="muted"></span>
+        </div>
+
+        <div id="valPretty" class="threecol" style="margin-top:.25rem;"></div>
+        <div>
+          <label class="muted" for="valRaw">Raw JSON</label>
+          <pre id="valRaw" class="codeblock" tabindex="0" style="min-height:140px;"></pre>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -193,15 +243,28 @@
       genArtifactsBtn: document.getElementById('genArtifactsBtn'),
       artifactsStatus: document.getElementById('artifactsStatus'),
       artifactsMd: document.getElementById('artifactsMd'),
+
+      // Validation
+      loadFromSelectionBtn: document.getElementById('loadFromSelectionBtn'),
+      valStatus: document.getElementById('valStatus'),
+      valDomain: document.getElementById('valDomain'),
+      valDimension: document.getElementById('valDimension'),
+      valProblem: document.getElementById('valProblem'),
+      valObjective: document.getElementById('valObjective'),
+      valSolution: document.getElementById('valSolution'),
+      runValidationBtn: document.getElementById('runValidationBtn'),
+      valRunNote: document.getElementById('valRunNote'),
+      valPretty: document.getElementById('valPretty'),
+      valRaw: document.getElementById('valRaw'),
     };
 
     const API = {
       narratives: '/api/narratives',
       dims: (nid) => `/api/narratives/${encodeURIComponent(nid)}/dimensions`,
       seeds: (did) => `/api/dimensions/${encodeURIComponent(did)}/seeds`,
+      validate: '/api/narrative-validation',
+      bodArtifacts: '/api/box-of-dirt/artifacts',
     };
-    API.generateBox = '/api/box-of-dirt';
-    API.bodArtifacts = '/api/box-of-dirt/artifacts';
 
     let cache = { narratives: [], dims: new Map(), seeds: new Map() };
 
@@ -219,7 +282,6 @@
       const lines = [];
       if (p.core_intent) lines.push(`Core Intent — ${p.core_intent}`);
       if (p.minimal_build) lines.push(`Minimal Build — ${p.minimal_build}`);
-
       const panels = Array.isArray(p.panels) ? p.panels
                   : Array.isArray(p.scenes) ? p.scenes
                   : Array.isArray(p.storyboard) ? p.storyboard
@@ -237,36 +299,23 @@
           if (item.caption) lines.push(item.caption);
         }
       });
-
-      if (p.load_bearing_test){
-        lines.push(`Load-Bearing Test — ${p.load_bearing_test}`);
-      }
+      if (p.load_bearing_test) lines.push(`Load-Bearing Test — ${p.load_bearing_test}`);
       if (p.validating_reactions){
         if (Array.isArray(p.validating_reactions)){
-          lines.push('Validating reactions we want —');
-          p.validating_reactions.forEach(x => lines.push(`- ${x}`));
-        } else {
-          lines.push(`Validating reactions we want — ${p.validating_reactions}`);
-        }
+          lines.push('Validating reactions we want —'); p.validating_reactions.forEach(x => lines.push(`- ${x}`));
+        } else { lines.push(`Validating reactions we want — ${p.validating_reactions}`); }
       }
       if (p.red_flags){
         if (Array.isArray(p.red_flags)){
-          lines.push('Red flags (invalidate) —');
-          p.red_flags.forEach(x => lines.push(`- ${x}`));
-        } else {
-          lines.push(`Red flags (invalidate) — ${p.red_flags}`);
-        }
+          lines.push('Red flags (invalidate) —'); p.red_flags.forEach(x => lines.push(`- ${x}`));
+        } else { lines.push(`Red flags (invalidate) — ${p.red_flags}`); }
       }
       if (p.first_eyes){
         if (Array.isArray(p.first_eyes)){
-          lines.push('First Eyes —');
-          p.first_eyes.forEach(x => lines.push(`- ${x}`));
-        } else {
-          lines.push(`First Eyes — ${p.first_eyes}`);
-        }
+          lines.push('First Eyes —'); p.first_eyes.forEach(x => lines.push(`- ${x}`));
+        } else { lines.push(`First Eyes — ${p.first_eyes}`); }
       }
       if (p.why_box_of_dirt) lines.push(`Why This is a Box of Dirt — ${p.why_box_of_dirt}`);
-
       return lines.join('\n');
     }
     function setStatus(el, msg, ok){
@@ -281,7 +330,7 @@
       return res.json();
     }
 
-    // Deep-link helpers (kept; they no longer toggle load-current)
+    // Deep-link helpers
     async function resolveNarrativeIdByDimensionId(did) {
       for (const n of (cache.narratives || [])) {
         try {
@@ -344,7 +393,7 @@
       renderContext();
     }
 
-    // Load data
+    // Loaders
     async function loadNarratives(){
       try{
         const rows = await fetchJSON(API.narratives);
@@ -378,7 +427,7 @@
       els.seed.innerHTML = `<option value="">${did ? 'Loading…' : 'Select a dimension'}</option>`;
       if (!did) return;
       try{
-        const payload = await fetchJSON(API.seeds(did));
+        const payload = await fetchJSON(`/api/dimensions/${encodeURIComponent(did)}/seeds`);
         const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
         cache.seeds.set(did, seeds);
         els.seed.innerHTML = `<option value="">Select…</option>` +
@@ -394,7 +443,7 @@
       return fromSelect || fromInput || null;
     }
 
-    // Prototype generation (no longer injects HTML editor/preview)
+    // Prototype generation
     async function generatePrototypeAndBuild(){
       const nid = els.domain.value;
       const did = els.dimension.value;
@@ -438,7 +487,6 @@
         const out = await protoRes.json();
         const p = out.prototype || out;
 
-        // Render summary
         els.protoCore.innerText  = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
         els.protoBuild.innerText = p.minimal_build ? `Minimal Build — ${p.minimal_build}` : '';
         els.protoTest.innerText  = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
@@ -452,23 +500,6 @@
         els.protoWhy.innerText = p.why_box_of_dirt ? `Why This is a Box of Dirt — ${p.why_box_of_dirt}` : '';
         els.protoWrap.hidden = false;
         els.protoStatus.textContent = '';
-
-        // Compose inputs for optional downstream generation (no injection)
-        const domainName = stripHashId(domainRow.title || '');
-        const dimensionName = stripHashId(dimRow.title || '');
-        const thesis = dimRow?.description ? String(dimRow.description) : null;
-        const seedText = composeSeedText(seedRow);
-        const prototypeText = composePrototypeText(p);
-
-        // If you still want raw HTML from backend, you could call API.generateBox here,
-        // but we no longer inject it anywhere on this page.
-        /* Example (commented):
-        await fetch(API.generateBox, {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Accept':'text/html' },
-          body: JSON.stringify({ domain: domainName, dimension: dimensionName, thesis, seed: seedText, prototype: prototypeText })
-        });
-        */
       }catch(e){
         els.protoStatus.textContent = 'Error: ' + e.message;
         els.protoWrap.hidden = true;
@@ -477,6 +508,7 @@
       }
     }
 
+    // Artifacts (Markdown only, per your prior setup)
     async function generateArtifactsAndPage() {
       const nid = els.domain.value;
       const did = els.dimension.value;
@@ -507,7 +539,6 @@
       els.genArtifactsBtn.disabled = true;
 
       try {
-        // Generate artifacts (Markdown) only
         const artRes = await fetch(API.bodArtifacts, {
           method:'POST',
           headers:{'Content-Type':'application/json', 'Accept':'text/markdown'},
@@ -525,6 +556,140 @@
       } finally {
         els.genArtifactsBtn.disabled = false;
       }
+    }
+
+    // === Validation card logic ===
+    function getSelectedRows(){
+      const nid = els.domain.value;
+      const did = els.dimension.value;
+      const sid = els.seed.value;
+      const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
+      const dims = cache.dims.get(nid) || [];
+      const dimRow = dims.find(d => String(d.id) === String(did));
+      const seeds = cache.seeds.get(did) || [];
+      const seedRow = seeds.find(s => String(s.id) === String(sid));
+      return { domainRow, dimRow, seedRow };
+    }
+
+    function prefillValidationFromSelection(){
+      const { domainRow, dimRow, seedRow } = getSelectedRows();
+      let missing = [];
+      if (!domainRow) missing.push('domain');
+      if (!dimRow) missing.push('dimension');
+      if (!seedRow) missing.push('seed');
+      if (missing.length){
+        setStatus(els.valStatus, `Select a ${missing.join(', ')} first.`, false);
+        return;
+      }
+      setStatus(els.valStatus, '', false);
+      els.valDomain.value    = stripHashId(domainRow.title || '');
+      els.valDimension.value = stripHashId(dimRow.title || '');
+      els.valProblem.value   = seedRow.problem   || '';
+      els.valObjective.value = seedRow.objective || '';
+      els.valSolution.value  = seedRow.solution  || '';
+    }
+
+    function renderValidationPretty(payload){
+      // payload.validation = { problem_validation:[], objective_measurement:[], solution_justification:[] }
+      const v = payload && payload.validation;
+      els.valPretty.innerHTML = '';
+      if (!v) return;
+
+      const blocks = [
+        ['Problem Validation', v.problem_validation],
+        ['Objective Measurement', v.objective_measurement],
+        ['Solution Justification', v.solution_justification],
+      ];
+
+      const sectionHTML = (title, arr=[]) => {
+        if (!Array.isArray(arr) || arr.length === 0) {
+          return `<div class="card"><div class="body"><div class="muted">${title}</div><div class="muted">No items.</div></div></div>`;
+        }
+        const items = arr.map(item => {
+          const metric = escapeHTML(item.metric || '');
+          const desc = item.description ? `<div class="muted small" style="margin:.15rem 0 .25rem;">${escapeHTML(item.description)}</div>` : '';
+          const datasets = Array.isArray(item.datasets) ? item.datasets : [];
+          const dsList = datasets.map(ds => {
+            const name = escapeHTML(ds.name || '');
+            const org = escapeHTML(ds.organization || '');
+            const notes = ds.notes ? ` — <span class="muted">${escapeHTML(ds.notes)}</span>` : '';
+            const url = ds.url ? `<div class="muted small">${escapeHTML(ds.url)}</div>` : '';
+            return `<li><strong>${name}</strong> <span class="muted">(${org})</span>${notes}${url}</li>`;
+          }).join('');
+          return `<li style="margin:.4rem 0;">
+            <div><strong>${metric}</strong></div>
+            ${desc}
+            ${dsList ? `<ul style="margin:.25rem 0 .25rem 1rem; padding:0;">${dsList}</ul>` : ''}
+          </li>`;
+        }).join('');
+        return `<div class="card">
+          <div class="body">
+            <div style="font-weight:650;">${title}</div>
+            <ul style="margin:.25rem 0 0 1rem; padding:0;">${items}</ul>
+          </div>
+        </div>`;
+      };
+
+      els.valPretty.innerHTML = blocks.map(([t,a]) => sectionHTML(t,a)).join('');
+    }
+
+    async function runValidation(){
+      const domain    = (els.valDomain.value || '').trim();
+      const dimension = (els.valDimension.value || '').trim();
+      const problem   = (els.valProblem.value || '').trim();
+      const objective = (els.valObjective.value || '').trim();
+      const solution  = (els.valSolution.value || '').trim();
+      const provider  = 'openai_web';
+
+      const missing = [];
+      if (!domain)    missing.push('domain');
+      if (!dimension) missing.push('dimension');
+      if (!problem)   missing.push('problem');
+      if (!objective) missing.push('objective');
+      if (!solution)  missing.push('solution');
+      if (missing.length){
+        setStatus(els.valStatus, `Missing: ${missing.join(', ')}`, false);
+        return;
+      }
+
+      setStatus(els.valStatus, 'Running…', false);
+      els.runValidationBtn.disabled = true;
+      els.valRunNote.textContent = '';
+      els.valRaw.textContent = '';
+      els.valPretty.innerHTML = '';
+
+      try{
+        const res = await fetch(API.validate, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+          body: JSON.stringify({ domain, dimension, problem, objective, solution, provider })
+        });
+        const text = await res.text();
+        let payload = null;
+        try { payload = JSON.parse(text); } catch(e){ /* keep raw */ }
+
+        els.valRaw.textContent = prettyJSON(text);
+
+        if (!res.ok){
+          setStatus(els.valStatus, `HTTP ${res.status}`, false);
+        } else if (payload && payload.error){
+          setStatus(els.valStatus, payload.error, false);
+        } else {
+          setStatus(els.valStatus, 'OK', true);
+          if (payload && payload.ok){
+            renderValidationPretty(payload);
+          }
+        }
+      }catch(e){
+        setStatus(els.valStatus, e.message, false);
+      }finally{
+        els.runValidationBtn.disabled = false;
+      }
+    }
+
+    function prettyJSON(raw){
+      try { return JSON.stringify(JSON.parse(raw), null, 2); }
+      catch(_) { return raw; }
     }
 
     function renderContext(){
@@ -573,8 +738,13 @@
       setStatus(els.selStatus, '', false);
       renderContext();
     });
+
     els.genProtoBtn.addEventListener('click', generatePrototypeAndBuild);
     els.genArtifactsBtn.addEventListener('click', generateArtifactsAndPage);
+
+    // Validation events
+    els.loadFromSelectionBtn.addEventListener('click', prefillValidationFromSelection);
+    els.runValidationBtn.addEventListener('click', runValidation);
 
     // Boot
     loadNarratives().then(maybeDeepLink);
