@@ -216,15 +216,6 @@
           <div><strong>First Eyes</strong><div id="protoEyes"></div></div>
           <div><strong>Why This is a Box of Dirt</strong><div id="protoWhy" style="white-space:pre-wrap;"></div></div>
         </div>
-
-        <!-- Debug panel (shown when ok === false or error present) -->
-        <div id="protoDebug" hidden class="box-section" style="margin-top:.6rem;">
-          <h3>Debug Output</h3>
-          <div class="box-scroll">
-            <div id="protoDebugNote" class="muted" style="margin-bottom:.35rem;"></div>
-            <pre id="protoDebugRaw" class="codeblock" tabindex="0" style="max-height:220px;"></pre>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -368,7 +359,6 @@
         </div>
         <div class="cardgrid-2">
           <div class="box-section" id="riskFailures"><h3>Likely Failures & Countermeasures</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="riskMonitoring"><h3>Monitoring & Triggers</h3><div class="box-scroll"></div></div>
         </div>
       </div>
     </section>
@@ -394,9 +384,6 @@
       protoEyes: document.getElementById('protoEyes'),
       protoWhy: document.getElementById('protoWhy'),
       protoRunNote: document.getElementById('protoRunNote'),
-      protoDebug: document.getElementById('protoDebug'),
-      protoDebugNote: document.getElementById('protoDebugNote'),
-      protoDebugRaw: document.getElementById('protoDebugRaw'),
 
       // Context
       ctxDomainTitle: document.getElementById('ctxDomainTitle'),
@@ -449,7 +436,6 @@
       runRiskBtn: document.getElementById('runRiskBtn'),
       riskStatus: document.getElementById('riskStatus'),
       riskFailures: document.querySelector('#riskFailures .box-scroll'),
-      riskMonitoring: document.querySelector('#riskMonitoring .box-scroll'),
     };
 
     const API = {
@@ -910,7 +896,6 @@
 
       // Show pretty, hide debug
       if (els.protoWrap)  els.protoWrap.hidden = false;
-      if (els.protoDebug) els.protoDebug.hidden = true;
     }
 
     async function generatePrototypeAndBuild(){
@@ -920,7 +905,6 @@
       setStatus(els.protoStatus, 'Running…', false);
       clearEl(els.protoRunNote);
       if (els.protoWrap)  els.protoWrap.hidden = true;
-      if (els.protoDebug) els.protoDebug.hidden = true;
       clearHTML(els.protoEyes);
       clearEl(els.protoCore); clearEl(els.protoBuild); clearEl(els.protoTest); clearEl(els.protoWhy);
       els.genProtoBtn.disabled = true;
@@ -948,32 +932,17 @@
         if (!res.ok){
           const msg = data?.error || `HTTP ${res.status}`;
           setStatus(els.protoStatus, msg, false);
-          if (els.protoDebug){
-            els.protoDebugNote.textContent = data?.detail ? String(data.detail) : '—';
-            els.protoDebugRaw.textContent = text || '';
-            els.protoDebug.hidden = false;
-          }
           return;
         }
 
         // Envelope handling
         if (data?.error){
           setStatus(els.protoStatus, data.error, false);
-          if (els.protoDebug){
-            els.protoDebugNote.textContent = data.detail ? String(data.detail) : '—';
-            els.protoDebugRaw.textContent = text || '';
-            els.protoDebug.hidden = true; // error already summarized; show details only if you prefer
-          }
           return;
         }
 
         if (data?.ok === false){
           setStatus(els.protoStatus, 'Model output could not be parsed (showing raw).', false);
-          if (els.protoDebug){
-            els.protoDebugNote.textContent = data?.note || '—';
-            els.protoDebugRaw.textContent = data?.raw || text || '';
-            els.protoDebug.hidden = false;
-          }
           return;
         }
 
@@ -1344,15 +1313,13 @@
         }).join('') : '<div class="muted">No failures</div>';
       }
 
-      // Optional: clear the separate monitoring box if you have one
-      if (els.riskMonitoring){ els.riskMonitoring.innerHTML = '<div class="muted">Shown per failure ↑</div>'; }
     }
 
 
     async function runRisks(){
       const t = requiredTripletOrStatus(els.riskStatus); if (!t) return;
       setStatus(els.riskStatus, 'Running…', false);
-      clearBoxScroll('#riskFailures .box-scroll'); clearBoxScroll('#riskMonitoring .box-scroll');
+      clearBoxScroll('#riskFailures .box-scroll');
       try{
         const res = await fetch(API.risks, {
           method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
