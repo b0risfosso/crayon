@@ -32,6 +32,7 @@ from prompts import (
     EMBODIED_SYS_MSG,
     ROADMAP_SYS_MSG,
     ARCHETYPE_PLAYBOOK_SYS_MSG,
+    RISKS_SYS_MSG,
 )
 
 app = Flask(__name__)
@@ -2453,138 +2454,6 @@ def api_narrative_embodied():
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
 
 
-@app.post("/api/narrative-playbook")
-def api_narrative_playbook():
-    data = request.get_json(silent=True) or {}
-
-    domain    = (data.get("domain") or "").strip()
-    dimension = (data.get("dimension") or "").strip()
-    problem   = (data.get("problem") or "").strip()
-    objective = (data.get("objective") or "").strip()
-    solution  = (data.get("solution") or "").strip()
-    provider  = _provider_from(data)  # openai | openai_web | xai | gemini | deepseek
-
-    missing = [k for k,v in {
-        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
-    }.items() if not v]
-    if missing:
-        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
-
-    user_msg = _roadmap_user_message(domain, dimension, problem, objective, solution)
-
-    try:
-        model_name = None
-        raw_text = None
-        parsed = None
-
-        if provider == "xai":
-            xai = get_xai_client()
-            model_name = os.getenv("XAI_MODEL", "grok-4")
-            chat = xai.chat.create(model=model_name)
-            chat.append(xai_system(ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON with key 'phases' (array). No prose."))
-            schema_hint = (
-                "Schema:\n"
-                "{ phases: [ { name, horizon, goal?, milestones:[], outputs:[], indicators:[], decision_gates:[] } ] }"
-            )
-            chat.append(xai_user(user_msg + "\n\n" + schema_hint))
-            response, parsed_obj = chat.parse(RoadmapPlaybook)
-            raw_text = getattr(response, "content", None)
-            parsed = parsed_obj
-
-        elif provider == "gemini":
-            client = get_gemini_client()
-            model_name = _gemini_model()
-            prompt = ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON matching the schema." + "\n\n" + user_msg
-            resp = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json",
-                    "response_schema": RoadmapPlaybook,
-                },
-            )
-            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
-            raw_text = getattr(resp, "text", None)
-
-        elif provider == "deepseek":
-            client = get_deepseek_client()
-            model_name = _deepseek_model()
-            sys_prompt = ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON with key 'phases'. No prose."
-            completion = client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_msg},
-                ],
-                temperature=0.3,
-            )
-            raw_text = (completion.choices[0].message.content or "").strip()
-            json_text = _extract_json_text(raw_text)  # your existing helper
-            try:
-                parsed = RoadmapPlaybook.model_validate_json(json_text)
-            except Exception:
-                parsed = None
-
-        elif provider == "openai_web":
-            client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
-            sys_prompt = ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\n" \
-                        "Schema: { phases: [ { name, horizon, goal?, milestones:[], outputs:[], indicators:[], decision_gates:[] } ] }"
-            resp = client.responses.create(
-                model=model_name,
-                tools=[{"type": "web_search"}],  # optional; consistent with your pattern
-                input=[
-                    {"role":"system","content": sys_prompt},
-                    {"role":"user","content": user_msg},
-                ],
-            )
-            raw_text = resp.output_text or ""
-            json_text = _extract_json_text(raw_text)
-            try:
-                parsed = RoadmapPlaybook.model_validate_json(json_text)
-            except Exception:
-                parsed = None
-
-        else:  # "openai"
-            client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
-            parsed_resp = client.responses.parse(
-                model=model_name,
-                input=[
-                    {"role":"system","content": ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
-                    {"role":"user","content": (
-                        user_msg + "\n\n"
-                        "Return an object with key 'phases' where each phase has: "
-                        "name, horizon, goal?, milestones[], outputs[], indicators[], decision_gates[]."
-                    )},
-                ],
-                text_format=RoadmapPlaybook,
-            )
-            parsed = parsed_resp.output_parsed
-            raw_text = parsed_resp.output_text
-
-        if parsed is None:
-            return jsonify({
-                "ok": False,
-                "provider": provider,
-                "model": model_name,
-                "raw": raw_text,
-                "note": "Parsing failed; 'raw' contains unparsed output."
-            }), 200
-
-        return jsonify({
-            "ok": True,
-            "provider": provider,
-            "model": model_name,
-            "domain": domain,
-            "dimension": dimension,
-            "playbook": parsed.model_dump(),
-        }), 200
-
-    except Exception as e:
-        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
-
-
 @app.post("/api/narrative-archetype-playbook")
 def api_narrative_archetype_playbook():
     data = request.get_json(silent=True) or {}
@@ -2721,3 +2590,137 @@ def api_narrative_archetype_playbook():
 
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
+
+@app.post("/api/narrative-risks")
+def api_narrative_risks():
+    data = request.get_json(silent=True) or {}
+
+    domain    = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    problem   = (data.get("problem") or "").strip()
+    objective = (data.get("objective") or "").strip()
+    solution  = (data.get("solution") or "").strip()
+    provider  = _provider_from(data)  # openai | openai_web | xai | gemini | deepseek
+
+    missing = [k for k,v in {
+        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
+    }.items() if not v]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    user_msg = _risks_user_message(domain, dimension, problem, objective, solution)
+
+    try:
+        model_name = None
+        raw_text = None
+        parsed: Optional[RiskAssessment] = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(RISKS_SYS_MSG + "\n\nReturn ONLY JSON with key 'failures' (array). No prose."))
+            schema_hint = (
+                "Schema:\n"
+                "{ failures: [ { name, symptoms:[], impact, countermeasures:[], "
+                "monitoring:{ metrics:[{metric, rationale?, yellow, red}], triggered_actions:[{action, owner?, notes?}] } } ] }"
+            )
+            chat.append(xai_user(user_msg + "\n\n" + schema_hint))
+            response, parsed_obj = chat.parse(RiskAssessment)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            prompt = RISKS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema." + "\n\n" + user_msg
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": RiskAssessment,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            sys_prompt = RISKS_SYS_MSG + "\n\nReturn ONLY JSON with key 'failures'. No prose."
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)  # your existing helper
+            try:
+                parsed = RiskAssessment.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            sys_prompt = RISKS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\n" \
+                        "Schema: { failures:[{ name, symptoms:[], impact, countermeasures:[], monitoring:{ metrics:[{metric, rationale?, yellow, red}], triggered_actions:[{action, owner?, notes?}] } }] }"
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type": "web_search"}],  # optional; consistent with your other endpoints
+                input=[
+                    {"role":"system","content": sys_prompt},
+                    {"role":"user","content": user_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = RiskAssessment.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": RISKS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
+                    {"role":"user","content": (
+                        user_msg + "\n\n"
+                        "Return an object with key 'failures'. Each failure has: name, symptoms[], impact, countermeasures[], "
+                        "monitoring:{ metrics:[{metric, rationale?, yellow, red}], triggered_actions:[{action, owner?, notes?}] }."
+                    )},
+                ],
+                text_format=RiskAssessment,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
+            }), 200
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain": domain,
+            "dimension": dimension,
+            "risks": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
