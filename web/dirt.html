@@ -194,33 +194,86 @@
     </section>
 
     <!-- Narrative Prototype -->
+    <!-- Narrative Prototype (JSON envelope) -->
     <section class="card" aria-labelledby="h-proto">
       <header><h2 id="h-proto">Narrative Prototype</h2></header>
       <div class="body">
-        <div class="actions">
-          <button id="genProtoBtn">Generate Prototype</button>
+        <div class="actions small" style="gap:.6rem;align-items:center;">
+          <span class="muted">POST <span class="pill">/api/narrative-prototype</span></span>
           <span id="protoStatus" class="muted"></span>
         </div>
-        <div id="protoWrap" hidden class="proto-box">
-          <div id="protoCore" style="white-space:pre-wrap;"></div>
-          <div id="protoBuild" style="white-space:pre-wrap;"></div>
-          <div id="protoTest" style="white-space:pre-wrap;"></div>
-          <div id="protoEyes"></div>
-          <div id="protoWhy" style="white-space:pre-wrap;"></div>
+
+        <div class="actions">
+          <button id="genProtoBtn">Generate Prototype</button>
+          <span id="protoRunNote" class="muted"></span>
         </div>
-        
+
+        <!-- Pretty, scrollable result -->
+        <div id="protoWrap" hidden class="proto-box">
+          <div><strong>Core Intent</strong><div id="protoCore" style="white-space:pre-wrap;"></div></div>
+          <div><strong>Minimal Build</strong><div id="protoBuild" style="white-space:pre-wrap;"></div></div>
+          <div><strong>Load-Bearing Test</strong><div id="protoTest" style="white-space:pre-wrap;"></div></div>
+          <div><strong>First Eyes</strong><div id="protoEyes"></div></div>
+          <div><strong>Why This is a Box of Dirt</strong><div id="protoWhy" style="white-space:pre-wrap;"></div></div>
+        </div>
+
+        <!-- Debug panel (shown when ok === false or error present) -->
+        <div id="protoDebug" hidden class="box-section" style="margin-top:.6rem;">
+          <h3>Debug Output</h3>
+          <div class="box-scroll">
+            <div id="protoDebugNote" class="muted" style="margin-bottom:.35rem;"></div>
+            <pre id="protoDebugRaw" class="codeblock" tabindex="0" style="max-height:220px;"></pre>
+          </div>
+        </div>
       </div>
     </section>
 
+
     <!-- Deployment & Artifacts -->
+    <!-- Deployment & Box-of-Dirt Artifacts (JSON envelope) -->
     <section class="card" aria-labelledby="h-artifacts">
       <header><h2 id="h-artifacts">Deployment & Box-of-Dirt Artifacts</h2></header>
       <div class="body">
-        <div class="actions">
-          <button id="genArtifactsBtn">Generate Artifacts (Markdown)</button>
+        <div class="actions small" style="gap:.6rem;align-items:center;">
+          <span class="muted">POST <span class="pill">/api/box-of-dirt/artifacts</span></span>
           <span id="artifactsStatus" class="muted"></span>
         </div>
-        <pre id="artifactsMd" class="codeblock" tabindex="0" style="min-height:180px;"></pre>
+
+        <div class="actions">
+          <button id="genArtifactsBtn">Generate Artifacts</button>
+          <span id="artRunNote" class="muted"></span>
+        </div>
+
+        <!-- Pretty layout for JSON bundle -->
+        <div class="cardgrid-2" id="artifactsPretty" style="margin-top:.25rem;">
+          <div class="box-section">
+            <h3>Real Artifacts</h3>
+            <div class="box-scroll" id="realArtifactsBox"><!-- filled by JS --></div>
+          </div>
+          <div class="box-section">
+            <h3>Box of Dirt</h3>
+            <div class="box-scroll" id="bodItemsBox"><!-- filled by JS --></div>
+          </div>
+        </div>
+
+        <div class="box-section" style="margin-top:.6rem;">
+          <h3>Safety & Guardrails</h3>
+          <div class="box-scroll" id="guardrailsBox"><!-- filled by JS --></div>
+        </div>
+
+        <div class="box-section" style="margin-top:.6rem;">
+          <h3 id="nextStepsTitle">Next steps (48–72 hours)</h3>
+          <div class="box-scroll" id="nextStepsBox"><!-- filled by JS --></div>
+        </div>
+
+        <!-- Debug panel (when ok === false or error present) -->
+        <div id="artifactsDebug" hidden class="box-section" style="margin-top:.6rem;">
+          <h3>Debug Output</h3>
+          <div class="box-scroll">
+            <div id="artifactsDebugNote" class="muted" style="margin-bottom:.35rem;"></div>
+            <pre id="artifactsDebugRaw" class="codeblock" tabindex="0" style="max-height:220px;"></pre>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -287,7 +340,7 @@
           <div class="box-section" id="embHands"><h3>Touch</h3><div class="box-scroll"></div></div>
           <div class="box-section" id="embNose"><h3>Smell</h3><div class="box-scroll"></div></div>
           <div class="box-section" id="embMouth"><h3>Taste</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embSkin"><h3>Music</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embMusic"><h3>Music</h3><div class="box-scroll"></div></div>
         </div>
       </div>
     </section>
@@ -349,6 +402,10 @@
       protoTest: document.getElementById('protoTest'),
       protoEyes: document.getElementById('protoEyes'),
       protoWhy: document.getElementById('protoWhy'),
+      protoRunNote: document.getElementById('protoRunNote'),
+      protoDebug: document.getElementById('protoDebug'),
+      protoDebugNote: document.getElementById('protoDebugNote'),
+      protoDebugRaw: document.getElementById('protoDebugRaw'),
 
       // Context
       ctxDomainTitle: document.getElementById('ctxDomainTitle'),
@@ -361,7 +418,15 @@
       // Artifacts
       genArtifactsBtn: document.getElementById('genArtifactsBtn'),
       artifactsStatus: document.getElementById('artifactsStatus'),
-      artifactsMd: document.getElementById('artifactsMd'),
+      artRunNote: document.getElementById('artRunNote'),
+      realArtifactsBox: document.getElementById('realArtifactsBox'),
+      bodItemsBox: document.getElementById('bodItemsBox'),
+      guardrailsBox: document.getElementById('guardrailsBox'),
+      nextStepsTitle: document.getElementById('nextStepsTitle'),
+      nextStepsBox: document.getElementById('nextStepsBox'),
+      artifactsDebug: document.getElementById('artifactsDebug'),
+      artifactsDebugNote: document.getElementById('artifactsDebugNote'),
+      artifactsDebugRaw: document.getElementById('artifactsDebugRaw'),
 
       // Validation
       valStatus: document.getElementById('valStatus'),
@@ -583,76 +648,6 @@
         els.seed.innerHTML = `<option value="">Failed to load seeds</option>`;
       }
     }
-    function currentSeedId(){
-      const fromSelect = els.seed.value && Number(els.seed.value);
-      const fromInput = els.seedIdInput.value && Number(els.seedIdInput.value);
-      return fromSelect || fromInput || null;
-    }
-
-    // Prototype generation
-    async function generatePrototypeAndBuild(){
-      const nid = els.domain.value;
-      const did = els.dimension.value;
-      const sid = els.seed.value;
-
-      const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
-      const dims = cache.dims.get(nid) || [];
-      const dimRow = dims.find(d => String(d.id) === String(did));
-      const seeds = cache.seeds.get(did) || [];
-      const seedRow = seeds.find(s => String(s.id) === String(sid));
-
-      const errs = [];
-      if (!domainRow) errs.push('domain');
-      if (!dimRow) errs.push('dimension');
-      if (!seedRow) errs.push('seed');
-      if (errs.length){
-        els.protoStatus.textContent = `Select a ${errs.join(', ')} first.`;
-        els.protoWrap.hidden = true;
-        return;
-      }
-
-      els.genProtoBtn.disabled = true;
-      els.protoStatus.textContent = 'Generating…';
-      els.protoWrap.hidden = true;
-
-      try{
-        const protoRes = await fetch('/api/narrative-prototype', {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
-          body: JSON.stringify({
-            domain: stripHashId(domainRow.title || `Narrative ${domainRow.id}`),
-            dimension: stripHashId(dimRow.title || `Dimension ${dimRow.id}`),
-            seed: {
-              problem: seedRow.problem || '',
-              objective: seedRow.objective || '',
-              solution: seedRow.solution || ''
-            }
-          })
-        });
-        if (!protoRes.ok) throw new Error(`HTTP ${protoRes.status}`);
-        const out = await protoRes.json();
-        const p = out.prototype || out;
-
-        els.protoCore.innerText  = p.core_intent ? `Core Intent — ${p.core_intent}` : '';
-        els.protoBuild.innerText = p.minimal_build ? `Minimal Build — ${p.minimal_build}` : '';
-        els.protoTest.innerText  = p.load_bearing_test ? `Load-Bearing Test — ${p.load_bearing_test}` : '';
-        if (Array.isArray(p.first_eyes)) {
-          els.protoEyes.innerHTML = `<div style="font-weight:600;">First Eyes —</div>` +
-            `<ul style="margin:.25rem 0 .5rem .95rem; padding:0;">` +
-            p.first_eyes.map(x => `<li>${String(x)}</li>`).join('') + `</ul>`;
-        } else {
-          els.protoEyes.textContent = p.first_eyes ? `First Eyes — ${p.first_eyes}` : '';
-        }
-        els.protoWhy.innerText = p.why_box_of_dirt ? `Why This is a Box of Dirt — ${p.why_box_of_dirt}` : '';
-        els.protoWrap.hidden = false;
-        els.protoStatus.textContent = '';
-      }catch(e){
-        els.protoStatus.textContent = 'Error: ' + e.message;
-        els.protoWrap.hidden = true;
-      }finally{
-        els.genProtoBtn.disabled = false;
-      }
-    }
 
     // Artifacts (Markdown only, per your prior setup)
     async function generateArtifactsAndPage() {
@@ -681,18 +676,16 @@
       const seedThree = composeSeedText(seedRow);
 
       els.artifactsStatus.textContent = 'Generating artifacts…';
-      els.artifactsMd.textContent = '';
       els.genArtifactsBtn.disabled = true;
 
       try {
         const artRes = await fetch(API.bodArtifacts, {
           method:'POST',
-          headers:{'Content-Type':'application/json', 'Accept':'text/markdown'},
+          headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ domain, dimension, seed: seedThree })
         });
         if (!artRes.ok) throw new Error(`Artifacts HTTP ${artRes.status}`);
         const md = await artRes.text();
-        els.artifactsMd.textContent = md;
 
         els.artifactsStatus.textContent = 'OK — artifacts generated';
         els.artifactsStatus.classList.add('ok');
@@ -815,6 +808,9 @@
       return t;
     }
 
+    function clearEl(el){ if (el) el.textContent = ''; }
+    function clearHTML(el){ if (el) el.innerHTML = ''; }
+
     // tiny util to clear sections without deleting their containers
     function clearBoxScroll(selector){
       const el = document.querySelector(selector);
@@ -905,6 +901,239 @@
       catch(_) { return raw; }
     }
 
+    function renderPrototypeEnvelope(payload){
+      const p = payload?.prototype ?? payload; // tolerate direct object
+      if (!p) return;
+
+      // Pretty content
+      els.protoCore.textContent  = p.core_intent || '';
+      els.protoBuild.textContent = p.minimal_build || '';
+      els.protoTest.textContent  = p.load_bearing_test || '';
+
+      if (Array.isArray(p.first_eyes) && p.first_eyes.length){
+        els.protoEyes.innerHTML = `<ul style="margin:.25rem 0 0 1rem; padding:0;">${
+          p.first_eyes.map(x => `<li>${escapeHTML(String(x))}</li>`).join('')
+        }</ul>`;
+      } else {
+        els.protoEyes.textContent = '';
+      }
+
+      els.protoWhy.textContent = p.why_box_of_dirt || '';
+
+      // Show pretty, hide debug
+      if (els.protoWrap)  els.protoWrap.hidden = false;
+      if (els.protoDebug) els.protoDebug.hidden = true;
+    }
+
+    async function generatePrototypeAndBuild(){
+      const t = requiredTripletOrStatus(els.protoStatus); if (!t) return;
+
+      // Reset UI
+      setStatus(els.protoStatus, 'Running…', false);
+      clearEl(els.protoRunNote);
+      if (els.protoWrap)  els.protoWrap.hidden = true;
+      if (els.protoDebug) els.protoDebug.hidden = true;
+      clearHTML(els.protoEyes);
+      clearEl(els.protoCore); clearEl(els.protoBuild); clearEl(els.protoTest); clearEl(els.protoWhy);
+      els.genProtoBtn.disabled = true;
+
+      try{
+        // Build request per new API shape: either SeedInput variant is allowed; we’ll send the split fields
+        const body = {
+          domain: t.domain,
+          dimension: t.dimension,
+          provider: DEFAULT_PROVIDER, // explicit default
+          seed: { problem: t.problem, objective: t.objective, solution: t.solution }, // also allowed by API
+        };
+
+        const res = await fetch('/api/narrative-prototype', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch { /* leave as null for error display */ }
+
+        // HTTP error -> surface .error if present
+        if (!res.ok){
+          const msg = data?.error || `HTTP ${res.status}`;
+          setStatus(els.protoStatus, msg, false);
+          if (els.protoDebug){
+            els.protoDebugNote.textContent = data?.detail ? String(data.detail) : '—';
+            els.protoDebugRaw.textContent = text || '';
+            els.protoDebug.hidden = false;
+          }
+          return;
+        }
+
+        // Envelope handling
+        if (data?.error){
+          setStatus(els.protoStatus, data.error, false);
+          if (els.protoDebug){
+            els.protoDebugNote.textContent = data.detail ? String(data.detail) : '—';
+            els.protoDebugRaw.textContent = text || '';
+            els.protoDebug.hidden = true; // error already summarized; show details only if you prefer
+          }
+          return;
+        }
+
+        if (data?.ok === false){
+          setStatus(els.protoStatus, 'Model output could not be parsed (showing raw).', false);
+          if (els.protoDebug){
+            els.protoDebugNote.textContent = data?.note || '—';
+            els.protoDebugRaw.textContent = data?.raw || text || '';
+            els.protoDebug.hidden = false;
+          }
+          return;
+        }
+
+        if (data?.ok === true){
+          renderPrototypeEnvelope(data);
+          setStatus(els.protoStatus, 'OK', true);
+          return;
+        }
+
+        // Fallback: try to render if the object already looks like the prototype
+        renderPrototypeEnvelope(data);
+        setStatus(els.protoStatus, 'OK', true);
+      }catch(e){
+        setStatus(els.protoStatus, e.message, false);
+      }finally{
+        els.genProtoBtn.disabled = false;
+      }
+    }
+
+    // ============ ARTIFACTS (JSON envelope) ============
+
+    function renderArtifactsBundle(bundle){
+      if (!bundle) return;
+
+      // Real artifacts
+      if (els.realArtifactsBox){
+        const arr = Array.isArray(bundle.real_artifacts) ? bundle.real_artifacts : [];
+        els.realArtifactsBox.innerHTML = arr.length ? arr.map(a => {
+          const title = `<div style="font-weight:650;">${escapeHTML(a.title||'')}</div>`;
+          const owner = a.owner ? `<div class="box-kv"><strong>Owner:</strong> ${escapeHTML(a.owner)}</div>` : '';
+          const desc  = a.description ? `<div>${escapeHTML(a.description)}</div>` : '';
+          const notes = a.notes ? `<div class="muted">${escapeHTML(a.notes)}</div>` : '';
+          return `<div style="margin:.6rem 0;">${title}${owner}${desc}${notes}</div>`;
+        }).join('') : '<div class="muted">—</div>';
+      }
+
+      // Box of Dirt items
+      if (els.bodItemsBox){
+        const arr = Array.isArray(bundle.box_of_dirt) ? bundle.box_of_dirt : [];
+        els.bodItemsBox.innerHTML = arr.length ? arr.map(b => {
+          const title = `<div style="font-weight:650;">${escapeHTML(b.title||'')}</div>`;
+          const owner = b.owner ? `<div class="box-kv"><strong>Owner:</strong> ${escapeHTML(b.owner)}</div>` : '';
+          const bullets = Array.isArray(b.bullets) && b.bullets.length
+            ? `<ul>${b.bullets.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ul>` : '';
+          return `<div style="margin:.6rem 0;">${title}${owner}${bullets}</div>`;
+        }).join('') : '<div class="muted">—</div>';
+      }
+
+      // Safety / guardrails
+      if (els.guardrailsBox){
+        els.guardrailsBox.innerHTML = bundle.safety_guardrails
+          ? `<pre class="codeblock" tabindex="0" style="max-height:220px;">${escapeHTML(bundle.safety_guardrails)}</pre>`
+          : '<div class="muted">—</div>';
+      }
+
+      // Next steps
+      if (els.nextStepsTitle){
+        els.nextStepsTitle.textContent = bundle.next_steps_title || 'Next steps (48–72 hours)';
+      }
+      if (els.nextStepsBox){
+        const steps = Array.isArray(bundle.next_steps) ? bundle.next_steps : [];
+        els.nextStepsBox.innerHTML = steps.length
+          ? `<ol style="margin:.2rem 0 0 1rem;">${steps.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ol>`
+          : '<div class="muted">—</div>';
+      }
+    }
+
+    async function generateArtifacts(){
+      const t = requiredTripletOrStatus(els.artifactsStatus); if (!t) return;
+
+      // Reset UI
+      setStatus(els.artifactsStatus, 'Running…', false);
+      clearEl(els.artRunNote);
+      clearHTML(els.realArtifactsBox);
+      clearHTML(els.bodItemsBox);
+      clearHTML(els.guardrailsBox);
+      clearHTML(els.nextStepsBox);
+      if (els.artifactsDebug) els.artifactsDebug.hidden = true;
+      els.genArtifactsBtn.disabled = true;
+
+      try{
+        // Build request per new API shape. Send split seed fields to avoid any parsing ambiguity.
+        const body = {
+          domain: t.domain,
+          dimension: t.dimension,
+          provider: DEFAULT_PROVIDER,
+          seed_problem: t.problem,
+          seed_objective: t.objective,
+          seed_solution: t.solution,
+        };
+
+        const res = await fetch('/api/box-of-dirt/artifacts', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch { /* leave as null for error display */ }
+
+        if (!res.ok){
+          const msg = data?.error || `HTTP ${res.status}`;
+          setStatus(els.artifactsStatus, msg, false);
+          if (els.artifactsDebug){
+            els.artifactsDebugNote.textContent = data?.detail ? String(data.detail) : '—';
+            els.artifactsDebugRaw.textContent = text || '';
+            els.artifactsDebug.hidden = false;
+          }
+          return;
+        }
+
+        if (data?.error){
+          setStatus(els.artifactsStatus, data.error, false);
+          if (els.artifactsDebug){
+            els.artifactsDebugNote.textContent = data.detail ? String(data.detail) : '—';
+            els.artifactsDebugRaw.textContent = text || '';
+            els.artifactsDebug.hidden = false;
+          }
+          return;
+        }
+
+        if (data?.ok === false){
+          setStatus(els.artifactsStatus, 'Model output could not be parsed (showing raw).', false);
+          if (els.artifactsDebug){
+            els.artifactsDebugNote.textContent = data?.note || '—';
+            els.artifactsDebugRaw.textContent = data?.raw || text || '';
+            els.artifactsDebug.hidden = true; // you can set to false if you want to show the raw panel
+          }
+          return;
+        }
+
+        if (data?.ok === true){
+          renderArtifactsBundle(data.artifacts);
+          setStatus(els.artifactsStatus, 'OK', true);
+          return;
+        }
+
+        // Fallback: attempt to render if the object already looks like the bundle
+        renderArtifactsBundle(data?.artifacts ?? data);
+        setStatus(els.artifactsStatus, 'OK', true);
+      }catch(e){
+        setStatus(els.artifactsStatus, e.message, false);
+      }finally{
+        els.genArtifactsBtn.disabled = false;
+      }
+    }
+
     function renderContext(){
       const nid = els.domain.value;
       const domainRow = (cache.narratives || []).find(n => String(n.id) === String(nid));
@@ -975,8 +1204,7 @@
       const v = payload?.embodied || payload?.map || payload;
       const keys = [
         ['embEyes', v?.eyes], ['embEars', v?.ears], ['embHands', v?.hands],
-        ['embNose', v?.nose], ['embMouth', v?.mouth], ['embSkin', v?.skin],
-        ['embForces', v?.forces],
+        ['embNose', v?.nose], ['embMouth', v?.mouth], ['embMusic', v?.music],
       ];
       for (const [id, arr] of keys){
         const box = document.querySelector(`#${id} .box-scroll`);
@@ -993,7 +1221,7 @@
     async function runEmbodied(){
       const t = requiredTripletOrStatus(els.embStatus); if (!t) return;
       setStatus(els.embStatus, 'Running…', false);
-      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll','#embNose .box-scroll','#embMouth .box-scroll','#embSkin .box-scroll','#embForces .box-scroll'].forEach(clearBoxScroll);
+      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll','#embNose .box-scroll','#embMouth .box-scroll','#embMusic .box-scroll'].forEach(clearBoxScroll);
       try{
         const res = await fetch(API.embodied, {
           method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
@@ -1182,11 +1410,11 @@
       renderContext();
     });
 
-    els.genProtoBtn.addEventListener('click', generatePrototypeAndBuild);
-    els.genArtifactsBtn.addEventListener('click', generateArtifactsAndPage);
+    els.genProtoBtn?.addEventListener('click', generatePrototypeAndBuild);
+    els.genArtifactsBtn?.addEventListener('click', generateArtifacts);
 
     // Validation events
-    els.runValidationBtn.addEventListener('click', runValidation);
+    els.runValidationBtn?.addEventListener('click', runValidation);
     els.runStakeBtn?.addEventListener('click', runStakeholders);
     els.runEmbBtn?.addEventListener('click', runEmbodied);
     els.runRoadBtn?.addEventListener('click', runRoadmap);

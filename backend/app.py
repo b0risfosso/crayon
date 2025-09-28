@@ -397,6 +397,25 @@ class FailurePoint(BaseModel):
 class RiskAssessment(BaseModel):
     failures: List[FailurePoint] = Field(..., description="List of failure points with monitoring")
 
+class RealArtifact(BaseModel):
+    title: str = Field(..., description="One-line name")
+    owner: str = Field(..., description="Role/team")
+    description: str = Field(..., description="1–2 sentences on what & why")
+    notes: Optional[str] = Field(None, description="Constraints, standards, or regulatory anchors")
+
+class BoxOfDirtItem(BaseModel):
+    title: str = Field(..., description="One-line name")
+    owner: str = Field(..., description="Role/team")
+    bullets: List[str] = Field(..., description="2–4 immediate prototype actions")
+
+class ArtifactsBundle(BaseModel):
+    real_artifacts: List[RealArtifact] = Field(..., description="8–12 prioritized deployable artifacts")
+    box_of_dirt: List[BoxOfDirtItem] = Field(..., description="8–12 prioritized minimal prototypes")
+    safety_guardrails: Optional[str] = Field(None, description="Short paragraph if safety-sensitive; else 'No special safety issues.'")
+    next_steps_title: str = Field(default="Next steps (48–72 hours)")
+    next_steps: List[str] = Field(default_factory=list, description="Exactly 3 concrete actions")
+
+
 
 
 
@@ -450,43 +469,15 @@ def _compose_three_line_seed(seed_str, problem, objective, solution):
     if solution:  parts.append(f"Solution (Link): {solution.strip()}")
     return "\n".join(parts)
 
-def _make_artifacts_user_msg(domain, dimension, seed_three_line):
-    instruction = (
-        "Produce (A) and (B) as described by the System prompt. Focus on practical deployment artifacts first; "
-        "then list immediate \"box-of-dirt\" prototypes I can build today (documents, schemas, mock UI, safe simulators). "
-        "Follow the System rules about safety and artifact structure. End with exactly 3 next steps the requester can do in 48–72 hours."
-    )
-    output_format = (
-        "OUTPUT FORMAT (how to structure the assistant's reply)\n"
-        "Use this structure exactly. Each artifact entry should be short and uniform.\n"
-        "(A) Real, deployable artifacts\n"
-        "Artifact name — 1–2 sentence description (what it is and why required).\n"
-        "Owner: Role/team\n"
-        "Notes: 1–2 short constraints/standards/regulatory anchors (if relevant)\n"
-        "(Repeat for 8–12 items.)\n"
-        "(B) Box-of-dirt artifacts you can build right now\n"
-        "Prototype name — 1–2 sentence description (what it produces and who it’s for).\n"
-        "Immediate prototypes:\n"
-        "file_or_artifact_name.ext — short description (what you'll produce in that file)\n"
-        "another_file.ext — short description\n"
-        "Owner: Role/team\n"
-        "(Repeat for 8–12 items.)\n"
-        "Safety guardrails\n"
-        "One short paragraph if the domain is safety-sensitive, otherwise one line: \"No special safety issues.\"\n"
-        "3 Next steps (48–72 hours)\n"
-        "Short, concrete action (e.g., \"Create feedstock_schema.json with fields X,Y,Z.\")\n"
-        "Short, concrete action\n"
-        "Short, concrete action"
-    )
+def _make_artifacts_user_msg(domain: str, dimension: str, seed_three_line: str) -> str:
+    # Straightforward, model-friendly input
     return (
-        f"USER (prompt template)\n"
         f"Domain: {domain}\n"
         f"Dimension: {dimension}\n"
-        f"Seed: {seed_three_line}\n"
-        f"Instruction to assistant (paste below exactly after the 3 fields above):\n"
-        f"{instruction}\n"
-        f"{output_format}"
+        f"Seed (three lines):\n{seed_three_line}\n\n"
+        "Produce the JSON object exactly per schema."
     )
+
 
 def _provider_from(data: dict) -> str:
     p = (data.get("provider") or "").strip().lower()
@@ -1375,57 +1366,123 @@ def api_dimension_seeds(dimension_id: int):
 @app.post("/api/narrative-prototype")
 def api_narrative_prototype():
     data = request.get_json(silent=True) or {}
-    domain = (data.get("domain") or "").strip()
+    domain    = (data.get("domain") or "").strip()
     dimension = (data.get("dimension") or "").strip()
+    provider  = _provider_from(data)
 
-    # Accept either flat fields or a nested seed object
     seed = data.get("seed") or {}
-    problem = (data.get("problem") or seed.get("problem") or "").strip()
+    problem   = (data.get("problem")   or seed.get("problem")   or "").strip()
     objective = (data.get("objective") or seed.get("objective") or "").strip()
-    solution = (data.get("solution") or seed.get("solution") or "").strip()
+    solution  = (data.get("solution")  or seed.get("solution")  or "").strip()
 
-    # Validation
-    missing = []
-    if not domain: missing.append("domain")
-    if not dimension: missing.append("dimension")
-    if not problem: missing.append("problem")
-    if not objective: missing.append("objective")
-    if not solution: missing.append("solution")
+    missing = [k for k,v in {
+        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
+    }.items() if not v]
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
     usr_msg = _prototype_user_msg(domain, dimension, problem, objective, solution)
 
     try:
-        parsed_resp = client.responses.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
-            input=[
-                {"role": "system", "content": PROTOTYPE_SYS_MSG},
-                {"role": "user", "content": usr_msg},
-            ],
-            text_format=NarrativePrototype,
-        )
+        parsed = None
+        raw_text = None
+        model_name = None
 
-        parsed = parsed_resp.output_parsed  # -> NarrativePrototype | None
-        if not parsed:
-            # Helpful debug path if parsing fails
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(PROTOTYPE_SYS_MSG))
+            chat.append(xai_user(usr_msg))
+            response, parsed_obj = chat.parse(NarrativePrototype)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=PROTOTYPE_SYS_MSG + "\n\n" + usr_msg,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": NarrativePrototype,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role":"system","content": PROTOTYPE_SYS_MSG},
+                    {"role":"user","content": usr_msg},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = NarrativePrototype.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type":"web_search"}],  # optional
+                input=[
+                    {"role":"system","content": PROTOTYPE_SYS_MSG},
+                    {"role":"user","content": usr_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = NarrativePrototype.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": PROTOTYPE_SYS_MSG},
+                    {"role":"user","content": usr_msg},
+                ],
+                text_format=NarrativePrototype,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
             return jsonify({
-                "domain": domain,
-                "dimension": dimension,
-                "raw": parsed_resp.output_text,
-                "note": "Parsing failed; 'raw' contains the unparsed model output."
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
             }), 200
 
-        proto = parsed.model_dump()
         return jsonify({
             "ok": True,
+            "provider": provider,
+            "model": model_name,
             "domain": domain,
             "dimension": dimension,
-            "prototype": proto
+            "prototype": parsed.model_dump(),
         }), 200
 
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
 
 
 @app.get("/api/seeds/<int:seed_id>/box")
@@ -1890,51 +1947,15 @@ def list_seed_svgs(seed_id: int):
         })
     return jsonify({"items": items})
 
-@app.route("/api/box-of-dirt", methods=["POST"])
-def box_of_dirt():
-    data = request.get_json(silent=True) or {}
-    domain     = (data.get("domain") or "").strip()
-    dimension  = (data.get("dimension") or "").strip()
-    seed       = (data.get("seed") or "").strip()
-    prototype  = (data.get("prototype") or "").strip()
-    thesis     = (data.get("thesis") or "").strip()
-
-    if not (domain and dimension and seed and prototype):
-        return jsonify({"error": "domain, dimension, seed, prototype are required"}), 400
-
-    parts = [
-        "INPUT (paste your case here; the model will parse it)",
-        "Domain", domain,
-        "Dimension", dimension
-    ]
-    if thesis:
-        parts.append(thesis)
-    parts += ["Seed", seed, "Prototype", prototype]
-    full_prompt = f"{BOX_OF_DIRT_PROMPT}\n" + "\n".join(parts)
-
-    try:
-        client = _get_llm()
-        res = client.chat.completions.create(
-            model="gpt-5-mini-2025-08-07",
-            messages=[{"role":"user","content": full_prompt}]
-        )
-        html = (res.choices[0].message.content or "").strip()
-        if html.startswith("```"):
-            # strip accidental markdown fences
-            html = html.strip("`")
-            html = html.split("\n", 1)[-1] if "\n" in html else html
-        return Response(html, mimetype="text/html; charset=utf-8")
-    except Exception as e:
-        return jsonify({"error": f"generation failed: {e}"}), 500
 
 
-@app.route("/api/box-of-dirt/artifacts", methods=["POST"])
-def box_of_dirt_artifacts():
+@app.post("/api/box-of-dirt/artifacts")
+def api_box_of_dirt_artifacts():
     data = request.get_json(silent=True) or {}
     domain    = (data.get("domain") or "").strip()
     dimension = (data.get("dimension") or "").strip()
+    provider  = _provider_from(data)
 
-    # Accept either `seed` (3-line) or components:
     seed_three = _compose_three_line_seed(
         data.get("seed"),
         data.get("seed_problem"),
@@ -1948,90 +1969,106 @@ def box_of_dirt_artifacts():
     user_msg = _make_artifacts_user_msg(domain, dimension, seed_three)
 
     try:
-        client = _get_llm()
-        res = client.chat.completions.create(
-            model="gpt-5-mini-2025-08-07",
-            messages=[
-                {"role":"system", "content": BOX_OF_DIRT_ARTIFACTS_SYSTEM},
-                {"role":"user",   "content": user_msg},
-            ],
-        )
-        md = (res.choices[0].message.content or "").strip()
-        # In case a model adds code fences, strip them to keep pure Markdown text
-        if md.startswith("```"):
-            md = md.strip("`")
-            md = md.split("\n", 1)[-1] if "\n" in md else md
-        return Response(md, mimetype="text/markdown; charset=utf-8")
+        parsed = None
+        raw_text = None
+        model_name = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(BOX_OF_DIRT_ARTIFACTS_SYSTEM))
+            chat.append(xai_user(user_msg))
+            response, parsed_obj = chat.parse(ArtifactsBundle)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=BOX_OF_DIRT_ARTIFACTS_SYSTEM + "\n\n" + user_msg,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": ArtifactsBundle,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role":"system","content": BOX_OF_DIRT_ARTIFACTS_SYSTEM},
+                    {"role":"user","content": user_msg},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = ArtifactsBundle.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type":"web_search"}],  # optional; consistent with other endpoints
+                input=[
+                    {"role":"system","content": BOX_OF_DIRT_ARTIFACTS_SYSTEM},
+                    {"role":"user","content": user_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = ArtifactsBundle.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": BOX_OF_DIRT_ARTIFACTS_SYSTEM},
+                    {"role":"user","content": user_msg},
+                ],
+                text_format=ArtifactsBundle,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
+            }), 200
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain": domain,
+            "dimension": dimension,
+            "artifacts": parsed.model_dump(),
+        }), 200
+
     except Exception as e:
-        return jsonify({"error": f"artifacts generation failed: {e}"}), 500
-
-@app.route("/api/render-artifact", methods=["POST"], strict_slashes=False)
-def render_seed():
-    payload = request.get_json(silent=True) or {}
-    artifact_yaml = payload.get("artifact_yaml", "")
-    artifacts_md  = payload.get("artifacts_markdown", "")
-    model = payload.get("model")
-    temperature = float(payload.get("temperature", 0.1))
-
-    if not artifact_yaml or "domain:" not in artifact_yaml:
-        return jsonify({"error": "artifact_yaml is required and must include YAML content."}), 400
-    try:
-        # tell the model about the markdown so it can fill the arrays
-        prompt = build_user_prompt(artifact_yaml, artifacts_md)
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        resp = client.chat.completions.create(
-            model="gpt-5-mini-2025-08-07",
-            messages=[{"role":"system","content": SYSTEM_INSTRUCTIONS},
-                      {"role":"user","content": prompt}],
-        )
-        txt = (resp.choices[0].message.content or "")
-        html = extract_html_codeblock(txt) or txt
-        if not html.strip().startswith("<!DOCTYPE html"):
-            raise ValueError("Model did not return an HTML document.")
-        return jsonify({"html": html})
-    except Exception as e:
-        return jsonify({"error": f"{e}"}), 500
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
 
 
-@app.post("/api/box-of-dirt/bulk")
-def api_bulk_start():
-    data = request.get_json(silent=True) or {}
-    try:
-        n = int(data.get("n", 0))
-    except Exception:
-        n = 0
-    if n <= 0:
-        return jsonify({"ok": False, "error": "n must be a positive integer"}), 400
-
-    seed_ids = _pick_random_seed_ids(n)
-    if not seed_ids:
-        return jsonify({"ok": False, "error": "no seeds available"}), 400
-
-    job_id = uuid.uuid4().hex
-    with BULK_JOBS_LOCK:
-        BULK_JOBS[job_id] = {
-            "job_id": job_id,
-            "created_at": datetime.utcnow().isoformat(),
-            "n": len(seed_ids),
-            "done": False,
-            "ok": 0,
-            "fail": 0,
-            "items": []
-        }
-
-    t = threading.Thread(target=_bulk_worker, args=(job_id, seed_ids), daemon=True)
-    t.start()
-
-    return jsonify({"ok": True, "job_id": job_id, "n": len(seed_ids)}), 200
-
-
-@app.get("/api/box-of-dirt/bulk/<job_id>")
-def api_bulk_status(job_id):
-    with BULK_JOBS_LOCK:
-        job = BULK_JOBS.get(job_id)
-    if not job:
-        return jsonify({"ok": False, "error": "job not found"}), 404
-    return jsonify({"ok": True, **job}), 200
 
 
 @app.post("/api/narrative-validation")
