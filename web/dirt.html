@@ -98,6 +98,38 @@
 
     @media (max-width: 1100px){ .validation-grid { grid-template-columns: 1fr; } }
 
+    .proto-box {
+      border: 1px solid color-mix(in oklab, CanvasText 14%, transparent);
+      border-radius: .6rem;
+      padding: .75rem;
+      background: color-mix(in oklab, Canvas 96%, CanvasText 4%);
+      display: grid;
+      gap: .5rem;
+
+      /* NEW: lock height + scroll */
+      max-height: 300px;   /* adjust as needed */
+      overflow-y: auto;
+    }
+
+    /* Reusable grids + scroll areas for the new cards */
+    .cardgrid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:.75rem; }
+    .cardgrid-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:.75rem; }
+    .cardgrid-4 { display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:.75rem; }
+    @media (max-width: 1100px){
+      .cardgrid-4, .cardgrid-3, .cardgrid-2 { grid-template-columns: 1fr; }
+    }
+    .box-section {
+      border: 1px solid color-mix(in oklab, CanvasText 14%, transparent);
+      border-radius: .6rem;
+      background: color-mix(in oklab, Canvas 96%, CanvasText 4%);
+      padding: .75rem;
+      display:flex; flex-direction:column; gap:.25rem;
+    }
+    .box-section h3 { margin:0 0 .35rem 0; font-size:.95rem; font-weight:650; }
+    .box-scroll { flex:1; overflow-y:auto; max-height: 260px; font-size:.9rem; line-height:1.35; }
+    .box-scroll ul { margin:.3rem 0 0 1rem; padding:0; }
+    .box-kv { font-size:.85rem; opacity:.85; }
+
   </style>
 </head>
 <body>
@@ -169,14 +201,14 @@
           <button id="genProtoBtn">Generate Prototype</button>
           <span id="protoStatus" class="muted"></span>
         </div>
-        <div id="protoWrap" hidden style="border:1px solid color-mix(in oklab, CanvasText 14%, transparent);
-             border-radius:.6rem; padding:.75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); display:grid; gap:.5rem;">
+        <div id="protoWrap" hidden class="proto-box">
           <div id="protoCore" style="white-space:pre-wrap;"></div>
           <div id="protoBuild" style="white-space:pre-wrap;"></div>
           <div id="protoTest" style="white-space:pre-wrap;"></div>
           <div id="protoEyes"></div>
           <div id="protoWhy" style="white-space:pre-wrap;"></div>
         </div>
+        
       </div>
     </section>
 
@@ -217,6 +249,102 @@
   
       </div>
     </section>
+
+    <!-- Stakeholder mapping -->
+    <section class="card" aria-labelledby="h-stake">
+      <header><h2 id="h-stake">Stakeholder Mapping</h2></header>
+      <div class="body">
+        <div class="actions small">
+          <span class="muted">POST <span class="pill">/api/narrative-stakeholders</span></span>
+          <span id="stakeStatus" class="muted"></span>
+        </div>
+        <div class="actions">
+          <button id="runStakeBtn">Run Stakeholders</button>
+        </div>
+        <div id="stakePretty" class="cardgrid-4">
+          <div class="box-section" id="stakePrimary"><h3>Primary</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="stakeSecondary"><h3>Secondary</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="stakeEndUsers"><h3>End Users / Beneficiaries</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="stakeExternal"><h3>External / Contextual</h3><div class="box-scroll"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Embodied narrative -->
+    <section class="card" aria-labelledby="h-embodied">
+      <header><h2 id="h-embodied">Embodied Narrative (Senses & Forces)</h2></header>
+      <div class="body">
+        <div class="actions small">
+          <span class="muted">POST <span class="pill">/api/narrative-embodied</span></span>
+          <span id="embStatus" class="muted"></span>
+        </div>
+        <div class="actions">
+          <button id="runEmbBtn">Run Embodied Map</button>
+        </div>
+        <div id="embPretty" class="cardgrid-3">
+          <div class="box-section" id="embEyes"><h3>Eyes</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embEars"><h3>Ears</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embHands"><h3>Hands</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embNose"><h3>Nose</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embMouth"><h3>Mouth</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embSkin"><h3>Skin</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embForces"><h3>Forces</h3><div class="box-scroll"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Roadmap / playbook -->
+    <section class="card" aria-labelledby="h-playbook">
+      <header><h2 id="h-playbook">Roadmap / Playbook (Concept → Adoption)</h2></header>
+      <div class="body">
+        <div class="actions small">
+          <span class="muted">POST <span class="pill">/api/narrative-playbook</span></span>
+          <span id="roadStatus" class="muted"></span>
+        </div>
+        <div class="actions">
+          <button id="runRoadBtn">Run Roadmap</button>
+        </div>
+        <div id="roadPretty" class="cardgrid-3"><!-- phases will fill here --></div>
+      </div>
+    </section>
+
+    <!-- Archetype-driven playbook -->
+    <section class="card" aria-labelledby="h-archpb">
+      <header><h2 id="h-archpb">Archetype-Driven Playbook</h2></header>
+      <div class="body">
+        <div class="actions small">
+          <span class="muted">POST <span class="pill">/api/narrative-archetype-playbook</span></span>
+          <span id="archStatus" class="muted"></span>
+        </div>
+        <div class="actions">
+          <button id="runArchBtn">Run Archetype Playbook</button>
+        </div>
+        <div id="archClass" class="box-kv"></div>
+        <div id="archPretty" class="cardgrid-3"><!-- phases --></div>
+        <div id="archNorth" class="box-section" style="margin-top:.6rem;">
+          <h3>North Star</h3><div class="box-scroll" id="archNorthBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Risks & early-warning monitoring -->
+    <section class="card" aria-labelledby="h-risks">
+      <header><h2 id="h-risks">Risks & Early-Warning Monitoring</h2></header>
+      <div class="body">
+        <div class="actions small">
+          <span class="muted">POST <span class="pill">/api/narrative-risks</span></span>
+          <span id="riskStatus" class="muted"></span>
+        </div>
+        <div class="actions">
+          <button id="runRiskBtn">Run Risks</button>
+        </div>
+        <div class="cardgrid-2">
+          <div class="box-section" id="riskFailures"><h3>Likely Failures & Countermeasures</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="riskMonitoring"><h3>Monitoring & Triggers</h3><div class="box-scroll"></div></div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <script>
@@ -257,6 +385,34 @@
       runValidationBtn: document.getElementById('runValidationBtn'),
       valRunNote: document.getElementById('valRunNote'),
       valPretty: document.getElementById('valPretty'),
+
+      // Stakeholders
+      runStakeBtn: document.getElementById('runStakeBtn'),
+      stakeStatus: document.getElementById('stakeStatus'),
+      stakePretty: document.getElementById('stakePretty'),
+
+      // Embodied
+      runEmbBtn: document.getElementById('runEmbBtn'),
+      embStatus: document.getElementById('embStatus'),
+      embPretty: document.getElementById('embPretty'),
+
+      // Roadmap
+      runRoadBtn: document.getElementById('runRoadBtn'),
+      roadStatus: document.getElementById('roadStatus'),
+      roadPretty: document.getElementById('roadPretty'),
+
+      // Archetype
+      runArchBtn: document.getElementById('runArchBtn'),
+      archStatus: document.getElementById('archStatus'),
+      archClass: document.getElementById('archClass'),
+      archPretty: document.getElementById('archPretty'),
+      archNorthBody: document.getElementById('archNorthBody'),
+
+      // Risks
+      runRiskBtn: document.getElementById('runRiskBtn'),
+      riskStatus: document.getElementById('riskStatus'),
+      riskFailures: document.querySelector('#riskFailures .box-scroll'),
+      riskMonitoring: document.querySelector('#riskMonitoring .box-scroll'),
     };
 
     const API = {
@@ -265,6 +421,11 @@
       seeds: (did) => `/api/dimensions/${encodeURIComponent(did)}/seeds`,
       validate: '/api/narrative-validation',
       bodArtifacts: '/api/box-of-dirt/artifacts',
+      stake: '/api/narrative-stakeholders',
+      embodied: '/api/narrative-embodied',
+      road: '/api/narrative-playbook',
+      arch: '/api/narrative-archetype-playbook',
+      risks: '/api/narrative-risks',
     };
 
     let cache = { narratives: [], dims: new Map(), seeds: new Map() };
@@ -643,6 +804,43 @@
         (L ? `<div><strong>Solution:</strong> ${escapeHTML(L)}</div>` : '');
     }
 
+    function currentSeedTriplet() {
+      const { domainRow, dimRow, seedRow } = getSelectedRows();
+      if (!domainRow || !dimRow || !seedRow) return null;
+      return {
+        domain: stripHashId(domainRow.title || ''),
+        dimension: stripHashId(dimRow.title || ''),
+        problem: (seedRow.problem || '').trim(),
+        objective: (seedRow.objective || '').trim(),
+        solution: (seedRow.solution || '').trim(),
+      };
+    }
+
+    function requiredTripletOrStatus(statusEl){
+      const t = currentSeedTriplet();
+      if (!t) setStatus(statusEl, 'Select a domain, dimension, and seed first.', false);
+      else {
+        const miss = [];
+        if (!t.domain) miss.push('domain');
+        if (!t.dimension) miss.push('dimension');
+        if (!t.problem) miss.push('problem');
+        if (!t.objective) miss.push('objective');
+        if (!t.solution) miss.push('solution');
+        if (miss.length) { setStatus(statusEl, `Missing: ${miss.join(', ')}`, false); return null; }
+      }
+      return t;
+    }
+
+    // tiny util to clear sections without deleting their containers
+    function clearBoxScroll(selector){
+      const el = document.querySelector(selector);
+      if (el) el.replaceChildren();
+    }
+
+    // default provider setting for these new routes
+    const DEFAULT_PROVIDER = 'openai';
+
+
 
     async function runValidation(){
       const { domainRow, dimRow, seedRow } = getSelectedRows();
@@ -747,6 +945,223 @@
       els.ctxSeedL.textContent = L ? `Solution (Link): ${L}` : '';
     }
 
+    function renderStakeholders(payload){
+      const v = payload?.stakeholders || payload?.map || payload; // be tolerant
+      const S = {
+        primary: v?.primary || [],
+        secondary: v?.secondary || [],
+        end: v?.end_users_beneficiaries || [],
+        ext: v?.external_contextual || [],
+      };
+      const paint = (id, arr) => {
+        const box = document.querySelector(`#${id} .box-scroll`);
+        if (!box) return;
+        if (!Array.isArray(arr) || !arr.length){ box.innerHTML = '<div class="muted">No entries</div>'; return; }
+        box.innerHTML = arr.map(x=>{
+          const name = escapeHTML(x.name||'');
+          const cat  = x.category ? ` <span class="muted">(${escapeHTML(x.category)})</span>` : '';
+          const role = x.role ? `<div class="box-kv"><strong>Role:</strong> ${escapeHTML(x.role)}</div>` : '';
+          const why  = x.why ? `<div>${escapeHTML(x.why)}</div>` : '';
+          return `<div style="margin:.5rem 0;"><div style="font-weight:650;">${name}${cat}</div>${role}${why}</div>`;
+        }).join('');
+      };
+      paint('stakePrimary', S.primary);
+      paint('stakeSecondary', S.secondary);
+      paint('stakeEndUsers', S.end);
+      paint('stakeExternal', S.ext);
+    }
+
+    async function runStakeholders(){
+      const t = requiredTripletOrStatus(els.stakeStatus); if (!t) return;
+      setStatus(els.stakeStatus, 'Running…', false);
+      ['#stakePrimary .box-scroll','#stakeSecondary .box-scroll','#stakeEndUsers .box-scroll','#stakeExternal .box-scroll'].forEach(clearBoxScroll);
+      try{
+        const res = await fetch(API.stake, {
+          method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify({...t, provider: DEFAULT_PROVIDER})
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || j?.error){ setStatus(els.stakeStatus, j?.error||`HTTP ${res.status}`, false); return; }
+        setStatus(els.stakeStatus, 'OK', true);
+        renderStakeholders(j?.map ?? j?.stakeholders ?? j?.output ?? j);
+      }catch(e){ setStatus(els.stakeStatus, e.message, false); }
+    }
+
+    function renderEmbodied(payload){
+      const v = payload?.embodied || payload?.map || payload;
+      const keys = [
+        ['embEyes', v?.eyes], ['embEars', v?.ears], ['embHands', v?.hands],
+        ['embNose', v?.nose], ['embMouth', v?.mouth], ['embSkin', v?.skin],
+        ['embForces', v?.forces],
+      ];
+      for (const [id, arr] of keys){
+        const box = document.querySelector(`#${id} .box-scroll`);
+        if (!box) continue;
+        if (!Array.isArray(arr) || !arr.length){ box.innerHTML = '<div class="muted">No entries</div>'; continue; }
+        box.innerHTML = arr.map(x=>{
+          const cue = escapeHTML(x.cue||'');
+          const why = x.why ? `<div class="muted">${escapeHTML(x.why)}</div>` : '';
+          return `<div style="margin:.5rem 0;"><div style="font-weight:650;">${cue}</div>${why}</div>`;
+        }).join('');
+      }
+    }
+
+    async function runEmbodied(){
+      const t = requiredTripletOrStatus(els.embStatus); if (!t) return;
+      setStatus(els.embStatus, 'Running…', false);
+      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll','#embNose .box-scroll','#embMouth .box-scroll','#embSkin .box-scroll','#embForces .box-scroll'].forEach(clearBoxScroll);
+      try{
+        const res = await fetch(API.embodied, {
+          method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify({...t, provider: DEFAULT_PROVIDER})
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || j?.error){ setStatus(els.embStatus, j?.error||`HTTP ${res.status}`, false); return; }
+        setStatus(els.embStatus, 'OK', true);
+        renderEmbodied(j?.map ?? j?.embodied ?? j?.output ?? j);
+      }catch(e){ setStatus(els.embStatus, e.message, false); }
+    }
+
+    function renderRoadmap(payload){
+      const v = payload?.playbook || payload?.roadmap || payload;
+      const phases = Array.isArray(v?.phases) ? v.phases : [];
+      const root = els.roadPretty; if (!root) return;
+      root.innerHTML = phases.map(p=>{
+        const name = escapeHTML(p.name||'');
+        const horizon = p.horizon ? `<div class="box-kv"><strong>Horizon:</strong> ${escapeHTML(p.horizon)}</div>` : '';
+        const mk = (label, arr) => (Array.isArray(arr)&&arr.length)
+          ? `<div><strong>${label}:</strong><ul>${arr.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ul></div>` : '';
+        return `<div class="box-section"><h3>${name}</h3>${horizon}
+          ${p.goal ? `<div><strong>Goal:</strong> ${escapeHTML(p.goal)}</div>`:''}
+          <div class="box-scroll">
+            ${mk('Milestones', p.milestones)}
+            ${mk('Outputs', p.outputs)}
+            ${mk('Indicators', p.indicators)}
+            ${mk('Decision Gates', p.decision_gates)}
+          </div>
+        </div>`;
+      }).join('') || '<div class="muted">No phases</div>';
+    }
+
+    async function runRoadmap(){
+      const t = requiredTripletOrStatus(els.roadStatus); if (!t) return;
+      setStatus(els.roadStatus, 'Running…', false);
+      els.roadPretty.replaceChildren();
+      try{
+        const res = await fetch(API.road, {
+          method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify({...t, provider: DEFAULT_PROVIDER})
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || j?.error){ setStatus(els.roadStatus, j?.error||`HTTP ${res.status}`, false); return; }
+        setStatus(els.roadStatus, 'OK', true);
+        renderRoadmap(j?.playbook ?? j?.roadmap ?? j);
+      }catch(e){ setStatus(els.roadStatus, e.message, false); }
+    }
+
+    function renderArchetype(payload){
+      const v = payload?.playbook || payload;
+      // classification
+      const cls = v?.classification;
+      els.archClass.innerHTML = cls
+        ? `<strong>Archetype:</strong> ${escapeHTML(cls.archetype||'')} — <span class="muted">${escapeHTML(cls.why||'')}</span>`
+        : '';
+      // phases
+      const phases = Array.isArray(v?.phases) ? v.phases : [];
+      els.archPretty.innerHTML = phases.map(p=>{
+        const name = escapeHTML(p.name||'');
+        const horizon = p.horizon ? `<div class="box-kv"><strong>Horizon:</strong> ${escapeHTML(p.horizon)}</div>` : '';
+        const mk = (label, arr) => (Array.isArray(arr)&&arr.length)
+          ? `<div><strong>${label}:</strong><ul>${arr.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ul></div>` : '';
+        return `<div class="box-section"><h3>${name}</h3>${horizon}
+          <div class="box-scroll">
+            ${p.goal ? `<div><strong>Goal:</strong> ${escapeHTML(p.goal)}</div>`:''}
+            ${mk('Milestones', p.milestones)}
+            ${mk('Outputs', p.outputs)}
+            ${mk('Indicators', p.indicators)}
+            ${mk('Decision Gates', p.decision_gates)}
+          </div>
+        </div>`;
+      }).join('') || '<div class="muted">No phases</div>';
+      // north star
+      els.archNorthBody.innerHTML = v?.north_star ? escapeHTML(v.north_star) : '<div class="muted">—</div>';
+    }
+
+    async function runArchetype(){
+      const t = requiredTripletOrStatus(els.archStatus); if (!t) return;
+      setStatus(els.archStatus, 'Running…', false);
+      els.archPretty.replaceChildren(); els.archClass.textContent=''; els.archNorthBody.textContent='';
+      try{
+        const res = await fetch(API.arch, {
+          method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify({...t, provider: DEFAULT_PROVIDER})
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || j?.error){ setStatus(els.archStatus, j?.error||`HTTP ${res.status}`, false); return; }
+        setStatus(els.archStatus, 'OK', true);
+        renderArchetype(j?.playbook ?? j);
+      }catch(e){ setStatus(els.archStatus, e.message, false); }
+    }
+
+    function renderRisks(payload){
+      const v = payload?.assessment || payload?.risks || payload;
+      // Failures
+      const failBox = els.riskFailures;
+      if (failBox){
+        const failures = Array.isArray(v?.failures) ? v.failures : [];
+        failBox.innerHTML = failures.length ? failures.map(f=>{
+          const name = `<div style="font-weight:650;">${escapeHTML(f.name||'')}</div>`;
+          const mk = (label, arr) => (Array.isArray(arr)&&arr.length)
+            ? `<div><strong>${label}:</strong><ul>${arr.map(x=>`<li>${escapeHTML(String(x))}</li>`).join('')}</ul></div>` : '';
+          const impact = f.impact ? `<div><strong>Impact:</strong> ${escapeHTML(f.impact)}</div>` : '';
+          const counters = mk('Countermeasures', f.countermeasures);
+          const symptoms = mk('Symptoms', f.symptoms);
+          return `<div style="margin:.6rem 0;">${name}${impact}${symptoms}${counters}</div>`;
+        }).join('') : '<div class="muted">No failures</div>';
+      }
+      // Monitoring
+      const monBox = els.riskMonitoring;
+      if (monBox){
+        const m = v?.monitoring || {};
+        const metrics = Array.isArray(m.metrics) ? m.metrics : [];
+        const actions = Array.isArray(m.triggered_actions) ? m.triggered_actions : [];
+        const metricsHTML = metrics.length ? `<div><strong>Metrics:</strong><ul>${
+          metrics.map(x=>{
+            const line = `<strong>${escapeHTML(x.metric||'')}</strong>`;
+            const why  = x.rationale ? ` — <span class="muted">${escapeHTML(x.rationale)}</span>` : '';
+            const thr  = (x.yellow||x.red) ? `<div class="box-kv">Thresholds: yellow=${escapeHTML(String(x.yellow||''))}, red=${escapeHTML(String(x.red||''))}</div>` : '';
+            return `<li>${line}${why}${thr}</li>`;
+          }).join('')}
+        </ul></div>` : '<div class="muted">No metrics</div>';
+        const actionsHTML = actions.length ? `<div style="margin-top:.4rem;"><strong>Triggered Actions:</strong><ul>${
+          actions.map(a=>{
+            const t = `<strong>${escapeHTML(a.action||'')}</strong>`;
+            const owner = a.owner ? ` — <span class="muted">owner: ${escapeHTML(a.owner)}</span>` : '';
+            const notes = a.notes ? `<div class="box-kv">${escapeHTML(a.notes)}</div>` : '';
+            return `<li>${t}${owner}${notes}</li>`;
+          }).join('')}
+        </ul></div>` : '';
+        monBox.innerHTML = metricsHTML + actionsHTML;
+      }
+    }
+
+    async function runRisks(){
+      const t = requiredTripletOrStatus(els.riskStatus); if (!t) return;
+      setStatus(els.riskStatus, 'Running…', false);
+      clearBoxScroll('#riskFailures .box-scroll'); clearBoxScroll('#riskMonitoring .box-scroll');
+      try{
+        const res = await fetch(API.risks, {
+          method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify({...t, provider: DEFAULT_PROVIDER})
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || j?.error){ setStatus(els.riskStatus, j?.error||`HTTP ${res.status}`, false); return; }
+        setStatus(els.riskStatus, 'OK', true);
+        renderRisks(j?.assessment ?? j?.risks ?? j);
+      }catch(e){ setStatus(els.riskStatus, e.message, false); }
+    }
+
+
     function escapeHTML(s){
       return String(s).replace(/[&<>"']/g, c => ({
         '&': '&amp;',
@@ -775,6 +1190,11 @@
 
     // Validation events
     els.runValidationBtn.addEventListener('click', runValidation);
+    els.runStakeBtn?.addEventListener('click', runStakeholders);
+    els.runEmbBtn?.addEventListener('click', runEmbodied);
+    els.runRoadBtn?.addEventListener('click', runRoadmap);
+    els.runArchBtn?.addEventListener('click', runArchetype);
+    els.runRiskBtn?.addEventListener('click', runRisks);
 
     // Boot
     loadNarratives().then(maybeDeepLink);

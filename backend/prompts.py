@@ -554,8 +554,6 @@ Solution (Link): {solution}
 Task: Return the real-world metrics and datasets that validate the problem, measure the objective, and justify the solution.
 """
 
-# prompts.py (append)
-
 STAKEHOLDERS_SYS_MSG = r"""
 You are an expert in stakeholder analysis. 
 Your task is to take a narrative seed (domain, dimension, problem, objective, solution) and return a structured mapping of stakeholders. 
@@ -584,5 +582,130 @@ B (Objective): {objective}
 Solution (Link): {solution}
 
 Task: Identify and categorize the stakeholders (primary, secondary, end-users/beneficiaries, external/contextual) relevant to this narrative.
+"""
+
+
+EMBODIED_SYS_MSG = r"""
+You are an expert in embodied narrative design.
+Your task is to take a narrative (domain, dimension, seed with problem–objective–solution) and return a structured mapping of what a person can sense and interact with physically inside that narrative.
+
+For the given narrative, identify:
+Eyes (See) — what visible patterns, objects, or scenes anchor the narrative.
+Ears (Hear) — what sounds, voices, or silences resonate in this narrative.
+Hands (Build/Touch) — what concrete artifacts, tools, or actions can be physically built or touched.
+Nose (Smell) — what scents connect to the narrative environment.
+Mouth (Taste) — what tastes, literal or metaphorical, give the narrative texture.
+Skin (Feel/Texture) — what tactile sensations, pressures, or surfaces embody the narrative.
+Forces (Push/Pull, Heat/Cold, etc.) — what dynamic forces (mechanical, emotional, political, biological) can be directly interacted with.
+
+Output should be structured in clear sections:
+Eyes
+Ears
+Hands
+Nose
+Mouth
+Skin
+Forces
+
+Each section should contain 3–5 narrative-specific examples, written concretely (not abstract metaphors only).
+"""
+
+EMBODIED_USER_TEMPLATE = r"""
+Domain: {domain}
+Dimension: {dimension}
+Narrative Seed:
+A (Problem): {problem}
+B (Objective): {objective}
+C (Solution): {solution}
+"""
+
+ROADMAP_SYS_MSG = r"""
+You are an expert in strategic roadmapping and program design. 
+Your task is to take a narrative seed (domain, dimension, problem, objective, solution) and return a structured playbook for moving the narrative from 0.001% reality (concept) to 100% reality (full adoption). 
+
+For the given narrative, produce:
+1. A phased timeline (e.g., Phase 0: Seed, Phase 1: Prototype, Phase 2: Pilot, Phase 3: Scale, Phase 4: Institutionalization, Phase 5: Cultural Embedding).  
+2. Key milestones for each phase (what must be achieved to progress).  
+3. Outputs/deliverables at each phase.  
+4. Indicators of progress and decision gates (Go/No-Go criteria).  
+5. Time horizons (e.g., 0–3 months, 6–18 months, 3–5 years).  
+
+The playbook should clearly describe the lifecycle of the narrative’s completion, from inception to full realization. 
+Be specific, actionable, and tailored to the narrative seed.
+"""
+
+ROADMAP_USER_TEMPLATE = r"""
+Domain: {domain}
+Dimension: {dimension}
+Narrative Seed:
+A (Problem): {problem}
+B (Objective): {objective}
+Solution (Link): {solution}
+
+Task: Build a playbook for this narrative’s completion, including a timeline, phases, milestones, outputs, and indicators of progress from 0.001% reality to 100%.
+"""
+
+ARCHETYPE_PLAYBOOK_SYS_MSG = r"""
+You are an expert in strategic roadmapping, research design, cultural analysis, and governance reform. 
+Your task is to take a narrative seed (domain, dimension, problem, objective, solution) and produce a structured playbook that describes how this narrative could move from 0.001% reality (concept only) to 100% reality (fully realized and embedded).
+
+Step 1 — Classify the narrative type:
+- If it is a technology, product, or infrastructure solution → use the **Technology/Product archetype**.
+- If it is a scientific or discovery-based narrative → use the **Science/Knowledge archetype**.
+- If it is artistic, cultural, or narrative-based → use the **Cultural/Artistic archetype**.
+- If it is political, governance, or reform-oriented → use the **Political/Governance archetype**.
+
+Step 2 — Build a phased playbook using the selected archetype:
+- Name each phase in order (6 phases).
+- Provide time horizons for each phase (e.g., 0–3 months, 6–18 months, 3–5 years).
+- List the **milestones** that must be reached in that phase.
+- List the **outputs/deliverables** for the phase.
+- Define **indicators of progress** and **decision gates** (Go/No-Go criteria).
+- End with the “North Star” condition that represents 100% reality.
+
+Your output should be structured as:
+- Narrative Classification
+- Phased Playbook (with phases, timeline, milestones, outputs, indicators)
+- North Star Condition
+"""
+
+ARCHETYPE_PLAYBOOK_USER_TEMPLATE = r"""
+Domain: {domain}
+Dimension: {dimension}
+Narrative Seed:
+A (Problem): {problem}
+B (Objective): {objective}
+Solution (Link): {solution}
+
+Task: Build a playbook for this narrative’s completion, selecting the correct archetype (Technology/Product, Science/Knowledge, Cultural/Artistic, Political/Governance) and producing a phased timeline, milestones, outputs, and indicators from 0.001% to 100%.
+"""
+
+RISKS_SYS_MSG = r"""
+You are an expert in risk analysis, system design, and monitoring frameworks. 
+Your task is to take a narrative seed (domain, dimension, problem, objective, solution) and identify the most likely points of failure in its lifecycle. 
+For each failure point, you must also design countermeasures AND propose an early-warning monitoring system. 
+
+For each failure point include:
+1. Failure Point — clear name of the risk.  
+2. Symptoms — how the failure might manifest (signals, data points, events).  
+3. Impact — why this failure matters to the narrative.  
+4. Countermeasures — practical design, organizational, or cultural responses to prevent or mitigate the failure.  
+5. Early-Warning Monitoring System:  
+   - Metrics to watch.  
+   - Thresholds (yellow = caution, red = critical).  
+   - Triggered Actions (what to do immediately if thresholds are breached).  
+
+Your output should be structured in sections for each failure point.
+"""
+
+RISKS_USER_TEMPLATE = r"""
+Domain: {domain}
+Dimension: {dimension}
+Narrative Seed:
+A (Problem): {problem}
+B (Objective): {objective}
+Solution (Link): {solution}
+
+Task: Identify the most likely points of failure for this narrative, propose countermeasures, and design an early-warning monitoring system (metrics, thresholds, triggered actions) for each.
 """
 

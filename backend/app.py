@@ -2,7 +2,7 @@ import os
 from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request, Response
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 from openai import OpenAI, OpenAIError
 # app.py (top-level, after Flask app creation)
@@ -29,6 +29,9 @@ from prompts import (
     SEED_SYS_MSG,
     VALIDATION_SYS_MSG,
     STAKEHOLDERS_SYS_MSG,
+    EMBODIED_SYS_MSG,
+    ROADMAP_SYS_MSG,
+    ARCHETYPE_PLAYBOOK_SYS_MSG,
 )
 
 app = Flask(__name__)
@@ -321,6 +324,79 @@ class StakeholderMap(BaseModel):
     end_users_beneficiaries: List[StakeholderExample] = Field(..., description="Problem-bearers & solution beneficiaries")
     external_contextual: List[StakeholderExample] = Field(..., description="International/funders/oversight/market forces")
 
+class SensoryItem(BaseModel):
+    cue: str = Field(..., description="Concrete, narrative-specific item (e.g., 'dust plumes over unpaved road', 'bleach odor in triage tent')")
+    why: Optional[str] = Field(None, description="Short reason/context for relevance")
+
+class EmbodiedMap(BaseModel):
+    eyes:  List[SensoryItem] = Field(..., description="Visible patterns/objects/scenes")
+    ears:  List[SensoryItem] = Field(..., description="Sounds/voices/silences")
+    hands: List[SensoryItem] = Field(..., description="Build/Touch — artifacts/tools/actions")
+    nose:  List[SensoryItem] = Field(..., description="Scents")
+    mouth: List[SensoryItem] = Field(..., description="Tastes (literal or metaphorical)")
+    skin:  List[SensoryItem] = Field(..., description="Tactile sensations/pressures/surfaces")
+    forces: List[SensoryItem] = Field(..., description="Dynamic forces: push/pull, heat/cold, emotional/political/biological")
+
+class PhaseItem(BaseModel):
+    name: str = Field(..., description="Phase label, e.g., 'Phase 0: Seed'")
+    horizon: str = Field(..., description="Time window, e.g., '0–3 months'")
+    goal: Optional[str] = Field(None, description="Headline outcome for this phase")
+    milestones: List[str] = Field(..., description="What must be achieved to progress")
+    outputs: List[str] = Field(..., description="Artifacts/deliverables produced in this phase")
+    indicators: List[str] = Field(..., description="Measurable indicators of progress")
+    decision_gates: List[str] = Field(..., description="Go/No-Go criteria")
+
+class RoadmapPlaybook(BaseModel):
+    phases: List[PhaseItem] = Field(..., description="Ordered list from concept to full adoption")
+
+class NarrativeClassification(BaseModel):
+    archetype: Literal[
+        "Technology/Product",
+        "Science/Knowledge",
+        "Cultural/Artistic",
+        "Political/Governance"
+    ] = Field(..., description="Selected narrative archetype")
+    why: Optional[str] = Field(None, description="Short rationale for this classification")
+
+class PhaseStep(BaseModel):
+    name: str = Field(..., description="Phase label, e.g., 'Phase 0: Seed'")
+    horizon: str = Field(..., description="Time window, e.g., '0–3 months'")
+    goal: Optional[str] = Field(None, description="Headline outcome for this phase")
+    milestones: List[str] = Field(..., description="What must be achieved to progress")
+    outputs: List[str] = Field(..., description="Artifacts/deliverables produced in this phase")
+    indicators: List[str] = Field(..., description="Measurable indicators of progress")
+    decision_gates: List[str] = Field(..., description="Go/No-Go criteria")
+
+class ArchetypePlaybook(BaseModel):
+    classification: NarrativeClassification
+    phases: List[PhaseStep] = Field(..., description="Ordered list (target: 6 phases)")
+    north_star: str = Field(..., description="Definition of 100% reality (fully realized & embedded)")
+
+class MetricWatch(BaseModel):
+    metric: str = Field(..., description="Name of the metric to monitor")
+    rationale: Optional[str] = Field(None, description="Why this metric matters")
+    yellow: str = Field(..., description="Caution threshold (human-readable)")
+    red: str = Field(..., description="Critical threshold (human-readable)")
+
+class TriggeredAction(BaseModel):
+    action: str = Field(..., description="Immediate step when threshold breaches")
+    owner: Optional[str] = Field(None, description="Role/team responsible")
+    notes: Optional[str] = Field(None, description="Any brief implementation notes")
+
+class MonitoringSystem(BaseModel):
+    metrics: List[MetricWatch] = Field(..., description="Metrics with thresholds")
+    triggered_actions: List[TriggeredAction] = Field(..., description="What to do on breach")
+
+class FailurePoint(BaseModel):
+    name: str = Field(..., description="Risk name")
+    symptoms: List[str] = Field(..., description="How the failure manifests")
+    impact: str = Field(..., description="Why it matters")
+    countermeasures: List[str] = Field(..., description="Prevent/mitigate steps")
+    monitoring: MonitoringSystem = Field(..., description="Early-warning monitoring system")
+
+class RiskAssessment(BaseModel):
+    failures: List[FailurePoint] = Field(..., description="List of failure points with monitoring")
+
 
 
 
@@ -598,6 +674,32 @@ def _stakeholders_user_message(domain: str, dimension: str, problem: str, object
     return STAKEHOLDERS_USER_TEMPLATE.format(
         domain=domain, dimension=dimension, problem=problem, objective=objective, solution=solution
     )
+
+def _embodied_user_message(domain: str, dimension: str, problem: str, objective: str, solution: str) -> str:
+    from prompts import EMBODIED_USER_TEMPLATE
+    return EMBODIED_USER_TEMPLATE.format(
+        domain=domain, dimension=dimension, problem=problem, objective=objective, solution=solution
+    )
+
+def _roadmap_user_message(domain: str, dimension: str, problem: str, objective: str, solution: str) -> str:
+    from prompts import ROADMAP_USER_TEMPLATE
+    return ROADMAP_USER_TEMPLATE.format(
+        domain=domain, dimension=dimension, problem=problem, objective=objective, solution=solution
+    )
+
+def _archetype_playbook_user_message(domain: str, dimension: str, problem: str, objective: str, solution: str) -> str:
+    from prompts import ARCHETYPE_PLAYBOOK_USER_TEMPLATE
+    return ARCHETYPE_PLAYBOOK_USER_TEMPLATE.format(
+        domain=domain, dimension=dimension, problem=problem, objective=objective, solution=solution
+    )
+
+def _risks_user_message(domain: str, dimension: str, problem: str, objective: str, solution: str) -> str:
+    from prompts import RISKS_USER_TEMPLATE
+    return RISKS_USER_TEMPLATE.format(
+        domain=domain, dimension=dimension, problem=problem, objective=objective, solution=solution
+    )
+
+
 
 
 # ---------- NEW: LLM adapters (OpenAI + xAI + Gemini + Deepseek + OpenAI websearch) ----------
@@ -2213,6 +2315,545 @@ def api_narrative_stakeholders():
             "domain": domain,
             "dimension": dimension,
             "stakeholders": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
+
+@app.post("/api/narrative-stakeholders")
+def api_narrative_stakeholders():
+    data = request.get_json(silent=True) or {}
+
+    domain    = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    problem   = (data.get("problem") or "").strip()
+    objective = (data.get("objective") or "").strip()
+    solution  = (data.get("solution") or "").strip()
+    provider  = _provider_from(data)  # existing helper
+
+    missing = [k for k,v in {
+        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
+    }.items() if not v]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    user_msg = _stakeholders_user_message(domain, dimension, problem, objective, solution)
+
+    try:
+        model_name = None
+        raw_text = None
+        parsed = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON with keys: primary, secondary, end_users_beneficiaries, external_contextual. No prose."))
+            schema_hint = (
+                "Schema:\n"
+                "{\n"
+                "  primary: [{name, category?, role?, why}],\n"
+                "  secondary: [{...}],\n"
+                "  end_users_beneficiaries: [{...}],\n"
+                "  external_contextual: [{...}]\n"
+                "}"
+            )
+            chat.append(xai_user(user_msg + "\n\n" + schema_hint))
+            response, parsed_obj = chat.parse(StakeholderMap)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            prompt = STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema." + "\n\n" + user_msg
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": StakeholderMap,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            sys_prompt = STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON with keys primary, secondary, end_users_beneficiaries, external_contextual. No prose."
+            user_prompt = user_msg
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)  # your existing helper
+            try:
+                parsed = StakeholderMap.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            sys_prompt = STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\nSchema keys: primary, secondary, end_users_beneficiaries, external_contextual. Each item: {name, category?, role?, why}."
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type": "web_search"}],  # lets the model ground org names if it wants
+                input=[
+                    {"role":"system","content": sys_prompt},
+                    {"role":"user","content": user_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = StakeholderMap.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
+                    {"role":"user","content": (
+                        user_msg + "\n\n"
+                        "Return an object with keys: primary, secondary, end_users_beneficiaries, external_contextual.\n"
+                        "Each value is an array of {name, category?, role?, why}."
+                    )},
+                ],
+                text_format=StakeholderMap,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
+            }), 200
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain": domain,
+            "dimension": dimension,
+            "stakeholders": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
+
+@app.post("/api/narrative-embodied")
+def api_narrative_embodied():
+    data = request.get_json(silent=True) or {}
+
+    domain    = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    problem   = (data.get("problem") or "").strip()
+    objective = (data.get("objective") or "").strip()
+    solution  = (data.get("solution") or "").strip()
+    provider  = _provider_from(data)
+
+    missing = [k for k,v in {
+        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
+    }.items() if not v]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    user_msg = _embodied_user_message(domain, dimension, problem, objective, solution)
+
+    try:
+        model_name = None
+        raw_text = None
+        parsed = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys: eyes, ears, hands, nose, mouth, skin, forces. No prose."))
+            schema_hint = (
+                "Schema:\n"
+                "{ eyes:[{cue, why?}], ears:[{cue, why?}], hands:[{cue, why?}], "
+                "nose:[{cue, why?}], mouth:[{cue, why?}], skin:[{cue, why?}], forces:[{cue, why?}] }"
+            )
+            chat.append(xai_user(user_msg + "\n\n" + schema_hint))
+            response, parsed_obj = chat.parse(EmbodiedMap)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema." + "\n\n" + user_msg
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": EmbodiedMap,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            sys_prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys eyes, ears, hands, nose, mouth, skin, forces. No prose."
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = EmbodiedMap.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            sys_prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\nSchema keys: eyes, ears, hands, nose, mouth, skin, forces. Each item: {cue, why?}."
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type": "web_search"}],  # optional; not required here but consistent with your pattern
+                input=[
+                    {"role":"system","content": sys_prompt},
+                    {"role":"user","content": user_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = EmbodiedMap.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
+                    {"role":"user","content": (
+                        user_msg + "\n\n"
+                        "Return an object with keys: eyes, ears, hands, nose, mouth, skin, forces. "
+                        "Each value is an array of {cue, why?}."
+                    )},
+                ],
+                text_format=EmbodiedMap,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
+            }), 200
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain": domain,
+            "dimension": dimension,
+            "embodied": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
+
+@app.post("/api/narrative-playbook")
+def api_narrative_playbook():
+    data = request.get_json(silent=True) or {}
+
+    domain    = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    problem   = (data.get("problem") or "").strip()
+    objective = (data.get("objective") or "").strip()
+    solution  = (data.get("solution") or "").strip()
+    provider  = _provider_from(data)  # openai | openai_web | xai | gemini | deepseek
+
+    missing = [k for k,v in {
+        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
+    }.items() if not v]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    user_msg = _roadmap_user_message(domain, dimension, problem, objective, solution)
+
+    try:
+        model_name = None
+        raw_text = None
+        parsed = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON with key 'phases' (array). No prose."))
+            schema_hint = (
+                "Schema:\n"
+                "{ phases: [ { name, horizon, goal?, milestones:[], outputs:[], indicators:[], decision_gates:[] } ] }"
+            )
+            chat.append(xai_user(user_msg + "\n\n" + schema_hint))
+            response, parsed_obj = chat.parse(RoadmapPlaybook)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            prompt = ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON matching the schema." + "\n\n" + user_msg
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": RoadmapPlaybook,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            sys_prompt = ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON with key 'phases'. No prose."
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)  # your existing helper
+            try:
+                parsed = RoadmapPlaybook.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            sys_prompt = ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\n" \
+                        "Schema: { phases: [ { name, horizon, goal?, milestones:[], outputs:[], indicators:[], decision_gates:[] } ] }"
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type": "web_search"}],  # optional; consistent with your pattern
+                input=[
+                    {"role":"system","content": sys_prompt},
+                    {"role":"user","content": user_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = RoadmapPlaybook.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": ROADMAP_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
+                    {"role":"user","content": (
+                        user_msg + "\n\n"
+                        "Return an object with key 'phases' where each phase has: "
+                        "name, horizon, goal?, milestones[], outputs[], indicators[], decision_gates[]."
+                    )},
+                ],
+                text_format=RoadmapPlaybook,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
+            }), 200
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain": domain,
+            "dimension": dimension,
+            "playbook": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
+
+
+@app.post("/api/narrative-archetype-playbook")
+def api_narrative_archetype_playbook():
+    data = request.get_json(silent=True) or {}
+
+    domain    = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    problem   = (data.get("problem") or "").strip()
+    objective = (data.get("objective") or "").strip()
+    solution  = (data.get("solution") or "").strip()
+    provider  = _provider_from(data)  # openai | openai_web | xai | gemini | deepseek
+
+    missing = [k for k,v in {
+        "domain":domain, "dimension":dimension, "problem":problem, "objective":objective, "solution":solution
+    }.items() if not v]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    user_msg = _archetype_playbook_user_message(domain, dimension, problem, objective, solution)
+
+    try:
+        model_name = None
+        raw_text = None
+        parsed = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(ARCHETYPE_PLAYBOOK_SYS_MSG + "\n\nReturn ONLY JSON with keys: classification, phases, north_star. No prose."))
+            schema_hint = (
+                "Schema:\n"
+                "{\n"
+                "  classification: { archetype: 'Technology/Product'|'Science/Knowledge'|'Cultural/Artistic'|'Political/Governance', why? },\n"
+                "  phases: [ { name, horizon, goal?, milestones:[], outputs:[], indicators:[], decision_gates:[] } ],\n"
+                "  north_star: string\n"
+                "}"
+            )
+            chat.append(xai_user(user_msg + "\n\n" + schema_hint))
+            response, parsed_obj = chat.parse(ArchetypePlaybook)
+            raw_text = getattr(response, "content", None)
+            parsed = parsed_obj
+
+        elif provider == "gemini":
+            client = get_gemini_client()
+            model_name = _gemini_model()
+            prompt = ARCHETYPE_PLAYBOOK_SYS_MSG + "\n\nReturn ONLY JSON matching the schema." + "\n\n" + user_msg
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": ArchetypePlaybook,
+                },
+            )
+            parsed = resp.parsed if not isinstance(resp.parsed, list) else resp.parsed[0]
+            raw_text = getattr(resp, "text", None)
+
+        elif provider == "deepseek":
+            client = get_deepseek_client()
+            model_name = _deepseek_model()
+            sys_prompt = ARCHETYPE_PLAYBOOK_SYS_MSG + "\n\nReturn ONLY JSON with keys classification, phases, north_star. No prose."
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.3,
+            )
+            raw_text = (completion.choices[0].message.content or "").strip()
+            json_text = _extract_json_text(raw_text)  # uses your existing helper
+            try:
+                parsed = ArchetypePlaybook.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        elif provider == "openai_web":
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            sys_prompt = ARCHETYPE_PLAYBOOK_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\n" \
+                        "Schema: { classification:{archetype, why?}, phases:[{name, horizon, goal?, milestones:[], outputs:[], indicators:[], decision_gates:[]}], north_star:string }"
+            resp = client.responses.create(
+                model=model_name,
+                tools=[{"type": "web_search"}],  # optional; consistent with your other endpoints
+                input=[
+                    {"role":"system","content": sys_prompt},
+                    {"role":"user","content": user_msg},
+                ],
+            )
+            raw_text = resp.output_text or ""
+            json_text = _extract_json_text(raw_text)
+            try:
+                parsed = ArchetypePlaybook.model_validate_json(json_text)
+            except Exception:
+                parsed = None
+
+        else:  # "openai"
+            client = _get_llm()
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": ARCHETYPE_PLAYBOOK_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
+                    {"role":"user","content": (
+                        user_msg + "\n\n"
+                        "Return an object with keys: classification, phases, north_star. "
+                        "classification.archetype ∈ {Technology/Product, Science/Knowledge, Cultural/Artistic, Political/Governance}."
+                    )},
+                ],
+                text_format=ArchetypePlaybook,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; 'raw' contains unparsed output."
+            }), 200
+
+        # Optional sanity: encourage 6 phases (don't hard fail)
+        result = parsed.model_dump()
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain": domain,
+            "dimension": dimension,
+            "archetype_playbook": result
         }), 200
 
     except Exception as e:
