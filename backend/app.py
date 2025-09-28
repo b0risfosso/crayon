@@ -335,8 +335,7 @@ class EmbodiedMap(BaseModel):
     hands: List[SensoryItem] = Field(..., description="Build/Touch — artifacts/tools/actions")
     nose:  List[SensoryItem] = Field(..., description="Scents")
     mouth: List[SensoryItem] = Field(..., description="Tastes (literal or metaphorical)")
-    skin:  List[SensoryItem] = Field(..., description="Tactile sensations/pressures/surfaces")
-    forces: List[SensoryItem] = Field(..., description="Dynamic forces: push/pull, heat/cold, emotional/political/biological")
+    music: List[SensoryItem] = Field(..., description="Dynamic forces: push/pull, heat/cold, emotional/political/biological")
 
 class PhaseItem(BaseModel):
     name: str = Field(..., description="Phase label, e.g., 'Phase 0: Seed'")
@@ -2350,10 +2349,11 @@ def api_narrative_embodied():
             xai = get_xai_client()
             model_name = os.getenv("XAI_MODEL", "grok-4")
             chat = xai.chat.create(model=model_name)
-            chat.append(xai_system(EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys: eyes, ears, hands. No prose."))
+            chat.append(xai_system(EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys: eyes, ears, hands, nose, mouth, music. No prose."))
             schema_hint = (
                 "Schema:\n"
-                "{ eyes:[{cue, why?}], ears:[{cue, why?}], hands:[{cue, why?}] }"
+                "{ eyes:[{cue, why?}], ears:[{cue, why?}], hands:[{cue, why?}], "
+                "nose:[{cue, why?}], mouth:[{cue, why?}], music:[{cue, why?}] }"
             )
             chat.append(xai_user(user_msg + "\n\n" + schema_hint))
             response, parsed_obj = chat.parse(EmbodiedMap)
@@ -2378,7 +2378,7 @@ def api_narrative_embodied():
         elif provider == "deepseek":
             client = get_deepseek_client()
             model_name = _deepseek_model()
-            sys_prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys eyes, ears, hands, nose, mouth, skin, forces. No prose."
+            sys_prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON with keys eyes, ears, hands, nose, mouth, music. No prose."
             completion = client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -2397,7 +2397,7 @@ def api_narrative_embodied():
         elif provider == "openai_web":
             client = _get_llm()
             model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
-            sys_prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\nSchema keys: eyes, ears, hands, nose, mouth, skin, forces. Each item: {cue, why?}."
+            sys_prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\nSchema keys: eyes, ears, hands, nose, mouth, music. Each item: {cue, why?}."
             resp = client.responses.create(
                 model=model_name,
                 tools=[{"type": "web_search"}],  # optional; not required here but consistent with your pattern
@@ -2422,7 +2422,7 @@ def api_narrative_embodied():
                     {"role":"system","content": EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."},
                     {"role":"user","content": (
                         user_msg + "\n\n"
-                        "Return an object with keys: eyes, ears, hands, nose, mouth, skin, forces. "
+                        "Return an object with keys: eyes, ears, hands, nose, mouth, music. "
                         "Each value is an array of {cue, why?}."
                     )},
                 ],
@@ -2666,7 +2666,7 @@ def api_narrative_risks():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             sys_prompt = RISKS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\n" \
                         "Schema: { failures:[{ name, symptoms:[], impact, countermeasures:[], monitoring:{ metrics:[{metric, rationale?, yellow, red}], triggered_actions:[{action, owner?, notes?}] } }] }"
             resp = client.responses.create(
@@ -2686,7 +2686,7 @@ def api_narrative_risks():
 
         else:  # "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5")
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[

@@ -586,16 +586,26 @@ Task: Identify and categorize the stakeholders (primary, secondary, end-users/be
 
 
 EMBODIED_SYS_MSG = r"""
-You are an expert in embodied narrative exploration.
-Your task is to take a narrative (domain, dimension, seed with problem–objective–solution) and identify what can be:
-Seen with the eyes — concrete things, images, or patterns visible in the narrative.
-Heard with the ears — sounds, voices, or silences connected to the narrative.
-Built or touched with the hands — physical artifacts, tools, or actions that can be made or manipulated.
-Be specific and grounded in the given narrative. Avoid vague abstractions.
-Output should be structured in clear sections:
-Eyes (See)
-Ears (Hear)
-Hands (Build/Touch)
+You are an expert in embodied narrative design.
+Your task is to take a narrative (domain, dimension, seed with problem–objective–solution) and map it into six senses:
+Eyes (See) — 3–4 vivid, concrete visuals.
+Ears (Hear) — 3–4 sounds, voices, or silences.
+Hands (Build/Touch) — 3–4 physical actions or artifacts.
+Nose (Smell) — 3–4 scents anchoring the scene.
+Mouth (Taste) — 3–4 tastes, literal or metaphorical.
+Music (Rhythm) — 3–4 musical beats capturing the emotional rhythm of the narrative.
+Guidelines:
+Keep each section to short, strong beats (3–4 items max).
+Highlight embodiment: how the body feels when sensing or acting.
+Capture rhythm: a sense of sequence, tension, or release across the beats.
+Avoid vague abstractions; be specific and grounded in the narrative.
+Output format:
+Eyes (See): …
+Ears (Hear): …
+Hands (Build/Touch): …
+Nose (Smell): …
+Mouth (Taste): …
+Music (Rhythm): …
 """
 
 EMBODIED_USER_TEMPLATE = r"""

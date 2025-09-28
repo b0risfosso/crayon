@@ -272,19 +272,22 @@
 
     <!-- Embodied narrative -->
     <section class="card" aria-labelledby="h-embodied">
-      <header><h2 id="h-embodied">Embodied Narrative (Senses & Forces)</h2></header>
+      <header><h2 id="h-embodied">6 Senses</h2></header>
       <div class="body">
         <div class="actions small">
           <span class="muted">POST <span class="pill">/api/narrative-embodied</span></span>
           <span id="embStatus" class="muted"></span>
         </div>
         <div class="actions">
-          <button id="runEmbBtn">Run Embodied Map</button>
+          <button id="runEmbBtn">Run 6 senses</button>
         </div>
         <div id="embPretty" class="cardgrid-3">
-          <div class="box-section" id="embEyes"><h3>Eyes</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embEars"><h3>Ears</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embHands"><h3>Hands</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embEyes"><h3>Sight</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embEars"><h3>Sound</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embHands"><h3>Touch</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embNose"><h3>Smell</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embMouth"><h3>Taste</h3><div class="box-scroll"></div></div>
+          <div class="box-section" id="embSkin"><h3>Music</h3><div class="box-scroll"></div></div>
         </div>
       </div>
     </section>
@@ -971,7 +974,9 @@
     function renderEmbodied(payload){
       const v = payload?.embodied || payload?.map || payload;
       const keys = [
-        ['embEyes', v?.eyes], ['embEars', v?.ears], ['embHands', v?.hands]
+        ['embEyes', v?.eyes], ['embEars', v?.ears], ['embHands', v?.hands],
+        ['embNose', v?.nose], ['embMouth', v?.mouth], ['embSkin', v?.skin],
+        ['embForces', v?.forces],
       ];
       for (const [id, arr] of keys){
         const box = document.querySelector(`#${id} .box-scroll`);
@@ -988,7 +993,7 @@
     async function runEmbodied(){
       const t = requiredTripletOrStatus(els.embStatus); if (!t) return;
       setStatus(els.embStatus, 'Running…', false);
-      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll'].forEach(clearBoxScroll);
+      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll','#embNose .box-scroll','#embMouth .box-scroll','#embSkin .box-scroll','#embForces .box-scroll'].forEach(clearBoxScroll);
       try{
         const res = await fetch(API.embodied, {
           method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
