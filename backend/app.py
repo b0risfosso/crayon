@@ -1387,10 +1387,12 @@ def generate_narrative_seeds():
             rows = con.execute("""
                 SELECT id, problem, objective, solution, provider, created_at
                 FROM narrative_seeds
-                WHERE dimension_id=?
+                WHERE dimension_id = ?
+                    AND visibility = ?
+                    AND COALESCE(owner_email,'') = COALESCE(?, '')
                 ORDER BY id DESC
                 LIMIT 50
-            """, (dim_id, visibility, email or None)).fetchall()
+                """, (dim_id, visibility, owner_email)).fetchall()
 
         seeds_out = [
             {
