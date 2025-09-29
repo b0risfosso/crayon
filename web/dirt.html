@@ -209,15 +209,15 @@
     <!-- Narrative Prototype -->
     <!-- Narrative Prototype (JSON envelope) -->
     <section class="card" aria-labelledby="h-proto">
-      <header><h2 id="h-proto">Narrative Prototype</h2></header>
+      <header><h2 id="h-proto">Storyboard</h2></header>
       <div class="body">
         <div class="actions small" style="gap:.6rem;align-items:center;">
-          <span class="muted">POST <span class="pill">/api/narrative-prototype</span></span>
+          <span class="muted">Builds a concise storyboard prototype from the selected seed (problem, objective, solution)—summarizing the core intent, a minimal build to try now, a load-bearing test, first eyes (early reviewers), and why it qualifies as a safe, minimal prototype.</span>
           <span id="protoStatus" class="muted"></span>
         </div>
 
         <div class="actions">
-          <button id="genProtoBtn">Generate Prototype</button>
+          <button id="genProtoBtn">Generate Storyboard</button>
           <span id="protoRunNote" class="muted"></span>
         </div>
 
@@ -236,10 +236,10 @@
     <!-- Deployment & Artifacts -->
     <!-- Deployment & Box-of-Dirt Artifacts (JSON envelope) -->
     <section class="card" aria-labelledby="h-artifacts">
-      <header><h2 id="h-artifacts">Deployment & Box-of-Dirt Artifacts</h2></header>
+      <header><h2 id="h-artifacts">Real and Box-of-Dirt Artifacts</h2></header>
       <div class="body">
         <div class="actions small" style="gap:.6rem;align-items:center;">
-          <span class="muted">POST <span class="pill">/api/box-of-dirt/artifacts</span></span>
+          <span class="muted">Produces real-world artifacts (infrastructure, contracts, operations, governance) required for actual deployment of solution, alongside box-of-dirt artifacts (safe prototypes, mockups, documents) that can be created immediately.</span>
           <span id="artifactsStatus" class="muted"></span>
         </div>
 
@@ -277,7 +277,7 @@
       <header><h2 id="h-validate">Real-World Validation</h2></header>
       <div class="body">
         <div class="actions small">
-          <span class="muted">POST <span class="pill">/api/narrative-validation</span></span>
+          <span class="muted">Links the problem, objective, and solution to measurable datasets, metrics, and evidence sources — showing how the problem is validated, how progress toward the objective can be measured, and how the solution can be justified. Grounds the narrative in facts and data.</span>
           <span id="valStatus" class="muted"></span>
         </div>
     
@@ -305,7 +305,7 @@
       <header><h2 id="h-stake">Stakeholder Mapping</h2></header>
       <div class="body">
         <div class="actions small">
-          <span class="muted">POST <span class="pill">/api/narrative-stakeholders</span></span>
+          <span class="muted">Identifies the key people and groups connected to a narrative — primary actors, secondary influences, end users/beneficiaries, and external/contextual stakeholders — clarifying roles, interests, and motivations.</span>
           <span id="stakeStatus" class="muted"></span>
         </div>
         <div class="actions">
@@ -325,7 +325,7 @@
       <header><h2 id="h-embodied">6 Senses</h2></header>
       <div class="body">
         <div class="actions small">
-          <span class="muted">POST <span class="pill">/api/narrative-embodied</span></span>
+          <span class="muted">Explores the embodied experience of the narrative - sight, sound, touch, smell, taste, and music - providing sensory cues that ground the narrative in its lived experience.</span>
           <span id="embStatus" class="muted"></span>
         </div>
         <div class="actions">
@@ -350,14 +350,14 @@
     
     <!-- Archetype-driven playbook -->
     <section class="card" aria-labelledby="h-archpb">
-      <header><h2 id="h-archpb">Archetype-Driven Playbook</h2></header>
+      <header><h2 id="h-archpb">Playbook</h2></header>
       <div class="body">
         <div class="actions small">
-          <span class="muted">POST <span class="pill">/api/narrative-archetype-playbook</span></span>
+          <span class="muted">Outlines a step-by-step roadmap for the narrative — defining phases, goals, milestones, outputs, and decision gates — to guide progress from seed to scaled, embedded reality.</span>
           <span id="archStatus" class="muted"></span>
         </div>
         <div class="actions">
-          <button id="runArchBtn">Run Archetype Playbook</button>
+          <button id="runArchBtn">Run Playbook</button>
         </div>
         <div id="archClass" class="box-kv"></div>
         <div id="archPretty" class="cardgrid-3"><!-- phases --></div>
@@ -372,7 +372,7 @@
       <header><h2 id="h-risks">Risks & Early-Warning Monitoring</h2></header>
       <div class="body">
         <div class="actions small">
-          <span class="muted">POST <span class="pill">/api/narrative-risks</span></span>
+          <span class="muted">Highlights potential points of failure, their impacts, early-warning signals, and countermeasures — enabling proactive monitoring and response.</span>
           <span id="riskStatus" class="muted"></span>
         </div>
         <div class="actions">
