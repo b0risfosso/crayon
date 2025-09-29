@@ -957,7 +957,7 @@
 
       if (!domainRow || !dimRow || !seedRow) {
         setStatus(els.valStatus, 'Select a domain, dimension, and seed first.', false);
-        return;
+        return false;
       }
 
       const domain    = stripHashId(domainRow.title || '');
@@ -966,11 +966,8 @@
       const objective = (seedRow.objective || '').trim();
       const solution  = (seedRow.solution  || '').trim();
 
-
-      // provider is fixed to openai_web per your spec
       const provider = 'openai_web';
 
-      // Basic validation
       const missing = [];
       if (!domain)    missing.push('domain');
       if (!dimension) missing.push('dimension');
@@ -979,7 +976,7 @@
       if (!solution)  missing.push('solution');
       if (missing.length){
         setStatus(els.valStatus, `Missing: ${missing.join(', ')}`, false);
-        return;
+        return false;
       }
 
       setStatus(els.valStatus, 'Running…', false);
@@ -987,11 +984,7 @@
       els.valRunNote.textContent = '';
       if (els.valText) els.valText.innerHTML = '';
 
-      
-      const clear = sel => {
-        const el = document.querySelector(sel);
-        if (el) el.innerHTML = '';
-      };
+      const clear = sel => { const el = document.querySelector(sel); if (el) el.innerHTML = ''; };
       clear('#valProblem .val-content');
       clear('#valObjective .val-content');
       clear('#valSolution .val-content');
@@ -1007,24 +1000,45 @@
         let payload = null;
         try { payload = JSON.parse(text); } catch(e){}
 
-
         if (!res.ok){
           setStatus(els.valStatus, `HTTP ${res.status}`, false);
+          return false;
         } else if (payload && payload.error){
           setStatus(els.valStatus, payload.error, false);
+          return false;
         } else {
           setStatus(els.valStatus, 'OK', true);
           if (payload && payload.ok){
             renderValidationPretty(payload);
-            saveDirt('validation', {request: {domain, dimension, problem, objective, solution, provider}}, payload, provider);
+            saveDirt('validation', {request: {domain, dimension, problem, objective, solution, provider}}, payload);
           }
+          return true;
         }
       }catch(e){
         setStatus(els.valStatus, e.message, false);
+        return false;
       }finally{
         els.runValidationBtn.disabled = false;
       }
     }
+
+    async function runValidationWithRetry(maxAttempts = 2, delayMs = 2000){
+      let attempt = 1;
+      while (attempt <= maxAttempts){
+        const ok = await runValidation();
+        if (ok) return true;
+        if (attempt < maxAttempts){
+          setStatus(els.valStatus, `Validation failed — retrying (${attempt}/${maxAttempts-1})…`, false);
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+        attempt++;
+      }
+      setStatus(els.valStatus, `Validation failed after ${maxAttempts} attempt(s).`, false);
+      return false;
+    }
+
+
+    
 
     function prettyJSON(raw){
       try { return JSON.stringify(JSON.parse(raw), null, 2); }
@@ -1502,37 +1516,32 @@
     }
 
     // --- helper: persist a generation run ---
-    async function saveDirt(kind, inputObj, outputObj, provider=DEFAULT_PROVIDER){
+    async function saveDirt(kind, inputObj, outputObj){
       try{
-        // best-effort: include ids if we have them
-        const nid = els.domain.value || null;
-        const did = els.dimension.value || null;
-        const sid = els.seed.value || els.seedIdInput.value || null;
-
-        // include the seed triplet for querying later
-        const t = currentSeedTriplet();  // {domain, dimension, problem, objective, solution} or null
-        const provider = provider;       // or the provider you actually used for this panel
-
-        const body = {
-          kind,
-          provider,
-          nid, did, sid,
-          domain: t?.domain || null,
-          dimension: t?.dimension || null,
-          problem: t?.problem || null,
-          objective: t?.objective || null,
-          solution: t?.solution || null,
-          input: inputObj || {},
-          output: outputObj || {}
-        };
-
-        await fetch('/api/dirt', {
+        const res = await fetch('/api/dirt', {
           method:'POST',
-          headers:{'Content-Type':'application/json', 'Accept':'application/json'},
-          body: JSON.stringify(body)
+          headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify({
+            kind,
+            provider: 'openai',
+            nid: els.domain.value || null,
+            did: els.dimension.value || null,
+            sid: els.seed.value || els.seedIdInput.value || null,
+            ...currentSeedTriplet(),
+            input:  inputObj || {},
+            output: outputObj || {}
+          })
         });
-      }catch(_e){}
+        if (!res.ok){
+          console.warn('saveDirt failed', res.status);
+          setStatus(els.selStatus, `save failed (HTTP ${res.status})`, false);
+        }
+      }catch(e){
+        console.warn('saveDirt error', e);
+        setStatus(els.selStatus, `save error: ${e.message}`, false);
+      }
     }
+
 
     function setRunButtonsDisabled(disabled){
     [
@@ -1598,7 +1607,7 @@
 
     // 1) start validation first; when it finishes, drop concurrency to 2
     start(async () => {
-      await runValidation();
+      await runValidationWithRetry(2, 2000);
       // after validation completes, cap future concurrency at 2
       maxConcurrent = 2;
     });
@@ -1661,7 +1670,7 @@
     els.genArtifactsBtn?.addEventListener('click', generateArtifacts);
 
     // Validation events
-    els.runValidationBtn?.addEventListener('click', runValidation);
+    els.runValidationBtn?.addEventListener('click', () => runValidationWithRetry(2, 2000));
     els.runStakeBtn?.addEventListener('click', runStakeholders);
     els.runEmbBtn?.addEventListener('click', runEmbodied);
     els.runRoadBtn?.addEventListener('click', runRoadmap);
