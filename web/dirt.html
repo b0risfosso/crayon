@@ -695,15 +695,6 @@
       }
     }
 
-    // --- Pretty renderer: three scrollable sections (no raw JSON) ---
-    function renderValidationPretty(payload){
-      const v = (payload && payload.validation) || {};
-      // Ensure containers exist (valProblem/valObjective/valSolution each has .val-content)
-      fillValSection('valProblem',   v.problem_validation);
-      fillValSection('valObjective', v.objective_measurement);
-      fillValSection('valSolution',  v.solution_justification);
-    }
-
     function fillValSection(sectionId, items){
       const wrap = document.querySelector(`#${sectionId} .val-content`);
       if (!wrap) return;
@@ -824,21 +815,6 @@
       if (els.embText){
         els.embText.innerHTML = buildEmbHTML(_embData[key] || []);
       }
-    }
-
-    // Accepts API payload; normalizes and paints current tab (default: 'eyes')
-    function renderEmbodied(payload){
-      const v = payload?.embodied || payload?.map || payload || {};
-      _embData = {
-        eyes:  Array.isArray(v.eyes)  ? v.eyes  : [],
-        ears:  Array.isArray(v.ears)  ? v.ears  : [],
-        hands: Array.isArray(v.hands) ? v.hands : [],
-        nose:  Array.isArray(v.nose)  ? v.nose  : [],
-        mouth: Array.isArray(v.mouth) ? v.mouth : [],
-        music: Array.isArray(v.music) ? v.music : [],
-      };
-      const active = document.querySelector('#embTabs .emb-tab.active')?.dataset.k || 'eyes';
-      setActiveEmbTab(active);
     }
 
 
@@ -1243,22 +1219,19 @@
       }catch(e){ setStatus(els.stakeStatus, e.message, false); }
     }
 
+    // Accepts API payload; normalizes and paints current tab (default: 'eyes')
     function renderEmbodied(payload){
-      const v = payload?.embodied || payload?.map || payload;
-      const keys = [
-        ['embEyes', v?.eyes], ['embEars', v?.ears], ['embHands', v?.hands],
-        ['embNose', v?.nose], ['embMouth', v?.mouth], ['embMusic', v?.music],
-      ];
-      for (const [id, arr] of keys){
-        const box = document.querySelector(`#${id} .box-scroll`);
-        if (!box) continue;
-        if (!Array.isArray(arr) || !arr.length){ box.innerHTML = '<div class="muted">No entries</div>'; continue; }
-        box.innerHTML = arr.map(x=>{
-          const cue = escapeHTML(x.cue||'');
-          const why = x.why ? `<div class="muted">${escapeHTML(x.why)}</div>` : '';
-          return `<div style="margin:.5rem 0;"><div style="font-weight:650;">${cue}</div>${why}</div>`;
-        }).join('');
-      }
+      const v = payload?.embodied || payload?.map || payload || {};
+      _embData = {
+        eyes:  Array.isArray(v.eyes)  ? v.eyes  : [],
+        ears:  Array.isArray(v.ears)  ? v.ears  : [],
+        hands: Array.isArray(v.hands) ? v.hands : [],
+        nose:  Array.isArray(v.nose)  ? v.nose  : [],
+        mouth: Array.isArray(v.mouth) ? v.mouth : [],
+        music: Array.isArray(v.music) ? v.music : [],
+      };
+      const active = document.querySelector('#embTabs .emb-tab.active')?.dataset.k || 'eyes';
+      setActiveEmbTab(active);
     }
 
     async function runEmbodied(){
