@@ -227,6 +227,39 @@ def bootstrap_schema():
         con.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_seed_dedup
                        ON narrative_seeds(dimension_id, problem, objective, solution);""")
 
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS people (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS people_narratives (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            person_id INTEGER NOT NULL,
+            domain_id INTEGER,
+            dimension_id INTEGER,
+            seed_id INTEGER,
+            visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('public','private')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
+            FOREIGN KEY (domain_id) REFERENCES narratives(id) ON DELETE CASCADE,
+            FOREIGN KEY (dimension_id) REFERENCES narrative_dimensions(id) ON DELETE CASCADE,
+            FOREIGN KEY (seed_id) REFERENCES narrative_seeds(id) ON DELETE CASCADE
+        );
+        """)
+
+        con.execute("""
+        -- Helpful indexes
+        CREATE INDEX IF NOT EXISTS ix_people_email ON people(email);
+        CREATE INDEX IF NOT EXISTS ix_pn_person ON people_narratives(person_id);
+        CREATE INDEX IF NOT EXISTS ix_pn_scope  ON people_narratives(visibility, domain_id, dimension_id, seed_id);
+        """)
+
 
 
 bootstrap_schema()
@@ -628,14 +661,14 @@ def generate_seed_html(artifact_yaml: str, model: Optional[str] = None, temperat
         raise RuntimeError(f"LLM generation failed: {e}") from e
 
 
-def get_or_create_narrative(con, domain_title: str) -> int:
-    row = con.execute("SELECT id FROM narratives WHERE title = ?", (domain_title,)).fetchone()
+def get_or_create_narrative(con, domain_title, visibility='public', owner_email=None) -> int:
+    row = con.execute("SELECT id FROM narratives WHERE title = ?", (domain_title,visibility,owner_email)).fetchone()
     if row:
         return row["id"]
-    cur = con.execute("INSERT INTO narratives (title) VALUES (?)", (domain_title,))
+    cur = con.execute("INSERT INTO narratives (title) VALUES (?)", (domain_title,visibility,owner_email))
     return cur.lastrowid
 
-def upsert_dimension(con, narrative_id: int, name: str, thesis: str, targets: list, provider: str | None = None) -> int:
+def upsert_dimension(con, narrative_id: int, name: str, thesis: str, targets: list, provider: str | None = None, visibility='public', owner_email=None) -> int:
     row = con.execute(
         "SELECT id FROM narrative_dimensions WHERE narrative_id=? AND title=?",
         (narrative_id, name)
@@ -661,7 +694,7 @@ def upsert_dimension(con, narrative_id: int, name: str, thesis: str, targets: li
     return cur.lastrowid
 
 
-def insert_seed(con, dimension_id: int, problem: str, objective: str, solution: str, provider: str | None = None):
+def insert_seed(con, dimension_id: int, problem: str, objective: str, solution: str, provider: str | None = None, visibility='public', owner_email=None):
     # dedup via unique index; ignore if exact duplicate (provider is not part of the unique key)
     con.execute("""
         INSERT OR IGNORE INTO narrative_seeds (dimension_id, problem, objective, solution, provider)
@@ -1068,6 +1101,35 @@ def llm_generate_seeds_xai(domain: str, dimension: str, description: str, target
     response, parsed = chat.parse(NarrativeSeeds)
     return response, parsed
 
+def get_or_create_person(con, email: str, name: str | None = None) -> int:
+    if not email:
+        raise ValueError("email required for person")
+    row = con.execute("SELECT id FROM people WHERE email=?", (email,)).fetchone()
+    if row:
+        return row["id"]
+    con.execute("INSERT INTO people (email, name) VALUES (?, ?)", (email, name))
+    return con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+
+def link_person_to_domain(con, email: str, domain_id: int, visibility: str):
+    pid = get_or_create_person(con, email)
+    con.execute("""
+        INSERT INTO people_narratives (person_id, domain_id, visibility)
+        VALUES (?, ?, ?)
+    """, (pid, domain_id, visibility))
+
+def link_person_to_dimension(con, email: str, dimension_id: int, visibility: str):
+    pid = get_or_create_person(con, email)
+    con.execute("""
+        INSERT INTO people_narratives (person_id, dimension_id, visibility)
+        VALUES (?, ?, ?)
+    """, (pid, dimension_id, visibility))
+
+def link_person_to_seed(con, email: str, seed_id: int, visibility: str):
+    pid = get_or_create_person(con, email)
+    con.execute("""
+        INSERT INTO people_narratives (person_id, seed_id, visibility)
+        VALUES (?, ?, ?)
+    """, (pid, seed_id, visibility))
 
 
 # --- routes ---
@@ -1077,6 +1139,9 @@ def generate_narrative_dimensions():
     domain = (data.get("domain") or "").strip()
     n = data.get("n")
     provider = _provider_from(data)  # "openai" | "xai" (your helper)
+
+    visibility = (data.get("visibility") or "public").strip()
+    email = (data.get("email") or "").strip().lower()
 
     if not domain:
         return jsonify({"error": "Missing 'domain'"}), 400
@@ -1108,9 +1173,25 @@ def generate_narrative_dimensions():
 
         if parsed is not None:
             dims = parsed.model_dump()["dimensions"]
+
+            if visibility == "private" and not email:
+                return jsonify({
+                    "domain": domain,
+                    "provider": provider,
+                    "model": model_name,
+                    "dimensions": [{**d, "saved": False} for d in dims],
+                    "visibility": visibility,
+                    "email": email
+                }), 200
+
             with closing(connect()) as con, con:
-                narrative_id = get_or_create_narrative(con, domain)
+                narrative_id = get_or_create_narrative(con, domain, visibility, email)
                 saved = []
+                if email:
+                    try:
+                        link_person_to_domain(con, email, narrative_id, visibility)
+                    except Exception:
+                        pass  # non-fatal
                 for d in dims:
                     dim_id = upsert_dimension(
                         con,
@@ -1118,15 +1199,25 @@ def generate_narrative_dimensions():
                         name=d["name"],
                         thesis=d["thesis"],
                         targets=d.get("targets") or [],
-                        provider=provider
+                        provider=provider,
+                        visibility=visibility,
+                        owner_email=email or None
                     )
-                    saved.append({**d, "id": dim_id, "provider": provider})
+                    # NEW: link person ↔ dimension per row (only if email present)
+                    if email:
+                        try:
+                            link_person_to_dimension(con, email, dim_id, visibility)
+                        except Exception:
+                            pass
+                    saved.append({**d, "id": dim_id, "provider": provider, "saved": True})
 
             return jsonify({
                 "domain": domain,
                 "provider": provider,
                 "model": model_name,
-                "dimensions": saved
+                "dimensions": saved,
+                "visibility": visibility,
+                "email": email
             }), 200
 
         return jsonify({
@@ -1150,6 +1241,9 @@ def generate_narrative_seeds():
     description = (data.get("description") or "").strip()
     targets = data.get("targets") or []
     provider = _provider_from(data)
+
+    visibility = (data.get("visibility") or "public").strip()
+    email = (data.get("email") or "").strip().lower()
 
     if not (domain and dimension and description):
         return jsonify({"error": "Missing required fields: domain, dimension, description"}), 400
@@ -1191,15 +1285,28 @@ def generate_narrative_seeds():
 
         seeds = parsed.model_dump()["seeds"]
 
+        if visibility == "private" and not email:
+            return jsonify({
+                "domain": domain,
+                "dimension": dimension,
+                "provider": provider,
+                "model": model_name,
+                "seeds": [{**s, "saved": False} for s in seeds],
+                "visibility": visibility,
+                "email": email
+            }), 200
+
         with closing(connect()) as con, con:
-            narrative_id = get_or_create_narrative(con, domain)
+            narrative_id = get_or_create_narrative(con, domain, visibility=visibility, owner_email=email or None)
             dim_id = upsert_dimension(
                 con,
                 narrative_id=narrative_id,
                 name=dimension,
                 thesis=description,
                 targets=targets,
-                provider=provider
+                provider=provider,
+                visibility=visibility,
+                owner_email=email or None
             )
             for s in seeds:
                 insert_seed(
@@ -1208,8 +1315,15 @@ def generate_narrative_seeds():
                     problem=(s.get("problem") or "").strip(),
                     objective=(s.get("objective") or "").strip(),
                     solution=(s.get("solution") or "").strip(),
-                    provider=provider
+                    provider=provider,
+                    visibility=visibility,
+                    owner_email=email or None
                 )
+                if email:
+                    try:
+                        link_person_to_seed(con, email, sid, visibility)
+                    except Exception:
+                        pass
 
             rows = con.execute("""
                 SELECT id, problem, objective, solution, provider, created_at
@@ -1217,7 +1331,7 @@ def generate_narrative_seeds():
                 WHERE dimension_id=?
                 ORDER BY id DESC
                 LIMIT 50
-            """, (dim_id,)).fetchall()
+            """, (dim_id, visibility, email or None)).fetchall()
 
         seeds_out = [
             {
@@ -1226,7 +1340,8 @@ def generate_narrative_seeds():
                 "objective": r["objective"],
                 "solution": r["solution"],
                 "provider": r["provider"],
-                "created_at": r["created_at"]
+                "created_at": r["created_at"],
+                "saved": True
             } for r in rows
         ]
 
@@ -1236,7 +1351,9 @@ def generate_narrative_seeds():
             "dimension_id": dim_id,
             "provider": provider,
             "model": model_name,
-            "seeds": seeds_out
+            "seeds": seeds_out,
+            "visibility": visibility,
+            "email": email
         }), 200
 
     except Exception as e:
@@ -1401,6 +1518,47 @@ def api_narratives():
         ORDER BY COALESCE(created_at, '') DESC, id DESC
     """)
     return jsonify(rows)
+
+@app.get("/api/people/<email>/items")
+def api_people_items(email: str):
+    email = email.strip().lower()
+    with closing(connect()) as con:
+        con.row_factory = sqlite3.Row
+        # Domains
+        domains = con.execute("""
+            SELECT DISTINCT n.id, n.title, n.created_at
+            FROM people p
+            JOIN people_narratives pn ON pn.person_id = p.id
+            JOIN narratives n ON n.id = pn.domain_id
+            WHERE p.email=? 
+            ORDER BY n.id DESC
+        """, (email,)).fetchall()
+        # Dimensions
+        dims = con.execute("""
+            SELECT DISTINCT d.id, d.name, d.thesis, d.narrative_id, d.created_at
+            FROM people p
+            JOIN people_narratives pn ON pn.person_id = p.id
+            JOIN narrative_dimensions d ON d.id = pn.dimension_id
+            WHERE p.email=?
+            ORDER BY d.id DESC
+        """, (email,)).fetchall()
+        # Seeds
+        seeds = con.execute("""
+            SELECT DISTINCT s.id, s.dimension_id, s.problem, s.objective, s.solution, s.created_at
+            FROM people p
+            JOIN people_narratives pn ON pn.person_id = p.id
+            JOIN narrative_seeds s ON s.id = pn.seed_id
+            WHERE p.email=?
+            ORDER BY s.id DESC
+        """, (email,)).fetchall()
+
+    return jsonify({
+        "email": email,
+        "domains": [dict(r) for r in domains],
+        "dimensions": [dict(r) for r in dims],
+        "seeds": [dict(r) for r in seeds],
+    })
+
 
 
 @app.get("/api/narratives/<int:narrative_id>/dimensions")
