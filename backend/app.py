@@ -253,12 +253,9 @@ def bootstrap_schema():
         );
         """)
 
-        con.execute("""
-        -- Helpful indexes
-        CREATE INDEX IF NOT EXISTS ix_people_email ON people(email);
-        CREATE INDEX IF NOT EXISTS ix_pn_person ON people_narratives(person_id);
-        CREATE INDEX IF NOT EXISTS ix_pn_scope  ON people_narratives(visibility, domain_id, dimension_id, seed_id);
-        """)
+        con.execute("""CREATE INDEX IF NOT EXISTS ix_people_email ON people(email);""")
+        con.execute("""CREATE INDEX IF NOT EXISTS ix_pn_person ON people_narratives(person_id);""")
+        con.execute("""CREATE INDEX IF NOT EXISTS ix_pn_scope  ON people_narratives(visibility, domain_id, dimension_id, seed_id);""")
 
 
 
