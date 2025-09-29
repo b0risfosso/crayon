@@ -939,7 +939,7 @@
           setStatus(els.valStatus, 'OK', true);
           if (payload && payload.ok){
             renderValidationPretty(payload);
-            saveDirt('validation', {request: {domain, dimension, problem, objective, solution, provider}}, payload);
+            saveDirt('validation', {request: {domain, dimension, problem, objective, solution, provider}}, payload, provider);
           }
         }
       }catch(e){
@@ -1425,7 +1425,7 @@
     }
 
     // --- helper: persist a generation run ---
-    async function saveDirt(kind, inputObj, outputObj){
+    async function saveDirt(kind, inputObj, outputObj, provider=DEFAULT_PROVIDER){
       try{
         // best-effort: include ids if we have them
         const nid = els.domain.value || null;
@@ -1434,7 +1434,7 @@
 
         // include the seed triplet for querying later
         const t = currentSeedTriplet();  // {domain, dimension, problem, objective, solution} or null
-        const provider = 'openai';       // or the provider you actually used for this panel
+        const provider = provider;       // or the provider you actually used for this panel
 
         const body = {
           kind,
