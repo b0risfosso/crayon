@@ -281,9 +281,6 @@
           <span id="valStatus" class="muted"></span>
         </div>
     
-        <!-- Optional: live summary of what's about to be validated -->
-        <div id="valSummary" class="muted small" style="line-height:1.4;"></div>
-    
         <div class="actions">
           <button id="runValidationBtn">Run Validation</button>
           <span id="valRunNote" class="muted"></span>
@@ -423,7 +420,6 @@
 
       // Validation
       valStatus: document.getElementById('valStatus'),
-      valSummary: document.getElementById('valSummary'),
       runValidationBtn: document.getElementById('runValidationBtn'),
       valRunNote: document.getElementById('valRunNote'),
       valTabs: document.getElementById('valTabs'),
@@ -814,26 +810,6 @@
       return { nid, did, sid, domainRow, dimRow, seedRow };
     }
 
-    function renderValSummary(domainRow, dimRow, seedRow){
-      if (!els.valSummary) return;
-      if (!domainRow || !dimRow || !seedRow){
-        els.valSummary.textContent = 'Select a domain, dimension, and seed.';
-        return;
-      }
-      const domain = stripHashId(domainRow.title || '');
-      const dimension = stripHashId(dimRow.title || '');
-      const A = seedRow.problem || '';
-      const B = seedRow.objective || '';
-      const L = seedRow.solution || '';
-
-      els.valSummary.innerHTML =
-        `<div><strong>Domain:</strong> ${escapeHTML(domain)} (#${domainRow.id})</div>` +
-        `<div><strong>Dimension:</strong> ${escapeHTML(dimension)} (#${dimRow.id})</div>` +
-        (A ? `<div><strong>Problem:</strong> ${escapeHTML(A)}</div>` : '') +
-        (B ? `<div><strong>Objective:</strong> ${escapeHTML(B)}</div>` : '') +
-        (L ? `<div><strong>Solution:</strong> ${escapeHTML(L)}</div>` : '');
-    }
-
     function currentSeedTriplet() {
       const { domainRow, dimRow, seedRow } = getSelectedRows();
       if (!domainRow || !dimRow || !seedRow) return null;
@@ -880,8 +856,6 @@
 
       if (!domainRow || !dimRow || !seedRow) {
         setStatus(els.valStatus, 'Select a domain, dimension, and seed first.', false);
-        els.valPretty.innerHTML = '';
-        renderValSummary(domainRow, dimRow, seedRow);
         return;
       }
 
@@ -891,7 +865,6 @@
       const objective = (seedRow.objective || '').trim();
       const solution  = (seedRow.solution  || '').trim();
 
-      renderValSummary(domainRow, dimRow, seedRow);
 
       // provider is fixed to openai_web per your spec
       const provider = 'openai_web';
