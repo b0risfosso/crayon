@@ -1028,6 +1028,7 @@
         if (data?.ok === true){
           renderPrototypeEnvelope(data);
           setStatus(els.protoStatus, 'OK', true);
+          saveDirt('storyboard', {request: body}, data);
           return;
         }
 
@@ -1142,6 +1143,7 @@
         if (data?.ok === true){
           renderArtifactsBundle(data.artifacts);
           setStatus(els.artifactsStatus, 'OK', true);
+          saveDirt('artifacts', {request: body}, data);
           return;
         }
 
