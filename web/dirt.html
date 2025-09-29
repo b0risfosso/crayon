@@ -331,17 +331,23 @@
         <div class="actions">
           <button id="runEmbBtn">Run 6 senses</button>
         </div>
-        <div id="embPretty" class="cardgrid-3">
-          <div class="box-section" id="embEyes"><h3>Sight</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embEars"><h3>Sound</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embHands"><h3>Touch</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embNose"><h3>Smell</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embMouth"><h3>Taste</h3><div class="box-scroll"></div></div>
-          <div class="box-section" id="embMusic"><h3>Music</h3><div class="box-scroll"></div></div>
+    
+        <!-- Tabs -->
+        <div id="embTabs" class="tabs">
+          <button class="tab emb-tab active" type="button" data-k="eyes">Sight</button>
+          <button class="tab emb-tab"         type="button" data-k="ears">Sound</button>
+          <button class="tab emb-tab"         type="button" data-k="hands">Touch</button>
+          <button class="tab emb-tab"         type="button" data-k="nose">Smell</button>
+          <button class="tab emb-tab"         type="button" data-k="mouth">Taste</button>
+          <button class="tab emb-tab"         type="button" data-k="music">Music</button>
+          <span class="spacer"></span>
         </div>
+    
+        <!-- Single display block -->
+        <div id="embText" class="codeblock" tabindex="0" aria-live="polite" aria-atomic="true" style="max-height:300px;"></div>
       </div>
     </section>
-
+    
     <!-- Archetype-driven playbook -->
     <section class="card" aria-labelledby="h-archpb">
       <header><h2 id="h-archpb">Archetype-Driven Playbook</h2></header>
@@ -434,7 +440,9 @@
       // Embodied
       runEmbBtn: document.getElementById('runEmbBtn'),
       embStatus: document.getElementById('embStatus'),
-      embPretty: document.getElementById('embPretty'),
+      embTabs: document.getElementById('embTabs'),
+      embText: document.getElementById('embText'),
+
 
       // Roadmap
       runRoadBtn: document.getElementById('runRoadBtn'),
@@ -793,6 +801,46 @@
       const active = document.querySelector('#valTabs .val-tab.active')?.dataset.k || 'problem';
       setActiveValTab(active);
     }
+
+    // --- Embodied: single-block renderer with tabs ---
+    let _embData = { eyes: [], ears: [], hands: [], nose: [], mouth: [], music: [] };
+
+    function buildEmbHTML(items){
+      if (!Array.isArray(items) || items.length === 0){
+        return `<div class="muted">No entries</div>`;
+      }
+      return items.map(x=>{
+        const cue = escapeHTML(x?.cue || '');
+        const why = x?.why ? `<div class="muted">${escapeHTML(x.why)}</div>` : '';
+        return `<div style="margin:.5rem 0;"><div style="font-weight:650;">${cue}</div>${why}</div>`;
+      }).join('');
+    }
+
+    function setActiveEmbTab(key){
+      // key ∈ {'eyes','ears','hands','nose','mouth','music'}
+      document.querySelectorAll('#embTabs .emb-tab').forEach(btn=>{
+        btn.classList.toggle('active', btn.dataset.k === key);
+      });
+      if (els.embText){
+        els.embText.innerHTML = buildEmbHTML(_embData[key] || []);
+      }
+    }
+
+    // Accepts API payload; normalizes and paints current tab (default: 'eyes')
+    function renderEmbodied(payload){
+      const v = payload?.embodied || payload?.map || payload || {};
+      _embData = {
+        eyes:  Array.isArray(v.eyes)  ? v.eyes  : [],
+        ears:  Array.isArray(v.ears)  ? v.ears  : [],
+        hands: Array.isArray(v.hands) ? v.hands : [],
+        nose:  Array.isArray(v.nose)  ? v.nose  : [],
+        mouth: Array.isArray(v.mouth) ? v.mouth : [],
+        music: Array.isArray(v.music) ? v.music : [],
+      };
+      const active = document.querySelector('#embTabs .emb-tab.active')?.dataset.k || 'eyes';
+      setActiveEmbTab(active);
+    }
+
 
 
 
@@ -1216,18 +1264,25 @@
     async function runEmbodied(){
       const t = requiredTripletOrStatus(els.embStatus); if (!t) return;
       setStatus(els.embStatus, 'Running…', false);
-      ['#embEyes .box-scroll','#embEars .box-scroll','#embHands .box-scroll','#embNose .box-scroll','#embMouth .box-scroll','#embMusic .box-scroll'].forEach(clearBoxScroll);
+      if (els.embText) els.embText.innerHTML = '';  // clear single view
       try{
         const res = await fetch(API.embodied, {
-          method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+          method:'POST',
+          headers:{'Content-Type':'application/json','Accept':'application/json'},
           body: JSON.stringify({...t, provider: DEFAULT_PROVIDER})
         });
         const j = await res.json().catch(()=>null);
-        if (!res.ok || j?.error){ setStatus(els.embStatus, j?.error||`HTTP ${res.status}`, false); return; }
+        if (!res.ok || j?.error){
+          setStatus(els.embStatus, j?.error||`HTTP ${res.status}`, false);
+          return;
+        }
         setStatus(els.embStatus, 'OK', true);
         renderEmbodied(j?.map ?? j?.embodied ?? j?.output ?? j);
-      }catch(e){ setStatus(els.embStatus, e.message, false); }
+      }catch(e){
+        setStatus(els.embStatus, e.message, false);
+      }
     }
+
 
     function renderRoadmap(payload){
       const v = payload?.playbook || payload?.roadmap || payload;
@@ -1416,6 +1471,14 @@
       if (!btn) return;
       setActiveValTab(btn.dataset.k);
     });
+
+    // Embodied tabs wiring
+    els.embTabs?.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.emb-tab');
+      if (!btn) return;
+      setActiveEmbTab(btn.dataset.k);
+    });
+
 
     els.genProtoBtn?.addEventListener('click', generatePrototypeAndBuild);
     els.genArtifactsBtn?.addEventListener('click', generateArtifacts);
