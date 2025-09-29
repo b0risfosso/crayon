@@ -130,6 +130,19 @@
     .box-scroll ul { margin:.3rem 0 0 1rem; padding:0; }
     .box-kv { font-size:.85rem; opacity:.85; }
 
+    /* Tabs for validation */
+    .tabs { display:flex; align-items:center; gap:.35rem; margin:.25rem 0 .5rem 0; }
+    .tab {
+      padding:.45rem .7rem; border-radius:.5rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+      background: color-mix(in oklab, Canvas 94%, CanvasText 6%); cursor:pointer; font-size:.85rem;
+    }
+    .tab.active {
+      background: color-mix(in oklab, Canvas 90%, CanvasText 10%);
+      border-color: color-mix(in oklab, CanvasText 26%, transparent);
+      box-shadow: 0 1px 0 rgba(0,0,0,.06) inset;
+    }
+
+
   </style>
 </head>
 <body>
@@ -276,14 +289,19 @@
           <span id="valRunNote" class="muted"></span>
         </div>
     
-        <div id="valPretty" class="validation-grid">
-          <div class="val-section" id="valProblem"><h3>Problem Validation</h3><div class="val-content"></div></div>
-          <div class="val-section" id="valObjective"><h3>Objective Measurement</h3><div class="val-content"></div></div>
-          <div class="val-section" id="valSolution"><h3>Solution Justification</h3><div class="val-content"></div></div>
+        <!-- Tabs -->
+        <div id="valTabs" class="tabs">
+          <button class="tab val-tab active" type="button" data-k="problem">Problem Validation</button>
+          <button class="tab val-tab"         type="button" data-k="objective">Objective Measurement</button>
+          <button class="tab val-tab"         type="button" data-k="solution">Solution Justification</button>
+          <span class="spacer"></span>
         </div>
-  
+    
+        <!-- Single display block -->
+        <div id="valText" class="codeblock" tabindex="0" aria-live="polite" aria-atomic="true" style="max-height:300px;"></div>
       </div>
     </section>
+    
 
     <!-- Stakeholder mapping -->
     <section class="card" aria-labelledby="h-stake">
@@ -408,7 +426,9 @@
       valSummary: document.getElementById('valSummary'),
       runValidationBtn: document.getElementById('runValidationBtn'),
       valRunNote: document.getElementById('valRunNote'),
-      valPretty: document.getElementById('valPretty'),
+      valTabs: document.getElementById('valTabs'),
+      valText: document.getElementById('valText'),
+
 
       // Stakeholders
       runStakeBtn: document.getElementById('runStakeBtn'),
@@ -719,6 +739,65 @@
       return String(s || '').replace(/"/g, '&quot;');
     }
 
+    let _validationData = { problem: [], objective: [], solution: [] };
+
+    function buildValidationHTML(items){
+      if (!Array.isArray(items) || items.length === 0){
+        return `<div class="muted">No entries</div>`;
+      }
+      return items.map(item => {
+        const metric = escapeHTML(item?.metric || '');
+        const desc   = item?.description ? `<div class="muted">${escapeHTML(item.description)}</div>` : '';
+
+        const ds = Array.isArray(item?.datasets) ? item.datasets : [];
+        const dsHTML = ds.map(d => {
+          const name = escapeHTML(d?.name || '');
+          const org  = escapeHTML(d?.organization || '');
+          const notes= d?.notes ? ` — <span class="muted">${escapeHTML(d.notes)}</span>` : '';
+          const url  = d?.url ? ` — <a href="${escapeAttr(d.url)}" target="_blank" rel="noopener">${escapeHTML(d.url)}</a>` : '';
+          return `<li><strong>${name}</strong> <span class="muted">(${org})</span>${notes}${url}</li>`;
+        }).join('');
+
+        return `
+          <div class="metric" style="margin:.55rem 0; word-break: break-word;">
+            <div style="font-weight:650;">${metric}</div>
+            ${desc}
+            ${dsHTML ? `<ul style="margin:.35rem 0 0 1rem; padding:0;">${dsHTML}</ul>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setActiveValTab(key){
+      // key ∈ {'problem','objective','solution'}
+      const map = {
+        problem:   _validationData.problem,
+        objective: _validationData.objective,
+        solution:  _validationData.solution,
+      };
+      // Toggle active class
+      document.querySelectorAll('#valTabs .val-tab').forEach(btn=>{
+        btn.classList.toggle('active', btn.dataset.k === key);
+      });
+      // Paint the single text block
+      if (els.valText){
+        els.valText.innerHTML = buildValidationHTML(map[key] || []);
+      }
+    }
+
+    // Accepts the API payload, stores it, then shows the current tab (defaults to "problem")
+    function renderValidationPretty(payload){
+      const v = (payload && payload.validation) || {};
+      _validationData = {
+        problem:   Array.isArray(v.problem_validation)      ? v.problem_validation      : [],
+        objective: Array.isArray(v.objective_measurement)   ? v.objective_measurement   : [],
+        solution:  Array.isArray(v.solution_justification)  ? v.solution_justification  : [],
+      };
+      // If no tab is currently active, default to problem
+      const active = document.querySelector('#valTabs .val-tab.active')?.dataset.k || 'problem';
+      setActiveValTab(active);
+    }
+
 
 
     function getSelectedRows(){
@@ -832,6 +911,8 @@
       setStatus(els.valStatus, 'Running…', false);
       els.runValidationBtn.disabled = true;
       els.valRunNote.textContent = '';
+      if (els.valText) els.valText.innerHTML = '';
+
       
       const clear = sel => {
         const el = document.querySelector(sel);
@@ -1354,6 +1435,13 @@
     els.seedIdInput.addEventListener('input', ()=>{
       setStatus(els.selStatus, '', false);
       renderContext();
+    });
+
+    // Validation tabs wiring
+    els.valTabs?.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.val-tab');
+      if (!btn) return;
+      setActiveValTab(btn.dataset.k);
     });
 
     els.genProtoBtn?.addEventListener('click', generatePrototypeAndBuild);
