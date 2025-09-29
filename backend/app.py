@@ -19,6 +19,7 @@ from google import genai
 import uuid
 import threading
 import time
+from datetime import datetime
 from prompts import (
     BOX_OF_DIRT_ARTIFACTS_SYSTEM,
     PROTOTYPE_SYS_MSG,
@@ -40,12 +41,41 @@ PANELS_ROOT = Path("/var/www/site/data/assets/panels")  # target on disk
 ASSETS_ROOT = Path("/var/www/site/data/assets/panels")   # << per your ask
 WEB_PREFIX  = "/assets/panels"                            # serve as: /assets/seed_{id}/...
 
+DIRT_DIR = Path("/var/www/site/data/dirt")
+DIRT_DIR.mkdir(parents=True, exist_ok=True)
+
 BULK_JOBS = {}  # job_id -> { created_at, n, done, ok, fail, items: [ {seed_id, status, error, version} ], started_at, finished_at }
 BULK_JOBS_LOCK = threading.Lock()
 
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL | re.IGNORECASE)
+
+
+# --- add once during startup (e.g., right after app = Flask(__name__)) ---
+def _init_dirt_table():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS dirt (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            kind TEXT NOT NULL,                 -- 'prototype' | 'artifacts' | 'validation' | 'stakeholders' | 'embodied' | 'playbook' | 'archetype' | 'risks'
+            provider TEXT,
+            nid INTEGER,                        -- narrative id (optional)
+            did INTEGER,                        -- dimension id (optional)
+            sid INTEGER,                        -- seed id (optional)
+            domain TEXT,
+            dimension TEXT,
+            problem TEXT,
+            objective TEXT,
+            solution TEXT,
+            input_json TEXT NOT NULL,
+            output_json TEXT NOT NULL
+        );
+        """)
+        conn.commit()
+
+_init_dirt_table()
 
 
 def _extract_json_text(s: str) -> str:
@@ -435,6 +465,47 @@ BODY_WRAPPER_STYLE = """
   .badge { display:inline-block; padding:.2rem .45rem; border:1px solid #d0d0d0; border-radius:.4rem; background:#fff; font-size:.8rem; }
 </style>
 """
+
+# --- helper to persist one record ---
+def save_dirt_record(kind, provider, nid, did, sid, domain, dimension, problem, objective, solution, input_obj, output_obj):
+    created_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    input_json  = json.dumps(input_obj, ensure_ascii=False)
+    output_json = json.dumps(output_obj, ensure_ascii=False)
+
+    # DB row
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO dirt
+            (created_at, kind, provider, nid, did, sid, domain, dimension, problem, objective, solution, input_json, output_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (created_at, kind, provider, nid, did, sid, domain, dimension, problem, objective, solution, input_json, output_json))
+        gen_id = cur.lastrowid
+        conn.commit()
+
+    # Optional: also write a pretty file to disk for quick inspection / diffs
+    safe_domain    = (domain or "domain").replace("/", "_")
+    safe_dimension = (dimension or "dimension").replace("/", "_")
+    safe_kind      = kind.replace("/", "_")
+    sid_str        = str(sid or "na")
+    file_dir = DIRT_DIR / sid_str
+    file_dir.mkdir(parents=True, exist_ok=True)
+    file_path = file_dir / f"{created_at}_{safe_kind}.json"
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "id": gen_id,
+            "created_at": created_at,
+            "kind": kind,
+            "provider": provider,
+            "nid": nid, "did": did, "sid": sid,
+            "domain": domain, "dimension": dimension,
+            "problem": problem, "objective": objective, "solution": solution,
+            "input": input_obj,
+            "output": output_obj,
+        }, f, ensure_ascii=False, indent=2)
+
+    return gen_id
+
 
 def compose_input_block(domain: str, dimension: str, seed: str, prototype: str, thesis: Optional[str]) -> str:
     parts = [
@@ -2757,3 +2828,34 @@ def api_narrative_risks():
     except Exception as e:
         return jsonify({"error": "Internal Server Error", "detail": str(e)}), 500
 
+
+# --- JSON API: /api/dirt (POST) ---
+@app.post("/api/dirt")
+def api_save_dirt():
+    payload = request.get_json(silent=True) or {}
+    # Required
+    kind     = (payload.get("kind") or "").strip()
+    input_o  = payload.get("input")   # dict
+    output_o = payload.get("output")  # dict
+
+    if not kind or input_o is None or output_o is None:
+        return jsonify({"error": "kind, input, and output are required"}), 400
+
+    # Optional context
+    provider  = payload.get("provider")
+    nid       = payload.get("nid")
+    did       = payload.get("did")
+    sid       = payload.get("sid")
+    domain    = payload.get("domain")
+    dimension = payload.get("dimension")
+    problem   = payload.get("problem")
+    objective = payload.get("objective")
+    solution  = payload.get("solution")
+
+    try:
+        dirt_id = save_dirt_record(
+            kind, provider, nid, did, sid, domain, dimension, problem, objective, solution, input_o, output_o
+        )
+        return jsonify({"ok": True, "id": dirt_id})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500

@@ -939,6 +939,7 @@
           setStatus(els.valStatus, 'OK', true);
           if (payload && payload.ok){
             renderValidationPretty(payload);
+            saveDirt('validation', {request: {domain, dimension, problem, objective, solution, provider}}, payload);
           }
         }
       }catch(e){
@@ -1033,6 +1034,7 @@
         // Fallback: try to render if the object already looks like the prototype
         renderPrototypeEnvelope(data);
         setStatus(els.protoStatus, 'OK', true);
+        saveDirt('storyboard', {request: body}, data);
       }catch(e){
         setStatus(els.protoStatus, e.message, false);
       }finally{
@@ -1146,6 +1148,7 @@
         // Fallback: attempt to render if the object already looks like the bundle
         renderArtifactsBundle(data?.artifacts ?? data);
         setStatus(els.artifactsStatus, 'OK', true);
+        saveDirt('artifacts', {request: body}, data);
       }catch(e){
         setStatus(els.artifactsStatus, e.message, false);
       }finally{
@@ -1216,6 +1219,7 @@
         if (!res.ok || j?.error){ setStatus(els.stakeStatus, j?.error||`HTTP ${res.status}`, false); return; }
         setStatus(els.stakeStatus, 'OK', true);
         renderStakeholders(j?.map ?? j?.stakeholders ?? j?.output ?? j);
+        saveDirt('stakeholders', {request: {...t, provider: DEFAULT_PROVIDER}}, j);
       }catch(e){ setStatus(els.stakeStatus, e.message, false); }
     }
 
@@ -1251,6 +1255,7 @@
         }
         setStatus(els.embStatus, 'OK', true);
         renderEmbodied(j?.map ?? j?.embodied ?? j?.output ?? j);
+        saveDirt('embodied', {request: {...t, provider: DEFAULT_PROVIDER}}, j);
       }catch(e){
         setStatus(els.embStatus, e.message, false);
       }
@@ -1291,6 +1296,7 @@
         if (!res.ok || j?.error){ setStatus(els.roadStatus, j?.error||`HTTP ${res.status}`, false); return; }
         setStatus(els.roadStatus, 'OK', true);
         renderRoadmap(j?.playbook ?? j?.roadmap ?? j);
+        saveDirt('playbook', {request: {...t, provider: DEFAULT_PROVIDER}}, j);
       }catch(e){ setStatus(els.roadStatus, e.message, false); }
     }
 
@@ -1348,6 +1354,7 @@
         if (!res.ok || j?.error){ setStatus(els.archStatus, j?.error||`HTTP ${res.status}`, false); return; }
         setStatus(els.archStatus, 'OK', true);
         renderArchetype(j?.archetype_playbook ?? j?.playbook ?? j);
+        saveDirt('archetype', {request: {...t, provider: DEFAULT_PROVIDER}}, j);
       }catch(e){ setStatus(els.archStatus, e.message, false); }
     }
 
@@ -1411,8 +1418,43 @@
         if (!res.ok || j?.error){ setStatus(els.riskStatus, j?.error||`HTTP ${res.status}`, false); return; }
         setStatus(els.riskStatus, 'OK', true);
         renderRisks(j?.assessment ?? j?.risks ?? j);
+        saveDirt('risks', {request: {...t, provider: DEFAULT_PROVIDER}}, j);
       }catch(e){ setStatus(els.riskStatus, e.message, false); }
     }
+
+    // --- helper: persist a generation run ---
+    async function saveDirt(kind, inputObj, outputObj){
+      try{
+        // best-effort: include ids if we have them
+        const nid = els.domain.value || null;
+        const did = els.dimension.value || null;
+        const sid = els.seed.value || els.seedIdInput.value || null;
+
+        // include the seed triplet for querying later
+        const t = currentSeedTriplet();  // {domain, dimension, problem, objective, solution} or null
+        const provider = 'openai';       // or the provider you actually used for this panel
+
+        const body = {
+          kind,
+          provider,
+          nid, did, sid,
+          domain: t?.domain || null,
+          dimension: t?.dimension || null,
+          problem: t?.problem || null,
+          objective: t?.objective || null,
+          solution: t?.solution || null,
+          input: inputObj || {},
+          output: outputObj || {}
+        };
+
+        await fetch('/api/dirt', {
+          method:'POST',
+          headers:{'Content-Type':'application/json', 'Accept':'application/json'},
+          body: JSON.stringify(body)
+        });
+      }catch(_e){}
+    }
+
 
 
     function escapeHTML(s){
