@@ -600,6 +600,7 @@
         els.seedIdInput.value = String(sid);
       }
       renderContext();
+      if (sid) loadSavedGenerationsForSeed(String(sid));
     }
 
     // Loaders
@@ -872,6 +873,80 @@
 
     // default provider setting for these new routes
     const DEFAULT_PROVIDER = 'openai';
+
+    async function loadSavedDirtForSeed(sid){
+      if (!sid) return;
+
+      // fetch recent history for this seed
+      let rows = [];
+      try{
+        const res = await fetch(`/api/dirt?sid=${encodeURIComponent(sid)}&limit=100`, {
+          headers:{'Accept':'application/json'}
+        });
+        rows = await res.json();
+        if (!Array.isArray(rows)) rows = [];
+      }catch(_e){ rows = []; }
+
+      // pick latest per kind
+      const latest = new Map();
+      for (const r of rows){
+        const k = String(r.kind || '').toLowerCase();      // e.g. 'storyboard', 'artifacts', ...
+        if (!k) continue;
+        if (!latest.has(k)) latest.set(k, r); // rows are already newest-first
+      }
+
+      // Storyboard / Prototype
+      const sb = latest.get('storyboard') || latest.get('prototype');
+      if (sb?.output){
+        renderPrototypeEnvelope(sb.output);
+        setStatus(els.protoStatus, `Loaded (${new Date(sb.created_at).toLocaleString()})`, true);
+        if (els.protoWrap) els.protoWrap.hidden = false;
+      } else {
+        // optional: clear storyboard UI
+        // els.protoWrap.hidden = true;
+        // clearEl(els.protoCore); clearEl(els.protoBuild); clearEl(els.protoTest); clearEl(els.protoWhy);
+      }
+
+      // Artifacts
+      const ar = latest.get('artifacts');
+      if (ar?.output){
+        // Accept either {artifacts:{...}} envelope or the bundle directly
+        const bundle = ar.output?.artifacts ?? ar.output;
+        renderArtifactsBundle(bundle);
+        setStatus(els.artifactsStatus, `Loaded (${new Date(ar.created_at).toLocaleString()})`, true);
+      } else {
+        // optional: clear artifacts UI
+        // clearHTML(els.realArtifactsBox); clearHTML(els.bodItemsBox);
+        // clearHTML(els.guardrailsBox); clearHTML(els.nextStepsBox);
+      }
+
+      // (Optional) If you want the rest to auto-load too, uncomment:
+
+      // Validation
+      const vv = latest.get('validation');
+      if (vv?.output){ renderValidationPretty(vv.output); setStatus(els.valStatus, `Loaded (${new Date(vv.created_at).toLocaleString()})`, true); }
+
+      // Stakeholders
+      const st = latest.get('stakeholders');
+      if (st?.output){ renderStakeholders(st.output?.map ?? st.output?.stakeholders ?? st.output); setStatus(els.stakeStatus, `Loaded (${new Date(st.created_at).toLocaleString()})`, true); }
+
+      // Embodied
+      const em = latest.get('embodied');
+      if (em?.output){ renderEmbodied(em.output?.map ?? em.output?.embodied ?? em.output); setStatus(els.embStatus, `Loaded (${new Date(em.created_at).toLocaleString()})`, true); }
+
+      // Playbook
+      const pb = latest.get('playbook');
+      if (pb?.output){ renderRoadmap(pb.output?.playbook ?? pb.output?.roadmap ?? pb.output); setStatus(els.roadStatus, `Loaded (${new Date(pb.created_at).toLocaleString()})`, true); }
+
+      // Archetype
+      const ap = latest.get('archetype');
+      if (ap?.output){ renderArchetype(ap.output?.archetype_playbook ?? ap.output?.playbook ?? ap.output); setStatus(els.archStatus, `Loaded (${new Date(ap.created_at).toLocaleString()})`, true); }
+
+      // Risks
+      const rk = latest.get('risks');
+      if (rk?.output){ renderRisks(rk.output?.assessment ?? rk.output?.risks ?? rk.output); setStatus(els.riskStatus, `Loaded (${new Date(rk.created_at).toLocaleString()})`, true); }
+    }
+
 
 
 
@@ -1476,10 +1551,12 @@
       setStatus(els.selStatus, '', false);
       els.seedIdInput.value = els.seed.value || '';
       renderContext();
+      loadSavedGenerationsForSeed(els.seed.value || els.seedIdInput.value);
     });
     els.seedIdInput.addEventListener('input', ()=>{
       setStatus(els.selStatus, '', false);
       renderContext();
+      loadSavedGenerationsForSeed(els.seed.value || els.seedIdInput.value);
     });
 
     // Validation tabs wiring
@@ -1511,6 +1588,7 @@
     // Boot
     loadNarratives().then(maybeDeepLink);
     renderContext();
+
   })();
   </script>
 </body>

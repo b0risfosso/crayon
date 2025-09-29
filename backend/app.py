@@ -2859,3 +2859,53 @@ def api_save_dirt():
         return jsonify({"ok": True, "id": dirt_id})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# List saved generations (history)
+@app.get("/api/dirt")
+def list_dirt():
+    sid   = request.args.get("sid")
+    kind  = request.args.get("kind")      # e.g. 'storyboard', 'artifacts', 'validation', ...
+    limit = int(request.args.get("limit", 50))
+
+    q = """SELECT id, created_at, kind, provider, nid, did, sid,
+                  domain, dimension, problem, objective, solution,
+                  input_json, output_json
+           FROM generations"""
+    args, where = [], []
+    if sid:
+        where.append("sid = ?")
+        args.append(sid)
+    if kind:
+        where.append("kind = ?")
+        args.append(kind)
+    if where:
+        q += " WHERE " + " AND ".join(where)
+    q += " ORDER BY id DESC LIMIT ?"
+    args.append(limit)
+
+    rows = []
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        for r in conn.execute(q, args):
+            try:
+                out_obj = json.loads(r["output_json"] or "{}")
+            except Exception:
+                out_obj = {}
+            try:
+                in_obj = json.loads(r["input_json"] or "{}")
+            except Exception:
+                in_obj = {}
+            rows.append({
+                "id": r["id"],
+                "created_at": r["created_at"],
+                "kind": r["kind"],
+                "provider": r["provider"],
+                "nid": r["nid"], "did": r["did"], "sid": r["sid"],
+                "domain": r["domain"], "dimension": r["dimension"],
+                "problem": r["problem"], "objective": r["objective"], "solution": r["solution"],
+                "input": in_obj,
+                "output": out_obj,
+            })
+    return jsonify(rows)
+
