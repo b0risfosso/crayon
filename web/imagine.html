@@ -68,7 +68,7 @@
       <label class="chip">
         <input type="radio" name="visibility" value="private"> Private
       </label>
-      <input type="email" id="emailInput" placeholder="Enter email (optional)" />
+      <input type="email" id="emailInput" placeholder="Enter email to save narratives to your email (optional)" />
     </div>
     
 
@@ -95,8 +95,13 @@
     const noneBtn = document.getElementById('noneBtn');
     const invertBtn = document.getElementById('invertBtn');
 
-    const visibility = form.querySelector('input[name="visibility"]:checked').value;
-    const email = document.getElementById('emailInput').value.trim();
+    function currentVisibility() {
+      return (form.querySelector('input[name="visibility"]:checked')?.value || 'public');
+    }
+    function currentEmail() {
+      return (document.getElementById('emailInput')?.value || '').trim().toLowerCase();
+    }
+
 
 
     // ---------- provider selection logic ----------
@@ -251,9 +256,10 @@
         description: thesisText,
         targets: Array.isArray(dim.targets) ? dim.targets : [],
         provider,
-        visibility,
-        email
+        visibility: currentVisibility(),
+        email: currentEmail()
       };
+
       card._seedUI = { seedStatus, seedWrap };
 
       card._dimId = dim.id || null;          // <-- dimension id from backend
@@ -331,7 +337,9 @@
 
       let dimData;
       try {
-        dimData = await postJSON('/api/narrative-dimensions', { domain, provider, visibility, email  }, 180000);
+        const v = currentVisibility();
+        const em = currentEmail();
+        dimData = await postJSON('/api/narrative-dimensions', { domain, provider, visibility: v, email: em }, 180000);
       } catch (e) {
         status.textContent = `Failed: ${e.message || e}`;
         return;
