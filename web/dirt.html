@@ -177,6 +177,7 @@
           </div>
         </div>
         <div class="toolbar">
+          <button id="runAllBtn" type="button">Run All</button>
           <span id="selStatus" class="muted"></span>
         </div>
       </div>
@@ -394,6 +395,7 @@
       seed: document.getElementById('seedSelect'),
       seedIdInput: document.getElementById('seedIdInput'),
       selStatus: document.getElementById('selStatus'),
+      runAllBtn: document.getElementById('runAllBtn'),
 
       // Prototype
       genProtoBtn: document.getElementById('genProtoBtn'),
@@ -1532,6 +1534,87 @@
       }catch(_e){}
     }
 
+    function setRunButtonsDisabled(disabled){
+    [
+      els.genProtoBtn, els.genArtifactsBtn,
+      els.runValidationBtn, els.runStakeBtn,
+      els.runEmbBtn, els.runRoadBtn,
+      els.runArchBtn, els.runRiskBtn,
+      els.runAllBtn
+    ].forEach(b => { if (b) b.disabled = !!disabled; });
+  }
+
+  async function runAll(){
+    // require complete seed triplet
+    const t = requiredTripletOrStatus(els.selStatus);
+    if (!t) return;
+
+    setRunButtonsDisabled(true);
+
+    // order AFTER validation — edit as you like
+    const others = [
+      () => generatePrototypeAndBuild(),
+      () => generateArtifacts(),
+      () => runStakeholders(),
+      () => runEmbodied(),
+      () => runRoadmap(),
+      () => runArchetype(),
+      () => runRisks(),
+    ];
+
+    const total = 1 + others.length;
+    let done = 0;
+    let running = 0;
+    let maxConcurrent = 3;  // start with 3 (validation + two)
+    const queue = others.slice();
+
+    const update = () => setStatus(els.selStatus, `Running all… (${done}/${total})`, false);
+
+    let resolveFinished;
+    const finished = new Promise(r => (resolveFinished = r));
+
+    function start(fn){
+      running++;
+      Promise.resolve()
+        .then(fn)
+        .catch(()=>{}) // panels show their own errors
+        .then(()=>{
+          running--;
+          done++;
+          update();
+          if (done === total){
+            resolveFinished();
+          } else {
+            launchNext();
+          }
+        });
+    }
+
+    function launchNext(){
+      while (running < maxConcurrent && queue.length){
+        start(queue.shift());
+      }
+    }
+
+    // 1) start validation first; when it finishes, drop concurrency to 2
+    start(async () => {
+      await runValidation();
+      // after validation completes, cap future concurrency at 2
+      maxConcurrent = 2;
+    });
+
+    // 2) immediately start two more alongside validation (to make 3 total)
+    launchNext(); // with maxConcurrent=3 and running=1, this starts 2 more
+
+    update();
+    await finished;
+
+    setStatus(els.selStatus, 'All done ✓', true);
+    setRunButtonsDisabled(false);
+  }
+
+
+
 
 
     function escapeHTML(s){
@@ -1584,6 +1667,8 @@
     els.runRoadBtn?.addEventListener('click', runRoadmap);
     els.runArchBtn?.addEventListener('click', runArchetype);
     els.runRiskBtn?.addEventListener('click', runRisks);
+
+    els.runAllBtn?.addEventListener('click', runAll);
 
     // Boot
     loadNarratives().then(maybeDeepLink);
