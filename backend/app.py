@@ -2871,7 +2871,7 @@ def list_dirt():
     q = """SELECT id, created_at, kind, provider, nid, did, sid,
                   domain, dimension, problem, objective, solution,
                   input_json, output_json
-           FROM generations"""
+           FROM dirt"""
     args, where = [], []
     if sid:
         where.append("sid = ?")
