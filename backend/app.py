@@ -657,46 +657,108 @@ def generate_seed_html(artifact_yaml: str, model: Optional[str] = None, temperat
     except Exception as e:
         raise RuntimeError(f"LLM generation failed: {e}") from e
 
+# --- keep schema unchanged; adapt helpers to it ---
 
-def get_or_create_narrative(con, domain_title, visibility='public', owner_email=None) -> int:
-    row = con.execute("SELECT id FROM narratives WHERE title = ?", (domain_title,visibility,owner_email)).fetchone()
+def get_or_create_narrative(con, title: str,
+                            visibility: str = 'public',
+                            owner_email: str | None = None) -> int:
+    row = con.execute(
+        """
+        SELECT id FROM narratives
+        WHERE title = ?
+          AND COALESCE(owner_email,'') = COALESCE(?, '')
+          AND visibility = ?
+        LIMIT 1
+        """,
+        (title, owner_email, visibility)
+    ).fetchone()
     if row:
         return row["id"]
-    cur = con.execute("INSERT INTO narratives (title) VALUES (?)", (domain_title,visibility,owner_email))
-    return cur.lastrowid
 
-def upsert_dimension(con, narrative_id: int, name: str, thesis: str, targets: list, provider: str | None = None, visibility='public', owner_email=None) -> int:
+    con.execute(
+        """
+        INSERT INTO narratives (title, visibility, owner_email)
+        VALUES (?, ?, ?)
+        """,
+        (title, visibility, owner_email)
+    )
+    return con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+
+
+def upsert_dimension(con,
+                     narrative_id: int,
+                     name: str,                 # maps to column: title
+                     thesis: str,               # maps to column: description
+                     targets: list,
+                     provider: str | None = None,
+                     visibility: str = 'public',
+                     owner_email: str | None = None) -> int:
+    # find by narrative, title, scope
     row = con.execute(
-        "SELECT id FROM narrative_dimensions WHERE narrative_id=? AND title=?",
-        (narrative_id, name)
+        """
+        SELECT id FROM narrative_dimensions
+        WHERE narrative_id = ?
+          AND title = ?
+          AND COALESCE(owner_email,'') = COALESCE(?, '')
+          AND visibility = ?
+        LIMIT 1
+        """,
+        (narrative_id, name, owner_email, visibility)
     ).fetchone()
+
     targets_json = json.dumps(targets or [])
+
     if row:
-        # When updating, also refresh provider if supplied
+        dim_id = row["id"]
         if provider:
             con.execute(
-                "UPDATE narrative_dimensions SET description=?, targets_json=?, provider=? WHERE id=?",
-                (thesis, targets_json, provider, row["id"])
+                """
+                UPDATE narrative_dimensions
+                   SET description = ?, targets_json = ?, provider = ?
+                 WHERE id = ?
+                """,
+                (thesis, targets_json, provider, dim_id)
             )
         else:
             con.execute(
-                "UPDATE narrative_dimensions SET description=?, targets_json=? WHERE id=?",
-                (thesis, targets_json, row["id"])
+                """
+                UPDATE narrative_dimensions
+                   SET description = ?, targets_json = ?
+                 WHERE id = ?
+                """,
+                (thesis, targets_json, dim_id)
             )
-        return row["id"]
-    cur = con.execute(
-        "INSERT INTO narrative_dimensions (narrative_id, title, description, targets_json, provider) VALUES (?,?,?,?,?)",
-        (narrative_id, name, thesis, targets_json, provider)
+        return dim_id
+
+    con.execute(
+        """
+        INSERT INTO narrative_dimensions
+          (narrative_id, title, description, targets_json, provider, visibility, owner_email)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (narrative_id, name, thesis, targets_json, provider, visibility, owner_email)
     )
-    return cur.lastrowid
+    return con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
 
 
-def insert_seed(con, dimension_id: int, problem: str, objective: str, solution: str, provider: str | None = None, visibility='public', owner_email=None):
-    # dedup via unique index; ignore if exact duplicate (provider is not part of the unique key)
-    con.execute("""
-        INSERT OR IGNORE INTO narrative_seeds (dimension_id, problem, objective, solution, provider)
-        VALUES (?,?,?,?,?)
-    """, (dimension_id, problem, objective, solution, provider))
+def insert_seed(con,
+                dimension_id: int,
+                problem: str,
+                objective: str,
+                solution: str,
+                provider: str | None = None,
+                visibility: str = 'public',
+                owner_email: str | None = None) -> int:
+    # If you previously used OR IGNORE for dedup, restore it here:
+    con.execute(
+        """
+        INSERT INTO narrative_seeds
+          (dimension_id, problem, objective, solution, provider, visibility, owner_email)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (dimension_id, problem, objective, solution, provider, visibility, owner_email)
+    )
+    return con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
 
 
 def find_dimension_id(con, narrative_id: int, dim_name: str):
