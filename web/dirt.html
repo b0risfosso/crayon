@@ -600,7 +600,7 @@
         els.seedIdInput.value = String(sid);
       }
       renderContext();
-      if (sid) loadSavedGenerationsForSeed(String(sid));
+      if (sid) loadSavedDirtForSeed(String(sid));
     }
 
     // Loaders
@@ -1551,12 +1551,12 @@
       setStatus(els.selStatus, '', false);
       els.seedIdInput.value = els.seed.value || '';
       renderContext();
-      loadSavedGenerationsForSeed(els.seed.value || els.seedIdInput.value);
+      loadSavedDirtForSeed(els.seed.value || els.seedIdInput.value);
     });
     els.seedIdInput.addEventListener('input', ()=>{
       setStatus(els.selStatus, '', false);
       renderContext();
-      loadSavedGenerationsForSeed(els.seed.value || els.seedIdInput.value);
+      loadSavedDirtForSeed(els.seed.value || els.seedIdInput.value);
     });
 
     // Validation tabs wiring
