@@ -142,6 +142,16 @@
       box-shadow: 0 1px 0 rgba(0,0,0,.06) inset;
     }
 
+    .card.primary {
+      /* Subtle blue-tinted panel; works in light/dark */
+      border-color: color-mix(in oklab, dodgerblue 40%, CanvasText 20%);
+      background: color-mix(in oklab, Canvas 88%, dodgerblue 12%);
+      box-shadow: 0 1px 0 rgba(30,144,255,.12) inset;
+    }
+    .badge-req { color: #b00020; font-weight: 650; }
+    .small { font-size:.85rem; }
+
+
 
   </style>
 </head>
@@ -153,8 +163,22 @@
 
   <main class="grid cols-2">
     <!-- Left: Seed selection -->
-    <section class="card" aria-labelledby="h-select">
+    <section class="card primary" aria-labelledby="h-select">
       <header><h2 id="h-select">Select Seed</h2></header>
+      <div class="row" id="emailRow" style="grid-template-columns: 1fr;">
+        <div>
+          <label for="emailInput">
+            Email (required to load your saved narratives)
+            <span class="badge-req">(required)</span>
+          </label>
+          <div class="actions" style="gap:.4rem;">
+            <input id="emailInput" type="email" placeholder="you@example.com" style="flex:1;">
+            <button type="button" id="saveEmailBtn">Save</button>
+            <span id="emailStatus" class="muted"></span>
+          </div>
+          <div class="muted small">Enter and save your email to load your private domains/dimensions/seeds.</div>
+        </div>
+      </div>      
       <div class="body">
         <div class="row">
           <div>
@@ -464,6 +488,11 @@
       riskFailures: document.querySelector('#riskFailures .box-scroll'),
     };
 
+    els.emailInput = document.getElementById('emailInput');
+    els.saveEmailBtn = document.getElementById('saveEmailBtn');
+    els.emailStatus = document.getElementById('emailStatus');
+
+
     const API = {
       narratives: '/api/narratives',
       dims: (nid) => `/api/narratives/${encodeURIComponent(nid)}/dimensions`,
@@ -477,7 +506,31 @@
       risks: '/api/narrative-risks',
     };
 
+    const EMAIL_KEY = 'fg_user_email';
+
     let cache = { narratives: [], dims: new Map(), seeds: new Map() };
+
+    function saveEmailToStorage(email) {
+      const v = String(email || '').trim().toLowerCase();
+      if (v) localStorage.setItem(EMAIL_KEY, v);
+      else localStorage.removeItem(EMAIL_KEY);
+    }
+
+    function readEmailFromStorage() {
+      return (localStorage.getItem(EMAIL_KEY) || '').trim().toLowerCase();
+    }
+
+    function currentEmail() {
+      const typed = (document.getElementById('emailInput')?.value || '').trim().toLowerCase();
+      return typed || readEmailFromStorage();
+    }
+
+    // Append ?email=... when present
+    function withEmail(url) {
+      const em = currentEmail();
+      if (!em) return url;
+      return url + (url.includes('?') ? '&' : '?') + 'email=' + encodeURIComponent(em);
+    }
 
     // Helpers
     function stripHashId(name){
@@ -608,7 +661,7 @@
     // Loaders
     async function loadNarratives(){
       try{
-        const rows = await fetchJSON(API.narratives);
+        const rows = await fetchJSON(withEmail(API.narratives));
         cache.narratives = rows;
         els.domain.innerHTML = `<option value="">Select…</option>` +
           rows.map(r => `<option value="${r.id}">${escapeHTML(r.title)} (#${r.id})</option>`).join('');
@@ -624,7 +677,7 @@
       els.seed.innerHTML = `<option value="">Select a dimension</option>`;
       if (!nid) return;
       try{
-        const dims = await fetchJSON(API.dims(nid));
+        const dims = await fetchJSON(withEmail(API.dims(nid)));
         cache.dims.set(nid, dims);
         els.dimension.innerHTML = `<option value="">Select…</option>` +
           dims.map(d => `<option value="${d.id}">${escapeHTML(d.title)} (#${d.id})</option>`).join('');
@@ -639,7 +692,7 @@
       els.seed.innerHTML = `<option value="">${did ? 'Loading…' : 'Select a dimension'}</option>`;
       if (!did) return;
       try{
-        const payload = await fetchJSON(`/api/dimensions/${encodeURIComponent(did)}/seeds`);
+        const payload = await fetchJSON(withEmail(`/api/dimensions/${encodeURIComponent(did)}/seeds`));
         const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
         cache.seeds.set(did, seeds);
         els.seed.innerHTML = `<option value="">Select…</option>` +
@@ -649,6 +702,36 @@
         els.seed.innerHTML = `<option value="">Failed to load seeds</option>`;
       }
     }
+
+    async function ensureEmailThenLoad() {
+      // Prefill from storage if empty
+      const stored = readEmailFromStorage();
+      if (els.emailInput && !els.emailInput.value && stored) {
+        els.emailInput.value = stored;
+        els.emailStatus.textContent = 'Loaded saved email';
+        setTimeout(()=> els.emailStatus.textContent = '', 1200);
+      }
+
+      const em = currentEmail();
+      if (!em) {
+        els.selStatus.textContent = 'Enter and save your email to load your saved narratives.';
+        els.selStatus.classList.remove('ok'); els.selStatus.classList.add('err');
+        // Clear selects to avoid confusion
+        els.domain.innerHTML = `<option value="">Enter email to load…</option>`;
+        els.dimension.innerHTML = `<option value="">Select a domain</option>`;
+        els.seed.innerHTML = `<option value="">Select a dimension</option>`;
+        els.dimension.disabled = true; els.seed.disabled = true;
+        return; // stop here until email is provided
+      }
+
+      els.selStatus.textContent = '';
+      els.selStatus.classList.remove('err');
+
+      // Now we can load all lists (and honor deep links, if any)
+      await loadNarratives();
+      await maybeDeepLink();
+    }
+
 
     // Artifacts (Markdown only, per your prior setup)
     async function generateArtifactsAndPage() {
@@ -1527,6 +1610,7 @@
             nid: els.domain.value || null,
             did: els.dimension.value || null,
             sid: els.seed.value || els.seedIdInput.value || null,
+            email: currentEmail() || null,  
             ...currentSeedTriplet(),
             input:  inputObj || {},
             output: outputObj || {}
@@ -1637,6 +1721,17 @@
     }
 
     // Wiring
+    els.saveEmailBtn?.addEventListener('click', async () => {
+      const em = (els.emailInput?.value || '').trim().toLowerCase();
+      if (!em) { els.emailStatus.textContent = 'Please enter an email.'; return; }
+      saveEmailToStorage(em);
+      const old = els.saveEmailBtn.textContent;
+      els.saveEmailBtn.textContent = 'Saved';
+      els.emailStatus.textContent = 'Saved locally';
+      setTimeout(() => { els.saveEmailBtn.textContent = old; els.emailStatus.textContent = ''; }, 1200);
+      await ensureEmailThenLoad();
+    });
+
     els.domain.addEventListener('change', onDomainChange);
     els.dimension.addEventListener('change', onDimensionChange);
     els.seed.addEventListener('change', ()=>{
@@ -1680,7 +1775,7 @@
     els.runAllBtn?.addEventListener('click', runAll);
 
     // Boot
-    loadNarratives().then(maybeDeepLink);
+    ensureEmailThenLoad();
     renderContext();
 
   })();
