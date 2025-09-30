@@ -77,30 +77,6 @@ def _init_dirt_table():
 
 _init_dirt_table()
 
-def _ensure_private_uniqueness():
-    with closing(connect()) as con, con:
-        # narratives: title per owner
-        try:
-            con.execute("DROP INDEX IF EXISTS idx_narratives_title")
-        except sqlite3.OperationalError:
-            pass
-        con.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_title_owner
-            ON narratives(title, COALESCE(owner_email,''))
-        """)
-
-        # dimensions: (narrative_id, title) per owner
-        try:
-            con.execute("DROP INDEX IF EXISTS idx_dim_unique")
-        except sqlite3.OperationalError:
-            pass
-        con.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_dim_unique_owner
-            ON narrative_dimensions(narrative_id, title, COALESCE(owner_email,''))
-        """)
-
-_ensure_private_uniqueness()
-
 def _cols(con, table):
     return {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
 
@@ -167,6 +143,30 @@ def connect():
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     return con
+
+def _ensure_private_uniqueness():
+    with closing(connect()) as con, con:
+        # narratives: title per owner
+        try:
+            con.execute("DROP INDEX IF EXISTS idx_narratives_title")
+        except sqlite3.OperationalError:
+            pass
+        con.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_title_owner
+            ON narratives(title, COALESCE(owner_email,''))
+        """)
+
+        # dimensions: (narrative_id, title) per owner
+        try:
+            con.execute("DROP INDEX IF EXISTS idx_dim_unique")
+        except sqlite3.OperationalError:
+            pass
+        con.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_dim_unique_owner
+            ON narrative_dimensions(narrative_id, title, COALESCE(owner_email,''))
+        """)
+
+_ensure_private_uniqueness()
 
 def bootstrap_schema():
     with closing(connect()) as con, con:
