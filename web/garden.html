@@ -73,6 +73,19 @@
   <header>
     <h1>Fantasiagenesis · v4</h1>
     <div style="font-size:.85rem; opacity:.7">imagination and reality, growing together</div>
+    <div style="display:flex; align-items:center; gap:.5rem;">
+      <input id="emailInput" type="email" placeholder="you@example.com"
+             style="padding:.4rem .55rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                    border-radius:.45rem; background:color-mix(in oklab, Canvas 96%, CanvasText 4%);
+                    min-width: 240px;">
+      <button id="saveEmailBtn"
+              style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                     background:color-mix(in oklab, Canvas 92%, CanvasText 8%);
+                     border-radius:.5rem; cursor:pointer;">
+        Save
+      </button>
+      <span id="emailStatus" class="muted"></span>
+    </div>
   </header>
 
   <main class="app" id="app">
