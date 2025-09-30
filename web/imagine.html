@@ -62,13 +62,7 @@
     </div>
 
     <div class="row">
-      <label class="chip">
-        <input type="radio" name="visibility" value="public" checked> Public
-      </label>
-      <label class="chip">
-        <input type="radio" name="visibility" value="private"> Private
-      </label>
-      <input type="email" id="emailInput" placeholder="Enter email to save narratives to your email (optional)" />
+      <input type="email" id="emailInput" placeholder="Enter email to save results to your personal garden (optional)" />
     </div>
     
 
@@ -95,9 +89,6 @@
     const noneBtn = document.getElementById('noneBtn');
     const invertBtn = document.getElementById('invertBtn');
 
-    function currentVisibility() {
-      return (form.querySelector('input[name="visibility"]:checked')?.value || 'public');
-    }
     function currentEmail() {
       return (document.getElementById('emailInput')?.value || '').trim().toLowerCase();
     }
@@ -189,7 +180,7 @@
     const narrativeIdByTitle = new Map();
     async function ensureNarrativesCache() {
       if (narrativeIdByTitle.size) return;
-      const rows = await getJSON('/api/narratives');
+      const rows = await getJSON('/api/narratives?email=' + encodeURIComponent(em));
       rows.forEach(r => {
         if (r && r.title) narrativeIdByTitle.set(r.title, r.id);
       });
@@ -256,7 +247,6 @@
         description: thesisText,
         targets: Array.isArray(dim.targets) ? dim.targets : [],
         provider,
-        visibility: currentVisibility(),
         email: currentEmail()
       };
 
@@ -337,9 +327,8 @@
 
       let dimData;
       try {
-        const v = currentVisibility();
         const em = currentEmail();
-        dimData = await postJSON('/api/narrative-dimensions', { domain, provider, visibility: v, email: em }, 180000);
+        dimData = await postJSON('/api/narrative-dimensions', { domain, provider, email: em }, 180000);
       } catch (e) {
         status.textContent = `Failed: ${e.message || e}`;
         return;
@@ -390,6 +379,11 @@
       e.preventDefault();
       container.innerHTML = '';
       globalStatus.textContent = '';
+
+      const em = currentEmail();
+      if (!em) {
+        globalStatus.textContent = 'No email entered — results will be generated but NOT saved.';
+      }
 
       const domains = (multiDomainsInput.value || '')
         .split('\n').map(s => s.trim()).filter(Boolean);
@@ -444,7 +438,7 @@
     }
     async function reconcileSeedLinks(narrativeId, dimensionId, anchors) {
       try {
-        const data = await getJSON(`/api/dimensions/${encodeURIComponent(dimensionId)}/seeds`);
+        const data = await getJSON(`/api/dimensions/${encodeURIComponent(dimensionId)}/seeds?email=${encodeURIComponent(em)}`);
         const list = Array.isArray(data?.seeds) ? data.seeds : [];
         const byKey = new Map(list.map(row => {
           const k = [row.problem, row.objective, row.solution].map(norm).join('||');
