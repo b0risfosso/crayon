@@ -77,6 +77,30 @@ def _init_dirt_table():
 
 _init_dirt_table()
 
+def _ensure_private_uniqueness():
+    with closing(connect()) as con, con:
+        # narratives: title per owner
+        try:
+            con.execute("DROP INDEX IF EXISTS idx_narratives_title")
+        except sqlite3.OperationalError:
+            pass
+        con.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_title_owner
+            ON narratives(title, COALESCE(owner_email,''))
+        """)
+
+        # dimensions: (narrative_id, title) per owner
+        try:
+            con.execute("DROP INDEX IF EXISTS idx_dim_unique")
+        except sqlite3.OperationalError:
+            pass
+        con.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_dim_unique_owner
+            ON narrative_dimensions(narrative_id, title, COALESCE(owner_email,''))
+        """)
+
+_ensure_private_uniqueness()
+
 def _cols(con, table):
     return {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
 
@@ -688,52 +712,45 @@ def generate_seed_html(artifact_yaml: str, model: Optional[str] = None, temperat
         raise RuntimeError(f"LLM generation failed: {e}") from e
 
 # --- keep schema unchanged; adapt helpers to it ---
-
-def get_or_create_narrative(con, title: str,
-                            visibility: str = 'public',
-                            owner_email: str | None = None) -> int:
+def get_or_create_narrative(con, title: str, owner_email: str) -> int:
     row = con.execute(
         """
         SELECT id FROM narratives
         WHERE title = ?
           AND COALESCE(owner_email,'') = COALESCE(?, '')
-          AND visibility = ?
         LIMIT 1
         """,
-        (title, owner_email, visibility)
+        (title, owner_email)
     ).fetchone()
     if row:
         return row["id"]
 
-    con.execute(
-        """
-        INSERT INTO narratives (title, visibility, owner_email)
-        VALUES (?, ?, ?)
-        """,
-        (title, visibility, owner_email)
-    )
+    # Optional: still write visibility='private' if column exists
+    try:
+        con.execute(
+            "INSERT INTO narratives (title, owner_email, visibility) VALUES (?,?, 'private')",
+            (title, owner_email)
+        )
+    except sqlite3.OperationalError:
+        con.execute(
+            "INSERT INTO narratives (title, owner_email) VALUES (?,?)",
+            (title, owner_email)
+        )
     return con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
 
 
-def upsert_dimension(con,
-                     narrative_id: int,
-                     name: str,                 # maps to column: title
-                     thesis: str,               # maps to column: description
-                     targets: list,
-                     provider: str | None = None,
-                     visibility: str = 'public',
-                     owner_email: str | None = None) -> int:
-    # find by narrative, title, scope
+def upsert_dimension(con, narrative_id: int, name: str, thesis: str,
+                     targets: list, provider: str | None,
+                     owner_email: str) -> int:
     row = con.execute(
         """
         SELECT id FROM narrative_dimensions
         WHERE narrative_id = ?
           AND title = ?
           AND COALESCE(owner_email,'') = COALESCE(?, '')
-          AND visibility = ?
         LIMIT 1
         """,
-        (narrative_id, name, owner_email, visibility)
+        (narrative_id, name, owner_email)
     ).fetchone()
 
     targets_json = json.dumps(targets or [])
@@ -742,52 +759,47 @@ def upsert_dimension(con,
         dim_id = row["id"]
         if provider:
             con.execute(
-                """
-                UPDATE narrative_dimensions
-                   SET description = ?, targets_json = ?, provider = ?
-                 WHERE id = ?
-                """,
+                "UPDATE narrative_dimensions SET description=?, targets_json=?, provider=? WHERE id=?",
                 (thesis, targets_json, provider, dim_id)
             )
         else:
             con.execute(
-                """
-                UPDATE narrative_dimensions
-                   SET description = ?, targets_json = ?
-                 WHERE id = ?
-                """,
+                "UPDATE narrative_dimensions SET description=?, targets_json=? WHERE id=?",
                 (thesis, targets_json, dim_id)
             )
         return dim_id
 
-    con.execute(
-        """
-        INSERT INTO narrative_dimensions
-          (narrative_id, title, description, targets_json, provider, visibility, owner_email)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (narrative_id, name, thesis, targets_json, provider, visibility, owner_email)
-    )
+    # insert (force private if column exists)
+    try:
+        con.execute("""
+            INSERT INTO narrative_dimensions
+              (narrative_id, title, description, targets_json, provider, owner_email, visibility)
+            VALUES (?, ?, ?, ?, ?, ?, 'private')
+        """, (narrative_id, name, thesis, targets_json, provider, owner_email))
+    except sqlite3.OperationalError:
+        con.execute("""
+            INSERT INTO narrative_dimensions
+              (narrative_id, title, description, targets_json, provider, owner_email)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (narrative_id, name, thesis, targets_json, provider, owner_email))
     return con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
 
 
-def insert_seed(con,
-                dimension_id: int,
-                problem: str,
-                objective: str,
-                solution: str,
-                provider: str | None = None,
-                visibility: str = 'public',
-                owner_email: str | None = None) -> int:
-    # If you previously used OR IGNORE for dedup, restore it here:
-    con.execute(
-        """
-        INSERT INTO narrative_seeds
-          (dimension_id, problem, objective, solution, provider, visibility, owner_email)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (dimension_id, problem, objective, solution, provider, visibility, owner_email)
-    )
+def insert_seed(con, dimension_id: int, problem: str, objective: str, solution: str,
+                provider: str | None, owner_email: str) -> int:
+    # insert (force private if column exists)
+    try:
+        con.execute("""
+            INSERT INTO narrative_seeds
+              (dimension_id, problem, objective, solution, provider, owner_email, visibility)
+            VALUES (?, ?, ?, ?, ?, ?, 'private')
+        """, (dimension_id, problem, objective, solution, provider, owner_email))
+    except sqlite3.OperationalError:
+        con.execute("""
+            INSERT INTO narrative_seeds
+              (dimension_id, problem, objective, solution, provider, owner_email)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (dimension_id, problem, objective, solution, provider, owner_email))
     return con.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
 
 
@@ -1263,22 +1275,20 @@ def generate_narrative_dimensions():
         if parsed is not None:
             dims = parsed.model_dump()["dimensions"]
 
-            if visibility == "private" and not email:
+            if not email:
                 return jsonify({
                     "domain": domain,
                     "provider": provider,
                     "model": model_name,
-                    "dimensions": [{**d, "saved": False} for d in dims],
-                    "visibility": visibility,
-                    "email": email
+                    "dimensions": [{**d, "saved": False} for d in dims]
                 }), 200
 
             with closing(connect()) as con, con:
-                narrative_id = get_or_create_narrative(con, domain, visibility, email)
+                narrative_id = get_or_create_narrative(con, domain, owner_email=email)
                 saved = []
                 if email:
                     try:
-                        link_person_to_domain(con, email, narrative_id, visibility)
+                        link_person_to_domain(con, email, narrative_id, visibility="private")
                     except Exception:
                         pass  # non-fatal
                 for d in dims:
@@ -1289,15 +1299,13 @@ def generate_narrative_dimensions():
                         thesis=d["thesis"],
                         targets=d.get("targets") or [],
                         provider=provider,
-                        visibility=visibility,
-                        owner_email=email or None
+                        owner_email=email
                     )
                     # NEW: link person ↔ dimension per row (only if email present)
-                    if email:
-                        try:
-                            link_person_to_dimension(con, email, dim_id, visibility)
-                        except Exception:
-                            pass
+                    try:
+                        link_person_to_dimension(con, email, dim_id, visibility="private")
+                    except Exception:
+                        pass
                     saved.append({**d, "id": dim_id, "provider": provider, "saved": True})
 
             return jsonify({
@@ -1305,7 +1313,6 @@ def generate_narrative_dimensions():
                 "provider": provider,
                 "model": model_name,
                 "dimensions": saved,
-                "visibility": visibility,
                 "email": email
             }), 200
 
@@ -1330,8 +1337,6 @@ def generate_narrative_seeds():
     description = (data.get("description") or "").strip()
     targets = data.get("targets") or []
     provider = _provider_from(data)
-
-    visibility = (data.get("visibility") or "public").strip()
     email = (data.get("email") or "").strip().lower()
 
     if not (domain and dimension and description):
@@ -1374,19 +1379,18 @@ def generate_narrative_seeds():
 
         seeds = parsed.model_dump()["seeds"]
 
-        if visibility == "private" and not email:
+        # NEW rule: no email -> DO NOT SAVE
+        if not email:
             return jsonify({
                 "domain": domain,
                 "dimension": dimension,
                 "provider": provider,
                 "model": model_name,
-                "seeds": [{**s, "saved": False} for s in seeds],
-                "visibility": visibility,
-                "email": email
+                "seeds": [{**s, "saved": False} for s in seeds]
             }), 200
 
         with closing(connect()) as con, con:
-            narrative_id = get_or_create_narrative(con, domain, visibility=visibility, owner_email=email or None)
+            narrative_id = get_or_create_narrative(con, domain, owner_email=email)
             dim_id = upsert_dimension(
                 con,
                 narrative_id=narrative_id,
@@ -1394,8 +1398,7 @@ def generate_narrative_seeds():
                 thesis=description,
                 targets=targets,
                 provider=provider,
-                visibility=visibility,
-                owner_email=email or None
+                owner_email=email
             )
             for s in seeds:
                 insert_seed(
@@ -1405,24 +1408,21 @@ def generate_narrative_seeds():
                     objective=(s.get("objective") or "").strip(),
                     solution=(s.get("solution") or "").strip(),
                     provider=provider,
-                    visibility=visibility,
-                    owner_email=email or None
+                    owner_email=email
                 )
-                if email:
-                    try:
-                        link_person_to_seed(con, email, sid, visibility)
-                    except Exception:
-                        pass
+                try:
+                    link_person_to_seed(con, email, sid, visibility="private")
+                except Exception:
+                    pass
 
             rows = con.execute("""
                 SELECT id, problem, objective, solution, provider, created_at
                 FROM narrative_seeds
                 WHERE dimension_id = ?
-                    AND visibility = ?
                     AND COALESCE(owner_email,'') = COALESCE(?, '')
                 ORDER BY id DESC
                 LIMIT 50
-                """, (dim_id, visibility, email)).fetchall()
+                """, (dim_id, email)).fetchall()
 
         seeds_out = [
             {
@@ -1443,7 +1443,6 @@ def generate_narrative_seeds():
             "provider": provider,
             "model": model_name,
             "seeds": seeds_out,
-            "visibility": visibility,
             "email": email
         }), 200
 
@@ -1601,14 +1600,20 @@ def _bulk_worker(job_id: str, seed_ids: list[int]):
 
 
 @app.get("/api/narratives")
-def api_narratives():
-    rows = _query_all("""
-        SELECT id, title, created_at
-        FROM narratives
-        WHERE COALESCE(title,'') <> ''
-        ORDER BY COALESCE(created_at, '') DESC, id DESC
-    """)
-    return jsonify(rows)
+def list_narratives():
+    email = (request.args.get("email") or "").strip().lower()
+    if not email:
+        # No email -> nothing is public anymore
+        return jsonify([])
+
+    with closing(connect()) as con:
+        rows = con.execute("""
+            SELECT id, title, description, created_at
+            FROM narratives
+            WHERE COALESCE(owner_email,'') = COALESCE(?, '')
+            ORDER BY id DESC
+        """, (email,)).fetchall()
+    return jsonify([dict(r) for r in rows])
 
 @app.get("/api/people/<email>/items")
 def api_people_items(email: str):
@@ -1653,31 +1658,38 @@ def api_people_items(email: str):
 
 
 @app.get("/api/narratives/<int:narrative_id>/dimensions")
-def api_narrative_dimensions(narrative_id: int):
-    exists = _query_all("SELECT 1 AS ok FROM narratives WHERE id = ? LIMIT 1", (narrative_id,))
-    if not exists:
-        abort(404, description="Narrative not found")
+def list_dimensions(narrative_id: int):
+    email = (request.args.get("email") or "").strip().lower()
+    if not email:
+        return jsonify([])
 
-    dims = _query_all("""
-        SELECT id, narrative_id, title, description, provider, created_at
-        FROM narrative_dimensions
-        WHERE narrative_id = ?
-        ORDER BY id ASC
-    """, (narrative_id,))
-    return jsonify(dims)
+    with closing(connect()) as con:
+        rows = con.execute("""
+            SELECT id, title, description, targets_json, provider, created_at
+            FROM narrative_dimensions
+            WHERE narrative_id = ?
+              AND COALESCE(owner_email,'') = COALESCE(?, '')
+            ORDER BY id DESC
+        """, (narrative_id, email)).fetchall()
+    return jsonify([dict(r) for r in rows])
 
 
 @app.get("/api/dimensions/<int:dimension_id>/seeds")
-def api_dimension_seeds(dimension_id: int):
-    rows = _query_all("""
-        SELECT id, problem, objective, solution, provider, created_at
-        FROM narrative_seeds
-        WHERE dimension_id = ?
-        ORDER BY id DESC
-        LIMIT 200
-    """, (dimension_id,))
-    return jsonify({"ok": True, "dimension_id": dimension_id, "seeds": rows})
+def list_seeds(dimension_id: int):
+    email = (request.args.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"dimension_id": dimension_id, "seeds": []})
 
+    with closing(connect()) as con:
+        rows = con.execute("""
+            SELECT id, problem, objective, solution, provider, created_at
+            FROM narrative_seeds
+            WHERE dimension_id = ?
+              AND COALESCE(owner_email,'') = COALESCE(?, '')
+            ORDER BY id DESC
+            LIMIT 200
+        """, (dimension_id, email)).fetchall()
+    return jsonify({"dimension_id": dimension_id, "seeds": [dict(r) for r in rows]})
 
 
 @app.post("/api/narrative-prototype")
