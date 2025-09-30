@@ -67,29 +67,41 @@
                      border-radius: .6rem; background: Canvas; }
     .muted { opacity:.7; font-size:.9rem; }
 
+    .email-panel {
+      background: color-mix(in oklab, Highlight 92%, Canvas 8%);
+      border-color: color-mix(in oklab, Highlight 40%, transparent);
+    }
+    .email-panel header h2 {
+      color: HighlightText;
+    }
+
+
   </style>
 </head>
 <body>
   <header>
     <h1>Fantasiagenesis · v4</h1>
     <div style="font-size:.85rem; opacity:.7">imagination and reality, growing together</div>
-    <div style="display:flex; align-items:center; gap:.5rem;">
-      <input id="emailInput" type="email" placeholder="you@example.com"
-             style="padding:.4rem .55rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
-                    border-radius:.45rem; background:color-mix(in oklab, Canvas 96%, CanvasText 4%);
-                    min-width: 240px;">
-      <button id="saveEmailBtn"
-              style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
-                     background:color-mix(in oklab, Canvas 92%, CanvasText 8%);
-                     border-radius:.5rem; cursor:pointer;">
-        Save
-      </button>
-      <span id="emailStatus" class="muted"></span>
-    </div>
+    
   </header>
 
   <main class="app" id="app">
     <aside class="left-rail" aria-label="Navigation panels">
+      <section class="panel email-panel" id="panel-email" aria-labelledby="h-email">
+        <header><h2 id="h-email">Your Email</h2></header>
+        <div class="content" style="display:grid; gap:.5rem;">
+          <input id="emailInput" type="email" placeholder="you@example.com"
+                 style="padding:.5rem .6rem; border:1px solid #ccc; border-radius:.5rem;" />
+          <button id="saveEmailBtn"
+                  style="padding:.45rem .7rem; border:1px solid rgba(0,0,0,.2);
+                         border-radius:.5rem; cursor:pointer; background:#0b5cff; color:#fff;">
+            Save Email
+          </button>
+          <div class="muted" style="font-size:.85rem;">Email is required to load your private narratives.</div>
+          <span id="emailStatus" class="muted"></span>
+        </div>
+      </section>
+      
       <section class="panel" id="panel-domains" aria-labelledby="h-domains">
         <header><h2 id="h-domains">Narrative Domains</h2></header>
         <div class="content">
@@ -176,10 +188,14 @@
       boxError: document.getElementById('boxError'),
       boxHost: document.getElementById('boxHost'),
       expandBoxBtn: document.getElementById('expandBoxBtn'),
-    shareRow: document.getElementById('shareRow'),
-    shareLink: document.getElementById('shareLink'),
-    copyShareBtn: document.getElementById('copyShareBtn'),
-    shareStatus: document.getElementById('shareStatus'),
+      shareRow: document.getElementById('shareRow'),
+      shareLink: document.getElementById('shareLink'),
+      copyShareBtn: document.getElementById('copyShareBtn'),
+      shareStatus: document.getElementById('shareStatus'),
+      emailInput: document.getElementById('emailInput'),
+      saveEmailBtn: document.getElementById('saveEmailBtn'),
+      emailStatus: document.getElementById('emailStatus'),
+
     };
 
     // === API endpoints wired to provided Flask app ===
@@ -189,6 +205,31 @@
       listSeeds: (dimensionId) => `/api/dimensions/${encodeURIComponent(dimensionId)}/seeds`,
       getSeedBox: (seedId) => `/api/seeds/${encodeURIComponent(seedId)}/box`,
     };
+
+    const EMAIL_KEY = 'fg_user_email';
+
+    function saveEmailToStorage(email) {
+      const v = String(email || '').trim().toLowerCase();
+      if (v) localStorage.setItem(EMAIL_KEY, v);
+      else localStorage.removeItem(EMAIL_KEY);
+    }
+
+    function readEmailFromStorage() {
+      return (localStorage.getItem(EMAIL_KEY) || '').trim().toLowerCase();
+    }
+
+    function currentEmail() {
+      const typed = (document.getElementById('emailInput')?.value || '').trim().toLowerCase();
+      return typed || readEmailFromStorage();
+    }
+
+    // Append ?email=... when present
+    function withEmail(url) {
+      const em = currentEmail();
+      if (!em) return url;
+      return url + (url.includes('?') ? '&' : '?') + 'email=' + encodeURIComponent(em);
+    }
+
 
     // Simple cache
     let lastBoxRequestSeedId = null;        // race guard
@@ -276,7 +317,7 @@
     // Loaders aligned to Flask API
     async function loadDomains(){
       try {
-        const data = await fetchJSON(API.listNarratives);
+        const data = await fetchJSON(withEmail(API.listNarratives));
         const domains = Array.isArray(data) ? data : [];
         showEmpty(els.domainsEmpty, domains.length === 0);
         renderList(els.domainsList, domains, label.domain, onSelectDomain, state.domain && keyOf(state.domain));
@@ -286,6 +327,31 @@
       }
     }
 
+    async function ensureEmailThenLoad() {
+      // Prefill from storage if empty
+      const stored = readEmailFromStorage();
+      if (els.emailInput && !els.emailInput.value && stored) {
+        els.emailInput.value = stored;
+        els.emailStatus.textContent = 'Loaded saved email';
+        setTimeout(()=> els.emailStatus.textContent = '', 1200);
+      }
+
+      const em = currentEmail();
+      if (!em) {
+        // Empty the lists and prompt
+        els.crumbs.textContent = 'Enter your email to load your private narratives.';
+        [els.domainsList, els.dimensionsList, els.seedsList].forEach(ul => ul.replaceChildren());
+        els.domainsEmpty.hidden = false; els.domainsEmpty.textContent = 'Email required.';
+        els.dimensionsEmpty.hidden = false; els.dimensionsEmpty.textContent = 'Email required.';
+        els.seedsEmpty.hidden = false; els.seedsEmpty.textContent = 'Email required.';
+        return;
+      }
+
+      // Email present: load
+      await loadDomains();
+      await maybeDeepLink(); // optional; see “5)” below if you add deep links
+    }
+
     async function onSelectDomain(domain, li){
       state.domain = domain; state.dimension = null; state.seed = null; setBreadcrumbs();
       setActive(els.domainsList, li);
@@ -293,7 +359,7 @@
       showEmpty(els.dimensionsEmpty, true); showEmpty(els.seedsEmpty, true);
       showSeed(null);
       try {
-        const dims = await fetchJSON(API.listDimensions(domain.id));
+        const dims = await fetchJSON(withEmail(API.listDimensions(domain.id)));
         showEmpty(els.dimensionsEmpty, dims.length === 0);
         renderList(els.dimensionsList, dims, label.dimension, onSelectDimension, state.dimension && keyOf(state.dimension));
       } catch (e){
@@ -309,7 +375,7 @@
       showEmpty(els.seedsEmpty, true);
       showSeed(null);
       try {
-        const payload = await fetchJSON(API.listSeeds(dimension.id));
+        const payload = await fetchJSON(withEmail(API.listSeeds(dimension.id)));
         const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
         showEmpty(els.seedsEmpty, seeds.length === 0);
         renderList(els.seedsList, seeds, (s)=>label.seedTitle(s), onSelectSeed, state.seed && keyOf(state.seed));
@@ -416,6 +482,17 @@ function renderBoxHTML(payload){
     els.boxHost.appendChild(container);
   }
 }
+// Save button
+els.saveEmailBtn?.addEventListener('click', async () => {
+  const em = (els.emailInput?.value || '').trim().toLowerCase();
+  if (!em) { els.emailStatus.textContent = 'Please enter an email.'; return; }
+  saveEmailToStorage(em);
+  const old = els.saveEmailBtn.textContent;
+  els.saveEmailBtn.textContent = 'Saved';
+  els.emailStatus.textContent = 'Saved locally';
+  setTimeout(() => { els.saveEmailBtn.textContent = old; els.emailStatus.textContent = ''; }, 1200);
+  await ensureEmailThenLoad();
+});
 
 els.expandBoxBtn.addEventListener('click', ()=>{
   if (!state.seed) return;
@@ -436,7 +513,7 @@ els.copyShareBtn.addEventListener('click', async ()=>{
 
 
     // Boot
-    loadDomains();
+    ensureEmailThenLoad();
   })();
   </script>
 </body>
