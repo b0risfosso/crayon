@@ -43,6 +43,24 @@
 <body>
   <h1>Imagine</h1>
 
+  <section class="panel" id="panel-instructions" aria-labelledby="h-instructions" 
+          style="border-color: color-mix(in oklab, dodgerblue 40%, CanvasText 20%);
+                  background: color-mix(in oklab, Canvas 88%, dodgerblue 12%);
+                  box-shadow: 0 1px 0 rgba(30,144,255,.12) inset;">
+    <header><h2 id="h-instructions">Instructions</h2></header>
+    <div class="content" style="font-size:.9rem; line-height:1.45;">
+      <ul style="margin:0; padding-left:1.1rem; display:grid; gap:.4rem;">
+        <li>Enter your <strong>email</strong> to load or save private narratives.</li>
+        <li>Type one or more <strong>domains</strong> (one per line).</li>
+        <li>Select which <strong>providers</strong> you want to use for generation.</li>
+        <li>Click <strong>Generate</strong> to create narrative dimensions and seeds.</li>
+        <li>Click a seed to open its <em>Box of Dirt</em> view.</li>
+      </ul>
+      <p class="muted" style="margin-top:.6rem;">Email is required to save work to your private garden.</p>
+    </div>
+  </section>
+
+
   <form id="form" autocomplete="off">
     <textarea id="domains" rows="4" placeholder="Enter one or more domains — one per line"></textarea>
 
