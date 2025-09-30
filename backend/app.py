@@ -110,22 +110,16 @@ def add_scope_columns_if_missing():
 
         # narratives
         cols = _cols(con, "narratives")
-        if "visibility" not in cols:
-            con.execute("ALTER TABLE narratives ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'")
         if "owner_email" not in cols:
             con.execute("ALTER TABLE narratives ADD COLUMN owner_email TEXT")
 
         # narrative_dimensions
         cols = _cols(con, "narrative_dimensions")
-        if "visibility" not in cols:
-            con.execute("ALTER TABLE narrative_dimensions ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'")
         if "owner_email" not in cols:
             con.execute("ALTER TABLE narrative_dimensions ADD COLUMN owner_email TEXT")
 
         # narrative_seeds
         cols = _cols(con, "narrative_seeds")
-        if "visibility" not in cols:
-            con.execute("ALTER TABLE narrative_seeds ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'")
         if "owner_email" not in cols:
             con.execute("ALTER TABLE narrative_seeds ADD COLUMN owner_email TEXT")
 
@@ -297,7 +291,6 @@ def bootstrap_schema():
             domain_id INTEGER,
             dimension_id INTEGER,
             seed_id INTEGER,
-            visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('public','private')),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
@@ -309,7 +302,7 @@ def bootstrap_schema():
 
         con.execute("""CREATE INDEX IF NOT EXISTS ix_people_email ON people(email);""")
         con.execute("""CREATE INDEX IF NOT EXISTS ix_pn_person ON people_narratives(person_id);""")
-        con.execute("""CREATE INDEX IF NOT EXISTS ix_pn_scope  ON people_narratives(visibility, domain_id, dimension_id, seed_id);""")
+        con.execute("""CREATE INDEX IF NOT EXISTS ix_pn_scope  ON people_narratives(domain_id, dimension_id, seed_id);""")
 
 
 
@@ -1240,8 +1233,6 @@ def generate_narrative_dimensions():
     domain = (data.get("domain") or "").strip()
     n = data.get("n")
     provider = _provider_from(data)  # "openai" | "xai" (your helper)
-
-    visibility = (data.get("visibility") or "public").strip()
     email = (data.get("email") or "").strip().lower()
 
     if not domain:
