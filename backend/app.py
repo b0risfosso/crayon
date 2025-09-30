@@ -77,6 +77,36 @@ def _init_dirt_table():
 
 _init_dirt_table()
 
+def _cols(con, table):
+    return {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
+
+def add_scope_columns_if_missing():
+    with closing(sqlite3.connect(DB_PATH)) as con, con:
+        con.row_factory = sqlite3.Row
+
+        # narratives
+        cols = _cols(con, "narratives")
+        if "visibility" not in cols:
+            con.execute("ALTER TABLE narratives ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'")
+        if "owner_email" not in cols:
+            con.execute("ALTER TABLE narratives ADD COLUMN owner_email TEXT")
+
+        # narrative_dimensions
+        cols = _cols(con, "narrative_dimensions")
+        if "visibility" not in cols:
+            con.execute("ALTER TABLE narrative_dimensions ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'")
+        if "owner_email" not in cols:
+            con.execute("ALTER TABLE narrative_dimensions ADD COLUMN owner_email TEXT")
+
+        # narrative_seeds
+        cols = _cols(con, "narrative_seeds")
+        if "visibility" not in cols:
+            con.execute("ALTER TABLE narrative_seeds ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'")
+        if "owner_email" not in cols:
+            con.execute("ALTER TABLE narrative_seeds ADD COLUMN owner_email TEXT")
+
+add_scope_columns_if_missing()
+
 
 def _extract_json_text(s: str) -> str:
     if not s:
@@ -1392,7 +1422,7 @@ def generate_narrative_seeds():
                     AND COALESCE(owner_email,'') = COALESCE(?, '')
                 ORDER BY id DESC
                 LIMIT 50
-                """, (dim_id, visibility, owner_email)).fetchall()
+                """, (dim_id, visibility, email)).fetchall()
 
         seeds_out = [
             {
