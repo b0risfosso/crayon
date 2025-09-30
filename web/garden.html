@@ -1036,16 +1036,6 @@ embTabs?.addEventListener('click', (e)=>{
 });
 
 
-els.copyShareBtn.addEventListener('click', async ()=>{
-  try {
-    await navigator.clipboard.writeText(els.shareLink.value || '');
-    els.shareStatus.textContent = 'Copied!';
-  } catch (e){
-    els.shareStatus.textContent = 'Copy failed';
-  }
-  setTimeout(()=> els.shareStatus.textContent = '', 2000);
-});
-
 els.openInDirtBtn?.addEventListener('click', () => {
   const url = buildDirtUrl(true);
   if (url) window.open(url, '_blank', 'noopener');
