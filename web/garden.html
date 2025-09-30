@@ -143,6 +143,22 @@
 
     <section class="display" aria-label="Display">
       <div class="breadcrumbs" id="crumbs">Choose a seed to view its text.</div>
+      <div class="toolbar" id="displayToolbar"
+        style="padding:.5rem 1rem; border-bottom:1px solid color-mix(in oklab, CanvasText 12%, transparent);
+                display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      <button id="openInDirtBtn" type="button" disabled
+              style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                    background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer;">
+        Open in Dirt
+      </button>
+      <button id="copyDirtLinkBtn" type="button" disabled
+              style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                    background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; cursor:pointer;">
+        Copy link
+      </button>
+      <span id="dirtLinkStatus" class="muted" role="status" aria-live="polite"></span>
+    </div>
+
       <div class="viewer" id="viewer">
         <p class="empty" id="viewerEmpty">Nothing selected yet.</p>
         <article id="seedView" hidden>
@@ -295,6 +311,10 @@
       emailInput: document.getElementById('emailInput'),
       saveEmailBtn: document.getElementById('saveEmailBtn'),
       emailStatus: document.getElementById('emailStatus'),
+      openInDirtBtn: document.getElementById('openInDirtBtn'),
+      copyDirtLinkBtn: document.getElementById('copyDirtLinkBtn'),
+      dirtLinkStatus: document.getElementById('dirtLinkStatus'),
+
       
 
     };
@@ -455,7 +475,7 @@
 
     function showSeed(seed){
       state.seed = seed || null;
-      setBreadcrumbs();
+      setBreadcrumbs(); updateDirtButtons();
 
       if (!seed){
         els.seedView.hidden = true; els.viewerEmpty.hidden = false;
@@ -511,7 +531,7 @@
     }
 
     async function onSelectDomain(domain, li){
-      state.domain = domain; state.dimension = null; state.seed = null; setBreadcrumbs();
+      state.domain = domain; state.dimension = null; state.seed = null; setBreadcrumbs(); updateDirtButtons();
       setActive(els.domainsList, li);
       clearList(els.dimensionsList); clearList(els.seedsList);
       showEmpty(els.dimensionsEmpty, true); showEmpty(els.seedsEmpty, true);
@@ -527,7 +547,7 @@
     }
 
     async function onSelectDimension(dimension, li){
-      state.dimension = dimension; state.seed = null; setBreadcrumbs();
+      state.dimension = dimension; state.seed = null; setBreadcrumbs(); updateDirtButtons();
       setActive(els.dimensionsList, li);
       clearList(els.seedsList);
       showEmpty(els.seedsEmpty, true);
@@ -544,7 +564,7 @@
     }
 
     function onSelectSeed(seed, li){
-      state.seed = seed; setBreadcrumbs(); setActive(els.seedsList, li); showSeed(seed);
+      state.seed = seed; setBreadcrumbs(); setActive(els.seedsList, li); showSeed(seed); updateDirtButtons();
     }
 
     async function fetchSeedBox(seedId){
@@ -608,6 +628,26 @@ function setShareUiForSeed(seed){
   els.shareLink.value = url;
   els.shareStatus.textContent = '';
 }
+
+function buildDirtUrl(includeEmail = true){
+  if (!(state.domain && state.dimension && state.seed)) return '';
+  const q = new URLSearchParams({
+    nid: String(state.domain.id),
+    did: String(state.dimension.id),
+    sid: String(state.seed.id),
+  }).toString();
+  let url = `/dirt.html?${q}`;
+  if (includeEmail) url = withEmail(url);   // preserves ?email=... if present
+  return url;
+}
+
+function updateDirtButtons(){
+  const has = !!(state.domain && state.dimension && state.seed);
+  if (els.openInDirtBtn) els.openInDirtBtn.disabled = !has;
+  if (els.copyDirtLinkBtn) els.copyDirtLinkBtn.disabled = !has;
+  if (!has && els.dirtLinkStatus) els.dirtLinkStatus.textContent = '';
+}
+
 
 
 function renderBoxHTML(payload){
@@ -938,6 +978,24 @@ els.copyShareBtn.addEventListener('click', async ()=>{
   }
   setTimeout(()=> els.shareStatus.textContent = '', 2000);
 });
+
+els.openInDirtBtn?.addEventListener('click', () => {
+  const url = buildDirtUrl(true);
+  if (url) window.open(url, '_blank', 'noopener');
+});
+
+els.copyDirtLinkBtn?.addEventListener('click', async () => {
+  const url = buildDirtUrl(true);
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(new URL(url, location.origin).toString());
+    els.dirtLinkStatus.textContent = 'Copied!';
+  } catch (e){
+    els.dirtLinkStatus.textContent = 'Copy failed';
+  }
+  setTimeout(()=> { if (els.dirtLinkStatus) els.dirtLinkStatus.textContent = ''; }, 1500);
+});
+
 
 
 
