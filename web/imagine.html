@@ -63,6 +63,7 @@
 
     <div class="row">
       <input type="email" id="emailInput" placeholder="Enter email to save results to your personal garden (optional)" />
+      <button type="button" id="saveEmailBtn" class="secondary" title="Save email locally">Save email</button>
     </div>
     
 
@@ -78,6 +79,7 @@
   <script>
     const PROVIDERS = ['openai', 'openai_web', 'xai', 'gemini', 'deepseek'];
     const MAX_SEED_CONCURRENCY = 2;
+    const EMAIL_KEY = 'fg_user_email';
 
     const form = document.getElementById('form');
     const multiDomainsInput = document.getElementById('domains');
@@ -88,10 +90,30 @@
     const providerChips = document.getElementById('providerChips');
     const noneBtn = document.getElementById('noneBtn');
     const invertBtn = document.getElementById('invertBtn');
+    const saveEmailBtn = document.getElementById('saveEmailBtn');
+
+
+    function saveEmailToStorage(email) {
+      const v = String(email || '').trim().toLowerCase();
+      if (v) localStorage.setItem(EMAIL_KEY, v);
+      else localStorage.removeItem(EMAIL_KEY);
+    }
+
+    function readEmailFromStorage() {
+      return (localStorage.getItem(EMAIL_KEY) || '').trim().toLowerCase();
+    }
+
+    function prefillEmailFromStorage() {
+      const input = document.getElementById('emailInput');
+      const v = readEmailFromStorage();
+      if (input && v && !input.value) input.value = v;  // don't clobber user-typed text
+    }
 
     function currentEmail() {
-      return (document.getElementById('emailInput')?.value || '').trim().toLowerCase();
+      const typed = (document.getElementById('emailInput')?.value || '').trim().toLowerCase();
+      return typed || readEmailFromStorage();
     }
+
 
 
 
@@ -373,9 +395,22 @@
       status.textContent = `Done — dims ${cards.length}, seeds ${ok}/${cards.length}${fail ? `, ${fail} failed` : ''}`;
     }
 
+    // Save button: persist email locally
+    saveEmailBtn?.addEventListener('click', () => {
+      const em = (document.getElementById('emailInput')?.value || '').trim().toLowerCase();
+      if (!em) { alert('Enter an email to save.'); return; }
+      saveEmailToStorage(em);
+      const old = saveEmailBtn.textContent;
+      saveEmailBtn.textContent = 'Saved';
+      setTimeout(() => { saveEmailBtn.textContent = old; }, 1200);
+    });
+
+
 
     // ---------- orchestrator ----------
     form.addEventListener('submit', async (e) => {
+      const emAtSubmit = currentEmail();
+      if (emAtSubmit) saveEmailToStorage(emAtSubmit);
       e.preventDefault();
       container.innerHTML = '';
       globalStatus.textContent = '';
@@ -460,7 +495,7 @@
       }
     }
 
-
+    prefillEmailFromStorage();
     // initialize “Select all” state (already checked) to non-indeterminate
     allProvidersCb.indeterminate = false;
   </script>
