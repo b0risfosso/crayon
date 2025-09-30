@@ -600,7 +600,7 @@
         try {
           let dims = cache.dims.get(String(n.id));
           if (!dims) {
-            dims = await fetchJSON(`/api/narratives/${encodeURIComponent(n.id)}/dimensions`);
+            dims = await fetchJSON(withEmail(`/api/narratives/${encodeURIComponent(n.id)}/dimensions`));
             cache.dims.set(String(n.id), dims);
           }
           if (Array.isArray(dims) && dims.some(d => String(d.id) === String(did))) {
@@ -615,13 +615,13 @@
         let dims = cache.dims.get(String(n.id));
         if (!dims) {
           try {
-            dims = await fetchJSON(`/api/narratives/${encodeURIComponent(n.id)}/dimensions`);
+            dims = await fetchJSON(withEmail(`/api/narratives/${encodeURIComponent(n.id)}/dimensions`));
             cache.dims.set(String(n.id), dims);
           } catch (e) { continue; }
         }
         for (const d of (dims || [])) {
           try {
-            const payload = await fetchJSON(`/api/dimensions/${encodeURIComponent(d.id)}/seeds`);
+            const payload = await fetchJSON(withEmail(`/api/dimensions/${encodeURIComponent(d.id)}/seeds`));
             const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
             if (seeds.some(s => String(s.id) === String(sid))) {
               return { nid: String(n.id), did: String(d.id) };
@@ -965,7 +965,7 @@
       // fetch recent history for this seed
       let rows = [];
       try{
-        const res = await fetch(`/api/dirt?sid=${encodeURIComponent(sid)}&limit=100`, {
+        const res = await fetch(withEmail(`/api/dirt?sid=${encodeURIComponent(sid)}&limit=100`), {
           headers:{'Accept':'application/json'}
         });
         rows = await res.json();
