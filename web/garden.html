@@ -505,6 +505,79 @@
       }
     }
 
+    async function maybeDeepLink(){
+      const params = new URLSearchParams(location.search);
+      let nid = params.get('nid');
+      let did = params.get('did');
+      let sid = params.get('sid');
+
+      if (!nid && !did && !sid) return;
+
+      // 1) Load domain (narrative)
+      let narratives = [];
+      try {
+        narratives = await fetchJSON(withEmail(API.listNarratives));
+      } catch {}
+      let domain = null;
+
+      if (nid) {
+        domain = narratives.find(n => String(n.id) === String(nid)) || null;
+      } else if (did || sid) {
+        // if only did/sid provided, try to discover nid by scanning dims
+        for (const n of narratives) {
+          try {
+            const dims = await fetchJSON(withEmail(API.listDimensions(n.id)));
+            if (did && dims.some(d => String(d.id) === String(did))) { domain = n; nid = n.id; break; }
+            if (sid) {
+              for (const d of dims) {
+                const payload = await fetchJSON(withEmail(API.listSeeds(d.id)));
+                const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
+                if (seeds.some(s => String(s.id) === String(sid))) { domain = n; nid = n.id; did = d.id; break; }
+              }
+              if (domain) break;
+            }
+          } catch {}
+        }
+      }
+
+      if (!domain) return;
+
+      // Select domain in UI (don’t pass a <li>)
+      await onSelectDomain(domain, null);
+
+      // 2) Load/select dimension
+      let dimension = null;
+      if (did) {
+        try {
+          const dims = await fetchJSON(withEmail(API.listDimensions(domain.id)));
+          dimension = dims.find(d => String(d.id) === String(did)) || null;
+        } catch {}
+      }
+      if (!dimension && sid) {
+        try {
+          const dims = await fetchJSON(withEmail(API.listDimensions(domain.id)));
+          for (const d of dims) {
+            const payload = await fetchJSON(withEmail(API.listSeeds(d.id)));
+            const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
+            if (seeds.some(s => String(s.id) === String(sid))) { dimension = d; did = d.id; break; }
+          }
+        } catch {}
+      }
+      if (!dimension) return;
+      await onSelectDimension(dimension, null);
+
+      // 3) Load/select seed
+      if (sid) {
+        try {
+          const payload = await fetchJSON(withEmail(API.listSeeds(dimension.id)));
+          const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
+          const seed = seeds.find(s => String(s.id) === String(sid));
+          if (seed) onSelectSeed(seed, null);
+        } catch {}
+      }
+    }
+
+
     async function ensureEmailThenLoad() {
       // Prefill from storage if empty
       const stored = readEmailFromStorage();
@@ -963,12 +1036,6 @@ embTabs?.addEventListener('click', (e)=>{
 });
 
 
-els.expandBoxBtn.addEventListener('click', ()=>{
-  if (!state.seed) return;
-  const url = getShareUrlForSeed(state.seed.id);
-  window.open(url, '_blank', 'noopener');
-});
-
 els.copyShareBtn.addEventListener('click', async ()=>{
   try {
     await navigator.clipboard.writeText(els.shareLink.value || '');
@@ -1001,6 +1068,7 @@ els.copyDirtLinkBtn?.addEventListener('click', async () => {
 
     // Boot
     ensureEmailThenLoad();
+    
   })();
   </script>
 </body>
