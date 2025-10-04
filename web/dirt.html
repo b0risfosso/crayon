@@ -213,11 +213,11 @@
           </div>
         </div>
         <div class="toolbar">
-          <button id="runAllBtn" type="button">Run All</button>
+          <button id="runAllBtn" type="button">create dirt (all)</button>
           <span id="selStatus" class="muted"></span>
           <nav aria-label="Related pages">
-            <a href="grow.html">grow dirt</a>
-          </nav>
+            <a id="growLink" href="grow.html" target="_blank" rel="noopener noreferrer">grow dirt</a>
+          </nav>          
         </div>
       </div>
     </section>
@@ -547,6 +547,30 @@
       if (!em) return url;
       return url + (url.includes('?') ? '&' : '?') + 'email=' + encodeURIComponent(em);
     }
+
+    // Build deep link to grow.html with the current selection
+    function updateGrowLink(){
+      const nid = els.domain?.value || '';
+      const did = els.dimension?.value || '';
+      const sid = els.seed?.value || els.seedIdInput?.value || '';
+
+      const params = new URLSearchParams();
+      if (nid) params.set('nid', nid);
+      if (did) params.set('did', did);
+      if (sid) params.set('sid', sid);
+
+      // include email, using your existing storage helpers
+      if (typeof currentEmail === 'function') {
+        const em = currentEmail();
+        if (em) params.set('email', em);
+      }
+
+      const qs = params.toString();
+      const href = 'grow.html' + (qs ? `?${qs}` : '');
+      const a = document.getElementById('growLink');
+      if (a) a.href = href;
+    }
+
 
     // Helpers
     function stripHashId(name){
@@ -1774,6 +1798,18 @@
       const btn = e.target.closest('.emb-tab');
       if (!btn) return;
       setActiveEmbTab(btn.dataset.k);
+    });
+
+    updateGrowLink();
+
+    els.domain.addEventListener('change', updateGrowLink);
+    els.dimension.addEventListener('change', updateGrowLink);
+    els.seed.addEventListener('change', updateGrowLink);
+    els.seedIdInput.addEventListener('input', updateGrowLink);
+
+    els.saveEmailBtn?.addEventListener('click', () => {
+    // your existing save logic...
+      updateGrowLink();
     });
 
 
