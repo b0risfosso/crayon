@@ -255,9 +255,30 @@
 
     const loaded = Object.create(null); // { kind: {input, output} }
 
-    function escapeHTML(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+    function escapeHTML(s){
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[c]));
+    }
 
-    function currentEmail(){ return (els.email.value || '').trim(); }
+
+    // --- Email storage modelled on Dirt page ---
+    const EMAIL_KEY = 'fg_user_email';
+    function saveEmailToStorage(email){
+        const v = String(email||'').trim().toLowerCase();
+        if(v) localStorage.setItem(EMAIL_KEY, v); else localStorage.removeItem(EMAIL_KEY);
+    }
+    function readEmailFromStorage(){
+        return (localStorage.getItem(EMAIL_KEY) || '').trim().toLowerCase();
+    }
+    function currentEmail(){
+        const typed = (els.email?.value || '').trim().toLowerCase();
+        return typed || readEmailFromStorage();
+    }
 
     function setStatus(kind, msg, ok=false){
       const el = els.status[kind];
@@ -399,6 +420,18 @@
     const params = new URLSearchParams(location.search);
     if(params.has('email')){ els.email.value = params.get('email'); }
     loadNarrativesForEmail();
+
+    function init(){
+    // Load saved email from localStorage if present
+    const savedEmail = readEmailFromStorage();
+    if(savedEmail){
+        els.email.value = savedEmail;
+    }
+    for(const k of KINDS){ createCard(k); attachToggle(k); }
+        els.loadAllBtn.addEventListener('click', loadAll);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
