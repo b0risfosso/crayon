@@ -375,13 +375,77 @@
         if(!domains.length){ els.domain.innerHTML = '<option value="">No domains found for this email</option>'; els.dimension.disabled=true; els.seed.disabled=true; els.loadAllBtn.disabled = true; return; }
         els.domain.innerHTML = '<option value="">Select a domain</option>' + domains.map(d=>`<option value="${escapeHTML(d.id)}">${escapeHTML(d.title||d.name||('Domain '+d.id))}</option>`).join('');
         els.dimension.disabled = true; els.seed.disabled = true; els.loadAllBtn.disabled = true;
-        els.domain.onchange = () => populateDimensions(domains);
-        els.dimension.onchange = () => populateSeeds(domains);
+        els.domain.onchange    = onDomainChange;
+        els.dimension.onchange = onDimensionChange; 
         els.seed.onchange = updateLoadBtnState;
       }catch(err){
         console.error(err); els.domain.innerHTML = `<option value="">Error: ${escapeHTML(err.message)}</option>`; els.dimension.disabled=true; els.seed.disabled=true; els.loadAllBtn.disabled = true;
       }
     }
+
+    async function onDomainChange(){
+        clearBodies();
+        const nid = els.domain.value;
+
+        // reset UI
+        els.dimension.disabled = !nid;
+        els.seed.disabled = true;
+        els.dimension.innerHTML = `<option value="">${nid ? 'Loading…' : 'Select a domain'}</option>`;
+        els.seed.innerHTML = `<option value="">Select a dimension</option>`;
+        updateLoadBtnState();
+        if(!nid) return;
+
+        try{
+            const email = currentEmail();
+            const url = `/api/narratives/${encodeURIComponent(nid)}/dimensions` + (email ? `?email=${encodeURIComponent(email)}` : '');
+            const dims = await fetchJSON(url);
+
+            els.dimension.innerHTML =
+            '<option value="">Select a dimension</option>' +
+            (Array.isArray(dims) ? dims.map(d =>
+                `<option value="${escapeHTML(d.id)}">${escapeHTML(d.title || d.name || ('Dimension ' + d.id))}</option>`
+            ).join('') : '<option value="">No dimensions</option>');
+
+            els.dimension.disabled = false;
+        }catch(err){
+            els.dimension.innerHTML = `<option value="">Error: ${escapeHTML(err.message)}</option>`;
+            els.dimension.disabled = true;
+        }finally{
+            updateLoadBtnState();
+        }
+    }
+
+    async function onDimensionChange(){
+        clearBodies();
+        const did = els.dimension.value;
+
+        // reset UI
+        els.seed.disabled = !did;
+        els.seed.innerHTML = `<option value="">${did ? 'Loading…' : 'Select a dimension'}</option>`;
+        updateLoadBtnState();
+        if(!did) return;
+
+        try{
+            const email = currentEmail();
+            const url = `/api/dimensions/${encodeURIComponent(did)}/seeds` + (email ? `?email=${encodeURIComponent(email)}` : '');
+            const payload = await fetchJSON(url);
+            const seeds = Array.isArray(payload?.seeds) ? payload.seeds : [];
+
+            els.seed.innerHTML =
+            '<option value="">Select a seed</option>' +
+            seeds.map(s =>
+                `<option value="${escapeHTML(s.id)}">${escapeHTML(s.title || s.problem || ('Seed ' + s.id))}</option>`
+            ).join('');
+
+            els.seed.disabled = false;
+        }catch(err){
+            els.seed.innerHTML = `<option value="">Error: ${escapeHTML(err.message)}</option>`;
+            els.seed.disabled = true;
+        }finally{
+            updateLoadBtnState();
+        }
+    }
+
 
     function findSelected(list, id){ return list?.find?.(x=> String(x.id)===String(id)); }
 
