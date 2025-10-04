@@ -457,6 +457,29 @@
       }
     }
 
+    function createCard(kind){
+    const container = els.cardsContainer || document.getElementById('cards');
+
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.setAttribute('id', `card-${kind}`);
+    card.setAttribute('aria-labelledby', `h-${kind}`);
+
+    card.innerHTML = `
+        <header>
+        <h2 id="h-${kind}">${escapeHTML(kind)}</h2>
+        <div class="expand-row">
+            <span id="status-${kind}" class="status warn">Not loaded</span>
+            <button id="toggle-${kind}" class="btn" disabled>Expand</button>
+        </div>
+        </header>
+        <div class="body hidden" id="body-${kind}"></div>
+    `;
+
+    container.appendChild(card);
+    }
+
+
     // ------- Boot -------
     els.email.addEventListener('change', loadNarrativesForEmail);
     els.loadAllBtn.addEventListener('click', loadAllKinds);
