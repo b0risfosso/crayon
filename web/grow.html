@@ -316,6 +316,52 @@
       return r.json();
     }
 
+    // --- Deep link handler for grow.html ---
+    async function maybeDeepLink() {
+        const params = new URLSearchParams(location.search);
+        const email = params.get('email');
+        const sid   = params.get('sid');
+        const nid   = params.get('nid');
+        const did   = params.get('did');
+
+        // 1) Prefill and save email if provided
+        if (email) {
+            els.email.value = decodeURIComponent(email);
+            saveEmailToStorage(email);
+        } else {
+            // Fallback to stored email
+            const stored = readEmailFromStorage?.() || localStorage.getItem('fg_user_email');
+            if (stored && !els.email.value) els.email.value = stored;
+        }
+
+        // 2) If a seed id is provided, immediately load that Dirt
+        if (sid) {
+            els.loadAllStatus.textContent = `Loading saved Dirt for seed #${sid}…`;
+            try {
+            // load each kind for that seed id
+            for (const k of KINDS) {
+                const data = await loadLatestDirt(k, sid);
+                if (data) {
+                loaded[k] = data;
+                setStatus(k, `Loaded — click to expand`, true);
+                document.getElementById(`toggle-${k}`).disabled = false;
+                } else {
+                setStatus(k, `No saved Dirt found`, false);
+                }
+            }
+            els.loadAllStatus.textContent = 'Loaded all via deep link';
+            els.loadAllStatus.classList.add('ok');
+            } catch (e) {
+            console.error(e);
+            els.loadAllStatus.textContent = 'Error loading deep link data';
+            els.loadAllStatus.classList.add('warn');
+            }
+        } else {
+            els.loadAllStatus.textContent = 'No seed id provided in link';
+        }
+    }
+
+
     async function loadNarrativesForEmail(){
       const email = currentEmail();
       if(!email){ els.domain.innerHTML = '<option value="">Enter email above…</option>'; els.dimension.innerHTML='<option value="">Select a domain</option>'; els.seed.innerHTML='<option value="">Select a dimension</option>'; els.dimension.disabled = true; els.seed.disabled = true; els.loadAllBtn.disabled = true; return; }
@@ -423,12 +469,13 @@
 
     function init(){
     // Load saved email from localStorage if present
-    const savedEmail = readEmailFromStorage();
-    if(savedEmail){
-        els.email.value = savedEmail;
-    }
-    for(const k of KINDS){ createCard(k); attachToggle(k); }
+        const savedEmail = readEmailFromStorage();
+        if(savedEmail){
+            els.email.value = savedEmail;
+        }
+        for(const k of KINDS){ createCard(k); attachToggle(k); }
         els.loadAllBtn.addEventListener('click', loadAll);
+        maybeDeepLink();
     }
 
     document.addEventListener('DOMContentLoaded', init);
