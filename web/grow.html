@@ -110,7 +110,7 @@
     </aside>
 
     <!-- Right: read-only cards -->
-    <section style="display:grid; gap:1rem;">
+    <section id="cards" style="display:grid; gap:1rem;">
       <!-- Storyboard -->
       <section class="card" id="card-storyboard" aria-labelledby="h-storyboard">
         <header>
@@ -248,7 +248,9 @@
         playbook: document.getElementById('body-playbook'),
         archetype: document.getElementById('body-archetype'),
         risks: document.getElementById('body-risks'),
-      }
+      },
+    cardsContainer: document.getElementById('cards')
+
     };
 
     const KINDS = ['storyboard','artifacts','validation','stakeholders','senses','playbook','archetype','risks'];
@@ -326,7 +328,7 @@
 
         // 1) Prefill and save email if provided
         if (email) {
-            els.email.value = decodeURIComponent(email);
+            els.email.value = email;
             saveEmailToStorage(email);
         } else {
             // Fallback to stored email
@@ -457,51 +459,28 @@
       }
     }
 
-    function createCard(kind){
-    const container = els.cardsContainer || document.getElementById('cards');
-
-    const card = document.createElement('section');
-    card.className = 'card';
-    card.setAttribute('id', `card-${kind}`);
-    card.setAttribute('aria-labelledby', `h-${kind}`);
-
-    card.innerHTML = `
-        <header>
-        <h2 id="h-${kind}">${escapeHTML(kind)}</h2>
-        <div class="expand-row">
-            <span id="status-${kind}" class="status warn">Not loaded</span>
-            <button id="toggle-${kind}" class="btn" disabled>Expand</button>
-        </div>
-        </header>
-        <div class="body hidden" id="body-${kind}"></div>
-    `;
-
-    container.appendChild(card);
-    }
-
-
     // ------- Boot -------
-    els.email.addEventListener('change', loadNarrativesForEmail);
-    els.loadAllBtn.addEventListener('click', loadAllKinds);
-    attachToggles();
 
     // Optionally auto-fill email from query string
     const params = new URLSearchParams(location.search);
     if(params.has('email')){ els.email.value = params.get('email'); }
-    loadNarrativesForEmail();
 
     function init(){
-    // Load saved email from localStorage if present
         const savedEmail = readEmailFromStorage();
-        if(savedEmail){
-            els.email.value = savedEmail;
-        }
-        for(const k of KINDS){ createCard(k); attachToggle(k); }
-        els.loadAllBtn.addEventListener('click', loadAll);
+        if(savedEmail && !els.email.value){ els.email.value = savedEmail; }
+
+        attachToggles(); // only once
+        els.email.addEventListener('change', loadNarrativesForEmail);
+        els.loadAllBtn.addEventListener('click', loadAllKinds);
+
+        // initial loads
+        const params = new URLSearchParams(location.search);
+        if(params.has('email')) els.email.value = params.get('email');
+        loadNarrativesForEmail();
         maybeDeepLink();
     }
-
     document.addEventListener('DOMContentLoaded', init);
+
   </script>
 </body>
 </html>
