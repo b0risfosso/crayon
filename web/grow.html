@@ -672,24 +672,30 @@
     // ------- Boot -------
 
     // Optionally auto-fill email from query string
-    const params = new URLSearchParams(location.search);
-    if(params.has('email')){ els.email.value = params.get('email'); }
 
    // One toggle handler for all cards (works for static & future cards)
+    // One toggle handler for all cards (works for static & future cards)
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('button[id^="toggle-"]');
-      if (!btn || btn.disabled) return;        // ignore disabled
+      if (!btn || btn.disabled) return;
+
+      // Don't react if the click originated from inside any card body
+      // (prevents weird bubbling if a body has interactive children)
+      if (e.target.closest('[id^="body-"]')) return;
+
+      e.preventDefault();
+      e.stopPropagation();
 
       const kind = btn.id.slice('toggle-'.length);
       const body = document.getElementById(`body-${kind}`);
       if (!body) return;
 
-      if (body.classList.contains('hidden')) {
+      const isHidden = body.classList.contains('hidden');
+
+      if (isHidden) {
         if (typeof renderKind === 'function') renderKind(kind);
         body.classList.remove('hidden');
         btn.textContent = 'Hide';
-
-        // If storyboard is opened, append brief if it exists
         if (kind === 'storyboard' && loaded.__decision_brief) {
           _appendDecisionBriefToStoryboard();
         }
@@ -698,6 +704,7 @@
         btn.textContent = 'Expand';
       }
     });
+
 
 
 
