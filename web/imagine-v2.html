@@ -43,55 +43,51 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>Fantasiagenesis · Imagine v2</h1>
-    <div style="display:flex; gap:.5rem; align-items:center; font-size:.85rem; opacity:.85;">
-      <a href="garden.html"
-         style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
-                background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; text-decoration:none; color:inherit;">See Your Garden</a>
-      <a href="dirt.html"
-         style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
-                background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; text-decoration:none; color:inherit;">Build Boxes of Dirt</a>
-    </div>
-  </header>
-
-  <section class="panel blue" aria-labelledby="h-instructions">
-    <header><p id="h-instructions">Instructions</p></header>
-    <div class="content" style="font-size:.9rem; line-height:1.45;">
-      <ul style="margin:0; padding-left:1.1rem; display:grid; gap:.4rem;">
+    <header>
+        <h1>Fantasiagenesis · Imagine v2</h1>
+        <div style="display:flex; gap:.5rem; align-items:center; font-size:.85rem; opacity:.85;">
+        <a href="garden.html"
+        style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+        background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; text-decoration:none; color:inherit;">See Your Garden</a>
+        <a href="dirt.html"
+        style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+        background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; text-decoration:none; color:inherit;">Build Boxes of Dirt</a>
+        </div>
+        </header>
+        
+        <section class="panel blue" aria-labelledby="h-instructions">
+        <header><p id="h-instructions">Instructions</p></header>
+        <div class="content" style="font-size:.9rem; line-height:1.45;">
+        <ul style="margin:0; padding-left:1.1rem; display:grid; gap:.4rem;">
         <li>Enter one or more <strong>core stories</strong> (one per line). We'll architect domains for each.</li>
         <li>Optionally enter your email to save outputs to your private garden.</li>
-        <li>Select generation providers, then click <em>Generate</em>.</li>
-        <li>We will: Core Story → Domain Architecture → Dimensions → Seeds. Click a seed to open its box of dirt.</li>
-      </ul>
-      <p class="muted" style="margin-top:.6rem;">Email is required if you want results saved & deep‑linked.</p>
-    </div>
-  </section>
-
-  <form id="form" autocomplete="off" style="display:grid; gap:.7rem; margin:1rem 0; align-items:start;">
-    <textarea id="coreStories" rows="4" placeholder="Enter one or more core stories — one per line (e.g., oceans, holding the sun, Chicago microgrids)"></textarea>
-
-    <div class="row">
-      <span class="muted">Providers:</span>
-      <label class="chip"><input id="allProviders" type="checkbox" checked> Select all</label>
-      <div id="providerChips" class="providers"></div>
-      <button id="noneBtn" type="button" class="secondary" title="Deselect all providers">None</button>
-      <button id="invertBtn" type="button" class="secondary" title="Invert selection">Invert</button>
-    </div>
-
-    <div class="row">
-      <input type="email" id="emailInput" placeholder="Enter email to save results to your personal garden (optional)" />
-      <button type="button" id="saveEmailBtn" class="secondary" title="Save email locally">Save email</button>
-    </div>
-
-    <div class="row">
-      <button type="submit">Generate</button>
-      <span id="hint" class="muted">Runs: Core stories → domain architecture (9002) → dimensions → seeds with live updates.</span>
-    </div>
-  </form>
-
-  <div id="globalStatus" class="meta"></div>
-  <div id="container"></div>
+        <li>Click <em>Generate</em> to run with the default provider (OpenAI).</li>
+        </ul>
+        <p class="muted" style="margin-top:.6rem;">Email is required if you want results saved & deep‑linked.</p>
+        </div>
+        </section>
+        
+        <form id="form" autocomplete="off" style="display:grid; gap:.7rem; margin:1rem 0; align-items:start;">
+        <textarea id="coreStories" rows="4" placeholder="Enter one or more core stories — one per line (e.g., oceans, holding the sun, Chicago microgrids)"></textarea>
+        
+        <div class="row">
+        <span class="muted">Provider:</span>
+        <label class="chip"><input id="providerOpenAI" type="checkbox" value="openai" checked disabled> openai</label>
+        </div>
+        
+        <div class="row">
+        <input type="email" id="emailInput" placeholder="Enter email to save results to your personal garden (optional)" />
+        <button type="button" id="saveEmailBtn" class="secondary" title="Save email locally">Save email</button>
+        </div>
+        
+        <div class="row">
+        <button type="submit">Generate</button>
+        <span id="hint" class="muted">Runs: Core stories → domain architecture → dimensions → seeds using OpenAI.</span>
+        </div>
+        </form>
+        
+        <div id="globalStatus" class="meta"></div>
+        <div id="container"></div>
 
   <script>
     // --- Config ---
