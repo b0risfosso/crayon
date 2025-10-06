@@ -131,10 +131,11 @@
         const status = el('div', { className: 'muted', text: 'Generating dimensions…' });
         container.append(status);
 
+        let dimData;
         try {
             const fullDomain = `${coreStory}: ${domainName}${description ? ' - ' + description : ''}`;
 
-            const dimData = await postJSON(
+            dimData = await postJSON(
             `${DIM_API_BASE}/api/narrative-dimensions`,
             {
                 domain: fullDomain,
