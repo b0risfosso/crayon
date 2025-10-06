@@ -535,6 +535,15 @@ class DomainArchitectOutput(BaseModel):
     core_story: str
     groups: List[DomainGroup] = Field(..., min_items=6, max_items=8)
 
+class PrototypeDecisionBrief(BaseModel):
+    why_this_matters: str = Field(..., description="Why this prototype matters")
+    plan_14d: str = Field(..., description="14-day growth plan (concise prose, bullets ok)")
+    evolve_conditions: List[str] = Field(default_factory=list, description="Bullets for evolve gates")
+    prune_conditions: List[str] = Field(default_factory=list, description="Bullets for prune gates")
+    if_evolve_next_steps: List[str] = Field(default_factory=list)
+    if_prune_next_steps: List[str] = Field(default_factory=list)
+    markdown: Optional[str] = Field(None, description="Full write-up with H2 headers")
+
 
 
 BODY_WRAPPER_STYLE = """
