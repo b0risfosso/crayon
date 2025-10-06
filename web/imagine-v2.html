@@ -160,7 +160,6 @@
       } catch(e){ if(tries>0){ seedStatus.textContent='Retrying…'; await sleep(1200); return createSeedsForDimension(payload, ui, extras, tries-1); } seedStatus.className='seed-error'; seedStatus.textContent=`Seed request failed: ${e.message||e}`; }
     }
 
-    async function runProviderForDomain(domainName, provider, providerUI, email){ const { status, grid } = providerUI; status.textContent='Generating dimensions…'; let dimData; try{ dimData = await postJSON(`${DIM_API_BASE}/api/narrative-dimensions`, { domain: domainName, provider, email }, 180000); } catch(e){ status.textContent=`Failed: ${e.message||e}`; return; }
       const dims = Array.isArray(dimData?.dimensions)? dimData.dimensions : []; status.textContent = `Dimensions: ${dims.length}`; if(!dims.length) return; const narrativeId = getNarrativeIdForTitle(dimData.domain || domainName);
       const cards = dims.map((dim, idx)=>{ const c = renderDimensionCard(idx, dim, dimData.domain||domainName, provider, email); c._narrativeId = narrativeId || null; grid.appendChild(c); return c; });
       let i=0, ok=0, fail=0; async function seedWorker(){ while(i<cards.length){ const idx=i++; const card=cards[idx]; try{ await createSeedsForDimension(card._seedPayload, card._seedUI, { email, narrativeId: card._narrativeId, dimensionId: card._dimId }); ok++; status.textContent=`Seeds: ${ok}/${cards.length}${fail?` (${fail} failed)`:''}`; } catch{ fail++; status.textContent=`Seeds: ${ok}/${cards.length} (${fail} failed)`; } } }
