@@ -94,8 +94,8 @@
     const CORE_API_BASE = ''; // domain_architect lives here
     const DIM_API_BASE = ''; // same-origin (''), override if needed
 
-    const PROVIDERS = ['openai', 'openai_web', 'xai', 'gemini', 'deepseek'];
-    const MAX_SEED_CONCURRENCY = 2;
+    const PROVIDER = 'openai';
+    const MAX_SEED_CONCURRENCY = 4;
     const EMAIL_KEY = 'fg_user_email';
 
     // --- Elements ---
@@ -103,25 +103,7 @@
     const storiesInput = document.getElementById('coreStories');
     const globalStatus = document.getElementById('globalStatus');
     const container = document.getElementById('container');
-    const providerChips = document.getElementById('providerChips');
-    const allProvidersCb = document.getElementById('allProviders');
-    const noneBtn = document.getElementById('noneBtn');
-    const invertBtn = document.getElementById('invertBtn');
     const saveEmailBtn = document.getElementById('saveEmailBtn');
-
-    // --- Provider chips ---
-    providerChips.innerHTML = PROVIDERS.map(p => `<label class="chip"><input type="checkbox" value="${p}" checked> ${p}</label>`).join('');
-
-    function getProviderCheckboxes(){ return Array.from(providerChips.querySelectorAll('input[type="checkbox"]')); }
-    function syncAllCheckboxFromChildren(){ const boxes = getProviderCheckboxes(); const checked = boxes.filter(b=>b.checked).length; allProvidersCb.indeterminate = checked>0 && checked<boxes.length; allProvidersCb.checked = checked===boxes.length; }
-    function setAllProviders(val){ getProviderCheckboxes().forEach(b=>b.checked=val); allProvidersCb.indeterminate=false; allProvidersCb.checked=val; }
-    function invertProviders(){ getProviderCheckboxes().forEach(b=>b.checked=!b.checked); syncAllCheckboxFromChildren(); }
-    function getSelectedProviders(){ const sel = getProviderCheckboxes().filter(b=>b.checked).map(b=>b.value); return sel.length?sel:[]; }
-
-    allProvidersCb.addEventListener('change', ()=> setAllProviders(allProvidersCb.checked));
-    providerChips.addEventListener('change', syncAllCheckboxFromChildren);
-    noneBtn.addEventListener('click', ()=> setAllProviders(false));
-    invertBtn.addEventListener('click', invertProviders);
 
     // --- Email storage helpers ---
     function saveEmailToStorage(email){ const v = String(email||'').trim().toLowerCase(); if(v) localStorage.setItem(EMAIL_KEY, v); else localStorage.removeItem(EMAIL_KEY); }
@@ -145,6 +127,9 @@
     async function ensureNarrativesCache(email){ if(narrativeIdByTitle.size) return; if(!email) return; const rows = await getJSON(`/api/narratives?email=${encodeURIComponent(email)}`); rows.forEach(r=>{ if(r && r.title) narrativeIdByTitle.set(r.title, r.id); }); }
     function getNarrativeIdForTitle(title){ return narrativeIdByTitle.get(title) || null; }
 
+    async function runProviderForDomain(domainName,email,container){ const status=el('div',{className:'muted',text:'Generating dimensions…'}); container.append(status); try{ const dimData=await postJSON(`${DIM_API_BASE}/api/narrative-dimensions`,{domain:domainName,provider:PROVIDER,email},180000); const dims=Array.isArray(dimData?.dimensions)?dimData.dimensions:[]; status.textContent=`Dimensions: ${dims.length}`; if(!dims.length)return; const narrativeId=getNarrativeIdForTitle(dimData.domain||domainName); for(const dim of dims){ const card=el('details'); card.append(el('summary',{text:dim.title||dim.name||'Untitled'})); const thesis=el('div',{className:'thesis',text:dim.description||dim.thesis||''}); card.append(thesis); const seedStatus=el('div',{className:'muted',text:'Generating seeds…'}); card.append(seedStatus); container.append(card); const data=await postJSON(`/api/narrative-seeds`,{domain:domainName,dimension:dim.name||dim.title||'',description:dim.description||dim.thesis||'',targets:dim.targets||[],provider:PROVIDER,email}); seedStatus.textContent=''; if(Array.isArray(data.seeds)){ data.seeds.forEach(s=>{ const a=el('a',{className:'seedlink',attrs:{href:linkHref(narrativeId,dim.id,s.id||null),target:'_blank',rel:'noopener'}}); const seed=el('div',{className:'seed'}); seed.innerHTML=`<strong>A (Problem):</strong> ${escapeHtml(s.problem||'')}<br><strong>B (Objective):</strong> ${escapeHtml(s.objective||'')}<br><strong>Solution (Link):</strong> ${escapeHtml(s.solution||'')}`; a.append(seed); card.append(a); }); } else { seedStatus.textContent='No seeds returned.'; } } }catch(e){ status.textContent=`Failed: ${e.message||e}`; } }
+
+
     // --- Rendering helpers ---
     function linkHref(nid, did, sid){ const p=new URLSearchParams(); if(nid) p.set('nid', String(nid)); if(did) p.set('did', String(did)); if(sid) p.set('sid', String(sid)); return `dirt.html${p.toString()?`?${p.toString()}`:''}`; }
     function norm(s){ return String(s||'').replace(/\s+/g,' ').trim().toLowerCase(); }
@@ -156,8 +141,6 @@
     function makeDomainGroupBlock(title){ const wrap=el('div', { className:'panel' }); const head=el('div', { className:'group-title', html: `${escapeHtml(title)} <span class="badge">group</span>` }); const cols=el('div', { className:'columns' }); wrap.append(head, cols); return { wrap, cols }; }
 
     function makeDomainCard(domain){ const card=el('div', { className:'domain-card' }); const head=el('div', { className:'domain-head' }); head.append(el('span', { text: domain.name||'Untitled domain' }), el('span',{ className:'badge', text:'domain'})); const desc=el('div', { className:'muted', text: domain.description||'' }); const providerWrap=el('div', { className:'grid' }); card.append(head, desc, providerWrap); return { card, providerWrap }; }
-
-    function makeProviderBlock(provider){ const block=el('div', { className:'provider-block' }); const head=el('div', { className:'provider-head' }); const badge=el('span', { className:'badge', text: provider }); const name=el('span', { className:'provider-name', text:'Dimensions' }); const status=el('span', { className:'provider-status', text:'Waiting…' }); const grid=el('div', { className:'grid' }); head.append(badge, name, el('span', { className:'muted', text:'·'}), status); block.append(head, grid); return { block, status, grid }; }
 
     function renderDimensionCard(idx, dim, domainName, provider, email){ const card=el('details'); const title = dim.title || dim.name || 'Untitled'; const sum=el('summary', { text: `${idx+1}. ${title}` }); const thesisText = dim.description || dim.thesis || ''; const thesis=el('div', { className:'thesis', text: thesisText }); const targetsList=el('ul', { className:'targets' }); (Array.isArray(dim.targets)? dim.targets: []).forEach(t=> targetsList.appendChild(el('li', { text: t })));
       const seedBox=el('div', { className:'seedbox' }); const seedHeader=el('div', { className:'seed-title', html:`Seeds <span class="badge">${provider}</span>` }); const seedStatus=el('div', { className:'muted', text:'Waiting…' }); const seedWrap=el('div'); seedBox.append(seedHeader, seedStatus, seedWrap); card.append(sum, thesis, targetsList, seedBox);
@@ -186,36 +169,10 @@
     async function architectDomains(core, provider){ const url = `/api/narrative/domain_architect`; return postJSON(url, { core_story: core, provider }); }
 
     // --- Orchestrator ---
-    form.addEventListener('submit', async (e)=>{
-      e.preventDefault(); container.innerHTML=''; globalStatus.textContent='';
-      const email = currentEmail(); if(email) saveEmailToStorage(email); else globalStatus.textContent = 'No email entered — results will be generated but NOT saved.';
-      const cores = (storiesInput.value||'').split('\n').map(s=> s.trim()).filter(Boolean); if(!cores.length){ globalStatus.textContent='Please enter at least one core story.'; return; }
-      const selectedProviders = getSelectedProviders(); if(!selectedProviders.length){ globalStatus.textContent='Please select at least one provider.'; return; }
-      try{ await ensureNarrativesCache(email); } catch {}
-
-      for(let i=0;i<cores.length;i++){
-        const core = cores[i]; globalStatus.textContent = `Architecting ${i+1} of ${cores.length}: ${core}`;
-        const coreUI = makeCoreStorySection(core);
-        let arch; try{ arch = await architectDomains(core, selectedProviders[0]); } catch(err){ coreUI.err.textContent = `Domain architecture failed: ${err.message||err}`; continue; }
-        const groups = arch?.domain_map?.groups || [];
-        if(!groups.length){ coreUI.meta.textContent='No groups returned.'; continue; }
-
-        // Render groups & domains
-        for(const g of groups){ const block = makeDomainGroupBlock(g.title || 'Domains'); coreUI.section.appendChild(block.wrap);
-          (Array.isArray(g.domains)? g.domains: []).forEach(dom => { const dc = makeDomainCard(dom); block.cols.appendChild(dc.card);
-            // For each provider, render a block and run dim+seed
-            const pBlocks = {}; selectedProviders.forEach(p=>{ const pb = makeProviderBlock(p); dc.providerWrap.append(pb.block); dc.providerWrap.append(el('div',{className:'pro-sep'})); pBlocks[p]=pb; });
-            // Run sequentially per domain to limit load
-            (async ()=>{ for(const p of selectedProviders){ await runProviderForDomain(dom.name, p, pBlocks[p], email); } })();
-          });
-        }
-      }
-      globalStatus.textContent = `Done. Processed ${cores.length} core stor${cores.length>1?'ies':'y'}.`;
-    });
+    form.addEventListener('submit',async e=>{ e.preventDefault(); container.innerHTML=''; globalStatus.textContent=''; const email=currentEmail(); if(email) saveEmailToStorage(email); else globalStatus.textContent='No email entered — results will be generated but NOT saved.'; const cores=(storiesInput.value||'').split('\n').map(s=>s.trim()).filter(Boolean); if(!cores.length){ globalStatus.textContent='Please enter at least one core story.'; return; } try{ await ensureNarrativesCache(email);}catch{} for(let i=0;i<cores.length;i++){ const core=cores[i]; globalStatus.textContent=`Architecting ${i+1} of ${cores.length}: ${core}`; const section=el('section'); section.append(el('h2',{text:core})); container.append(section); let arch; try{ arch=await architectDomains(core);}catch(err){ section.append(el('div',{className:'error',text:`Domain architecture failed: ${err.message||err}`})); continue; } const groups=arch?.domain_map?.groups||[]; if(!groups.length){ section.append(el('div',{className:'muted',text:'No groups returned.'})); continue; } for(const g of groups){ const gtitle=el('h3',{text:g.title||'Domains'}); section.append(gtitle); const cols=el('div',{className:'columns'}); section.append(cols); (Array.isArray(g.domains)?g.domains:[]).forEach(dom=>{ const card=el('div',{className:'domain-card'}); card.append(el('div',{className:'domain-head',text:dom.name||'Unnamed Domain'})); card.append(el('div',{className:'muted',text:dom.description||''})); cols.append(card); runProviderForDomain(dom.name,email,card); }); } } globalStatus.textContent=`Done. Processed ${cores.length} core stor${cores.length>1?'ies':'y'}.`; });
 
     // Init
     prefillEmailFromStorage();
-    allProvidersCb.indeterminate=false;
   </script>
 </body>
 </html>
