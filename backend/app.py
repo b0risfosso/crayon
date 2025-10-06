@@ -3345,7 +3345,7 @@ def api_grow_decision_brief():
 
         elif provider == "openai_web":
             resp = openai_client.responses.create(
-                model= "gpt-5-mini-2025-08-07" #_openai_model(),
+                model= "gpt-5-mini-2025-08-07", #_openai_model(),
                 input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
                 tools=[{"type":"web_search"}],
             )
