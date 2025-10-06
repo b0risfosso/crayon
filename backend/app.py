@@ -553,7 +553,7 @@ class PrototypeDecisionBrief(BaseModel):
 class GrowArtifacts(BaseModel):
     why_matters: str = Field(..., description="Why this Box of Dirt matters")
     plan_14d: str = Field(..., description="14-day conceptual growth plan")
-    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="Binary decision gates")
+    evolve_prune_conditions: conlist(str, min_length=1, max_length=8) = Field(..., description="Binary decision gates")
     next_if_evolve: str = Field(..., description="Next steps if evolve is chosen")
     next_if_prune: str = Field(..., description="Next steps if prune is chosen")
     compliance_footer: str = Field(..., description="Fixed compliance footer")
@@ -566,7 +566,7 @@ class RWVPlanBuckets(BaseModel):
 class GrowRealWorldValidation(BaseModel):
     why_matters: str = Field(..., description="Markdown section beginning with '## Why this box of dirt matters'")
     plan_14d: RWVPlanBuckets = Field(..., description="Markdown sections for the 14-day plan by category")
-    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="Each bullet tagged 'Evolve if:' or 'Prune if:' and tied to named metrics")
+    evolve_prune_conditions: conlist(str,  min_length=1, max_length=8) = Field(..., description="Each bullet tagged 'Evolve if:' or 'Prune if:' and tied to named metrics")
     next_if_evolve: RWVPlanBuckets = Field(..., description="Markdown next-steps by category")
     next_if_prune: RWVPlanBuckets = Field(..., description="Markdown next-steps by category")
     disclaimer: str = Field(..., description="Must equal: 'This Real-World Validation remains conceptual and public-safe; no operational procedures are included.'")
@@ -580,7 +580,7 @@ class StakeholderBucketsText(BaseModel):
 class GrowStakeholder(BaseModel):
     why_matters: str = Field(..., description="Markdown section starting with '## Why this box of dirt matters'")
     plan_14d: StakeholderBucketsText = Field(..., description="14-day plan, per category")
-    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="<=8 bullets, each tagged Evolve if… / Prune if…")
+    evolve_prune_conditions: conlist(str,  min_length=1, max_length=8) = Field(..., description="<=8 bullets, each tagged Evolve if… / Prune if…")
     next_if_evolve: StakeholderBucketsText = Field(..., description="Next steps (evolve), per category")
     next_if_prune: StakeholderBucketsText = Field(..., description="Next steps (prune), per category")
     disclaimer: str = Field(..., description="Must equal: 'This Stakeholder Mapping remains conceptual and public-safe; it contains no operational playbooks or personal data.'")
@@ -588,7 +588,7 @@ class GrowStakeholder(BaseModel):
 class GrowPlaybook(BaseModel):
     why_matters: str = Field(..., description="Markdown starting with '## Why this box of dirt is important'")
     plan_14d: str = Field(..., description="Markdown starting with '## How this box of dirt can be grown over the next 14 days'")
-    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="≤8 bullets; each starts with 'Evolve if…' or 'Prune if…'")
+    evolve_prune_conditions: conlist(str,  min_length=1, max_length=8) = Field(..., description="≤8 bullets; each starts with 'Evolve if…' or 'Prune if…'")
     next_if_evolve: str = Field(..., description="Markdown starting with '## Next Steps — Evolve Path'")
     next_if_prune: str = Field(..., description="Markdown starting with '## Next Steps — Prune Path'")
     disclaimer: str = Field(..., description="Must equal the required end statement")
@@ -596,7 +596,7 @@ class GrowPlaybook(BaseModel):
 class GrowRisks(BaseModel):
     why_matters: str = Field(..., description="Markdown; begins with '## Why this box of dirt matters'")
     plan_14d: str = Field(..., description="Markdown; begins with '## 14-day growth plan'")
-    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(
+    evolve_prune_conditions: conlist(str,  min_length=1, max_length=8) = Field(
         ..., description="≤8 binary gates; each references provided risks/metrics/thresholds"
     )
     next_if_evolve: str = Field(..., description="Markdown; begins with '## If Evolve → next steps'")
@@ -606,7 +606,7 @@ class GrowRisks(BaseModel):
 class GrowEmbodied(BaseModel):
     why_matters: str = Field(..., description="Markdown; begins with '## Why this box of dirt is important'")
     plan_14d: str = Field(..., description="Markdown; begins with '## How it can be grown over the next 14 days'")
-    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(
+    evolve_prune_conditions: conlist(str,  min_length=1, max_length=8) = Field(
         ..., description="≤8 concise bullets with Evolve/Prune signals"
     )
     next_if_evolve: str = Field(..., description="Markdown; begins with '## Next Steps — Evolve Path'")
