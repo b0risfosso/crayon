@@ -160,11 +160,6 @@
       } catch(e){ if(tries>0){ seedStatus.textContent='Retrying…'; await sleep(1200); return createSeedsForDimension(payload, ui, extras, tries-1); } seedStatus.className='seed-error'; seedStatus.textContent=`Seed request failed: ${e.message||e}`; }
     }
 
-      const dims = Array.isArray(dimData?.dimensions)? dimData.dimensions : []; status.textContent = `Dimensions: ${dims.length}`; if(!dims.length) return; const narrativeId = getNarrativeIdForTitle(dimData.domain || domainName);
-      const cards = dims.map((dim, idx)=>{ const c = renderDimensionCard(idx, dim, dimData.domain||domainName, provider, email); c._narrativeId = narrativeId || null; grid.appendChild(c); return c; });
-      let i=0, ok=0, fail=0; async function seedWorker(){ while(i<cards.length){ const idx=i++; const card=cards[idx]; try{ await createSeedsForDimension(card._seedPayload, card._seedUI, { email, narrativeId: card._narrativeId, dimensionId: card._dimId }); ok++; status.textContent=`Seeds: ${ok}/${cards.length}${fail?` (${fail} failed)`:''}`; } catch{ fail++; status.textContent=`Seeds: ${ok}/${cards.length} (${fail} failed)`; } } }
-      await Promise.all(Array.from({ length: Math.min(MAX_SEED_CONCURRENCY, cards.length) }, ()=> seedWorker())); status.textContent = `Done — dims ${cards.length}, seeds ${ok}/${cards.length}${fail?`, ${fail} failed`:''}`; }
-
     async function architectDomains(core, provider){ const url = `/api/narrative/domain_architect`; return postJSON(url, { core_story: core, provider }); }
 
     // --- Orchestrator ---
