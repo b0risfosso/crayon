@@ -127,15 +127,20 @@
     async function ensureNarrativesCache(email){ if(narrativeIdByTitle.size) return; if(!email) return; const rows = await getJSON(`/api/narratives?email=${encodeURIComponent(email)}`); rows.forEach(r=>{ if(r && r.title) narrativeIdByTitle.set(r.title, r.id); }); }
     function getNarrativeIdForTitle(title){ return narrativeIdByTitle.get(title) || null; }
 
-    async function runProviderForDomain(domainName, email, container) {
+    async function runProviderForDomain(coreStory, domainName, description, email, container) {
         const status = el('div', { className: 'muted', text: 'Generating dimensions…' });
         container.append(status);
 
-        let dimData;
         try {
-            dimData = await postJSON(
+            const fullDomain = `${coreStory}: ${domainName}${description ? ' - ' + description : ''}`;
+
+            const dimData = await postJSON(
             `${DIM_API_BASE}/api/narrative-dimensions`,
-            { domain: domainName, provider: PROVIDER, email },
+            {
+                domain: fullDomain,
+                provider: PROVIDER,
+                email
+            },
             180000
             );
         } catch (e) {
@@ -234,7 +239,7 @@
     async function architectDomains(core, provider){ const url = `/api/narrative/domain_architect`; return postJSON(url, { core_story: core, provider }); }
 
     // --- Orchestrator ---
-    form.addEventListener('submit',async e=>{ e.preventDefault(); container.innerHTML=''; globalStatus.textContent=''; const email=currentEmail(); if(email) saveEmailToStorage(email); else globalStatus.textContent='No email entered — results will be generated but NOT saved.'; const cores=(storiesInput.value||'').split('\n').map(s=>s.trim()).filter(Boolean); if(!cores.length){ globalStatus.textContent='Please enter at least one core story.'; return; } try{ await ensureNarrativesCache(email);}catch{} for(let i=0;i<cores.length;i++){ const core=cores[i]; globalStatus.textContent=`Architecting ${i+1} of ${cores.length}: ${core}`; const section=el('section'); section.append(el('h2',{text:core})); container.append(section); let arch; try{ arch=await architectDomains(core);}catch(err){ section.append(el('div',{className:'error',text:`Domain architecture failed: ${err.message||err}`})); continue; } const groups=arch?.domain_map?.groups||[]; if(!groups.length){ section.append(el('div',{className:'muted',text:'No groups returned.'})); continue; } for(const g of groups){ const gtitle=el('h3',{text:g.title||'Domains'}); section.append(gtitle); const cols=el('div',{className:'columns'}); section.append(cols); (Array.isArray(g.domains)?g.domains:[]).forEach(dom=>{ const card=el('div',{className:'domain-card'}); card.append(el('div',{className:'domain-head',text:dom.name||'Unnamed Domain'})); card.append(el('div',{className:'muted',text:dom.description||''})); cols.append(card); runProviderForDomain(dom.name,email,card); }); } } globalStatus.textContent=`Done. Processed ${cores.length} core stor${cores.length>1?'ies':'y'}.`; });
+    form.addEventListener('submit',async e=>{ e.preventDefault(); container.innerHTML=''; globalStatus.textContent=''; const email=currentEmail(); if(email) saveEmailToStorage(email); else globalStatus.textContent='No email entered — results will be generated but NOT saved.'; const cores=(storiesInput.value||'').split('\n').map(s=>s.trim()).filter(Boolean); if(!cores.length){ globalStatus.textContent='Please enter at least one core story.'; return; } try{ await ensureNarrativesCache(email);}catch{} for(let i=0;i<cores.length;i++){ const core=cores[i]; globalStatus.textContent=`Architecting ${i+1} of ${cores.length}: ${core}`; const section=el('section'); section.append(el('h2',{text:core})); container.append(section); let arch; try{ arch=await architectDomains(core);}catch(err){ section.append(el('div',{className:'error',text:`Domain architecture failed: ${err.message||err}`})); continue; } const groups=arch?.domain_map?.groups||[]; if(!groups.length){ section.append(el('div',{className:'muted',text:'No groups returned.'})); continue; } for(const g of groups){ const gtitle=el('h3',{text:g.title||'Domains'}); section.append(gtitle); const cols=el('div',{className:'columns'}); section.append(cols); (Array.isArray(g.domains)?g.domains:[]).forEach(dom=>{ const card=el('div',{className:'domain-card'}); card.append(el('div',{className:'domain-head',text:dom.name||'Unnamed Domain'})); card.append(el('div',{className:'muted',text:dom.description||''})); cols.append(card); runProviderForDomain(core, dom.name, dom.description, email, card); }); } } globalStatus.textContent=`Done. Processed ${cores.length} core stor${cores.length>1?'ies':'y'}.`; });
 
     // Init
     prefillEmailFromStorage();
