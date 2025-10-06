@@ -637,37 +637,6 @@
       body.innerHTML = `<pre>${escapeHTML(text)}</pre>`;
     }
 
-    function attachToggles(){
-      for(const k of KINDS){
-        const btn = els.toggle[k];
-        const body = els.body[k];
-        if(!btn || !body) continue;
-        btn.addEventListener('click', async () => {
-          if(body.classList.contains('hidden')){
-            renderKind(k);
-            // --- NEW: when storyboard is expanded, append brief if available (or generate on-demand if needed)
-            if (k === 'storyboard') {
-              try{
-                if (!loaded.__decision_brief && loaded.storyboard) {
-                  // lazy-generate if background call hasn't completed (or not started)
-                  const payload = _buildBriefPayloadFromStoryboard(loaded.storyboard);
-                  loaded.__decision_brief = await _requestDecisionBrief(payload);
-                }
-                _appendDecisionBriefToStoryboard();
-              }catch(e){
-                console.warn('Decision brief (on expand) failed:', e.message);
-              }
-            }
-
-            showBody(k);
-            btn.textContent = 'Hide';
-          } else {
-            hideBody(k);
-            btn.textContent = 'Expand';
-          }
-        });
-      }
-    }
 
     async function runDecisionBrief(){
       if (!loaded.storyboard) {
@@ -706,19 +675,24 @@
     const params = new URLSearchParams(location.search);
     if(params.has('email')){ els.email.value = params.get('email'); }
 
-    // Universal toggle for any button with id="toggle-<kind>"
+   // One toggle handler for all cards (works for static & future cards)
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('button[id^="toggle-"]');
-      if (!btn) return;
+      if (!btn || btn.disabled) return;        // ignore disabled
+
       const kind = btn.id.slice('toggle-'.length);
       const body = document.getElementById(`body-${kind}`);
       if (!body) return;
 
       if (body.classList.contains('hidden')) {
-        // paint on first open
         if (typeof renderKind === 'function') renderKind(kind);
         body.classList.remove('hidden');
         btn.textContent = 'Hide';
+
+        // If storyboard is opened, append brief if it exists
+        if (kind === 'storyboard' && loaded.__decision_brief) {
+          _appendDecisionBriefToStoryboard();
+        }
       } else {
         body.classList.add('hidden');
         btn.textContent = 'Expand';
@@ -726,11 +700,13 @@
     });
 
 
+
     function init(){
         const savedEmail = readEmailFromStorage();
         if(savedEmail && !els.email.value){ els.email.value = savedEmail; }
 
-        attachToggles(); // only once
+        for (const k of KINDS) { els.toggle[k]?.setAttribute('type','button'); }
+
         els.email.addEventListener('change', loadNarrativesForEmail);
         els.loadAllBtn.addEventListener('click', loadAllKinds);
         els.briefBtn?.addEventListener('click', runDecisionBrief);
