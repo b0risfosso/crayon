@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fantasiagenesis · Imagine v2</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 1200px; }
+    header h1 { font-size: 1.6rem; margin-bottom: .4rem; }
+    .muted { opacity:.85; font-size:.9rem; }
+    .row { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+    textarea { padding:.6rem .7rem; min-width: 28rem; width: min(92vw, 50rem); border:1px solid #ccc; border-radius:.5rem; }
+    input[type="email"] { padding:.55rem .65rem; min-width: 24rem; border:1px solid #ccc; border-radius:.5rem; }
+    button { padding:.6rem .9rem; border:0; border-radius:.5rem; cursor:pointer; background:#0b5cff; color:#fff; }
+    button.secondary { background:#444; }
+    .chip { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .55rem; border:1px solid #ccc; border-radius:.6rem; background: rgba(0,0,0,.02); }
+    .providers { display:flex; gap:.6rem; flex-wrap:wrap; }
+    .badge { font-size:.8rem; padding:.15rem .45rem; border:1px solid #ddd; border-radius:.4rem; }
+    .panel { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.6rem; padding: .75rem 1rem; background: color-mix(in oklab, Canvas 92%, CanvasText 8%); }
+    .panel.blue { border-color: color-mix(in oklab, dodgerblue 40%, CanvasText 20%); background: color-mix(in oklab, Canvas 88%, dodgerblue 12%); box-shadow: 0 1px 0 rgba(30,144,255,.12) inset; }
+    .meta { font-size:.9rem; opacity:.9; margin:.25rem 0 .8rem; }
+    .grid { display:grid; gap:.8rem; }
+    details { border:1px solid #d0d0d0; border-radius:.6rem; padding:.75rem 1rem; background: rgba(0,0,0,.02); }
+    summary { cursor:pointer; font-weight:600; }
+    .thesis { margin:.4rem 0 .3rem; font-style: italic; white-space: pre-wrap; }
+    .targets { margin:.25rem 0 .5rem 1.25rem; }
+    .provider-block { border:1px solid #e2e2e2; border-radius:.6rem; padding:.6rem .8rem; background: rgba(0,0,0,.02); }
+    .provider-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.4rem; }
+    .provider-name { font-weight:600; }
+    .provider-status { font-size:.9rem; opacity:.8; }
+    .seedbox { border-top:1px dashed #c8c8c8; margin-top:.5rem; padding-top:.5rem; }
+    .seed { margin:.35rem 0; padding:.5rem .6rem; border:1px solid #e0e0e0; border-radius:.5rem; background:#fff; }
+    a.seedlink { text-decoration:none; color:inherit; display:block; }
+    a.seedlink:hover .seed { outline:2px solid #9bbcff; outline-offset:2px; }
+    .error, .seed-error, .dim-error { color:#b00020; white-space: pre-wrap; }
+    pre { background:#f6f6f6; padding:.75rem; border-radius:.5rem; overflow-x:auto; }
+    .group-title { font-size:1.05rem; font-weight:600; display:flex; align-items:center; gap:.4rem; }
+    .domain-card { border:1px solid #e3e3e3; border-radius:.6rem; padding:.6rem .8rem; background: rgba(0,0,0,.02); }
+    .domain-head { display:flex; align-items:center; gap:.6rem; }
+    .columns { display:grid; gap:1rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .pro-sep { height:.5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fantasiagenesis · Imagine v2</h1>
+    <div style="display:flex; gap:.5rem; align-items:center; font-size:.85rem; opacity:.85;">
+      <a href="garden.html"
+         style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; text-decoration:none; color:inherit;">See Your Garden</a>
+      <a href="dirt.html"
+         style="padding:.45rem .7rem; border:1px solid color-mix(in oklab, CanvasText 18%, transparent);
+                background:color-mix(in oklab, Canvas 92%, CanvasText 8%); border-radius:.5rem; text-decoration:none; color:inherit;">Build Boxes of Dirt</a>
+    </div>
+  </header>
+
+  <section class="panel blue" aria-labelledby="h-instructions">
+    <header><p id="h-instructions">Instructions</p></header>
+    <div class="content" style="font-size:.9rem; line-height:1.45;">
+      <ul style="margin:0; padding-left:1.1rem; display:grid; gap:.4rem;">
+        <li>Enter one or more <strong>core stories</strong> (one per line). We'll architect domains for each.</li>
+        <li>Optionally enter your email to save outputs to your private garden.</li>
+        <li>Select generation providers, then click <em>Generate</em>.</li>
+        <li>We will: Core Story → Domain Architecture → Dimensions → Seeds. Click a seed to open its box of dirt.</li>
+      </ul>
+      <p class="muted" style="margin-top:.6rem;">Email is required if you want results saved & deep‑linked.</p>
+    </div>
+  </section>
+
+  <form id="form" autocomplete="off" style="display:grid; gap:.7rem; margin:1rem 0; align-items:start;">
+    <textarea id="coreStories" rows="4" placeholder="Enter one or more core stories — one per line (e.g., oceans, holding the sun, Chicago microgrids)"></textarea>
+
+    <div class="row">
+      <span class="muted">Providers:</span>
+      <label class="chip"><input id="allProviders" type="checkbox" checked> Select all</label>
+      <div id="providerChips" class="providers"></div>
+      <button id="noneBtn" type="button" class="secondary" title="Deselect all providers">None</button>
+      <button id="invertBtn" type="button" class="secondary" title="Invert selection">Invert</button>
+    </div>
+
+    <div class="row">
+      <input type="email" id="emailInput" placeholder="Enter email to save results to your personal garden (optional)" />
+      <button type="button" id="saveEmailBtn" class="secondary" title="Save email locally">Save email</button>
+    </div>
+
+    <div class="row">
+      <button type="submit">Generate</button>
+      <span id="hint" class="muted">Runs: Core stories → domain architecture (9002) → dimensions → seeds with live updates.</span>
+    </div>
+  </form>
+
+  <div id="globalStatus" class="meta"></div>
+  <div id="container"></div>
+
+  <script>
+    // --- Config ---
+    const CORE_API_BASE = 'http://localhost:9002'; // domain_architect lives here
+    const DIM_API_BASE = ''; // same-origin (''), override if needed
+
+    const PROVIDERS = ['openai', 'openai_web', 'xai', 'gemini', 'deepseek'];
+    const MAX_SEED_CONCURRENCY = 2;
+    const EMAIL_KEY = 'fg_user_email';
+
+    // --- Elements ---
+    const form = document.getElementById('form');
+    const storiesInput = document.getElementById('coreStories');
+    const globalStatus = document.getElementById('globalStatus');
+    const container = document.getElementById('container');
+    const providerChips = document.getElementById('providerChips');
+    const allProvidersCb = document.getElementById('allProviders');
+    const noneBtn = document.getElementById('noneBtn');
+    const invertBtn = document.getElementById('invertBtn');
+    const saveEmailBtn = document.getElementById('saveEmailBtn');
+
+    // --- Provider chips ---
+    providerChips.innerHTML = PROVIDERS.map(p => `<label class="chip"><input type="checkbox" value="${p}" checked> ${p}</label>`).join('');
+
+    function getProviderCheckboxes(){ return Array.from(providerChips.querySelectorAll('input[type="checkbox"]')); }
+    function syncAllCheckboxFromChildren(){ const boxes = getProviderCheckboxes(); const checked = boxes.filter(b=>b.checked).length; allProvidersCb.indeterminate = checked>0 && checked<boxes.length; allProvidersCb.checked = checked===boxes.length; }
+    function setAllProviders(val){ getProviderCheckboxes().forEach(b=>b.checked=val); allProvidersCb.indeterminate=false; allProvidersCb.checked=val; }
+    function invertProviders(){ getProviderCheckboxes().forEach(b=>b.checked=!b.checked); syncAllCheckboxFromChildren(); }
+    function getSelectedProviders(){ const sel = getProviderCheckboxes().filter(b=>b.checked).map(b=>b.value); return sel.length?sel:[]; }
+
+    allProvidersCb.addEventListener('change', ()=> setAllProviders(allProvidersCb.checked));
+    providerChips.addEventListener('change', syncAllCheckboxFromChildren);
+    noneBtn.addEventListener('click', ()=> setAllProviders(false));
+    invertBtn.addEventListener('click', invertProviders);
+
+    // --- Email storage helpers ---
+    function saveEmailToStorage(email){ const v = String(email||'').trim().toLowerCase(); if(v) localStorage.setItem(EMAIL_KEY, v); else localStorage.removeItem(EMAIL_KEY); }
+    function readEmailFromStorage(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
+    function prefillEmailFromStorage(){ const input = document.getElementById('emailInput'); const v = readEmailFromStorage(); if(input && v && !input.value) input.value = v; }
+    function currentEmail(){ const typed = (document.getElementById('emailInput')?.value||'').trim().toLowerCase(); return typed || readEmailFromStorage(); }
+
+    saveEmailBtn?.addEventListener('click', ()=>{ const em=(document.getElementById('emailInput')?.value||'').trim().toLowerCase(); if(!em){ alert('Enter an email to save.'); return; } saveEmailToStorage(em); const old=saveEmailBtn.textContent; saveEmailBtn.textContent='Saved'; setTimeout(()=> saveEmailBtn.textContent=old, 1200); });
+
+    // --- Net utils ---
+    function el(tag, opts={}){ const node=document.createElement(tag); if(opts.className) node.className=opts.className; if('text' in opts) node.textContent=opts.text; if('html' in opts) node.innerHTML=opts.html; if(opts.attrs) Object.entries(opts.attrs).forEach(([k,v])=> node.setAttribute(k,v)); return node; }
+    function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+    const sleep = ms => new Promise(r=> setTimeout(r, ms));
+
+    async function fetchWithTimeout(url, options={}, timeoutMs=180000){ const controller=new AbortController(); const id=setTimeout(()=> controller.abort(), timeoutMs); try{ return await fetch(url, { ...options, signal: controller.signal }); } finally{ clearTimeout(id); } }
+    async function postJSON(url, body, timeoutMs=180000){ const resp = await fetchWithTimeout(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }, timeoutMs); let data; try{ data=await resp.json(); } catch{ throw new Error(`Non-JSON response from ${url} (status ${resp.status})`); } if(!resp.ok){ const msg=(data && (data.error||data.detail))? `${data.error||''} ${data.detail||''}`.trim() : `HTTP ${resp.status}`; throw new Error(msg); } return data; }
+    async function getJSON(url, timeoutMs=180000){ const resp = await fetchWithTimeout(url, {}, timeoutMs); let data; try{ data=await resp.json(); } catch{ throw new Error(`Non-JSON response from ${url} (status ${resp.status})`); } if(!resp.ok){ const msg=(data && (data.error||data.detail))? `${data.error||''} ${data.detail||''}`.trim() : `HTTP ${resp.status}`; throw new Error(msg); } return data; }
+
+    // --- Narrative cache for deep-links ---
+    const narrativeIdByTitle = new Map();
+    async function ensureNarrativesCache(email){ if(narrativeIdByTitle.size) return; if(!email) return; const rows = await getJSON(`/api/narratives?email=${encodeURIComponent(email)}`); rows.forEach(r=>{ if(r && r.title) narrativeIdByTitle.set(r.title, r.id); }); }
+    function getNarrativeIdForTitle(title){ return narrativeIdByTitle.get(title) || null; }
+
+    // --- Rendering helpers ---
+    function linkHref(nid, did, sid){ const p=new URLSearchParams(); if(nid) p.set('nid', String(nid)); if(did) p.set('did', String(did)); if(sid) p.set('sid', String(sid)); return `dirt.html${p.toString()?`?${p.toString()}`:''}`; }
+    function norm(s){ return String(s||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+
+    async function reconcileSeedLinks(email, narrativeId, dimensionId, anchors){ try{ const data= await getJSON(`/api/dimensions/${encodeURIComponent(dimensionId)}/seeds?email=${encodeURIComponent(email)}`); const list = Array.isArray(data?.seeds)? data.seeds : []; const byKey = new Map(list.map(row=>{ const k=[row.problem,row.objective,row.solution].map(norm).join('||'); return [k, row.id]; })); anchors.forEach(a=>{ const seed = a.firstChild; if(!seed || seed.dataset.hasId==='1') return; const k=[seed.dataset.problem, seed.dataset.objective, seed.dataset.solution].map(norm).join('||'); const sid = byKey.get(k); if(sid){ a.setAttribute('href', linkHref(narrativeId, dimensionId, sid)); seed.dataset.hasId='1'; } }); } catch {/* non-fatal */} }
+
+    function makeCoreStorySection(core){ const section=el('section'); const h2=el('h2', { text: core }); section.appendChild(h2); const meta=el('div', { className:'meta' }); const err=el('div', { className:'error' }); section.append(meta, err); container.appendChild(section); return { section, meta, err }; }
+
+    function makeDomainGroupBlock(title){ const wrap=el('div', { className:'panel' }); const head=el('div', { className:'group-title', html: `${escapeHtml(title)} <span class="badge">group</span>` }); const cols=el('div', { className:'columns' }); wrap.append(head, cols); return { wrap, cols }; }
+
+    function makeDomainCard(domain){ const card=el('div', { className:'domain-card' }); const head=el('div', { className:'domain-head' }); head.append(el('span', { text: domain.name||'Untitled domain' }), el('span',{ className:'badge', text:'domain'})); const desc=el('div', { className:'muted', text: domain.description||'' }); const providerWrap=el('div', { className:'grid' }); card.append(head, desc, providerWrap); return { card, providerWrap }; }
+
+    function makeProviderBlock(provider){ const block=el('div', { className:'provider-block' }); const head=el('div', { className:'provider-head' }); const badge=el('span', { className:'badge', text: provider }); const name=el('span', { className:'provider-name', text:'Dimensions' }); const status=el('span', { className:'provider-status', text:'Waiting…' }); const grid=el('div', { className:'grid' }); head.append(badge, name, el('span', { className:'muted', text:'·'}), status); block.append(head, grid); return { block, status, grid }; }
+
+    function renderDimensionCard(idx, dim, domainName, provider, email){ const card=el('details'); const title = dim.title || dim.name || 'Untitled'; const sum=el('summary', { text: `${idx+1}. ${title}` }); const thesisText = dim.description || dim.thesis || ''; const thesis=el('div', { className:'thesis', text: thesisText }); const targetsList=el('ul', { className:'targets' }); (Array.isArray(dim.targets)? dim.targets: []).forEach(t=> targetsList.appendChild(el('li', { text: t })));
+      const seedBox=el('div', { className:'seedbox' }); const seedHeader=el('div', { className:'seed-title', html:`Seeds <span class="badge">${provider}</span>` }); const seedStatus=el('div', { className:'muted', text:'Waiting…' }); const seedWrap=el('div'); seedBox.append(seedHeader, seedStatus, seedWrap); card.append(sum, thesis, targetsList, seedBox);
+      card._seedPayload = { domain: domainName, dimension: dim.name || dim.title || '', description: thesisText, targets: Array.isArray(dim.targets)? dim.targets: [], provider, email };
+      card._seedUI = { seedStatus, seedWrap }; card._dimId = dim.id || null; card._narrativeId = null; return card; }
+
+    async function createSeedsForDimension(payload, ui, extras, tries=2){ const { seedStatus, seedWrap } = ui; const { email, narrativeId, dimensionId } = extras || {}; const anchors=[]; try{ seedStatus.textContent='Generating seeds…'; const data = await postJSON(`${DIM_API_BASE}/api/narrative-seeds`, payload, 180000); seedStatus.textContent=''; if(Array.isArray(data.seeds)){
+          if(!data.seeds.length){ seedStatus.textContent='No seeds returned.'; return; }
+          data.seeds.forEach(s=>{ const href = linkHref(narrativeId, dimensionId, s.id||null); const a=el('a', { className:'seedlink', attrs:{ href, target:'_blank', rel:'noopener' } }); const seed=el('div', { className:'seed' }); seed.innerHTML = `<strong>A (Problem):</strong> ${escapeHtml(s.problem||'')}<br>` +
+              `<strong>B (Objective):</strong> ${escapeHtml(s.objective||'')}<br>` +
+              `<strong>Solution (Link):</strong> ${escapeHtml(s.solution||'')}` +
+              (s.provider? `<br><small>provider: ${escapeHtml(s.provider)}</small>`:'') +
+              (s.created_at? `<br><small>${escapeHtml(s.created_at)}</small>`:'');
+            seed.dataset.problem = (s.problem||''); seed.dataset.objective=(s.objective||''); seed.dataset.solution=(s.solution||''); seed.dataset.hasId = s.id? '1':'0'; a.appendChild(seed); seedWrap.appendChild(a); anchors.push(a); });
+          if(email && dimensionId && anchors.some(a=> a.firstChild?.dataset?.hasId==='0')){ await reconcileSeedLinks(email, narrativeId, dimensionId, anchors); }
+        } else if(data.raw){ const pre=el('pre'); pre.textContent=data.raw; seedWrap.appendChild(pre); seedStatus.textContent='Model returned raw text; parsing failed upstream.'; } else { const pre=el('pre'); pre.textContent=JSON.stringify(data,null,2); seedWrap.appendChild(pre); seedStatus.textContent='Unexpected response shape.'; }
+      } catch(e){ if(tries>0){ seedStatus.textContent='Retrying…'; await sleep(1200); return createSeedsForDimension(payload, ui, extras, tries-1); } seedStatus.className='seed-error'; seedStatus.textContent=`Seed request failed: ${e.message||e}`; }
+    }
+
+    async function runProviderForDomain(domainName, provider, providerUI, email){ const { status, grid } = providerUI; status.textContent='Generating dimensions…'; let dimData; try{ dimData = await postJSON(`${DIM_API_BASE}/api/narrative-dimensions`, { domain: domainName, provider, email }, 180000); } catch(e){ status.textContent=`Failed: ${e.message||e}`; return; }
+      const dims = Array.isArray(dimData?.dimensions)? dimData.dimensions : []; status.textContent = `Dimensions: ${dims.length}`; if(!dims.length) return; const narrativeId = getNarrativeIdForTitle(dimData.domain || domainName);
+      const cards = dims.map((dim, idx)=>{ const c = renderDimensionCard(idx, dim, dimData.domain||domainName, provider, email); c._narrativeId = narrativeId || null; grid.appendChild(c); return c; });
+      let i=0, ok=0, fail=0; async function seedWorker(){ while(i<cards.length){ const idx=i++; const card=cards[idx]; try{ await createSeedsForDimension(card._seedPayload, card._seedUI, { email, narrativeId: card._narrativeId, dimensionId: card._dimId }); ok++; status.textContent=`Seeds: ${ok}/${cards.length}${fail?` (${fail} failed)`:''}`; } catch{ fail++; status.textContent=`Seeds: ${ok}/${cards.length} (${fail} failed)`; } } }
+      await Promise.all(Array.from({ length: Math.min(MAX_SEED_CONCURRENCY, cards.length) }, ()=> seedWorker())); status.textContent = `Done — dims ${cards.length}, seeds ${ok}/${cards.length}${fail?`, ${fail} failed`:''}`; }
+
+    async function architectDomains(core, provider){ const url = `${CORE_API_BASE}/api/narrative/domain_architect`; return postJSON(url, { core_story: core, provider }); }
+
+    // --- Orchestrator ---
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault(); container.innerHTML=''; globalStatus.textContent='';
+      const email = currentEmail(); if(email) saveEmailToStorage(email); else globalStatus.textContent = 'No email entered — results will be generated but NOT saved.';
+      const cores = (storiesInput.value||'').split('\n').map(s=> s.trim()).filter(Boolean); if(!cores.length){ globalStatus.textContent='Please enter at least one core story.'; return; }
+      const selectedProviders = getSelectedProviders(); if(!selectedProviders.length){ globalStatus.textContent='Please select at least one provider.'; return; }
+      try{ await ensureNarrativesCache(email); } catch {}
+
+      for(let i=0;i<cores.length;i++){
+        const core = cores[i]; globalStatus.textContent = `Architecting ${i+1} of ${cores.length}: ${core}`;
+        const coreUI = makeCoreStorySection(core);
+        let arch; try{ arch = await architectDomains(core, selectedProviders[0]); } catch(err){ coreUI.err.textContent = `Domain architecture failed: ${err.message||err}`; continue; }
+        const groups = arch?.domain_map?.groups || [];
+        if(!groups.length){ coreUI.meta.textContent='No groups returned.'; continue; }
+
+        // Render groups & domains
+        for(const g of groups){ const block = makeDomainGroupBlock(g.title || 'Domains'); coreUI.section.appendChild(block.wrap);
+          (Array.isArray(g.domains)? g.domains: []).forEach(dom => { const dc = makeDomainCard(dom); block.cols.appendChild(dc.card);
+            // For each provider, render a block and run dim+seed
+            const pBlocks = {}; selectedProviders.forEach(p=>{ const pb = makeProviderBlock(p); dc.providerWrap.append(pb.block); dc.providerWrap.append(el('div',{className:'pro-sep'})); pBlocks[p]=pb; });
+            // Run sequentially per domain to limit load
+            (async ()=>{ for(const p of selectedProviders){ await runProviderForDomain(dom.name, p, pBlocks[p], email); } })();
+          });
+        }
+      }
+      globalStatus.textContent = `Done. Processed ${cores.length} core stor${cores.length>1?'ies':'y'}.`;
+    });
+
+    // Init
+    prefillEmailFromStorage();
+    allProvidersCb.indeterminate=false;
+  </script>
+</body>
+</html>
