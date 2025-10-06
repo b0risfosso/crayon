@@ -3,7 +3,7 @@ from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request, Response
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, conlist
 from openai import OpenAI, OpenAIError
 # app.py (top-level, after Flask app creation)
 import sqlite3, json, os
@@ -35,6 +35,12 @@ from prompts import (
     GROW_BRIEF_USER_TEMPLATE,
     DOMAIN_ARCHITECT_SYS_MSG,
     DOMAIN_ARCHITECT_USER_TEMPLATE,
+    GROW_ARTIFACTS_SYS_MSG,
+    GROW_REAL_WORLD_VALIDATION_SYS_MSG,
+    GROW_STAKEHOLDER_SYS_MSG,
+    GROW_PLAYBOOK_SYS_MSG,
+    GROW_RISKS_SYS_MSG,
+    GROW_EMBODIED_SYS_MSG,
 )
 
 app = Flask(__name__)
@@ -544,6 +550,69 @@ class PrototypeDecisionBrief(BaseModel):
     if_prune_next_steps: List[str] = Field(default_factory=list)
     markdown: Optional[str] = Field(None, description="Full write-up with H2 headers")
 
+class GrowArtifacts(BaseModel):
+    why_matters: str = Field(..., description="Why this Box of Dirt matters")
+    plan_14d: str = Field(..., description="14-day conceptual growth plan")
+    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="Binary decision gates")
+    next_if_evolve: str = Field(..., description="Next steps if evolve is chosen")
+    next_if_prune: str = Field(..., description="Next steps if prune is chosen")
+    compliance_footer: str = Field(..., description="Fixed compliance footer")
+
+class RWVPlanBuckets(BaseModel):
+    problem_validation: str = Field(..., description="Markdown text; keep 'Problem Validation' label inside")
+    objective_measurement: str = Field(..., description="Markdown text; keep 'Objective Measurement' label inside")
+    solution_justification: str = Field(..., description="Markdown text; keep 'Solution Justification' label inside")
+
+class GrowRealWorldValidation(BaseModel):
+    why_matters: str = Field(..., description="Markdown section beginning with '## Why this box of dirt matters'")
+    plan_14d: RWVPlanBuckets = Field(..., description="Markdown sections for the 14-day plan by category")
+    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="Each bullet tagged 'Evolve if:' or 'Prune if:' and tied to named metrics")
+    next_if_evolve: RWVPlanBuckets = Field(..., description="Markdown next-steps by category")
+    next_if_prune: RWVPlanBuckets = Field(..., description="Markdown next-steps by category")
+    disclaimer: str = Field(..., description="Must equal: 'This Real-World Validation remains conceptual and public-safe; no operational procedures are included.'")
+
+class StakeholderBucketsText(BaseModel):
+    primary: str = Field(..., description="Markdown for 'Primary' category")
+    secondary: str = Field(..., description="Markdown for 'Secondary' category")
+    end_users_beneficiaries: str = Field(..., description="Markdown for 'End Users / Beneficiaries'")
+    external_contextual: str = Field(..., description="Markdown for 'External / Contextual'")
+
+class GrowStakeholder(BaseModel):
+    why_matters: str = Field(..., description="Markdown section starting with '## Why this box of dirt matters'")
+    plan_14d: StakeholderBucketsText = Field(..., description="14-day plan, per category")
+    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="<=8 bullets, each tagged Evolve if… / Prune if…")
+    next_if_evolve: StakeholderBucketsText = Field(..., description="Next steps (evolve), per category")
+    next_if_prune: StakeholderBucketsText = Field(..., description="Next steps (prune), per category")
+    disclaimer: str = Field(..., description="Must equal: 'This Stakeholder Mapping remains conceptual and public-safe; it contains no operational playbooks or personal data.'")
+
+class GrowPlaybook(BaseModel):
+    why_matters: str = Field(..., description="Markdown starting with '## Why this box of dirt is important'")
+    plan_14d: str = Field(..., description="Markdown starting with '## How this box of dirt can be grown over the next 14 days'")
+    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(..., description="≤8 bullets; each starts with 'Evolve if…' or 'Prune if…'")
+    next_if_evolve: str = Field(..., description="Markdown starting with '## Next Steps — Evolve Path'")
+    next_if_prune: str = Field(..., description="Markdown starting with '## Next Steps — Prune Path'")
+    disclaimer: str = Field(..., description="Must equal the required end statement")
+
+class GrowRisks(BaseModel):
+    why_matters: str = Field(..., description="Markdown; begins with '## Why this box of dirt matters'")
+    plan_14d: str = Field(..., description="Markdown; begins with '## 14-day growth plan'")
+    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(
+        ..., description="≤8 binary gates; each references provided risks/metrics/thresholds"
+    )
+    next_if_evolve: str = Field(..., description="Markdown; begins with '## If Evolve → next steps'")
+    next_if_prune: str = Field(..., description="Markdown; begins with '## If Prune → next steps'")
+    disclaimer: str = Field(..., description="Must equal the required end statement")
+
+class GrowEmbodied(BaseModel):
+    why_matters: str = Field(..., description="Markdown; begins with '## Why this box of dirt is important'")
+    plan_14d: str = Field(..., description="Markdown; begins with '## How it can be grown over the next 14 days'")
+    evolve_prune_conditions: conlist(str, min_items=1, max_items=8) = Field(
+        ..., description="≤8 concise bullets with Evolve/Prune signals"
+    )
+    next_if_evolve: str = Field(..., description="Markdown; begins with '## Next Steps — Evolve Path'")
+    next_if_prune: str = Field(..., description="Markdown; begins with '## Next Steps — Prune Path'")
+    disclaimer: str = Field(..., description="Must equal the required end statement")
+
 
 
 BODY_WRAPPER_STYLE = """
@@ -657,6 +726,32 @@ def _domain_architect_user_message(core_story: str) -> str:
     # Only replace the single placeholder; leave all other braces untouched.
     return tmpl.replace("{core_story}", cs)
 
+def _grow_rwv_user_message(domain: str, dimension: str, dimension_desc: str,
+                      problem: str, objective: str, solution: str,
+                      validation: dict) -> str:
+    """
+    Compose a brace-safe user message. We embed the validation payload verbatim as JSON.
+    """
+    validation_json = json.dumps(validation or {}, ensure_ascii=False, separators=(",", ": "))
+    return (
+        "Use the following inputs and produce the five sections as specified.\n"
+        "Domain\n" + domain + "\n"
+        "Dimension\n" + dimension + "\n" +
+        (dimension_desc.strip() + "\n" if dimension_desc else "") +
+        "Seed\n"
+        f"A (Problem): {problem}\n"
+        f"B (Objective): {objective}\n"
+        f"Solution (Link): {solution}\n\n"
+        "Real-World Validation Box of Dirt (JSON):\n" + validation_json + "\n\n"
+        "Output Required:\n"
+        "- A description of why this box of dirt is important to making the narrative seed more real.\n"
+        "- A 14-day growth plan, keeping Problem Validation, Objective Measurement, and Solution Justification distinct.\n"
+        "- The evolve or prune conditions at Day 14, tied to the same categories (≤8 bullets).\n"
+        "- Next steps if evolve is chosen (non-operational).\n"
+        "- Next steps if prune is chosen (non-operational).\n"
+        "Return ONLY JSON matching the schema; section text may include Markdown H2 headers and category labels."
+    )
+
 
 
 def _grow_brief_user_msg(
@@ -684,6 +779,128 @@ def _grow_brief_user_msg(
         validating_reaction=validating_reaction or "",
         first_eyes=first_eyes or "",
         why_dirt=why_dirt or "",
+    )
+
+def _grow_artifacts_user_message(domain: str, dimension: str, problem: str, objective: str, solution: str,
+                            artifacts: dict) -> str:
+    """
+    Build a plain-text user message that includes inputs and artifacts as compact JSON blobs.
+    Avoids str.format on JSON to prevent brace interpolation issues.
+    """
+    artifacts_json = json.dumps(artifacts or {}, ensure_ascii=False, separators=(",", ": "))
+    return (
+        "Use the following inputs:\n"
+        f"Domain\n{domain}\n"
+        "Dimension\n"
+        f"{dimension}\n"
+        "Seed\n"
+        f"A (Problem): {problem}\n"
+        f"B (Objective): {objective}\n"
+        f"Solution (Link): {solution}\n\n"
+        "Artifacts JSON (verbatim):\n"
+        f"{artifacts_json}\n\n"
+        "Output Required:\n"
+        "- why_matters\n"
+        "- plan_14d\n"
+        "- evolve_prune_conditions (array, ≤8)\n"
+        "- next_if_evolve\n"
+        "- next_if_prune\n"
+        "Return ONLY JSON matching the schema fields above."
+    )
+
+def _grow_stakeholder_user_msg(domain: str, dimension: str, dimension_desc: str,
+                          problem: str, objective: str, solution: str,
+                          stakeholders_payload: dict) -> str:
+    """
+    Compose a brace-safe user message with the stakeholder mapping embedded as JSON.
+    """
+    mapping_json = json.dumps(stakeholders_payload or {}, ensure_ascii=False, separators=(",", ": "))
+    return (
+        "Use the following inputs and produce the five sections exactly as specified.\n"
+        "Domain\n" + domain + "\n"
+        "Dimension\n" + dimension + "\n" +
+        ((dimension_desc.strip() + "\n") if dimension_desc else "") +
+        "Seed\n"
+        f"A (Problem): {problem}\n"
+        f"B (Objective): {objective}\n"
+        f"Solution (Link): {solution}\n\n"
+        "Stakeholder Mapping (Box of Dirt) JSON:\n" + mapping_json + "\n\n"
+        "Output Required:\n"
+        "- Why this box of dirt is important to making the narrative seed more real.\n"
+        "- A 14-day growth plan, keeping Primary, Secondary, End Users / Beneficiaries, and External / Contextual distinct.\n"
+        "- The evolve or prune conditions at Day 14, tied to the stakeholder work.\n"
+        "- Next steps if evolve is chosen (non-operational).\n"
+        "- Next steps if prune is chosen (non-operational).\n"
+        "Return ONLY JSON matching the schema; section text may include Markdown H2 headers and category labels."
+    )
+
+def _grow_playbook_user_msg(domain: str, dimension: str, dimension_desc: str,
+                       problem: str, objective: str, solution: str,
+                       playbook_payload: dict) -> str:
+    pb_json = json.dumps(playbook_payload or {}, ensure_ascii=False, separators=(",", ": "))
+    return (
+        "Use the following Fantasia inputs and produce the five sections exactly as specified.\n"
+        "Domain\n" + domain + "\n"
+        "Dimension\n" + dimension + "\n" +
+        ((dimension_desc.strip() + "\n") if dimension_desc else "") +
+        "Seed\n"
+        f"A (Problem): {problem}\n"
+        f"B (Objective): {objective}\n"
+        f"Solution (Link): {solution}\n\n"
+        "Playbook (Box of Dirt) JSON:\n" + pb_json + "\n\n"
+        "Output Required:\n"
+        "- Why this box of dirt is important to making the narrative seed more real.\n"
+        "- How this box of dirt can be grown over the next 14 days.\n"
+        "- The evolve or prune conditions at the end of these 14 days.\n"
+        "- The next steps to take if evolve is chosen.\n"
+        "- The next steps to take if prune is chosen.\n"
+        "Return ONLY JSON matching the schema; section text may include Markdown H2 headers."
+    )
+
+def _grow_risks_user_msg(domain: str, dimension: str, dimension_desc: str,
+                    problem: str, objective: str, solution: str,
+                    risks_payload: dict) -> str:
+    risks_json = json.dumps(risks_payload or {}, ensure_ascii=False, separators=(",", ": "))
+    return (
+        "Use the following Fantasia inputs and produce the five sections exactly as specified.\n"
+        "Domain\n" + domain + "\n"
+        "Dimension\n" + dimension + "\n" +
+        ((dimension_desc.strip() + "\n") if dimension_desc else "") +
+        "Seed\n"
+        f"A (Problem): {problem}\n"
+        f"B (Objective): {objective}\n"
+        f"Solution (Link): {solution}\n\n"
+        "Risks & Early-Warning Monitoring (Box of Dirt) JSON:\n" + risks_json + "\n\n"
+        "Output Required:\n"
+        "- Why this box of dirt is important to making the narrative seed more real.\n"
+        "- How this box can be grown over the next 14 days (conceptual only).\n"
+        "- The evolve or prune conditions at Day 14.\n"
+        "- The next steps if evolve is chosen (non-operational).\n"
+        "- The next steps if prune is chosen (non-operational).\n"
+        "Return ONLY JSON matching the schema; section text may include Markdown H2 headers."
+    )
+
+def _grow_embodied_user_msg(domain: str, dimension: str, dimension_desc: str,
+                       problem: str, objective: str, solution: str,
+                       embodied_payload: dict) -> str:
+    senses_json = json.dumps(embodied_payload or {}, ensure_ascii=False, separators=(",", ": "))
+    return (
+        "Use the following Fantasia inputs and produce the five sections exactly as specified.\n"
+        "Domain\n" + domain + "\n"
+        "Dimension\n" + dimension + "\n" +
+        ((dimension_desc.strip() + "\n") if dimension_desc else "") +
+        "Seed\n"
+        f"A (Problem): {problem}\n"
+        f"B (Objective): {objective}\n"
+        f"Solution (Link): {solution}\n\n"
+        "6 Senses (Box of Dirt) JSON:\n" + senses_json + "\n\n"
+        "Output Required:\n"
+        "- Why this box of dirt is important to making the narrative seed more real.\n"
+        "- How it can be grown conceptually over the next 14 days.\n"
+        "- The evolve or prune conditions after 14 days.\n"
+        "- Next steps if evolve is chosen.\n"
+        "- Next steps if prune is chosen.\n"
+        "Return ONLY JSON matching the schema; section text may include Markdown H2 headers."
     )
 
 
@@ -3405,3 +3622,722 @@ def api_grow_decision_brief():
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/grow/artifacts", methods=["POST"])
+def api_grow_artifacts():
+    """
+    Input JSON:
+    {
+      "domain": "...",
+      "dimension": "...",
+      "seed": {
+        "problem": "...",
+        "objective": "...",
+        "solution": "..."
+      },
+      "artifacts": {
+        "real_artifacts": [ ... ],
+        "box_of_dirt": [ ... ],
+        "safety_guardrails": "..."
+      },
+      "provider": "openai|xai|gemini"?,  # optional
+      "model": "..."?                    # optional
+    }
+
+    Output:
+    { ok, provider, model, guide: GrowArtifacts }
+    """
+    # 1) Parse & validate inputs
+    data = request.get_json(force=True) or {}
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    seed = data.get("seed") or {}
+    problem = (seed.get("problem") or "").strip()
+    objective = (seed.get("objective") or "").strip()
+    solution = (seed.get("solution") or "").strip()
+    artifacts = data.get("artifacts") or {}
+
+    if not (domain and dimension and problem and objective and solution):
+        return jsonify({
+            "ok": False,
+            "error": "Missing required fields",
+            "detail": "domain, dimension, seed.problem, seed.objective, seed.solution are required"
+        }), 400
+
+    # 2) Provider/model defaults
+    provider = (data.get("provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")).lower()
+    model_name = data.get("model")
+    if not model_name:
+        if provider == "xai":
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+        elif provider == "gemini":
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-pro-exp-02-05")
+        else:
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+    model_name = "gpt-5-mini-2025-08-07"
+
+    # 3) Messages
+    sys_msg = GROW_ARTIFACTS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No markdown or prose outside JSON."
+    user_msg = _grow_artifacts_user_message(domain, dimension, problem, objective, solution, artifacts)
+
+    # 4) Call provider with strict parsing
+    try:
+        parsed = None
+        raw_text = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(sys_msg))
+            parsed_resp = chat.parse(
+                messages=[xai_user(user_msg)],
+                text_format=GrowArtifacts,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        elif provider == "gemini":
+            gclient = get_gemini_client()
+            parsed_resp = gclient.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=GrowArtifacts,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        else:
+            client = _get_llm()
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=GrowArtifacts,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "error": "ParseError",
+                "detail": "LLM output did not match GrowArtifacts schema",
+                "raw": raw_text,
+            }), 502
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "guide": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        import traceback, sys as _sys
+        tb = traceback.format_exc()
+        print(f"[box_of_dirt_guide] ERROR: {e}\n{tb}", file=_sys.stderr, flush=True)
+        return jsonify({
+            "ok": False,
+            "error": e.__class__.__name__,
+            "detail": str(e),
+            "traceback": tb,
+        }), 500
+
+
+@app.route("/api/grow/rwv", methods=["POST"])
+def api_grow_rwv():
+    """
+    Real-World Validation synthesizer.
+
+    Input JSON (example fields; dimension_desc is optional):
+    {
+      "domain": "…",
+      "dimension": "…",
+      "dimension_desc": "…",         # optional one-liner
+      "seed": {
+        "problem": "…",
+        "objective": "…",
+        "solution": "…"
+      },
+      "validation": {                # REQUIRED: with keys problem_validation, objective_measurement, solution_justification
+        "problem_validation": [ ... ],
+        "objective_measurement": [ ... ],
+        "solution_justification": [ ... ]
+      },
+      "provider": "openai|xai|gemini"?,  # optional
+      "model": "..."?                    # optional
+    }
+
+    Output:
+    { ok, provider, model, guide: GrowRealWorldValidation }
+    """
+    data = request.get_json(force=True) or {}
+
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    dimension_desc = (data.get("dimension_desc") or "").strip()
+
+    seed = data.get("seed") or {}
+    problem = (seed.get("problem") or "").strip()
+    objective = (seed.get("objective") or "").strip()
+    solution = (seed.get("solution") or "").strip()
+
+    validation = data.get("validation") or {}
+
+    if not (domain and dimension and problem and objective and solution):
+        return jsonify({
+            "ok": False,
+            "error": "Missing required fields",
+            "detail": "domain, dimension, seed.problem, seed.objective, seed.solution are required"
+        }), 400
+
+    # Provider/model defaults
+    provider = (data.get("provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")).lower()
+    model_name = data.get("model")
+    if not model_name:
+        if provider == "xai":
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+        elif provider == "gemini":
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-pro-exp-02-05")
+        else:
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+    model_name = "gpt-5-mini-2025-08-07"
+
+    # Build messages
+    sys_msg = GROW_REAL_WORLD_VALIDATION_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose outside JSON."
+    user_msg = _grow_rwv_user_message(domain, dimension, dimension_desc, problem, objective, solution, validation)
+
+    # Call provider with strict parsing
+    try:
+        parsed = None
+        raw_text = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(sys_msg))
+            parsed_resp = chat.parse(
+                messages=[xai_user(user_msg)],
+                text_format=GrowRealWorldValidation,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        elif provider == "gemini":
+            gclient = get_gemini_client()
+            parsed_resp = gclient.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=GrowRealWorldValidation,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        else:
+            client = _get_llm()
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=GrowRealWorldValidation,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "error": "ParseError",
+                "detail": "LLM output did not match GrowRealWorldValidation schema",
+                "raw": raw_text,
+            }), 502
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "guide": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        import traceback, sys as _sys
+        tb = traceback.format_exc()
+        print(f"[grow.artifacts] ERROR: {e}\n{tb}", file=_sys.stderr, flush=True)
+        return jsonify({
+            "ok": False,
+            "error": e.__class__.__name__,
+            "detail": str(e),
+            "traceback": tb,
+        }), 500
+
+
+@app.route("/api/grow/risks", methods=["POST"])
+def api_grow_risks():
+    """
+    Risks & Early-Warning Box of Dirt → Decision Brief.
+
+    Input JSON:
+    {
+      "domain": "...",
+      "dimension": "...",
+      "dimension_desc": "...",         # optional
+      "seed": { "problem": "...", "objective": "...", "solution": "..." },
+      "risks": {                       # REQUIRED (see user example structure)
+        "failures": [ ... ]
+      },
+      "provider": "openai|xai|gemini"?,# optional
+      "model": "..."?                  # optional
+    }
+
+    Output: { ok, provider, model, guide: GrowRisks }
+    """
+    data = request.get_json(force=True) or {}
+
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    dimension_desc = (data.get("dimension_desc") or "").strip()
+
+    seed = data.get("seed") or {}
+    problem = (seed.get("problem") or "").strip()
+    objective = (seed.get("objective") or "").strip()
+    solution = (seed.get("solution") or "").strip()
+
+    risks_payload = data.get("risks") or {}
+
+    if not (domain and dimension and problem and objective and solution and risks_payload):
+        return jsonify({
+            "ok": False,
+            "error": "Missing required fields",
+            "detail": "domain, dimension, seed.{problem,objective,solution}, and risks are required"
+        }), 400
+
+    provider = (data.get("provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")).lower()
+    model_name = data.get("model")
+    if not model_name:
+        if provider == "xai":
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+        elif provider == "gemini":
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-pro-exp-02-05")
+        else:
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+    model_name = "gpt-5-mini-2025-08-07"
+
+    sys_msg = GROW_RISKS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose outside JSON."
+    user_msg = _grow_risks_user_msg(domain, dimension, dimension_desc, problem, objective, solution, risks_payload)
+
+    try:
+        parsed = None
+        raw_text = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(sys_msg))
+            resp = chat.parse(messages=[xai_user(user_msg)], text_format=GrowRisks)
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        elif provider == "gemini":
+            gclient = get_gemini_client()
+            resp = gclient.responses.parse(
+                model=model_name,
+                input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
+                text_format=GrowRisks,
+            )
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        else:
+            client = _get_llm()
+            resp = client.responses.parse(
+                model=model_name,
+                input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
+                text_format=GrowRisks,
+            )
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "error": "ParseError",
+                "detail": "LLM output did not match GrowRisks schema",
+                "raw": raw_text,
+            }), 502
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "guide": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        import traceback, sys as _sys
+        tb = traceback.format_exc()
+        print(f"[grow.risks] ERROR: {e}\n{tb}", file=_sys.stderr, flush=True)
+        return jsonify({"ok": False, "error": e.__class__.__name__, "detail": str(e), "traceback": tb}), 500
+
+@app.route("/api/grow/playbook", methods=["POST"])
+def api_grow_playbook():
+    """
+    Playbook Box of Dirt → Strategic Operations Brief.
+
+    Input JSON:
+    {
+      "domain": "...",
+      "dimension": "...",
+      "dimension_desc": "...",   # optional
+      "seed": { "problem": "...", "objective": "...", "solution": "..." },
+      "archetype_playbook": {    # REQUIRED (your phases, north_star, etc.)
+        "classification": {...},
+        "north_star": "...",
+        "phases": [ ... ]
+      },
+      "provider": "openai|xai|gemini"?,  # optional
+      "model": "..."?                    # optional
+    }
+
+    Output: { ok, provider, model, guide: GrowPlaybook }
+    """
+    data = request.get_json(force=True) or {}
+
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    dimension_desc = (data.get("dimension_desc") or "").strip()
+
+    seed = data.get("seed") or {}
+    problem = (seed.get("problem") or "").strip()
+    objective = (seed.get("objective") or "").strip()
+    solution = (seed.get("solution") or "").strip()
+
+    playbook_payload = data.get("archetype_playbook") or {}
+
+    if not (domain and dimension and problem and objective and solution and playbook_payload):
+        return jsonify({
+            "ok": False,
+            "error": "Missing required fields",
+            "detail": "domain, dimension, seed.{problem,objective,solution}, and archetype_playbook are required"
+        }), 400
+
+    # Provider/model defaults
+    provider = (data.get("provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")).lower()
+    model_name = data.get("model")
+    if not model_name:
+        if provider == "xai":
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+        elif provider == "gemini":
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-pro-exp-02-05")
+        else:
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+    model_name = "gpt-5-mini-2025-08-07"
+
+    sys_msg = GROW_PLAYBOOK_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose outside JSON."
+    user_msg = _grow_playbook_user_msg(domain, dimension, dimension_desc, problem, objective, solution, playbook_payload)
+
+    try:
+        parsed = None
+        raw_text = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(sys_msg))
+            resp = chat.parse(messages=[xai_user(user_msg)], text_format=GrowPlaybook)
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        elif provider == "gemini":
+            gclient = get_gemini_client()
+            resp = gclient.responses.parse(
+                model=model_name,
+                input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
+                text_format=GrowPlaybook,
+            )
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        else:
+            client = _get_llm()
+            resp = client.responses.parse(
+                model=model_name,
+                input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
+                text_format=GrowPlaybook,
+            )
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "error": "ParseError",
+                "detail": "LLM output did not match GrowPlaybook schema",
+                "raw": raw_text,
+            }), 502
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "guide": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        import traceback, sys as _sys
+        tb = traceback.format_exc()
+        print(f"[grow.playbook] ERROR: {e}\n{tb}", file=_sys.stderr, flush=True)
+        return jsonify({"ok": False, "error": e.__class__.__name__, "detail": str(e), "traceback": tb}), 500
+
+
+@app.route("/api/grow/stakeholders", methods=["POST"])
+def api_grow_stakeholders():
+    """
+    Stakeholder Mapping “Box of Dirt” guide.
+
+    Input JSON:
+    {
+      "domain": "…",
+      "dimension": "…",
+      "dimension_desc": "…",   # optional
+      "seed": {
+        "problem": "…",
+        "objective": "…",
+        "solution": "…"
+      },
+      "stakeholders": {         # REQUIRED: {primary, secondary, end_users_beneficiaries, external_contextual}
+        "primary": [ ... ],
+        "secondary": [ ... ],
+        "end_users_beneficiaries": [ ... ],
+        "external_contextual": [ ... ]
+      },
+      "provider": "openai|xai|gemini"?,  # optional
+      "model": "..."?                    # optional
+    }
+
+    Output:
+    { ok, provider, model, guide: GrowStakeholder }
+    """
+    data = request.get_json(force=True) or {}
+
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    dimension_desc = (data.get("dimension_desc") or "").strip()
+
+    seed = data.get("seed") or {}
+    problem = (seed.get("problem") or "").strip()
+    objective = (seed.get("objective") or "").strip()
+    solution = (seed.get("solution") or "").strip()
+
+    stakeholders_payload = data.get("stakeholders") or {}
+
+    if not (domain and dimension and problem and objective and solution):
+        return jsonify({
+            "ok": False,
+            "error": "Missing required fields",
+            "detail": "domain, dimension, seed.problem, seed.objective, seed.solution are required"
+        }), 400
+
+    # Provider/model defaults
+    provider = (data.get("provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")).lower()
+    model_name = data.get("model")
+    if not model_name:
+        if provider == "xai":
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+        elif provider == "gemini":
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-pro-exp-02-05")
+        else:
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+    model_name = "gpt-5-mini-2025-08-07"
+
+    # Messages
+    sys_msg = GROW_STAKEHOLDER_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose outside JSON."
+    user_msg = _grow_stakeholder_user_msg(domain, dimension, dimension_desc, problem, objective, solution, stakeholders_payload)
+
+    # LLM call with strict parsing
+    try:
+        parsed = None
+        raw_text = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(sys_msg))
+            parsed_resp = chat.parse(
+                messages=[xai_user(user_msg)],
+                text_format=GrowStakeholder,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        elif provider == "gemini":
+            gclient = get_gemini_client()
+            parsed_resp = gclient.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=GrowStakeholder,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        else:
+            client = _get_llm()
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=GrowStakeholder,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "error": "ParseError",
+                "detail": "LLM output did not match GrowStakeholder schema",
+                "raw": raw_text,
+            }), 502
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "guide": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        import traceback, sys as _sys
+        tb = traceback.format_exc()
+        print(f"[grow.stakeholders] ERROR: {e}\n{tb}", file=_sys.stderr, flush=True)
+        return jsonify({
+            "ok": False,
+            "error": e.__class__.__name__,
+            "detail": str(e),
+            "traceback": tb,
+        }), 500
+
+
+@app.route("/api/grow/embodied", methods=["POST"])
+def api_grow_embodied():
+    """
+    6 Senses Box of Dirt → Embodied Narrative Brief.
+
+    Input JSON:
+    {
+      "domain": "...",
+      "dimension": "...",
+      "dimension_desc": "...",          # optional
+      "seed": { "problem": "...", "objective": "...", "solution": "..." },
+      "embodied": {                     # REQUIRED (eyes/ears/hands/nose/mouth/music arrays as provided)
+        ...  # see example
+      },
+      "provider": "openai|xai|gemini"?, # optional
+      "model": "..."?                   # optional
+    }
+
+    Output: { ok, provider, model, guide: GrowEmbodied }
+    """
+    data = request.get_json(force=True) or {}
+
+    domain = (data.get("domain") or "").strip()
+    dimension = (data.get("dimension") or "").strip()
+    dimension_desc = (data.get("dimension_desc") or "").strip()
+
+    seed = data.get("seed") or {}
+    problem = (seed.get("problem") or "").strip()
+    objective = (seed.get("objective") or "").strip()
+    solution = (seed.get("solution") or "").strip()
+
+    embodied_payload = data.get("embodied") or {}
+
+    if not (domain and dimension and problem and objective and solution and embodied_payload):
+        return jsonify({
+            "ok": False,
+            "error": "Missing required fields",
+            "detail": "domain, dimension, seed.{problem,objective,solution}, and embodied are required"
+        }), 400
+
+    provider = (data.get("provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")).lower()
+    model_name = data.get("model")
+    if not model_name:
+        if provider == "xai":
+            model_name = os.getenv("XAI_MODEL", "grok-4")
+        elif provider == "gemini":
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-pro-exp-02-05")
+        else:
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+    model_name = "gpt-5-mini-2025-08-07"
+
+    sys_msg = GROW_EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose outside JSON."
+    user_msg = _grow_embodied_user_msg(domain, dimension, dimension_desc, problem, objective, solution, embodied_payload)
+
+    try:
+        parsed = None
+        raw_text = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(sys_msg))
+            resp = chat.parse(messages=[xai_user(user_msg)], text_format=GrowEmbodied)
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        elif provider == "gemini":
+            gclient = get_gemini_client()
+            resp = gclient.responses.parse(
+                model=model_name,
+                input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
+                text_format=GrowEmbodied,
+            )
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        else:
+            client = _get_llm()
+            resp = client.responses.parse(
+                model=model_name,
+                input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
+                text_format=GrowEmbodied,
+            )
+            parsed, raw_text = resp.output_parsed, resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "error": "ParseError",
+                "detail": "LLM output did not match GrowEmbodied schema",
+                "raw": raw_text,
+            }), 502
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "guide": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        import traceback, sys as _sys
+        tb = traceback.format_exc()
+        print(f"[grow.embodied] ERROR: {e}\n{tb}", file=_sys.stderr, flush=True)
+        return jsonify({"ok": False, "error": e.__class__.__name__, "detail": str(e), "traceback": tb}), 500
