@@ -182,18 +182,6 @@
         <div class="body hidden" id="body-senses"></div>
       </section>
 
-      <!-- Playbook / Roadmap -->
-      <section class="card" id="card-playbook" aria-labelledby="h-playbook">
-        <header>
-          <h2 id="h-playbook">Playbook / Roadmap</h2>
-          <div class="expand-row">
-            <span id="status-playbook" class="status warn">Not loaded</span>
-            <button id="toggle-playbook" class="btn" disabled>Expand</button>
-          </div>
-        </header>
-        <div class="body hidden" id="body-playbook"></div>
-      </section>
-
       <!-- Archetype -->
       <section class="card" id="card-archetype" aria-labelledby="h-archetype">
         <header>
@@ -236,7 +224,6 @@
         validation: document.getElementById('status-validation'),
         stakeholders: document.getElementById('status-stakeholders'),
         senses: document.getElementById('status-senses'),
-        playbook: document.getElementById('status-playbook'),
         archetype: document.getElementById('status-archetype'),
         risks: document.getElementById('status-risks'),
       },
@@ -246,7 +233,6 @@
         validation: document.getElementById('toggle-validation'),
         stakeholders: document.getElementById('toggle-stakeholders'),
         senses: document.getElementById('toggle-senses'),
-        playbook: document.getElementById('toggle-playbook'),
         archetype: document.getElementById('toggle-archetype'),
         risks: document.getElementById('toggle-risks'),
       },
@@ -256,7 +242,6 @@
         validation: document.getElementById('body-validation'),
         stakeholders: document.getElementById('body-stakeholders'),
         senses: document.getElementById('body-senses'),
-        playbook: document.getElementById('body-playbook'),
         archetype: document.getElementById('body-archetype'),
         risks: document.getElementById('body-risks'),
       },
@@ -266,7 +251,7 @@
 
     };
 
-    const KINDS = ['storyboard','artifacts','validation','stakeholders','senses','playbook','archetype','risks'];
+    const KINDS = ['storyboard','artifacts','validation','stakeholders','embodied','archetype','risks'];
 
     const loaded = Object.create(null); // { kind: {input, output} }
 
