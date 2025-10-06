@@ -638,8 +638,16 @@ def _make_artifacts_user_msg(domain: str, dimension: str, seed_three_line: str) 
     )
 
 def _domain_architect_user_message(core_story: str) -> str:
-    tmpl = DOMAIN_ARCHITECT_USER_TEMPLATE if 'DOMAIN_ARCHITECT_USER_TEMPLATE' in globals() else "Core Story: {core_story}"
-    return tmpl.format(core_story=core_story.strip())
+    # Use simple replacement to avoid str.format interpreting JSON braces.
+    try:
+        tmpl = DOMAIN_ARCHITECT_USER_TEMPLATE
+    except NameError:
+        return f"Core Story: {core_story.strip()}\n\nReturn ONLY JSON per the system schema."
+
+    cs = core_story.strip()
+    # Only replace the single placeholder; leave all other braces untouched.
+    return tmpl.replace("{core_story}", cs)
+
 
 
 def _grow_brief_user_msg(
