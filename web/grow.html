@@ -607,19 +607,6 @@
               // --- NEW: if storyboard loaded, kick off decision-brief in background
               if (k === 'storyboard') {
                 els.briefBtn.disabled = false;     // NEW: enable run button
-                (async () => {
-                  try {
-                    const payload = _buildBriefPayloadFromStoryboard(data);
-                    const brief = await _requestDecisionBrief(payload);
-                    loaded.__decision_brief = brief;                    // stash globally
-                    // If user already expanded, append now
-                    if (!els.body.storyboard.classList.contains('hidden')) {
-                      _appendDecisionBriefToStoryboard();
-                    }
-                  } catch (e) {
-                    console.warn('Decision brief failed:', e.message);
-                  }
-                })();
               }
             } else {
               delete loaded[k];
@@ -682,6 +669,35 @@
       }
     }
 
+    async function runDecisionBrief(){
+      if (!loaded.storyboard) {
+        setStatus('storyboard', 'Load a storyboard first', false);
+        return;
+      }
+      const btn = els.briefBtn;
+      if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+
+      try{
+        const payload = _buildBriefPayloadFromStoryboard(loaded.storyboard);
+        const brief = await _requestDecisionBrief(payload);
+        loaded.__decision_brief = brief;
+
+        // Auto-show storyboard body and brief
+        renderKind('storyboard');                    // ensure storyboard text is painted
+        const body = els.body.storyboard;
+        if (body) body.classList.remove('hidden');   // unhide
+        if (els.toggle.storyboard) els.toggle.storyboard.textContent = 'Hide';
+        _appendDecisionBriefToStoryboard();          // append brief section
+        setStatus('storyboard', 'Brief ready — shown', true);
+      }catch(e){
+        console.warn('Decision brief failed:', e);
+        setStatus('storyboard', `Brief error: ${e.message}`, false);
+      }finally{
+        if (btn) { btn.disabled = false; btn.textContent = 'Decision Brief'; }
+      }
+    }
+
+
     
 
     // ------- Boot -------
@@ -697,6 +713,8 @@
         attachToggles(); // only once
         els.email.addEventListener('change', loadNarrativesForEmail);
         els.loadAllBtn.addEventListener('click', loadAllKinds);
+        els.briefBtn?.addEventListener('click', runDecisionBrief);
+
 
         // initial loads
         const params = new URLSearchParams(location.search);
