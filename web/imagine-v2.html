@@ -82,7 +82,7 @@
         
         <div class="row">
         <button type="submit">Generate</button>
-        <span id="hint" class="muted">Runs: Core stories → domain architecture → dimensions → seeds using OpenAI.</span>
+        <span id="hint" class="muted">Runs: Core stories → domain architecture → dimensions → seeds (problem/objective/solution).</span>
         </div>
         </form>
         
@@ -127,7 +127,78 @@
     async function ensureNarrativesCache(email){ if(narrativeIdByTitle.size) return; if(!email) return; const rows = await getJSON(`/api/narratives?email=${encodeURIComponent(email)}`); rows.forEach(r=>{ if(r && r.title) narrativeIdByTitle.set(r.title, r.id); }); }
     function getNarrativeIdForTitle(title){ return narrativeIdByTitle.get(title) || null; }
 
-    async function runProviderForDomain(domainName,email,container){ const status=el('div',{className:'muted',text:'Generating dimensions…'}); container.append(status); try{ const dimData=await postJSON(`${DIM_API_BASE}/api/narrative-dimensions`,{domain:domainName,provider:PROVIDER,email},180000); const dims=Array.isArray(dimData?.dimensions)?dimData.dimensions:[]; status.textContent=`Dimensions: ${dims.length}`; if(!dims.length)return; const narrativeId=getNarrativeIdForTitle(dimData.domain||domainName); for(const dim of dims){ const card=el('details'); card.append(el('summary',{text:dim.title||dim.name||'Untitled'})); const thesis=el('div',{className:'thesis',text:dim.description||dim.thesis||''}); card.append(thesis); const seedStatus=el('div',{className:'muted',text:'Generating seeds…'}); card.append(seedStatus); container.append(card); const data=await postJSON(`/api/narrative-seeds`,{domain:domainName,dimension:dim.name||dim.title||'',description:dim.description||dim.thesis||'',targets:dim.targets||[],provider:PROVIDER,email}); seedStatus.textContent=''; if(Array.isArray(data.seeds)){ data.seeds.forEach(s=>{ const a=el('a',{className:'seedlink',attrs:{href:linkHref(narrativeId,dim.id,s.id||null),target:'_blank',rel:'noopener'}}); const seed=el('div',{className:'seed'}); seed.innerHTML=`<strong>A (Problem):</strong> ${escapeHtml(s.problem||'')}<br><strong>B (Objective):</strong> ${escapeHtml(s.objective||'')}<br><strong>Solution (Link):</strong> ${escapeHtml(s.solution||'')}`; a.append(seed); card.append(a); }); } else { seedStatus.textContent='No seeds returned.'; } } }catch(e){ status.textContent=`Failed: ${e.message||e}`; } }
+    async function runProviderForDomain(domainName, email, container) {
+        const status = el('div', { className: 'muted', text: 'Generating dimensions…' });
+        container.append(status);
+
+        let dimData;
+        try {
+            dimData = await postJSON(
+            `${DIM_API_BASE}/api/narrative-dimensions`,
+            { domain: domainName, provider: PROVIDER, email },
+            180000
+            );
+        } catch (e) {
+            status.textContent = `Failed: ${e.message || e}`;
+            return;
+        }
+
+        const dims = Array.isArray(dimData?.dimensions) ? dimData.dimensions : [];
+        status.textContent = `Dimensions: ${dims.length}`;
+        if (!dims.length) return;
+
+        const narrativeId = getNarrativeIdForTitle(dimData.domain || domainName);
+
+        // 1) Render all dimension cards first
+        const cards = dims.map(dim => {
+            const card = el('details');
+            card.append(el('summary', { text: dim.title || dim.name || 'Untitled' }));
+            const thesis = el('div', { className: 'thesis', text: dim.description || dim.thesis || '' });
+            const seedStatus = el('div', { className: 'muted', text: 'Generating seeds…' });
+            card.append(thesis, seedStatus);
+            container.append(card);
+            return { dim, card, seedStatus };
+        });
+
+        // 2) Generate seeds per card with its own try/catch
+        for (const { dim, card, seedStatus } of cards) {
+            try {
+            const data = await postJSON(
+                `/api/narrative-seeds`,
+                {
+                domain: domainName,
+                dimension: dim.name || dim.title || '',
+                description: dim.description || dim.thesis || '',
+                targets: dim.targets || [],
+                provider: PROVIDER,
+                email
+                }
+            );
+            seedStatus.textContent = '';
+            if (Array.isArray(data.seeds)) {
+                data.seeds.forEach(s => {
+                const a = el('a', {
+                    className: 'seedlink',
+                    attrs: { href: linkHref(narrativeId, dim.id, s.id || null), target: '_blank', rel: 'noopener' }
+                });
+                const seed = el('div', { className: 'seed' });
+                seed.innerHTML =
+                    `<strong>A (Problem):</strong> ${escapeHtml(s.problem || '')}<br>` +
+                    `<strong>B (Objective):</strong> ${escapeHtml(s.objective || '')}<br>` +
+                    `<strong>Solution (Link):</strong> ${escapeHtml(s.solution || '')}`;
+                a.append(seed);
+                card.append(a);
+                });
+            } else {
+                seedStatus.textContent = 'No seeds returned.';
+            }
+            } catch (e) {
+            seedStatus.className = 'seed-error';
+            seedStatus.textContent = `Seed request failed: ${e.message || e}`;
+            // continue to next dimension
+            }
+        }
+    }
 
 
     // --- Rendering helpers ---
