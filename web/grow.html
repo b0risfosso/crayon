@@ -126,6 +126,8 @@
           <h2 id="h-storyboard">Storyboard</h2>
           <div class="expand-row">
             <span id="status-storyboard" class="status warn">Not loaded</span>
+            <!-- NEW: run button -->
+            <button id="run-brief" class="btn" disabled>Decision Brief</button>
             <button id="toggle-storyboard" class="btn" disabled>Expand</button>
           </div>
         </header>
@@ -258,7 +260,9 @@
         archetype: document.getElementById('body-archetype'),
         risks: document.getElementById('body-risks'),
       },
-    cardsContainer: document.getElementById('cards')
+    cardsContainer: document.getElementById('cards'),
+    briefBtn: document.getElementById('run-brief'),
+
 
     };
 
@@ -308,9 +312,18 @@
     function showBody(kind){ els.body[kind]?.classList.remove('hidden'); }
 
     function clearBodies(){
-      for(const k of KINDS){ hideBody(k); els.body[k].innerHTML=''; setStatus(k, 'Not loaded', false); setToggleEnabled(k,false); }
-      els.loadAllStatus.textContent = 'Nothing loaded'; els.loadAllStatus.classList.remove('ok'); els.loadAllStatus.classList.add('warn');
+      for(const k of KINDS){
+        hideBody(k);
+        els.body[k].innerHTML='';
+        setStatus(k, 'Not loaded', false);
+        setToggleEnabled(k,false);
+      }
+      if (els.briefBtn) els.briefBtn.disabled = true;  // NEW
+      els.loadAllStatus.textContent = 'Nothing loaded';
+      els.loadAllStatus.classList.remove('ok');
+      els.loadAllStatus.classList.add('warn');
     }
+
 
     function currentSeedTriplet(){
       // These are used only for display/context; loading /api/dirt relies on sid & kind
@@ -319,6 +332,96 @@
       const seed = els.seed.options[els.seed.selectedIndex]?.textContent || '';
       return {domain, dimension, seed};
     }
+
+    function _extractSeedTripletFromInput(input){
+    // Handles shapes like: {request:{ domain, dimension, seed:{problem,objective,solution} }}
+      const req = (input && (input.request || input)) || {};
+      const seed = req.seed || {};
+      return {
+        domain: req.domain || '',
+        dimension: req.dimension || '',
+        problem: seed.problem || req.problem || '',
+        objective: seed.objective || req.objective || '',
+        solution: seed.solution || req.solution || '',
+      };
+    }
+
+    function _buildBriefPayloadFromStoryboard(storyData){
+      // storyData = loaded['storyboard'] = { input, output, at }
+      const out = storyData?.output || {};
+      const proto = out.prototype || out; // tolerate either shape
+      const seedFromInput = _extractSeedTripletFromInput(storyData?.input);
+
+      const domain    = out.domain    || seedFromInput.domain    || '';
+      const dimension = out.dimension || seedFromInput.dimension || '';
+
+      // Map storyboard fields
+      const core_intent         = proto.core_intent || '';
+      const minimal_build       = proto.minimal_build || '';
+      const load_bearing_test   = proto.load_bearing_test || '';
+      // Some storyboards embed "Validating reaction" inside load_bearing_test; pass blank if not separate
+      const validating_reaction = proto.validating_reaction || '';
+      const first_eyes          = Array.isArray(proto.first_eyes) ? proto.first_eyes.join('\n') : (proto.first_eyes || '');
+      const why_dirt            = proto.why_box_of_dirt || proto.why_dirt || (out.why_box_of_dirt || '');
+
+      return {
+        // endpoint accepts split fields; you can also include nested seed if you prefer
+        domain,
+        dimension,
+        seed_problem:   seedFromInput.problem   || '',
+        seed_objective: seedFromInput.objective || '',
+        seed_solution:  seedFromInput.solution  || '',
+        core_intent,
+        minimal_build,
+        load_bearing_test,
+        validating_reaction,
+        first_eyes,
+        why_dirt,
+        // provider optional; omit to use server default
+        // provider: 'openai',
+      };
+    }
+
+    async function _requestDecisionBrief(payload){
+      const res = await fetch('/api/grow/decision-brief', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let j = null; try { j = JSON.parse(text); } catch {_ => {}}
+      if (!res.ok || !j?.ok) throw new Error((j && (j.error || j.message)) || `HTTP ${res.status}`);
+      return j.brief; // { why_this_matters, plan_14d, evolve_conditions, prune_conditions, if_evolve_next_steps, if_prune_next_steps, markdown }
+    }
+
+    function _appendDecisionBriefToStoryboard(){
+      const body = els.body.storyboard;
+      if (!body) return;
+      const brief = (loaded.__decision_brief || null);
+      if (!brief) return;
+
+      // Avoid duplicating if user toggles repeatedly
+      if (body.querySelector('.brief-wrap')) return;
+
+      const md = brief.markdown || [
+        '## Why this box of dirt/prototype matters', brief.why_this_matters || '',
+        '## 14-day growth plan',                      brief.plan_14d || '',
+        '## Evolve vs. Prune conditions',
+        ...(brief.evolve_conditions||[]).map(s=>'• '+s),
+        ...(brief.prune_conditions||[]).map(s=>'• '+s),
+        '## If Evolve → next steps', ...(brief.if_evolve_next_steps||[]).map(s=>'• '+s),
+        '## If Prune → next steps',  ...(brief.if_prune_next_steps||[]).map(s=>'• '+s),
+      ].join('\n');
+
+      body.insertAdjacentHTML('beforeend', `
+        <hr>
+        <div class="brief-wrap">
+          <h3 style="margin:.25rem 0 .35rem 0;">Decision Brief</h3>
+          <pre>${escapeHTML(md)}</pre>
+        </div>
+      `);
+    }
+
 
     // ------- Data loading (narratives + seeds) -------
     async function fetchJSON(url){
@@ -493,19 +596,49 @@
       els.loadAllBtn.disabled = true; els.loadAllStatus.textContent = 'Loading…';
       for(const k of KINDS){ setStatus(k, 'Loading…'); setToggleEnabled(k,false); hideBody(k); }
       try{
-        // Load sequentially (simple & gentle on backend); could parallelize if desired
         for(const k of KINDS){
           try{
             const data = await loadLatestDirt(k, sid);
-            if(data){ loaded[k] = data; setStatus(k, 'Loaded — click to expand', true); setToggleEnabled(k,true); }
-            else { delete loaded[k]; setStatus(k, 'No saved Dirt found', false); setToggleEnabled(k,false); }
-          }catch(inner){ console.error(k, inner); setStatus(k, `Error: ${inner.message}`, false); setToggleEnabled(k,false); }
+            if(data){
+              loaded[k] = data;
+              setStatus(k, 'Loaded — click to expand', true);
+              setToggleEnabled(k, true);
+
+              // --- NEW: if storyboard loaded, kick off decision-brief in background
+              if (k === 'storyboard') {
+                els.briefBtn.disabled = false;     // NEW: enable run button
+                (async () => {
+                  try {
+                    const payload = _buildBriefPayloadFromStoryboard(data);
+                    const brief = await _requestDecisionBrief(payload);
+                    loaded.__decision_brief = brief;                    // stash globally
+                    // If user already expanded, append now
+                    if (!els.body.storyboard.classList.contains('hidden')) {
+                      _appendDecisionBriefToStoryboard();
+                    }
+                  } catch (e) {
+                    console.warn('Decision brief failed:', e.message);
+                  }
+                })();
+              }
+            } else {
+              delete loaded[k];
+              setStatus(k, 'No saved Dirt found', false);
+              setToggleEnabled(k, false);
+            }
+          }catch(inner){
+            console.error(k, inner);
+            setStatus(k, `Error: ${inner.message}`, false);
+            setToggleEnabled(k, false);
+          }
         }
-        els.loadAllStatus.textContent = 'Finished loading'; els.loadAllStatus.classList.remove('warn'); els.loadAllStatus.classList.add('ok');
-      }finally{
+        els.loadAllStatus.textContent = 'Finished loading';
+        els.loadAllStatus.classList.remove('warn'); els.loadAllStatus.classList.add('ok');
+      } finally {
         els.loadAllBtn.disabled = false;
       }
     }
+
 
     function renderKind(kind){
       const d = loaded[kind]; const body = els.body[kind]; if(!body) return;
@@ -522,12 +655,34 @@
         const btn = els.toggle[k];
         const body = els.body[k];
         if(!btn || !body) continue;
-        btn.addEventListener('click', () => {
-          if(body.classList.contains('hidden')){ renderKind(k); showBody(k); btn.textContent = 'Hide'; }
-          else { hideBody(k); btn.textContent = 'Expand'; }
+        btn.addEventListener('click', async () => {
+          if(body.classList.contains('hidden')){
+            renderKind(k);
+            // --- NEW: when storyboard is expanded, append brief if available (or generate on-demand if needed)
+            if (k === 'storyboard') {
+              try{
+                if (!loaded.__decision_brief && loaded.storyboard) {
+                  // lazy-generate if background call hasn't completed (or not started)
+                  const payload = _buildBriefPayloadFromStoryboard(loaded.storyboard);
+                  loaded.__decision_brief = await _requestDecisionBrief(payload);
+                }
+                _appendDecisionBriefToStoryboard();
+              }catch(e){
+                console.warn('Decision brief (on expand) failed:', e.message);
+              }
+            }
+
+            showBody(k);
+            btn.textContent = 'Hide';
+          } else {
+            hideBody(k);
+            btn.textContent = 'Expand';
+          }
         });
       }
     }
+
+    
 
     // ------- Boot -------
 

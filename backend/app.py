@@ -31,6 +31,10 @@ from prompts import (
     ROADMAP_SYS_MSG,
     ARCHETYPE_PLAYBOOK_SYS_MSG,
     RISKS_SYS_MSG,
+    GROW_BRIEF_SYS_MSG,
+    GROW_BRIEF_USER_TEMPLATE,
+    DOMAIN_ARCHITECT_SYS_MSG,
+    DOMAIN_ARCHITECT_USER_TEMPLATE,
 )
 
 app = Flask(__name__)
@@ -519,7 +523,17 @@ class ArtifactsBundle(BaseModel):
     next_steps_title: str = Field(default="Next steps (48–72 hours)")
     next_steps: List[str] = Field(default_factory=list, description="Exactly 3 concrete actions")
 
+class DomainItem(BaseModel):
+    name: str = Field(..., description="Concise 2–6 word domain name")
+    description: str = Field(..., description="One-line description starting with a verb or concept")
 
+class DomainGroup(BaseModel):
+    title: str = Field(..., description="Group title, should start with an emoji")
+    domains: List[DomainItem] = Field(..., min_items=4, max_items=6)
+
+class DomainArchitectOutput(BaseModel):
+    core_story: str
+    groups: List[DomainGroup] = Field(..., min_items=6, max_items=8)
 
 
 
@@ -621,6 +635,38 @@ def _make_artifacts_user_msg(domain: str, dimension: str, seed_three_line: str) 
         f"Dimension: {dimension}\n"
         f"Seed (three lines):\n{seed_three_line}\n\n"
         "Produce the JSON object exactly per schema."
+    )
+
+def _domain_architect_user_message(core_story: str) -> str:
+    tmpl = DOMAIN_ARCHITECT_USER_TEMPLATE if 'DOMAIN_ARCHITECT_USER_TEMPLATE' in globals() else "Core Story: {core_story}"
+    return tmpl.format(core_story=core_story.strip())
+
+
+def _grow_brief_user_msg(
+    domain: str,
+    dimension: str,
+    seed_problem: str,
+    seed_objective: str,
+    seed_solution: str,
+    core_intent: str,
+    minimal_build: str,
+    load_bearing_test: str,
+    validating_reaction: str,
+    first_eyes: str,
+    why_dirt: str,
+) -> str:
+    return GROW_BRIEF_USER_TEMPLATE.format(
+        domain=domain or "",
+        dimension=dimension or "",
+        seed_problem=seed_problem or "",
+        seed_objective=seed_objective or "",
+        seed_solution=seed_solution or "",
+        core_intent=core_intent or "",
+        minimal_build=minimal_build or "",
+        load_bearing_test=load_bearing_test or "",
+        validating_reaction=validating_reaction or "",
+        first_eyes=first_eyes or "",
+        why_dirt=why_dirt or "",
     )
 
 
@@ -912,7 +958,7 @@ def llm_generate_dimensions_openai_web(domain: str, n: int | None):
     user_prompt = f"{DIM_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
 
     resp = client.responses.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         tools=[{"type": "web_search"}],
         input=[
             {"role": "system", "content": sys_prompt},
@@ -963,7 +1009,7 @@ def llm_generate_seeds_openai_web(domain: str, dimension: str, description: str,
     user_prompt = f"{SEED_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
 
     resp = client.responses.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         tools=[{"type": "web_search"}],
         input=[
             {"role": "system", "content": sys_prompt},
@@ -1140,7 +1186,7 @@ def llm_generate_dimensions_openai(domain: str, n: int | None):
     count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
     usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
     parsed_resp = client.responses.parse(
-        model=os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         input=[
             {"role": "system", "content": DIM_SYS_MSG},
             {"role": "user", "content": usr_msg},
@@ -1170,7 +1216,7 @@ def llm_generate_seeds_openai(domain: str, dimension: str, description: str, tar
         "Create A→B narrative seeds in this dimension."
     )
     parsed_resp = client.responses.parse(
-        model=os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         input=[
             {"role": "system", "content": SEED_SYS_MSG},
             {"role": "user", "content": usr_msg},
@@ -1255,12 +1301,12 @@ def generate_narrative_dimensions():
         elif provider == "openai_web":
             parsed_resp = llm_generate_dimensions_openai_web(domain, n)
             parsed = parsed_resp.output_parsed
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             raw_text = parsed_resp.output_text
         else:
             parsed_resp = llm_generate_dimensions_openai(domain, n)
             parsed = parsed_resp.output_parsed
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             raw_text = parsed_resp.output_text
 
         if parsed is not None:
@@ -1350,12 +1396,12 @@ def generate_narrative_seeds():
         elif provider == "openai_web":
             parsed_resp = llm_generate_seeds_openai_web(domain, dimension, description, targets)
             parsed = parsed_resp.output_parsed
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             raw_text = parsed_resp.output_text
         else:
             parsed_resp = llm_generate_seeds_openai(domain, dimension, description, targets)
             parsed = parsed_resp.output_parsed
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             raw_text = parsed_resp.output_text
 
         if not parsed:
@@ -1606,6 +1652,87 @@ def list_narratives():
         """, (email,)).fetchall()
     return jsonify([dict(r) for r in rows])
 
+@app.route("/api/narrative/domain_architect", methods=["POST"])
+def api_narrative_domain_architect():
+    """
+    Input: { core_story: str, provider?: 'openai'|'xai'|'gemini', model?: str }
+    Output: { ok, provider, model, domain_map }
+    """
+    data = request.get_json(force=True) or {}
+    core_story = (data.get("core_story") or "").strip()
+    if not core_story:
+        return jsonify({"ok": False, "error": "Missing required field: core_story"}), 400
+
+    provider = (data.get("provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")).lower()
+
+    user_msg = _domain_architect_user_message(core_story)
+    sys_msg = DOMAIN_ARCHITECT_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. No prose."
+
+    try:
+        model_name = None
+        parsed = None
+        raw_text = None
+
+        if provider == "xai":
+            xai = get_xai_client()
+            model_name = data.get("model") or os.getenv("XAI_MODEL", "grok-4")
+            chat = xai.chat.create(model=model_name)
+            chat.append(xai_system(sys_msg))
+            parsed_resp = chat.parse(
+                messages=[xai_user(user_msg)],
+                text_format=DomainArchitectOutput,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        elif provider == "gemini":
+            gclient = get_gemini_client()
+            model_name = data.get("model") or os.getenv("GEMINI_MODEL", "gemini-2.0-pro-exp-02-05")
+            parsed_resp = gclient.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=DomainArchitectOutput,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        else:
+            client = _get_llm()
+            model_name = data.get("model") or os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=DomainArchitectOutput,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+
+        if parsed is None:
+            return jsonify({
+                "ok": False,
+                "provider": provider,
+                "model": model_name,
+                "raw": raw_text,
+                "note": "Parsing failed; inspect 'raw' for details."
+            }), 200
+
+        return jsonify({
+            "ok": True,
+            "provider": provider,
+            "model": model_name,
+            "domain_map": parsed.model_dump(),
+        }), 200
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": "Internal Server Error", "detail": str(e)}), 500
+
+
 @app.get("/api/people/<email>/items")
 def api_people_items(email: str):
     email = email.strip().lower()
@@ -1752,7 +1879,7 @@ def api_narrative_prototype():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             resp = client.responses.create(
                 model=model_name,
                 tools=[{"type":"web_search"}],  # optional
@@ -1770,7 +1897,7 @@ def api_narrative_prototype():
 
         else:  # "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -2337,7 +2464,7 @@ def api_box_of_dirt_artifacts():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             resp = client.responses.create(
                 model=model_name,
                 tools=[{"type":"web_search"}],  # optional; consistent with other endpoints
@@ -2355,7 +2482,7 @@ def api_box_of_dirt_artifacts():
 
         else:  # "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -2477,7 +2604,7 @@ def api_narrative_validation():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             # Use web_search tool to help the model ground datasets
             sys_prompt = VALIDATION_SYS_MSG + "\n\nReturn ONLY JSON matching the schema. Do not add commentary."
             user_prompt = (
@@ -2502,7 +2629,7 @@ def api_narrative_validation():
 
         else:  # provider == "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -2621,7 +2748,7 @@ def api_narrative_stakeholders():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07"
             sys_prompt = STAKEHOLDERS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\nSchema keys: primary, secondary, end_users_beneficiaries, external_contextual. Each item: {name, category?, role?, why}."
             resp = client.responses.create(
                 model=model_name,
@@ -2640,7 +2767,7 @@ def api_narrative_stakeholders():
 
         else:  # "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -2753,7 +2880,7 @@ def api_narrative_embodied():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             sys_prompt = EMBODIED_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\nSchema keys: eyes, ears, hands, nose, mouth, music. Each item: {cue, why?}."
             resp = client.responses.create(
                 model=model_name,
@@ -2772,7 +2899,7 @@ def api_narrative_embodied():
 
         else:  # "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -2888,7 +3015,7 @@ def api_narrative_archetype_playbook():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             sys_prompt = ARCHETYPE_PLAYBOOK_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\n" \
                         "Schema: { classification:{archetype, why?}, phases:[{name, horizon, goal?, milestones:[], outputs:[], indicators:[], decision_gates:[]}], north_star:string }"
             resp = client.responses.create(
@@ -2908,7 +3035,7 @@ def api_narrative_archetype_playbook():
 
         else:  # "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -3023,7 +3150,7 @@ def api_narrative_risks():
 
         elif provider == "openai_web":
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             sys_prompt = RISKS_SYS_MSG + "\n\nReturn ONLY JSON matching the schema below. No commentary.\n" \
                         "Schema: { failures:[{ name, symptoms:[], impact, countermeasures:[], monitoring:{ metrics:[{metric, rationale?, yellow, red}], triggered_actions:[{action, owner?, notes?}] } }] }"
             resp = client.responses.create(
@@ -3043,7 +3170,7 @@ def api_narrative_risks():
 
         else:  # "openai"
             client = _get_llm()
-            model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
@@ -3161,3 +3288,103 @@ def list_dirt():
             })
     return jsonify(rows)
 
+@app.post("/api/grow/decision-brief")
+def api_grow_decision_brief():
+    data = request.get_json(force=True, silent=True) or {}
+    provider = _provider_from(data)  # uses your existing selector
+
+    # Accept either split fields or a nested storyboard object
+    domain = data.get("domain", "")
+    dimension = data.get("dimension", "")
+
+    seed_problem   = data.get("seed_problem")   or data.get("problem")   or data.get("seed", {}).get("problem", "")
+    seed_objective = data.get("seed_objective") or data.get("objective") or data.get("seed", {}).get("objective", "")
+    seed_solution  = data.get("seed_solution")  or data.get("solution")  or data.get("seed", {}).get("solution", "")
+
+    sb = data.get("storyboard") or {}
+    core_intent         = data.get("core_intent")         or sb.get("core_intent", "")
+    minimal_build       = data.get("minimal_build")       or sb.get("minimal_build", "")
+    load_bearing_test   = data.get("load_bearing_test")   or sb.get("load_bearing_test", "")
+    validating_reaction = data.get("validating_reaction") or sb.get("validating_reaction", "")
+    first_eyes          = data.get("first_eyes")          or sb.get("first_eyes", "")
+    why_dirt            = data.get("why_dirt")            or sb.get("why_dirt", "")
+
+    # Basic validation
+    missing = [k for k, v in {
+        "domain": domain, "dimension": dimension,
+        "seed_problem": seed_problem, "seed_objective": seed_objective, "seed_solution": seed_solution,
+        "core_intent": core_intent, "minimal_build": minimal_build, "load_bearing_test": load_bearing_test
+    }.items() if not (isinstance(v, str) and v.strip())]
+    if missing:
+        return jsonify({"ok": False, "error": f"Missing: {', '.join(missing)}"}), 400
+
+    sys_msg = GROW_BRIEF_SYS_MSG
+    user_msg = _grow_brief_user_msg(
+        domain, dimension,
+        seed_problem, seed_objective, seed_solution,
+        core_intent, minimal_build, load_bearing_test,
+        validating_reaction, first_eyes, why_dirt,
+    )
+
+    try:
+        if provider == "openai":
+            # Structured parse into Pydantic
+            client = _get_llm()
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": sys_msg},
+                    {"role":"user","content": user_msg},
+                ],
+                text_format=PrototypeDecisionBrief,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+            return jsonify({"ok": True, "brief": parsed.model_dump()}), 200
+
+        elif provider == "openai_web":
+            resp = openai_client.responses.create(
+                model= "gpt-5-mini-2025-08-07" #_openai_model(),
+                input=[{"role":"system","content":sys_msg},{"role":"user","content":user_msg}],
+                tools=[{"type":"web_search"}],
+            )
+            raw = resp.output_text or ""
+            obj = _parse_json_or_raise(raw, PrototypeDecisionBrief)
+            return jsonify({"ok": True, "brief": obj.model_dump()}), 200
+
+        elif provider == "xai":
+            parsed = xai_chat_parse(
+                system=sys_msg, user=user_msg, schema=PrototypeDecisionBrief
+            )
+            return jsonify({"ok": True, "brief": parsed.model_dump()}), 200
+
+        elif provider == "gemini":
+            parsed = gemini_structured_generate(
+                system=sys_msg, user=user_msg, schema=PrototypeDecisionBrief
+            )
+            return jsonify({"ok": True, "brief": parsed.model_dump()}), 200
+
+        elif provider == "deepseek":
+            text = deepseek_chat_complete(system=sys_msg, user=user_msg)
+            obj = _parse_json_or_raise(text, PrototypeDecisionBrief)
+            return jsonify({"ok": True, "brief": obj.model_dump()}), 200
+
+        else:
+                        # Structured parse into Pydantic
+            client = _get_llm()
+            model_name = "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07")
+            parsed_resp = client.responses.parse(
+                model=model_name,
+                input=[
+                    {"role":"system","content": sys_msg},
+                    {"role":"user","content": user_msg},
+                ],
+                text_format=PrototypeDecisionBrief,
+            )
+            parsed = parsed_resp.output_parsed
+            raw_text = parsed_resp.output_text
+            return jsonify({"ok": True, "brief": parsed.model_dump()}), 200
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
