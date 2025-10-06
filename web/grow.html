@@ -706,6 +706,26 @@
     const params = new URLSearchParams(location.search);
     if(params.has('email')){ els.email.value = params.get('email'); }
 
+    // Universal toggle for any button with id="toggle-<kind>"
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[id^="toggle-"]');
+      if (!btn) return;
+      const kind = btn.id.slice('toggle-'.length);
+      const body = document.getElementById(`body-${kind}`);
+      if (!body) return;
+
+      if (body.classList.contains('hidden')) {
+        // paint on first open
+        if (typeof renderKind === 'function') renderKind(kind);
+        body.classList.remove('hidden');
+        btn.textContent = 'Hide';
+      } else {
+        body.classList.add('hidden');
+        btn.textContent = 'Expand';
+      }
+    });
+
+
     function init(){
         const savedEmail = readEmailFromStorage();
         if(savedEmail && !els.email.value){ els.email.value = savedEmail; }
