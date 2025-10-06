@@ -958,7 +958,7 @@ def llm_generate_dimensions_openai_web(domain: str, n: int | None):
     user_prompt = f"{DIM_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
 
     resp = client.responses.create(
-        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07", #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         tools=[{"type": "web_search"}],
         input=[
             {"role": "system", "content": sys_prompt},
@@ -1009,7 +1009,7 @@ def llm_generate_seeds_openai_web(domain: str, dimension: str, description: str,
     user_prompt = f"{SEED_SYS_MSG}\n\n{usr_msg}\n\nReturn JSON only."
 
     resp = client.responses.create(
-        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07", #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         tools=[{"type": "web_search"}],
         input=[
             {"role": "system", "content": sys_prompt},
@@ -1186,7 +1186,7 @@ def llm_generate_dimensions_openai(domain: str, n: int | None):
     count_hint = f" Generate exactly {int(n)} items." if isinstance(n, int) and 1 <= n <= 12 else ""
     usr_msg = f"Create narrative dimensions for the domain of {domain}.{count_hint}"
     parsed_resp = client.responses.parse(
-        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07", #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         input=[
             {"role": "system", "content": DIM_SYS_MSG},
             {"role": "user", "content": usr_msg},
@@ -1216,7 +1216,7 @@ def llm_generate_seeds_openai(domain: str, dimension: str, description: str, tar
         "Create A→B narrative seeds in this dimension."
     )
     parsed_resp = client.responses.parse(
-        model= "gpt-5-mini-2025-08-07" #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
+        model= "gpt-5-mini-2025-08-07", #os.getenv("OPENAI_MODEL", "gpt-5-mini-2025-08-07"),
         input=[
             {"role": "system", "content": SEED_SYS_MSG},
             {"role": "user", "content": usr_msg},
@@ -1701,7 +1701,7 @@ def api_narrative_domain_architect():
 
         else:
             client = _get_llm()
-            model_name = data.get("model") or os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
+            model_name = "gpt-5-mini-2025-08-07" #data.get("model") or os.getenv("OPENAI_MODEL", "gpt-5.1-mini")
             parsed_resp = client.responses.parse(
                 model=model_name,
                 input=[
