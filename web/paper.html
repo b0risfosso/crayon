@@ -35,6 +35,16 @@
     details { margin-top:.6rem; }
     pre { background:#f6f6f6; padding:.65rem; border-radius:.5rem; overflow:auto; }
     .error { color:#b00020; white-space:pre-wrap; }
+    /* Thesis + evaluation styling */
+    .thesis-label { font-weight: 600; margin-top:.25rem; margin-bottom:.25rem; }
+    .thesis-box  { background:#eaf3ff; border:1px solid #cfe3ff; border-left:3px solid #8bbcff; border-radius:.5rem; padding:.5rem .6rem; }
+    .verify-box  { background:#fff8db; border:1px solid #f5e7a3; border-left:3px solid #e2c85a; border-radius:.5rem; padding:.5rem .6rem; }
+    .true-box    { background:#e9f7ef; border:1px solid #c9ecd6; border-left:3px solid #88d19e; border-radius:.5rem; padding:.5rem .6rem; }
+    .false-box   { background:#fdecea; border:1px solid #f7c7c3; border-left:3px solid #f39a93; border-radius:.5rem; padding:.5rem .6rem; }
+    .thesis-box + .verify-box,
+    .verify-box + .true-box,
+    .true-box + .false-box { margin-top:.5rem; }
+
   </style>
 </head>
 <body>
@@ -269,23 +279,39 @@
             }
 
             theses.forEach(t=>{
-            const wrap = el('div', { className:'dim-item' });
-            wrap.append(el('div', { className:'title', text: t.text || 'Thesis' }));
-            if (t.analysis){
-                const v = Array.isArray(t.analysis.verification) ? t.analysis.verification : [];
-                const verUL = `<ul>${v.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul>`;
-                const it = el('div', { className:'muted',
-                html:
-                `<div style="margin-top:.3rem;"><strong>Verification / Falsification</strong>${verUL}</div>
-                    <div style="margin-top:.3rem;"><strong>If True</strong><div>${escapeHtml(t.analysis.if_true||'')}</div></div>
-                    <div style="margin-top:.3rem;"><strong>If False (Alternative Thesis)</strong><div>${escapeHtml(t.analysis.if_false_alternative_thesis||'')}</div></div>`
+                const wrap = el('div', { className:'dim-item' });
+
+                // Thesis label + text
+                wrap.append(
+                    el('div', { className:'thesis-label', text:'Thesis' }),
+                    el('div', { className:'thesis-box',  text: t.text || '(no thesis text)' })
+                );
+
+                // Evaluation (if present)
+                if (t.analysis){
+                    const v = Array.isArray(t.analysis.verification) ? t.analysis.verification : [];
+                    const verHTML = v.length
+                    ? `<ul>${v.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul>`
+                    : '<div class="muted">(no steps)</div>';
+
+                    const verify = el('div', { className:'verify-box', html:
+                    `<strong>Verification / Falsification</strong>${verHTML}`
+                    });
+
+                    const ifTrue  = el('div', { className:'true-box',
+                    html: `<strong>If True</strong><div class="muted">${escapeHtml(t.analysis.if_true||'')}</div>` });
+
+                    const ifFalse = el('div', { className:'false-box',
+                    html: `<strong>If False (Alternative Thesis)</strong><div class="muted">${escapeHtml(t.analysis.if_false_alternative_thesis||'')}</div>` });
+
+                    wrap.append(verify, ifTrue, ifFalse);
+                } else {
+                    wrap.append(el('div', { className:'muted', text:'(no evaluation yet)' }));
+                }
+
+                tMount.append(wrap);
                 });
-                wrap.append(it);
-            } else {
-                wrap.append(el('div', { className:'muted', text:'(no evaluation yet)' }));
-            }
-            tMount.append(wrap);
-            });
+
         }catch(err){
             tMount.innerHTML = `<span class="error">Failed to load theses: ${escapeHtml(err.message||String(err))}</span>`;
         }
