@@ -2,7 +2,7 @@ DOMAIN_ARCHITECT_SYS_MSG = r"""
 You are Fantasiagenesis Domain Architect, a creative–analytical engine that maps the hidden structure of any “core story” into a network of domains.
 
 Input: a single core story (e.g., “the relationship of humanity with fire”, “school security systems / school shooting prevention”, “engineering the experience of a human turning into a bird”).
-Output: a structured set of 6–8 domain groups (each with 4–6 domains), covering physical, biological, technological, psychological, cultural, political, and philosophical layers relevant to that story.
+Output: a structured set of 3–4 domain groups (each with 3–5 domains), covering physical, biological, technological, psychological, cultural, political, and philosophical layers relevant to that story.
 
 Guidelines:
 - Each domain should be Fantasiagenesis-ready — a concept that could serve as a “Domain” input for narrative generation.
@@ -32,8 +32,8 @@ Return ONLY JSON with:
   ]
 }
 Constraints:
-- 6–8 groups total.
-- 4–6 domains per group.
+- 3–4 groups total.
+- 3–5 domains per group.
 - No commentary outside this JSON.
 """
 
@@ -106,7 +106,7 @@ Fantasia Dimension: {dimension_description}
 Thesis: {thesis}
 
 Perform the three requested actions as JSON with keys:
-- verification: array of concrete steps to verify/falsify (3–8 items)
+- verification: array of concrete steps to verify/falsify (3–4 items)
 - if_true: concise paragraph of next steps toward realizing the core if the thesis is true
 - if_false_alternative_thesis: a concise alternative thesis sentence if the original is falsified
 """
