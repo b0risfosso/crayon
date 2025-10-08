@@ -324,6 +324,61 @@ def render_prompt(template: str, **vars) -> str:
         safe = safe.replace("{{" + k + "}}", "{" + k + "}")
     return safe.format(**vars)
 
+DIM_LINE = re.compile(r"^\s*\d+\.\s*(?P<name>.+?)\s+—\s*(?P<thesis>.+?)\s*$")
+TARGETS_LINE = re.compile(r"^\s*Narrative\s+Targets:\s*(?P<list>.+?)\s*$", re.I)
+
+def parse_dimensions(text: str) -> list[dict]:
+    """
+    Parse the DIM output into [{name, thesis, targets:[...]}, ...].
+    Robust to extra blank lines and trailing punctuation.
+    """
+    dims: list[dict] = []
+    lines = [l.rstrip() for l in text.splitlines()]
+    i = 0
+    while i < len(lines):
+        m = DIM_LINE.match(lines[i] or "")
+        if not m:
+            i += 1
+            continue
+        name = m.group("name").strip()
+        thesis = m.group("thesis").strip()
+        targets: list[str] = []
+        j = i + 1
+        # find nearest "Narrative Targets:" after the header line
+        while j < len(lines):
+            t = TARGETS_LINE.match(lines[j] or "")
+            if t:
+                raw = t.group("list")
+                # split on comma or semicolon and strip
+                for tok in re.split(r"[;,]", raw):
+                    tok = tok.strip()
+                    if tok:
+                        targets.append(tok)
+                break
+            # stop if we hit another dimension header
+            if DIM_LINE.match(lines[j] or ""):
+                j -= 1  # step back so outer loop will reprocess header
+                break
+            j += 1
+        dims.append({"name": name, "thesis": thesis, "targets": targets})
+        i = max(j + 1, i + 1)
+    return dims
+
+def create_dimension(conn: sqlite3.Connection, domain_id: int, name: str,
+                     thesis: str | None, description: str | None,
+                     targets: list[str] | None, provider: str | None) -> int:
+    cur = conn.execute(
+        """
+        INSERT INTO fantasia_dimension
+            (domain_id, name, thesis, description, targets_json, provider, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        """,
+        (domain_id, name, thesis, description,
+         json.dumps(targets or []), provider)
+    )
+    return int(cur.lastrowid)
+
+
 
 
 # --- API: Domain Architect (OpenAI only) ---
@@ -520,4 +575,158 @@ def crayon_read_core_with_domains(core_id: int):
             "created_at": core["created_at"],
         },
         groups=groups
+    )
+
+
+@app.post("/api/dimensions/generate")
+def api_generate_dimensions():
+    """
+    Body:
+    {
+      "email": "owner@example.com",
+      "domain_id": 123,                  // required
+      "count": 3,                        // optional (defaults 3 or 4)
+      "model": "gpt-4o-mini"             // optional
+    }
+
+    Behavior:
+      - Verifies domain belongs to a core owned by email.
+      - Calls OpenAI with DIM_SYS_MSG + DIM_USER_TEMPLATE(domain name/desc).
+      - Parses dimensions and inserts into fantasia_dimension.
+      - Returns created rows.
+    """
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    domain_id = payload.get("domain_id")
+    count = int(payload.get("count") or 3)
+    model = (payload.get("model") or "gpt-4o-mini").strip()
+
+    if not email or not domain_id:
+        return jsonify(ok=False, error="Missing required fields: email, domain_id"), 400
+
+    with connect() as conn:
+        # fetch domain and owning core
+        row = conn.execute(
+            """
+            SELECT d.id AS domain_id, d.name AS domain_name,
+                   COALESCE(d.description,'') AS domain_description,
+                   c.id AS core_id, c.owner_email
+            FROM fantasia_domain d
+            JOIN fantasia_core c ON c.id = d.core_id
+            WHERE d.id = ?
+            """,
+            (domain_id,)
+        ).fetchone()
+        if not row:
+            return jsonify(ok=False, error="Domain not found"), 404
+        if (row["owner_email"] or "").lower() != email:
+            return jsonify(ok=False, error="Forbidden for this email"), 403
+
+        # Build user message safely (brace-escaping)
+        user_msg = render_prompt(
+            DIM_USER_TEMPLATE,
+            domain_name=row["domain_name"],
+            domain_description=row["domain_description"],
+            count=count
+        )
+
+        try:
+            # Call OpenAI (expect plain text back; format enforced by system prompt)
+            client_resp = _get_openai_client().chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": DIM_SYS_MSG},
+                    {"role": "user", "content": user_msg},
+                ],
+            )
+            content = client_resp.choices[0].message.content or ""
+        except Exception as e:
+            return jsonify(ok=False, error=f"LLM failure: {e}"), 502
+
+        dims = parse_dimensions(content)
+        if not dims:
+            # Return raw for debugging if parsing fails
+            return jsonify(ok=False, error="Failed to parse dimensions", raw=content), 502
+
+        created = []
+        with conn:
+            for d in dims:
+                dim_id = create_dimension(
+                    conn=conn,
+                    domain_id=row["domain_id"],
+                    name=d["name"],
+                    thesis=d.get("thesis"),
+                    description=None,  # keep thesis concise; description optional
+                    targets=d.get("targets") or [],
+                    provider="openai",
+                )
+                created.append({
+                    "id": dim_id,
+                    "name": d["name"],
+                    "thesis": d.get("thesis"),
+                    "targets": d.get("targets") or []
+                })
+
+    return jsonify(
+        ok=True,
+        provider="openai",
+        model=model,
+        domain={
+            "id": row["domain_id"],
+            "name": row["domain_name"],
+            "description": row["domain_description"],
+            "core_id": row["core_id"]
+        },
+        dimensions=created
+    )
+
+
+@app.get("/api/domains/<int:domain_id>/dimensions")
+def read_dimensions_for_domain(domain_id: int):
+    q_email = (request.args.get("email") or "").strip().lower()
+    if not q_email:
+        return jsonify(ok=False, error="Missing required query param: email"), 400
+
+    with connect() as conn:
+        # auth check: domain must belong to a core owned by email
+        owner = conn.execute(
+            """
+            SELECT c.owner_email
+            FROM fantasia_domain d
+            JOIN fantasia_core c ON c.id = d.core_id
+            WHERE d.id = ?
+            """,
+            (domain_id,)
+        ).fetchone()
+        if not owner:
+            return jsonify(ok=False, error="Domain not found"), 404
+        if (owner["owner_email"] or "").lower() != q_email:
+            return jsonify(ok=False, error="Forbidden for this email"), 403
+
+        rows = conn.execute(
+            """
+            SELECT id, name, COALESCE(thesis,'') AS thesis,
+                   COALESCE(description,'') AS description,
+                   COALESCE(targets_json,'[]') AS targets_json,
+                   COALESCE(provider,'') AS provider,
+                   created_at
+            FROM fantasia_dimension
+            WHERE domain_id = ?
+            ORDER BY created_at DESC, name COLLATE NOCASE
+            """,
+            (domain_id,)
+        ).fetchall()
+
+    return jsonify(
+        ok=True,
+        domain_id=domain_id,
+        dimensions=[{
+            "id": r["id"],
+            "name": r["name"],
+            "thesis": r["thesis"],
+            "description": r["description"],
+            "targets": json.loads(r["targets_json"] or "[]"),
+            "provider": r["provider"] or None,
+            "created_at": r["created_at"]
+        } for r in rows]
     )
