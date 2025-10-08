@@ -210,24 +210,19 @@ def init_db_cli():
             apply_schema(conn)
             print(f"[crayon] Applied schema: {MIGRATION_NAME} @ {DB_PATH}")
 
-# --- add these imports near the top of crayon.py ---
-import os
-import re
-from typing import Any, Dict, List
-from flask import request
-from contextlib import closing
 
-# You said you've added this file:
-from crayon_prompts import (
-    DOMAIN_ARCHITECT_SYS_MSG,
-    DOMAIN_ARCHITECT_USER_TEMPLATE,
-)
+class PDTargetList(BaseModel):
+    # Allow either list[str] directly or nested inside DimensionsResponse; included for future flexibility
+    pass
 
-# If using the official OpenAI SDK v1:
-try:
-    from openai import OpenAI
-except Exception:
-    OpenAI = None
+class PDDimension(BaseModel):
+    name: str = Field(..., description="Dimension name")
+    thesis: str = Field(..., description="1–2 sentence distilled thesis")
+    targets: List[str] = Field(..., min_items=3, max_items=6, description="Short target phrases")
+
+class PDDimensionsResponse(BaseModel):
+    dimensions: List[PDDimension] = Field(..., min_items=1)
+
 
 
 # --- add this helper to ensure we can store the LLM "group" label on domains ---
@@ -377,6 +372,28 @@ def create_dimension(conn: sqlite3.Connection, domain_id: int, name: str,
          json.dumps(targets or []), provider)
     )
     return int(cur.lastrowid)
+
+def _openai_parse_with_pydantic(system_msg: str, user_msg: str, model: str, schema: type[BaseModel]) -> BaseModel:
+    """
+    Uses OpenAI Responses API with Pydantic parsing (openai>=1.51).
+    """
+    client = _get_openai_client()
+    try:
+        resp = client.responses.parse(
+            model=model,
+            input=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            text_format=schema,
+        )
+    except Exception as e:
+        # Surface SDK / API errors cleanly
+        raise RuntimeError(f"OpenAI parse failed: {e}")
+    if not hasattr(resp, "output_parsed") or resp.output_parsed is None:
+        raise RuntimeError("OpenAI did not return parsed output")
+    return resp.output_parsed  # This is an instance of `schema`
+
 
 
 
@@ -630,55 +647,43 @@ def api_generate_dimensions():
             count=count
         )
 
-        try:
-            # Call OpenAI (expect plain text back; format enforced by system prompt)
-            client_resp = _get_openai_client().chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": DIM_SYS_MSG},
-                    {"role": "user", "content": user_msg},
-                ],
-            )
-            content = client_resp.choices[0].message.content or ""
-        except Exception as e:
-            return jsonify(ok=False, error=f"LLM failure: {e}"), 502
+        # Prefer a structured model (your default can be "gpt-4o-2024-08-06" for JSON reliability)
+        model = payload.get("model") or "gpt-5-mini-2025-08-07"
 
-        dims = parse_dimensions(content)
-        if not dims:
-            # Return raw for debugging if parsing fails
-            return jsonify(ok=False, error="Failed to parse dimensions", raw=content), 502
+        try:
+            parsed: PDDimensionsResponse = _openai_parse_with_pydantic(
+                DIM_SYS_MSG, user_msg, model=model, schema=PDDimensionsResponse
+            )
+        except Exception as e:
+            return jsonify(ok=False, error=str(e)), 502
+
+        dims_payload = parsed.dimensions or []
+        if not dims_payload:
+            return jsonify(ok=False, error="No dimensions returned"), 502
 
         created = []
         with conn:
-            for d in dims:
+            for d in dims_payload:
+                name = (d.name or "").strip()
+                thesis = (d.thesis or "").strip() or None
+                targets = [t.strip() for t in (d.targets or []) if t and t.strip()]
+                if not name:
+                    continue
                 dim_id = create_dimension(
                     conn=conn,
                     domain_id=row["domain_id"],
-                    name=d["name"],
-                    thesis=d.get("thesis"),
-                    description=None,  # keep thesis concise; description optional
-                    targets=d.get("targets") or [],
+                    name=name,
+                    thesis=thesis,
+                    description=None,
+                    targets=targets,
                     provider="openai",
                 )
                 created.append({
                     "id": dim_id,
-                    "name": d["name"],
-                    "thesis": d.get("thesis"),
-                    "targets": d.get("targets") or []
+                    "name": name,
+                    "thesis": thesis,
+                    "targets": targets
                 })
-
-    return jsonify(
-        ok=True,
-        provider="openai",
-        model=model,
-        domain={
-            "id": row["domain_id"],
-            "name": row["domain_name"],
-            "description": row["domain_description"],
-            "core_id": row["core_id"]
-        },
-        dimensions=created
-    )
 
 
 @app.get("/api/domains/<int:domain_id>/dimensions")
