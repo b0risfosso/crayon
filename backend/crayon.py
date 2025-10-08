@@ -310,14 +310,16 @@ def create_domain(conn: sqlite3.Connection, core_id: int, name: str, description
 
 def render_prompt(template: str, **vars) -> str:
     """
-    Safely render a template that contains literal JSON braces.
-    Escapes all braces, then restores the two known placeholders.
+    Safely render a template that contains literal JSON braces by:
+      1) Escaping all braces,
+      2) Re-enabling the placeholders present in `vars`,
+      3) Formatting with those vars.
     """
     safe = template.replace("{", "{{").replace("}", "}}")
-    # restore actual placeholders
-    for k in ("fantasia_core", "fantasia_core_description"):
+    for k in vars.keys():
         safe = safe.replace("{{" + k + "}}", "{" + k + "}")
     return safe.format(**vars)
+
 
 DIM_LINE = re.compile(r"^\s*\d+\.\s*(?P<name>.+?)\s+—\s*(?P<thesis>.+?)\s*$")
 TARGETS_LINE = re.compile(r"^\s*Narrative\s+Targets:\s*(?P<list>.+?)\s*$", re.I)
