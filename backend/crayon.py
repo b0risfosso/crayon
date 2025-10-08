@@ -129,24 +129,28 @@ SCHEMA = [
     # thesis (matches your current APIs)
     """
     CREATE TABLE IF NOT EXISTS fantasia_thesis (
-      id           INTEGER PRIMARY KEY,
-      core_id      INTEGER NOT NULL,
-      domain_id    INTEGER NOT NULL,
-      dimension_id INTEGER NOT NULL,
-      thesis_text  TEXT    NOT NULL,
-      provider     TEXT,
-      analysis_json TEXT,             -- evaluation output (JSON)
-      created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
-      updated_at   TEXT,
-      FOREIGN KEY (core_id)      REFERENCES fantasia_core(id)      ON DELETE CASCADE,
-      FOREIGN KEY (domain_id)    REFERENCES fantasia_domain(id)    ON DELETE CASCADE,
-      FOREIGN KEY (dimension_id) REFERENCES fantasia_dimension(id) ON DELETE CASCADE
-    );
+        id           INTEGER PRIMARY KEY,
+        core_id      INTEGER NOT NULL,
+        domain_id    INTEGER NOT NULL,
+        dimension_id INTEGER NOT NULL,
+        thesis_text  TEXT    NOT NULL,
+        provider     TEXT,
+        analysis_json TEXT,
+        author_email TEXT,  -- NEW
+        created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at   TEXT,
+        FOREIGN KEY (core_id)      REFERENCES fantasia_core(id)      ON DELETE CASCADE,
+        FOREIGN KEY (domain_id)    REFERENCES fantasia_domain(id)    ON DELETE CASCADE,
+        FOREIGN KEY (dimension_id) REFERENCES fantasia_dimension(id) ON DELETE CASCADE
+        -- If you rebuild table later, you can also add:
+        -- ,FOREIGN KEY (author_email) REFERENCES fantasia_users(email) ON UPDATE CASCADE ON DELETE SET NULL
+        );
     """,
-    "CREATE INDEX IF NOT EXISTS idx_thesis_core       ON fantasia_thesis(core_id);",
-    "CREATE INDEX IF NOT EXISTS idx_thesis_domain     ON fantasia_thesis(domain_id);",
-    "CREATE INDEX IF NOT EXISTS idx_thesis_dimension  ON fantasia_thesis(dimension_id);",
-    "CREATE INDEX IF NOT EXISTS idx_thesis_created_at ON fantasia_thesis(created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_core          ON fantasia_thesis(core_id);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_domain        ON fantasia_thesis(domain_id);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_dimension     ON fantasia_thesis(dimension_id);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_created_at    ON fantasia_thesis(created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_author_email  ON fantasia_thesis(author_email);",  # NEW
 
     # quoted-name compatibility views
     'CREATE VIEW IF NOT EXISTS "fantasia-core"      AS SELECT * FROM fantasia_core;',
@@ -185,10 +189,26 @@ def ensure_column(conn: sqlite3.Connection, table: str, col: str, decl: str) -> 
     if col.lower() not in cols:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl};")
 
+def run_migration_thesis_author(conn: sqlite3.Connection) -> None:
+    # Add column if missing
+    ensure_column(conn, "fantasia_thesis", "author_email", "TEXT")
+    # Index
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_author_email ON fantasia_thesis(author_email);")
+
+
 def run_post_migrations(conn: sqlite3.Connection) -> None:
     # Keep these around so later changes stay safe if the base SCHEMA shipped earlier without them.
     ensure_column(conn, "fantasia_domain", "group_title", "TEXT")
     ensure_column(conn, "fantasia_thesis", "analysis_json", "TEXT")
+    ensure_column(conn, "fantasia_thesis", "core_id", "INTEGER")
+    ensure_column(conn, "fantasia_thesis", "domain_id", "INTEGER")
+    ensure_column(conn, "fantasia_thesis", "thesis_text", "TEXT")
+    ensure_column(conn, "fantasia_thesis", "analysis_json", "TEXT")
+    run_migration_thesis_author(conn)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_core ON fantasia_thesis(core_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_domain ON fantasia_thesis(domain_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_created_at ON fantasia_thesis(created_at);")
+
 
 # --- health & init endpoints ---
 @app.get("/health")
@@ -211,15 +231,17 @@ def init_db_endpoint():
 
 
 def create_thesis(conn: sqlite3.Connection, core_id: int, domain_id: int, dimension_id: int,
-                  text: str, provider: Optional[str]) -> int:
+                  text: str, provider: Optional[str], author_email: Optional[str]) -> int:
     cur = conn.execute(
         """
-        INSERT INTO fantasia_thesis (core_id, domain_id, dimension_id, thesis_text, provider, created_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
+        INSERT INTO fantasia_thesis
+          (core_id, domain_id, dimension_id, thesis_text, provider, analysis_json, author_email, created_at)
+        VALUES (?,      ?,         ?,           ?,          ?,        NULL,         ?,            datetime('now'))
         """,
-        (core_id, domain_id, dimension_id, text, provider)
+        (core_id, domain_id, dimension_id, text, provider, (author_email or None))
     )
     return int(cur.lastrowid)
+
 
 def update_thesis_analysis(conn: sqlite3.Connection, thesis_id: int, analysis_json: str) -> None:
     conn.execute(
@@ -890,7 +912,9 @@ def api_thesis_generate():
             dimension_id=row["dimension_id"],
             text=thesis_text,
             provider="openai",
+            author_email=email,   # NEW
         )
+
 
     return jsonify(
         ok=True,
