@@ -26,19 +26,13 @@ from crayon_prompts import (
     DIM_USER_TEMPLATE,
     DOMAIN_ARCHITECT_SYS_MSG,
     DOMAIN_ARCHITECT_USER_TEMPLATE,
+    THESIS_SYS_MSG, 
+    THESIS_USER_TEMPLATE,
+    THESIS_EVAL_SYS_MSG, 
+    THESIS_EVAL_USER_TEMPLATE,
 )
 
 
-
-DB_PATH = "/var/www/site/data/crayon_data.db"
-DATA_DIR = str(Path(DB_PATH).parent)
-
-app = Flask(__name__)
-
-
-#!/usr/bin/env python3
-# crayon.py
-# Minimal Flask service + SQLite initializer for the new Fantasia schema.
 
 DB_PATH = "/var/www/site/data/crayon_data.db"
 DATA_DIR = str(Path(DB_PATH).parent)
@@ -49,113 +43,112 @@ def connect(db_path: str = DB_PATH) -> sqlite3.Connection:
     Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    # Sensible pragmas for durability + read performance
+    # Sensible pragmas
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
 
+# --- Base schema (idempotent) ---
 SCHEMA = [
-    # --- meta for migrations ---
+    # migrations meta
     """
     CREATE TABLE IF NOT EXISTS schema_migrations (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     """,
 
-    # --- users (old: people) ---
-    # From old 'people' concept: email, name, created_at
+    # users
     """
     CREATE TABLE IF NOT EXISTS fantasia_users (
-        id INTEGER PRIMARY KEY,
-        email TEXT NOT NULL UNIQUE,
-        display_name TEXT,
-        role TEXT CHECK (role IN ('owner','editor','viewer') ) DEFAULT 'owner',
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT
+      id INTEGER PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      display_name TEXT,
+      role TEXT CHECK (role IN ('owner','editor','viewer')) DEFAULT 'owner',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
     );
     """,
 
-    # --- core (maps old 'narratives') ---
-    # Old fields carried over: id, title, description, owner_email, created_at
+    # core
     """
     CREATE TABLE IF NOT EXISTS fantasia_core (
-        id INTEGER PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT,
-        owner_email TEXT NOT NULL,
-        status TEXT DEFAULT 'active',
-        provider TEXT,                 -- which LLM/provider generated it (optional)
-        tags_json TEXT,                -- JSON array of string tags (optional)
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT,
-        FOREIGN KEY (owner_email) REFERENCES fantasia_users(email) ON UPDATE CASCADE ON DELETE SET NULL
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      owner_email TEXT NOT NULL,
+      status TEXT DEFAULT 'active',
+      provider TEXT,
+      tags_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      FOREIGN KEY (owner_email) REFERENCES fantasia_users(email) ON UPDATE CASCADE ON DELETE SET NULL
     );
     """,
     "CREATE INDEX IF NOT EXISTS idx_core_owner ON fantasia_core(owner_email);",
     "CREATE INDEX IF NOT EXISTS idx_core_title ON fantasia_core(title);",
 
-    # --- domain (analogous to old 'narratives' in your note — a grouping under core) ---
-    # Designed to let one core have many domains (you were generating multiple domains per core story)
+    # domain (note: includes group_title for grouping)
     """
     CREATE TABLE IF NOT EXISTS fantasia_domain (
-        id INTEGER PRIMARY KEY,
-        core_id INTEGER NOT NULL,
-        name TEXT NOT NULL,            -- domain name/title
-        description TEXT,
-        provider TEXT,
-        targets_json TEXT,             -- JSON array/object of targets (kept from old dimension schema)
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT,
-        FOREIGN KEY (core_id) REFERENCES fantasia_core(id) ON DELETE CASCADE
+      id INTEGER PRIMARY KEY,
+      core_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      group_title TEXT,               -- for Domain Architect groups
+      provider TEXT,
+      targets_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      FOREIGN KEY (core_id) REFERENCES fantasia_core(id) ON DELETE CASCADE
     );
     """,
     "CREATE INDEX IF NOT EXISTS idx_domain_core ON fantasia_domain(core_id);",
     "CREATE INDEX IF NOT EXISTS idx_domain_name ON fantasia_domain(name);",
 
-    # --- dimension (maps old 'narrative_dimensions') ---
-    # Old carried fields: id, nid->(now domain/core), title/name, thesis/description, targets
+    # dimension
     """
     CREATE TABLE IF NOT EXISTS fantasia_dimension (
-        id INTEGER PRIMARY KEY,
-        domain_id INTEGER NOT NULL,
-        name TEXT NOT NULL,            -- dimension title
-        thesis TEXT,                   -- concise thesis (kept text)
-        description TEXT,              -- longer description
-        targets_json TEXT,             -- JSON of targets / metrics / aims
-        provider TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT,
-        FOREIGN KEY (domain_id) REFERENCES fantasia_domain(id) ON DELETE CASCADE
+      id INTEGER PRIMARY KEY,
+      domain_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      thesis TEXT,
+      description TEXT,
+      targets_json TEXT,
+      provider TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      FOREIGN KEY (domain_id) REFERENCES fantasia_domain(id) ON DELETE CASCADE
     );
     """,
     "CREATE INDEX IF NOT EXISTS idx_dimension_domain ON fantasia_dimension(domain_id);",
     "CREATE INDEX IF NOT EXISTS idx_dimension_name ON fantasia_dimension(name);",
 
-    # --- thesis (normalized, versionable statements per dimension) ---
-    # New table to let a dimension own multiple thesis versions/variants.
+    # thesis (matches your current APIs)
     """
     CREATE TABLE IF NOT EXISTS fantasia_thesis (
-        id INTEGER PRIMARY KEY,
-        dimension_id INTEGER NOT NULL,
-        version INTEGER NOT NULL DEFAULT 1,
-        statement TEXT NOT NULL,       -- the actual thesis text
-        rationale TEXT,                -- optional: why this thesis
-        metrics_json TEXT,             -- optional: JSON of suggested metrics/targets
-        author_email TEXT,             -- link to fantasia_users via email (optional)
-        provider TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT,
-        FOREIGN KEY (dimension_id) REFERENCES fantasia_dimension(id) ON DELETE CASCADE,
-        FOREIGN KEY (author_email) REFERENCES fantasia_users(email) ON UPDATE CASCADE ON DELETE SET NULL,
-        UNIQUE (dimension_id, version)
+      id           INTEGER PRIMARY KEY,
+      core_id      INTEGER NOT NULL,
+      domain_id    INTEGER NOT NULL,
+      dimension_id INTEGER NOT NULL,
+      thesis_text  TEXT    NOT NULL,
+      provider     TEXT,
+      analysis_json TEXT,             -- evaluation output (JSON)
+      created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT,
+      FOREIGN KEY (core_id)      REFERENCES fantasia_core(id)      ON DELETE CASCADE,
+      FOREIGN KEY (domain_id)    REFERENCES fantasia_domain(id)    ON DELETE CASCADE,
+      FOREIGN KEY (dimension_id) REFERENCES fantasia_dimension(id) ON DELETE CASCADE
     );
     """,
-    "CREATE INDEX IF NOT EXISTS idx_thesis_dimension ON fantasia_thesis(dimension_id);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_core       ON fantasia_thesis(core_id);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_domain     ON fantasia_thesis(domain_id);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_dimension  ON fantasia_thesis(dimension_id);",
+    "CREATE INDEX IF NOT EXISTS idx_thesis_created_at ON fantasia_thesis(created_at);",
 
-    # --- compatibility views exposing hyphenated names (quoted identifiers) ---
+    # quoted-name compatibility views
     'CREATE VIEW IF NOT EXISTS "fantasia-core"      AS SELECT * FROM fantasia_core;',
     'CREATE VIEW IF NOT EXISTS "fantasia-domain"    AS SELECT * FROM fantasia_domain;',
     'CREATE VIEW IF NOT EXISTS "fantasia-dimension" AS SELECT * FROM fantasia_dimension;',
@@ -163,52 +156,94 @@ SCHEMA = [
     'CREATE VIEW IF NOT EXISTS "fantasia-users"     AS SELECT * FROM fantasia_users;',
 ]
 
-MIGRATION_NAME = "001_initial_fantasia_schema"
+MIGRATION_NAME = "001_crayon_initial"
+
+
 
 def already_applied(conn: sqlite3.Connection, name: str) -> bool:
-    cur = conn.execute(
+    has_table = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations';"
-    )
-    has_table = cur.fetchone() is not None
+    ).fetchone() is not None
     if not has_table:
         return False
-    cur = conn.execute("SELECT 1 FROM schema_migrations WHERE name = ?;", (name,))
-    return cur.fetchone() is not None
+    return conn.execute(
+        "SELECT 1 FROM schema_migrations WHERE name = ?;", (name,)
+    ).fetchone() is not None
 
 def apply_schema(conn: sqlite3.Connection) -> None:
     with conn:
         for stmt in SCHEMA:
             conn.execute(stmt)
-        # record migration
         conn.execute(
             "INSERT OR IGNORE INTO schema_migrations (name) VALUES (?);",
             (MIGRATION_NAME,)
         )
 
+# --- small, idempotent column helpers (for future tweaks) ---
+def ensure_column(conn: sqlite3.Connection, table: str, col: str, decl: str) -> None:
+    cols = {r["name"].lower() for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if col.lower() not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl};")
+
+def run_post_migrations(conn: sqlite3.Connection) -> None:
+    # Keep these around so later changes stay safe if the base SCHEMA shipped earlier without them.
+    ensure_column(conn, "fantasia_domain", "group_title", "TEXT")
+    ensure_column(conn, "fantasia_thesis", "analysis_json", "TEXT")
+
+# --- health & init endpoints ---
 @app.get("/health")
 def health():
     try:
         with connect() as conn:
-            cur = conn.execute("SELECT 1;")
-            cur.fetchone()
+            conn.execute("SELECT 1;").fetchone()
         return jsonify(ok=True, db=DB_PATH, ts=datetime.utcnow().isoformat() + "Z")
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
 @app.post("/admin/init-db")
 def init_db_endpoint():
-    # idempotent: safe to call multiple times
     with connect() as conn:
         apply_schema(conn)
+        run_post_migrations(conn)
     return jsonify(ok=True, db=DB_PATH, applied=MIGRATION_NAME)
 
+# ensure your /admin/init-db (or app startup) calls run_all_migrations(conn)
+
+
+def create_thesis(conn: sqlite3.Connection, core_id: int, domain_id: int, dimension_id: int,
+                  text: str, provider: Optional[str]) -> int:
+    cur = conn.execute(
+        """
+        INSERT INTO fantasia_thesis (core_id, domain_id, dimension_id, thesis_text, provider, created_at)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+        """,
+        (core_id, domain_id, dimension_id, text, provider)
+    )
+    return int(cur.lastrowid)
+
+def update_thesis_analysis(conn: sqlite3.Connection, thesis_id: int, analysis_json: str) -> None:
+    conn.execute(
+        "UPDATE fantasia_thesis SET analysis_json = ?, updated_at = datetime('now') WHERE id = ?",
+        (analysis_json, thesis_id)
+    )
+
+def ensure_thesis_analysis_column(conn: sqlite3.Connection) -> None:
+    # add fantasia_thesis.analysis_json if missing
+    ensure_column(conn, "fantasia_thesis", "analysis_json", "TEXT")
+
+def run_migrations_extra(conn: sqlite3.Connection) -> None:
+    run_migrations_domain_group_title(conn)
+    ensure_thesis_analysis_column(conn)
+
+# and ensure init runs it:
 def init_db_cli():
     with connect() as conn:
-        if already_applied(conn, MIGRATION_NAME):
-            print(f"[crayon] Schema already applied: {MIGRATION_NAME} @ {DB_PATH}")
-        else:
+        if not already_applied(conn, MIGRATION_NAME):
             apply_schema(conn)
             print(f"[crayon] Applied schema: {MIGRATION_NAME} @ {DB_PATH}")
+        run_migrations_extra(conn)
+        print("[crayon] Verified fantasia_domain.group_title & fantasia_thesis.analysis_json")
+
 
 
 class PDTargetList(BaseModel):
@@ -222,6 +257,15 @@ class PDDimension(BaseModel):
 
 class PDDimensionsResponse(BaseModel):
     dimensions: List[PDDimension] = Field(..., min_items=1)
+
+class PDThesis(BaseModel):
+    thesis: str = Field(..., description="Precise thesis. 2-3 sentences")
+
+class PDThesisEval(BaseModel):
+    verification: List[str] = Field(..., min_items=1, description="Steps to verify/falsify")
+    if_true: str = Field(..., description="Next steps if thesis holds")
+    if_false_alternative_thesis: str = Field(..., description="Alternative thesis if falsified")
+
 
 
 
@@ -768,3 +812,203 @@ def read_dimensions_for_domain(domain_id: int):
             "created_at": r["created_at"]
         } for r in rows]
     )
+
+@app.post("/api/thesis/generate")
+def api_thesis_generate():
+    """
+    Body:
+    {
+      "email": "owner@example.com",
+      "dimension_id": 123,
+      "model": "gpt-4o-2024-08-06"
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    dim_id = payload.get("dimension_id")
+    model = (payload.get("model") or "gpt-4o-2024-08-06").strip()
+
+    if not email or not dim_id:
+        return jsonify(ok=False, error="Missing required fields: email, dimension_id"), 400
+
+    # Fetch dimension + domain + core; auth by owner
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT
+              dim.id   AS dimension_id,
+              COALESCE(dim.name,'') AS dimension_name,
+              COALESCE(dim.thesis,'') AS dimension_thesis,
+              COALESCE(dim.description,'') AS dimension_description,
+              d.id   AS domain_id,
+              d.name AS domain_name,
+              COALESCE(d.description,'') AS domain_description,
+              c.id   AS core_id,
+              c.title AS core_name,
+              COALESCE(c.description,'') AS core_description,
+              c.owner_email
+            FROM fantasia_dimension dim
+            JOIN fantasia_domain    d ON d.id = dim.domain_id
+            JOIN fantasia_core      c ON c.id = d.core_id
+            WHERE dim.id = ?
+            """,
+            (dim_id,)
+        ).fetchone()
+
+        if not row:
+            return jsonify(ok=False, error="Dimension not found"), 404
+        if (row["owner_email"] or "").lower() != email:
+            return jsonify(ok=False, error="Forbidden for this email"), 403
+
+    # Build user message (brace-safe)
+    user_msg = render_prompt(
+        THESIS_USER_TEMPLATE,
+        core_name=row["core_name"],
+        core_description=row["core_description"],
+        domain_description=row["domain_description"],
+        dimension_description=(row["dimension_description"] or row["dimension_thesis"] or row["dimension_name"] or ""),
+    )
+
+    # Generate thesis
+    try:
+        parsed: PDThesis = _openai_parse_with_pydantic(
+            THESIS_SYS_MSG, user_msg, model=model, schema=PDThesis
+        )
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 502
+
+    thesis_text = (parsed.thesis or "").strip().strip('"')
+    if not thesis_text:
+        return jsonify(ok=False, error="Empty thesis returned"), 502
+
+    # Persist
+    with connect() as conn, conn:
+        thesis_id = create_thesis(
+            conn=conn,
+            core_id=row["core_id"],
+            domain_id=row["domain_id"],
+            dimension_id=row["dimension_id"],
+            text=thesis_text,
+            provider="openai",
+        )
+
+    return jsonify(
+        ok=True,
+        provider="openai",
+        model=model,
+        thesis={
+            "id": thesis_id,
+            "text": thesis_text,
+            "core_id": row["core_id"],
+            "domain_id": row["domain_id"],
+            "dimension_id": row["dimension_id"]
+        }
+    ), 200
+
+
+@app.post("/api/thesis/evaluate")
+def api_thesis_evaluate():
+    """
+    Body:
+    {
+      "email": "owner@example.com",
+      "thesis_id": 456,
+      "model": "gpt-4o-2024-08-06",
+      "save": true   # optional; default true: store analysis_json onto the thesis
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    thesis_id = payload.get("thesis_id")
+    model = (payload.get("model") or "gpt-4o-2024-08-06").strip()
+    save = payload.get("save", True)
+
+    if not email or not thesis_id:
+        return jsonify(ok=False, error="Missing required fields: email, thesis_id"), 400
+
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT
+              t.id   AS thesis_id,
+              t.thesis_text,
+              dim.id AS dimension_id,
+              COALESCE(dim.name,'') AS dimension_name,
+              COALESCE(dim.thesis,'') AS dimension_thesis,
+              COALESCE(dim.description,'') AS dimension_description,
+              d.id   AS domain_id,
+              d.name AS domain_name,
+              COALESCE(d.description,'') AS domain_description,
+              c.id   AS core_id,
+              c.title AS core_name,
+              COALESCE(c.description,'') AS core_description,
+              c.owner_email
+            FROM fantasia_thesis t
+            JOIN fantasia_dimension dim ON dim.id = t.dimension_id
+            JOIN fantasia_domain    d   ON d.id = t.domain_id
+            JOIN fantasia_core      c   ON c.id = t.core_id
+            WHERE t.id = ?
+            """,
+            (thesis_id,)
+        ).fetchone()
+
+        if not row:
+            return jsonify(ok=False, error="Thesis not found"), 404
+        if (row["owner_email"] or "").lower() != email:
+            return jsonify(ok=False, error="Forbidden for this email"), 403
+
+    user_msg = render_prompt(
+        THESIS_EVAL_USER_TEMPLATE,
+        core_name=row["core_name"],
+        core_description=row["core_description"],
+        domain_description=row["domain_description"],
+        dimension_description=(row["dimension_description"] or row["dimension_thesis"] or row["dimension_name"] or ""),
+        thesis=row["thesis_text"],
+    )
+
+    try:
+        parsed: PDThesisEval = _openai_parse_with_pydantic(
+            THESIS_EVAL_SYS_MSG, user_msg, model=model, schema=PDThesisEval
+        )
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 502
+
+    analysis = {
+        "verification": parsed.verification,
+        "if_true": parsed.if_true,
+        "if_false_alternative_thesis": parsed.if_false_alternative_thesis,
+    }
+
+    if save:
+        with connect() as conn, conn:
+            ensure_thesis_analysis_column(conn)
+            update_thesis_analysis(conn, thesis_id=int(row["thesis_id"]), analysis_json=json.dumps(analysis))
+
+    return jsonify(
+        ok=True,
+        provider="openai",
+        model=model,
+        thesis_id=row["thesis_id"],
+        analysis=analysis,
+        saved=bool(save),
+    ), 200
+
+
+@app.get("/api/dimensions/<int:dimension_id>/theses")
+def list_theses_for_dimension(dimension_id: int):
+    q_email = (request.args.get("email") or "").strip().lower()
+    if not q_email:
+        return jsonify(ok=False, error="Missing required query param: email"), 400
+    with connect() as conn:
+        owner = conn.execute(
+            "SELECT c.owner_email FROM fantasia_dimension dim JOIN fantasia_domain d ON d.id=dim.domain_id JOIN fantasia_core c ON c.id=d.core_id WHERE dim.id=?",
+            (dimension_id,)
+        ).fetchone()
+        if not owner: return jsonify(ok=False, error="Dimension not found"), 404
+        if (owner["owner_email"] or "").lower() != q_email:
+            return jsonify(ok=False, error="Forbidden for this email"), 403
+        rows = conn.execute(
+            "SELECT id, thesis_text, COALESCE(analysis_json,'') AS analysis_json, created_at FROM fantasia_thesis WHERE dimension_id=? ORDER BY created_at DESC",
+            (dimension_id,)
+        ).fetchall()
+    return jsonify(ok=True, theses=[{"id":r["id"], "text":r["thesis_text"], "analysis": (json.loads(r["analysis_json"]) if r["analysis_json"] else None), "created_at": r["created_at"]} for r in rows])
