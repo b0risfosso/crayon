@@ -268,7 +268,6 @@ def _openai_json(system_msg: str, user_msg: str, model: str = "gpt-4o-mini") -> 
     client = _get_openai_client()
     resp = client.chat.completions.create(
         model=model,
-        temperature=0.3,
         messages=[
             {"role": "system", "content": system_msg},
             {"role": "user", "content": user_msg},
