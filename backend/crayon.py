@@ -601,28 +601,22 @@ def api_generate_dimensions():
     Body:
     {
       "email": "owner@example.com",
-      "domain_id": 123,                  // required
-      "count": 3,                        // optional (defaults 3 or 4)
-      "model": "gpt-4o-mini"             // optional
+      "domain_id": 123,
+      "count": 3,
+      "model": "gpt-4o-2024-08-06"
     }
-
-    Behavior:
-      - Verifies domain belongs to a core owned by email.
-      - Calls OpenAI with DIM_SYS_MSG + DIM_USER_TEMPLATE(domain name/desc).
-      - Parses dimensions and inserts into fantasia_dimension.
-      - Returns created rows.
     """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip().lower()
     domain_id = payload.get("domain_id")
     count = int(payload.get("count") or 3)
-    model = (payload.get("model") or "gpt-4o-mini").strip()
+    model = (payload.get("model") or "gpt-4o-2024-08-06").strip()
 
     if not email or not domain_id:
         return jsonify(ok=False, error="Missing required fields: email, domain_id"), 400
 
+    # Fetch + auth
     with connect() as conn:
-        # fetch domain and owning core
         row = conn.execute(
             """
             SELECT d.id AS domain_id, d.name AS domain_name,
@@ -634,56 +628,86 @@ def api_generate_dimensions():
             """,
             (domain_id,)
         ).fetchone()
+
         if not row:
             return jsonify(ok=False, error="Domain not found"), 404
         if (row["owner_email"] or "").lower() != email:
             return jsonify(ok=False, error="Forbidden for this email"), 403
 
-        # Build user message safely (brace-escaping)
-        user_msg = render_prompt(
-            DIM_USER_TEMPLATE,
-            domain_name=row["domain_name"],
-            domain_description=row["domain_description"],
-            count=count
-        )
+    # Build prompt (brace-safe)
+    user_msg = render_prompt(
+        DIM_USER_TEMPLATE,
+        domain_name=row["domain_name"],
+        domain_description=row["domain_description"],
+        count=count
+    )
 
-        # Prefer a structured model (your default can be "gpt-4o-2024-08-06" for JSON reliability)
-        model = payload.get("model") or "gpt-5-mini-2025-08-07"
+    # Call OpenAI with Pydantic parsing; fall back to JSON mode if unavailable
+    try:
+        client = _get_openai_client()
+        parsed = None
 
+        # Prefer responses.parse with Pydantic (openai>=1.51)
         try:
-            parsed: PDDimensionsResponse = _openai_parse_with_pydantic(
-                DIM_SYS_MSG, user_msg, model=model, schema=PDDimensionsResponse
+            resp = client.responses.parse(
+                model=model,
+                input=[
+                    {"role": "system", "content": DIM_SYS_MSG},
+                    {"role": "user", "content": user_msg},
+                ],
+                text_format=PDDimensionsResponse,
             )
-        except Exception as e:
-            return jsonify(ok=False, error=str(e)), 502
+            parsed = resp.output_parsed  # PDDimensionsResponse
+        except Exception as e_parse:
+            return jsonify(ok=False, error=f"OpenAI parse failed: {e_parse}"), 502
 
-        dims_payload = parsed.dimensions or []
-        if not dims_payload:
+        if not parsed or not parsed.dimensions:
             return jsonify(ok=False, error="No dimensions returned"), 502
 
-        created = []
-        with conn:
-            for d in dims_payload:
-                name = (d.name or "").strip()
-                thesis = (d.thesis or "").strip() or None
-                targets = [t.strip() for t in (d.targets or []) if t and t.strip()]
-                if not name:
-                    continue
-                dim_id = create_dimension(
-                    conn=conn,
-                    domain_id=row["domain_id"],
-                    name=name,
-                    thesis=thesis,
-                    description=None,
-                    targets=targets,
-                    provider="openai",
-                )
-                created.append({
-                    "id": dim_id,
-                    "name": name,
-                    "thesis": thesis,
-                    "targets": targets
-                })
+        dims_payload = parsed.dimensions
+
+    except Exception as e:
+        # Any unexpected client errors
+        return jsonify(ok=False, error=f"LLM failure: {e}"), 502
+
+    # Persist
+    created = []
+    with connect() as conn, conn:
+        for d in dims_payload:
+            name = (d.name or "").strip()
+            if not name:
+                continue
+            thesis = (d.thesis or "").strip() or None
+            targets = [t.strip() for t in (d.targets or []) if t and t.strip()]
+            dim_id = create_dimension(
+                conn=conn,
+                domain_id=row["domain_id"],
+                name=name,
+                thesis=thesis,
+                description=None,
+                targets=targets,
+                provider="openai",
+            )
+            created.append({
+                "id": dim_id,
+                "name": name,
+                "thesis": thesis,
+                "targets": targets
+            })
+
+    return jsonify(
+        ok=True,
+        provider="openai",
+        model=model,
+        domain={
+            "id": row["domain_id"],
+            "name": row["domain_name"],
+            "description": row["domain_description"],
+            "core_id": row["core_id"]
+        },
+        dimensions=created
+    ), 200
+
 
 
 @app.get("/api/domains/<int:domain_id>/dimensions")
