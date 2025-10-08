@@ -432,45 +432,9 @@ def api_domain_architect():
             ]
         ), 200
 
-@app.get("/api/cores/<int:core_id>/domains")
-def crayon_read_core_with_domains(core_id: int):
-    """
-    GET /api/cores?email=...
-    Returns a lightweight list of cores for that owner.
-    """
-    q_email = (request.args.get("email") or "").strip().lower()
-    if not q_email:
-        return jsonify(ok=False, error="Missing required query param: email"), 400
-
-    with connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, title, description, owner_email, provider, created_at
-            FROM fantasia_core
-            WHERE lower(owner_email) = ?
-            ORDER BY created_at DESC
-            """,
-            (q_email,)
-        ).fetchall()
-
-    return jsonify(
-        ok=True,
-        cores=[{
-            "id": r["id"],
-            "title": r["title"],
-            "description": r["description"] or "",
-            "owner_email": r["owner_email"],
-            "provider": r["provider"] or None,
-            "created_at": r["created_at"],
-        } for r in rows]
-    )
-
-@app.get("/api/cores")
+# ---- LIST CORES (by owner email) ----
+@app.get("/api/cores", endpoint="crayon_list_cores")
 def crayon_list_cores():
-    """
-    GET /api/cores?email=...
-    Returns a lightweight list of cores for that owner.
-    """
     q_email = (request.args.get("email") or "").strip().lower()
     if not q_email:
         return jsonify(ok=False, error="Missing required query param: email"), 400
@@ -478,7 +442,8 @@ def crayon_list_cores():
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, title, description, owner_email, provider, created_at
+            SELECT id, title, COALESCE(description,'') AS description,
+                   owner_email, COALESCE(provider,'') AS provider, created_at
             FROM fantasia_core
             WHERE lower(owner_email) = ?
             ORDER BY created_at DESC
@@ -491,18 +456,68 @@ def crayon_list_cores():
         cores=[{
             "id": r["id"],
             "title": r["title"],
-            "description": r["description"] or "",
+            "description": r["description"],
             "owner_email": r["owner_email"],
             "provider": r["provider"] or None,
             "created_at": r["created_at"],
         } for r in rows]
     )
 
+# ---- READ ONE CORE + ITS DOMAINS (grouped) ----
+@app.get("/api/cores/<int:core_id>/domains", endpoint="crayon_read_core_with_domains")
+def crayon_read_core_with_domains(core_id: int):
+    q_email = (request.args.get("email") or "").strip().lower()
+    if not q_email:
+        return jsonify(ok=False, error="Missing required query param: email"), 400
 
+    with connect() as conn:
+        core = conn.execute(
+            """
+            SELECT id, title, COALESCE(description,'') AS description,
+                   owner_email, COALESCE(provider,'') AS provider, created_at
+            FROM fantasia_core
+            WHERE id = ?
+            """,
+            (core_id,)
+        ).fetchone()
+        if not core:
+            return jsonify(ok=False, error="Core not found"), 404
+        if (core["owner_email"] or "").lower() != q_email:
+            return jsonify(ok=False, error="Forbidden for this email"), 403
 
-if __name__ == "__main__":
-    # Initialize on boot, then serve
-    init_db_cli()
-    # Bind to a new port/service (keeps old app.py live)
-    # Example: run behind systemd+gunicorn as crayon.service on 8011
-    app.run(host="127.0.0.1", port=8011, debug=False)
+        dom_rows = conn.execute(
+            """
+            SELECT id, name, COALESCE(description,'') AS description,
+                   COALESCE(group_title,'') AS group_title
+            FROM fantasia_domain
+            WHERE core_id = ?
+            ORDER BY group_title COLLATE NOCASE, name COLLATE NOCASE
+            """,
+            (core_id,)
+        ).fetchall()
+
+    groups_map = {}
+    for r in dom_rows:
+        gt = r["group_title"] or ""
+        groups_map.setdefault(gt, []).append({
+            "id": r["id"],
+            "name": r["name"],
+            "description": r["description"],
+            "group_title": (r["group_title"] or None),
+        })
+
+    groups = [{"title": (gt if gt else "Ungrouped"), "domains": doms}
+              for gt, doms in groups_map.items()]
+
+    return jsonify(
+        ok=True,
+        core={
+            "id": core["id"],
+            "title": core["title"],
+            "description": core["description"],
+            "owner_email": core["owner_email"],
+            "provider": core["provider"] or None,
+            "created_at": core["created_at"],
+        },
+        groups=groups
+    )
