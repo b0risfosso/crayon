@@ -56,7 +56,7 @@
   <main>
     <!-- Left: controls + core list -->
     <section class="panel" aria-labelledby="left-head">
-      <header id="left-head">Owner</header>
+        <header id="left-head">Cores</header>
       <div class="content">
         <div class="row" style="gap:.4rem; margin-bottom:.6rem;">
           <input id="emailInput" type="email" placeholder="you@example.com" />
@@ -124,23 +124,31 @@
 
     // ---- render cores list ----
     function renderCores(){
-      coreList.innerHTML = '';
-      const q = (elSearch.value||'').toLowerCase();
-      const filtered = !q ? cores : cores.filter(c => (c.title||'').toLowerCase().includes(q));
-      if (!filtered.length){
-        coreList.append(el('div', { className:'muted', text:'No cores.' }));
-        return;
-      }
-      filtered.forEach(c=>{
-        const item = el('div', { className:'item', attrs:{ role:'listitem', tabindex:'0', 'data-id':String(c.id) } });
-        const t = el('div', { className:'title', html:`${escapeHtml(c.title)} <span class="badge">#${c.id}</span>` });
-        const m = el('div', { className:'meta', html:`Owner: <code>${escapeHtml(c.owner_email||'')}</code> · ${escapeHtml((c.created_at||'').replace('T',' ').replace('Z',''))}` });
-        item.append(t, m);
-        item.addEventListener('click', ()=> loadCore(c.id));
-        item.addEventListener('keypress', (e)=>{ if(e.key==='Enter') loadCore(c.id); });
-        coreList.append(item);
-      });
+        coreList.innerHTML = '';
+        const q = (elSearch.value||'').toLowerCase();
+        const filtered = !q ? cores : cores.filter(c => (c.title||'').toLowerCase().includes(q));
+
+        if (!filtered.length){
+            coreList.append(el('div', { className:'muted', text:'No cores.' }));
+            return;
+        }
+
+        filtered.forEach(c=>{
+            const item = el('div', { className:'item', attrs:{ role:'listitem', tabindex:'0', 'data-id':String(c.id) } });
+
+            // Title (keep id badge if you like)
+            const t = el('div', { className:'title', html:`${escapeHtml(c.title)} <span class="badge">#${c.id}</span>` });
+
+            // Description (replaces owner/date line)
+            const d = el('div', { className:'muted', text: c.description || '' });
+
+            item.append(t, d);
+            item.addEventListener('click', ()=> loadCore(c.id));
+            item.addEventListener('keypress', (e)=>{ if(e.key==='Enter') loadCore(c.id); });
+            coreList.append(item);
+        });
     }
+
 
     // ---- render core view (domains + dimensions) ----
     function renderCoreView(payload){
