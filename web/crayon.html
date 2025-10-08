@@ -36,7 +36,7 @@
 <body>
   <header>
     <h1>Fantasiagenesis · Crayon</h1>
-    <p class="muted">Enter a single <strong>core title</strong> and <strong>description</strong>, click <em>Draw</em>. We’ll architect domains, then draw 3 dimensions per domain.</p>
+    <p class="muted">Enter a single <strong>core title</strong> and <strong>description</strong>, click <em>Draw</em>. We’ll architect the rest.</p>
   </header>
 
   <section class="panel blue" aria-labelledby="h-how">
@@ -44,15 +44,15 @@
     <div class="content" style="font-size:.92rem; line-height:1.45;">
       <ol style="margin:.4rem 0 0; padding-left:1.1rem;">
         <li>Save your email (recommended) so results persist.</li>
-        <li>Press <strong>Draw</strong> → creates core & domains via <code>/api/domain-architect</code>.</li>
-        <li>Automatically creates 3 dimensions for each domain via <code>/api/dimensions/generate</code>.</li>
+        <li>Input what are you creating / exploring / building.</li>
+        <li>Press <strong>Draw</strong> and watch your creation come to life.</li>
       </ol>
     </div>
   </section>
 
   <form id="form" autocomplete="off" style="display:grid; gap:.8rem; margin:1rem 0 1.25rem;">
-    <input id="coreTitle" type="text" placeholder="Core title (e.g., Unity Through Alignment)" />
-    <textarea id="coreDescription" placeholder="Core description (what are you exploring / building?)"></textarea>
+    <input id="coreTitle" type="text" placeholder="Core title (e.g., Chicago Microgrids)" />
+    <textarea id="coreDescription" placeholder="Core description (what are you creating / exploring / building? - 'building solar microgrids in the city of Chicago')"></textarea>
 
     <div class="row">
       <input type="email" id="emailInput" placeholder="Email (saves results under your account — optional but recommended)" />
@@ -61,7 +61,6 @@
 
     <div class="row">
       <button type="submit" id="drawBtn">Draw</button>
-      <span id="hint" class="muted">Write: <code>/api/domain-architect</code>, then <code>/api/dimensions/generate</code></span>
     </div>
   </form>
 
