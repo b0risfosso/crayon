@@ -157,11 +157,9 @@
 
           // dimensions mount + load button
           const dimMount = el('div', { className:'dim-list', attrs:{ id:`dims-${d.id}` } });
-          const thesesMount = el('div', { className:'dim-list', attrs:{ id:`theses-${d.id}` } });
           const btn = el('button', { text:'Show dimensions', attrs:{ type:'button' }});
           btn.addEventListener('click', ()=> loadDimensions(d.id));
 
-          card.append(head, dd, btn, dimMount, thesesMount);
           doms.append(card);
         });
         block.append(gt, doms);
@@ -226,9 +224,13 @@
                 const nm = el('div', { className:'title', text: d.name || 'Dimension' });
                 const th = el('div', { className:'muted', text: d.thesis || '' });
                 const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
-                it.append(nm, th, tg);
+
+                // theses mount per dimension (ID matches loader below)
+                const tMount = el('div', { className:'dim-list', attrs:{ id:`theses-${d.id}` } });
+
+                it.append(nm, th, tg, tMount);
                 mount.append(it);
-            });
+                });
 
             // Then fetch theses+evals per dimension and render under #theses-<id>
             for (const d of dims) {
