@@ -2,7 +2,7 @@ import os
 from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request, Response
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Any, Dict
 from pydantic import BaseModel, Field, conlist
 from openai import OpenAI, OpenAIError
 # app.py (top-level, after Flask app creation)
@@ -216,6 +216,216 @@ def init_db_cli():
         else:
             apply_schema(conn)
             print(f"[crayon] Applied schema: {MIGRATION_NAME} @ {DB_PATH}")
+
+# --- add these imports near the top of crayon.py ---
+import os
+import re
+from typing import Any, Dict, List
+from flask import request
+from contextlib import closing
+
+# You said you've added this file:
+from crayon_prompts import (
+    DOMAIN_ARCHITECT_SYS_MSG,
+    DOMAIN_ARCHITECT_USER_TEMPLATE,
+)
+
+# If using the official OpenAI SDK v1:
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
+
+
+# --- add this helper to ensure we can store the LLM "group" label on domains ---
+def ensure_column(conn: sqlite3.Connection, table: str, column: str, coltype: str) -> None:
+    cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table});")]
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype};")
+
+def run_migrations_domain_group_title(conn: sqlite3.Connection) -> None:
+    # Add fantasia_domain.group_title if missing
+    ensure_column(conn, "fantasia_domain", "group_title", "TEXT")
+
+# Update init path to also run this after initial schema
+def init_db_cli():
+    with connect() as conn:
+        if not already_applied(conn, MIGRATION_NAME):
+            apply_schema(conn)
+            print(f"[crayon] Applied schema: {MIGRATION_NAME} @ {DB_PATH}")
+        # Run lightweight, idempotent column migration
+        run_migrations_domain_group_title(conn)
+        print("[crayon] Verified fantasia_domain.group_title")
+
+
+# --- OpenAI utilities (OpenAI-only provider) ---
+def _get_openai_client() -> Any:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    if OpenAI is None:
+        raise RuntimeError("openai SDK not installed. `pip install openai` (v1).")
+    return OpenAI(api_key=api_key)
+
+def _openai_json(system_msg: str, user_msg: str, model: str = "gpt-4o-mini") -> Dict[str, Any]:
+    """
+    Calls OpenAI with system+user messages and expects STRICT JSON back.
+    Your system/user prompt already instructs 'Return ONLY JSON'.
+    """
+    client = _get_openai_client()
+    resp = client.chat.completions.create(
+        model=model,
+        temperature=0.3,
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ],
+        response_format={"type": "json_object"},
+    )
+    content = resp.choices[0].message.content
+    return json.loads(content)
+
+
+# --- DB helpers ---
+def upsert_user(conn: sqlite3.Connection, email: str, display_name: str | None = None) -> None:
+    conn.execute(
+        """
+        INSERT INTO fantasia_users(email, display_name)
+        VALUES (?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+          display_name = COALESCE(excluded.display_name, fantasia_users.display_name),
+          updated_at = datetime('now')
+        """,
+        (email, display_name),
+    )
+
+def create_core(conn: sqlite3.Connection, title: str, description: str | None,
+                owner_email: str, provider: str | None) -> int:
+    cur = conn.execute(
+        """
+        INSERT INTO fantasia_core (title, description, owner_email, provider, created_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+        """,
+        (title, description, owner_email, provider),
+    )
+    return int(cur.lastrowid)
+
+def create_domain(conn: sqlite3.Connection, core_id: int, name: str, description: str | None,
+                  group_title: str | None, provider: str | None, targets_json: str | None = None) -> int:
+    cur = conn.execute(
+        """
+        INSERT INTO fantasia_domain (core_id, name, description, group_title, provider, targets_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        """,
+        (core_id, name, description, group_title, provider, targets_json),
+    )
+    return int(cur.lastrowid)
+
+
+# --- API: Domain Architect (OpenAI only) ---
+@app.post("/api/domain-architect")
+def api_domain_architect():
+    """
+    Body JSON:
+    {
+      "email": "user@example.com",
+      "core_title": "string",
+      "core_description": "string",
+      "model": "gpt-4o-mini"   // optional
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip()
+    core_title = (payload.get("core_title") or "").strip()
+    core_desc = (payload.get("core_description") or "").strip()
+    model = (payload.get("model") or "gpt-4o-mini").strip()
+
+    if not email or not core_title:
+        return jsonify(ok=False, error="Missing required fields: email, core_title"), 400
+
+    # Prepare the LLM user message from your template
+    user_msg = DOMAIN_ARCHITECT_USER_TEMPLATE.format(
+        fantasia_core=core_title,
+        fantasia_core_description=core_desc or "",
+    )
+
+    # Run the model
+    try:
+        llm_json = _openai_json(DOMAIN_ARCHITECT_SYS_MSG, user_msg, model=model)
+    except Exception as e:
+        return jsonify(ok=False, error=f"LLM failure: {e}"), 502
+
+    # Basic shape validation
+    if "groups" not in llm_json or not isinstance(llm_json["groups"], list):
+        return jsonify(ok=False, error="LLM returned unexpected shape: missing 'groups' list"), 502
+
+    # Persist: user, core, domains
+    with connect() as conn, conn:  # transactional
+        # ensure migration for group_title
+        run_migrations_domain_group_title(conn)
+
+        upsert_user(conn, email, display_name=None)
+        core_id = create_core(conn, core_title, core_desc, owner_email=email, provider="openai")
+
+        created_domains: List[Dict[str, Any]] = []
+        for group in llm_json["groups"]:
+            group_title = (group.get("title") or "").strip() or None
+            domains = group.get("domains") or []
+            if not isinstance(domains, list):
+                continue
+            for d in domains:
+                name = ((d.get("name") or "").strip())
+                desc = ((d.get("description") or "").strip()) or None
+                if not name:
+                    continue
+                dom_id = create_domain(
+                    conn=conn,
+                    core_id=core_id,
+                    name=name,
+                    description=desc,
+                    group_title=group_title,
+                    provider="openai",
+                    targets_json=None
+                )
+                created_domains.append({
+                    "id": dom_id,
+                    "name": name,
+                    "description": desc,
+                    "group_title": group_title
+                })
+
+        # Response: echo LLM structure + ids + core row
+        return jsonify(
+            ok=True,
+            provider="openai",
+            model=model,
+            core={
+                "id": core_id,
+                "title": core_title,
+                "description": core_desc,
+                "owner_email": email
+            },
+            groups=[
+                {
+                    "title": (g.get("title") or None),
+                    "domains": [
+                        {
+                            "id": next(
+                                (cd["id"] for cd in created_domains
+                                 if cd["name"] == (d.get("name") or "").strip()
+                                 and cd["group_title"] == (g.get("title") or "").strip() or None),
+                                None
+                            ),
+                            "name": (d.get("name") or ""),
+                            "description": (d.get("description") or ""),
+                        }
+                        for d in (g.get("domains") or [])
+                    ],
+                }
+                for g in llm_json.get("groups", [])
+            ]
+        ), 200
+
 
 if __name__ == "__main__":
     # Initialize on boot, then serve
