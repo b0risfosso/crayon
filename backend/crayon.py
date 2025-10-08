@@ -842,13 +842,13 @@ def api_thesis_generate():
     {
       "email": "owner@example.com",
       "dimension_id": 123,
-      "model": "gpt-4o-2024-08-06"
+      "model": "gpt-5-mini-2025-08-07"
     }
     """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip().lower()
     dim_id = payload.get("dimension_id")
-    model = (payload.get("model") or "gpt-4o-2024-08-06").strip()
+    model = (payload.get("model") or "gpt-5-mini-2025-08-07").strip()
 
     if not email or not dim_id:
         return jsonify(ok=False, error="Missing required fields: email, dimension_id"), 400
@@ -937,14 +937,14 @@ def api_thesis_evaluate():
     {
       "email": "owner@example.com",
       "thesis_id": 456,
-      "model": "gpt-4o-2024-08-06",
+      "model": "gpt-5-mini-2025-08-07",
       "save": true   # optional; default true: store analysis_json onto the thesis
     }
     """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip().lower()
     thesis_id = payload.get("thesis_id")
-    model = (payload.get("model") or "gpt-4o-2024-08-06").strip()
+    model = (payload.get("model") or "gpt-5-mini-2025-08-07").strip()
     save = payload.get("save", True)
 
     if not email or not thesis_id:
