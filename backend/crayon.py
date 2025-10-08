@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from openai import OpenAI
 import sqlite3
@@ -25,7 +26,6 @@ from crayon_prompts import (
     DOMAIN_ARCHITECT_SYS_MSG,
     DOMAIN_ARCHITECT_USER_TEMPLATE,
 )
-from __future__ import annotations
 
 
 
