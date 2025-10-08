@@ -31,12 +31,14 @@
     .dim-item { border:1px dashed #d5d5d5; border-radius:.5rem; padding:.45rem .55rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
     .dim-name { font-weight:600; }
     pre { background:#f6f6f6; padding:.75rem; border-radius:.5rem; overflow-x:auto; }
+    .core-row{border:1px solid #e1e1e1;border-radius:.55rem;padding:.6rem .7rem;background:color-mix(in oklab, Canvas 97%, CanvasText 3%);display:grid;gap:.4rem}
+    .core-row .row{gap:.4rem}
   </style>
 </head>
 <body>
   <header>
     <h1>Fantasiagenesis · Crayon</h1>
-    <p class="muted">Enter a single <strong>core title</strong> and <strong>description</strong>, click <em>Draw</em>. We’ll architect the rest.</p>
+    <p class="muted">Enter one or more <strong>core titles</strong> with <strong>descriptions</strong>, then click <em>Draw</em> (single) or <em>Draw All</em> (sequential).</p>
   </header>
 
   <section class="panel blue" aria-labelledby="h-how">
@@ -44,21 +46,33 @@
     <div class="content" style="font-size:.92rem; line-height:1.45;">
       <ol style="margin:.4rem 0 0; padding-left:1.1rem;">
         <li>Save your email (recommended) so results persist.</li>
-        <li>Input what are you creating / exploring / building.</li>
-        <li>Press <strong>Draw</strong> and watch your creation come to life.</li>
+        <li>Add one or more cores below.</li>
+        <li>Press <strong>Draw</strong> (single) or <strong>Draw All</strong> (sequential). We’ll architect domains → dimensions → theses → evaluations.</li>
       </ol>
     </div>
   </section>
 
+  <div class="row">
+    <input type="email" id="emailInput" placeholder="Email (saves results under your account — optional but recommended)" />
+    <button type="button" id="saveEmailBtn" class="secondary" title="Save email locally">Save email</button>
+  </div>
+
+  <section class="panel" aria-labelledby="core-head">
+    <header id="core-head">Cores</header>
+    <div class="content">
+      <div id="coresRepeater" class="list"></div>
+      <div class="row" style="margin-top:.5rem;">
+        <button id="addCoreBtn" type="button">+ Add core</button>
+        <button id="drawAllBtn" type="button" style="margin-left:auto;">Draw All</button>
+      </div>
+      <div id="multiStatus" class="muted" style="margin-top:.5rem;"></div>
+    </div>
+  </section>
+
+  <!-- Single-core quick form still supported -->
   <form id="form" autocomplete="off" style="display:grid; gap:.8rem; margin:1rem 0 1.25rem;">
     <input id="coreTitle" type="text" placeholder="Core title (e.g., Chicago Microgrids)" />
     <textarea id="coreDescription" placeholder="Core description (what are you creating / exploring / building? - 'building solar microgrids in the city of Chicago')"></textarea>
-
-    <div class="row">
-      <input type="email" id="emailInput" placeholder="Email (saves results under your account — optional but recommended)" />
-      <button type="button" id="saveEmailBtn" class="secondary" title="Save email locally">Save email</button>
-    </div>
-
     <div class="row">
       <button type="submit" id="drawBtn">Draw</button>
     </div>
@@ -71,11 +85,10 @@
     // ------- Config -------
     const EMAIL_KEY = 'fg_user_email';
     const EP_DOMAIN_ARCH = '/api/domain-architect';
-    const EP_DIM_GEN = '/api/dimensions/generate';
-    const EP_THESIS_GEN = '/api/thesis/generate';
+    const EP_DIM_GEN     = '/api/dimensions/generate';
+    const EP_THESIS_GEN  = '/api/thesis/generate';
     const EP_THESIS_EVAL = '/api/thesis/evaluate';
-    const EP_LIST_THESES = (dimensionId, email) => `/api/dimensions/${dimensionId}/theses?email=${encodeURIComponent(email)}`; // optional debug
-
+    const EP_LIST_THESES = (dimensionId, email) => `/api/dimensions/${dimensionId}/theses?email=${encodeURIComponent(email)}`;
 
     // ------- Elements -------
     const elTitle = document.getElementById('coreTitle');
@@ -111,99 +124,119 @@
       }
       return data;
     }
-    function saveEmailToStorage(email){
-      const v = String(email||'').trim().toLowerCase();
-      if(v) localStorage.setItem(EMAIL_KEY, v); else localStorage.removeItem(EMAIL_KEY);
-    }
+    function saveEmailToStorage(v){ const s = String(v||'').trim().toLowerCase(); if (s) localStorage.setItem(EMAIL_KEY, s); else localStorage.removeItem(EMAIL_KEY); }
     function readEmailFromStorage(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
-    function prefillEmail(){
-      const v = readEmailFromStorage();
-      if (v && elEmail && !elEmail.value) elEmail.value = v;
+    function prefillEmail(){ const v = readEmailFromStorage(); if (v && elEmail && !elEmail.value) elEmail.value = v; }
+
+    // ------- Multi-core inputs -------
+    function coreRowTemplate(i){
+      const wrap  = el('div', { className:'core-row', attrs:{ 'data-idx': String(i) }});
+      const title = el('input', { attrs:{ type:'text', placeholder:'Core title…', name:`core_title_${i}` }});
+      const desc  = el('input', { attrs:{ type:'text', placeholder:'Core description…', name:`core_desc_${i}` }});
+      const row   = el('div', { className:'row' });
+      const del   = el('button', { className:'secondary', text:'Remove', attrs:{ type:'button' }});
+      del.addEventListener('click', ()=> wrap.remove());
+      row.append(del);
+      wrap.append(title, desc, row);
+      return wrap;
+    }
+    function addCoreRow(){
+      const cont = document.getElementById('coresRepeater');
+      const i = cont.children.length + 1;
+      cont.append(coreRowTemplate(i));
+    }
+    function readCorePairs(){
+      const cont = document.getElementById('coresRepeater');
+      const pairs = [];
+      cont.querySelectorAll('.core-row').forEach(row=>{
+        const title = row.querySelector('input[name^="core_title_"]')?.value?.trim();
+        const desc  = row.querySelector('input[name^="core_desc_"]')?.value?.trim();
+        if (title) pairs.push({ title, description: desc || '' });
+      });
+      return pairs;
     }
 
     // ------- Renderer -------
     function render(core, groups){
-        container.innerHTML = '';
-        const h2 = el('h2', { text: core.title });
-        const desc = el('div', { className: 'muted', text: core.description || '' });
-        container.append(h2, desc);
+      // For multi-run, do not wipe previous results completely; add a separator if there is content
+      if (container.children.length) container.append(el('hr'));
+      const h2 = el('h2', { text: core.title });
+      const desc = el('div', { className: 'muted', text: core.description || '' });
+      container.append(h2, desc);
 
-        const meta = el('div', { className:'meta', html:
-        `Core ID: <code>${escapeHtml(String(core.id || ''))}</code> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">openai</span>`
-        });
-        container.append(meta);
+      const meta = el('div', { className:'meta', html:
+        `Core ID: <code>${escapeHtml(String(core.id || ''))}</code> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'openai')}</span>`
+      });
+      container.append(meta);
 
-        if (!Array.isArray(groups) || !groups.length){
+      if (!Array.isArray(groups) || !groups.length){
         container.append(el('div', { className:'muted', text:'No domain groups returned.' }));
         return;
-        }
+      }
 
-        groups.forEach(g=>{
+      groups.forEach(g=>{
         const block = el('div', { className:'group-block' });
         const head = el('div', { className:'group-title', html: `${escapeHtml(g.title || 'Domains')} <span class="badge">group</span>` });
         const cols = el('div', { className:'columns' });
 
         (g.domains||[]).forEach(d=>{
-            const card = el('div', { className:'domain-card' });
-
-            // header without per-domain Draw button
-            const domTitle = el('div', { className:'domain-head', html:
+          const card = el('div', { className:'domain-card' });
+          const domTitle = el('div', { className:'domain-head', html:
             `${escapeHtml(d.name || 'Untitled domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>` : ''}`
-            });
-
-            const domDesc = el('div', { className:'muted', text: d.description || '' });
-            const dimList = el('div', { className:'dim-list', attrs: { id: `dim-${d.id}` } });
-
-            card.append(domTitle, domDesc, dimList);
-            cols.append(card);
+          });
+          const domDesc = el('div', { className:'muted', text: d.description || '' });
+          const dimList = el('div', { className:'dim-list', attrs: { id: `dim-${d.id}` } });
+          card.append(domTitle, domDesc, dimList);
+          cols.append(card);
         });
 
         block.append(head, cols);
         container.append(block);
-        });
+      });
     }
 
+    // ------- Thesis + Evaluation -------
     async function generateThesisAndEval(dimensionId){
-        const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
-        const mountThesis = document.getElementById(`thesis-${dimensionId}`);
-        const mountEval   = document.getElementById(`eval-${dimensionId}`);
-        if (mountThesis) mountThesis.textContent = 'Generating thesis…';
-        if (mountEval)   mountEval.textContent   = '';
+      const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
+      const mountThesis = document.getElementById(`thesis-${dimensionId}`);
+      const mountEval   = document.getElementById(`eval-${dimensionId}`);
+      if (mountThesis) mountThesis.textContent = 'Generating thesis…';
+      if (mountEval)   mountEval.textContent   = '';
 
-        // 1) Generate thesis
-        let thesis;
-        try{
-            const res = await postJSON(EP_THESIS_GEN, {
-            email, dimension_id: dimensionId, model: 'gpt-4o-2024-08-06'
-            }, 180000);
-            thesis = res?.thesis;
-            if (!thesis?.id) throw new Error('No thesis id');
-            if (mountThesis) mountThesis.innerHTML = `<strong>Thesis:</strong> ${escapeHtml(thesis.text || '')}`;
-        }catch(err){
-            if (mountThesis) mountThesis.innerHTML = `<span class="error">Thesis failed: ${escapeHtml(err.message||String(err))}</span>`;
-            return;
-        }
+      // 1) Generate thesis
+      let thesis;
+      try{
+        const res = await postJSON(EP_THESIS_GEN, {
+          email, dimension_id: dimensionId, model: 'gpt-5-mini-2025-08-07'
+        }, 180000);
+        thesis = res?.thesis;
+        if (!thesis?.id) throw new Error('No thesis id');
+        if (mountThesis) mountThesis.innerHTML = `<strong>Thesis:</strong> ${escapeHtml(thesis.text || '')}`;
+      }catch(err){
+        if (mountThesis) mountThesis.innerHTML = `<span class="error">Thesis failed: ${escapeHtml(err.message||String(err))}</span>`;
+        return;
+      }
 
-        // 2) Evaluate thesis
-        if (mountEval) mountEval.textContent = 'Evaluating thesis…';
-        try{
-            const res = await postJSON(EP_THESIS_EVAL, {
-            email, thesis_id: thesis.id, model: 'gpt-4o-2024-08-06', save: true
-            }, 180000);
-            const a = res?.analysis || {};
-            const ver = Array.isArray(a.verification) ? a.verification : [];
-            mountEval.innerHTML =
-            `<div><strong>Verification / Falsification</strong><ul>${
-                ver.map(v=>`<li>${escapeHtml(v)}</li>`).join('')
-            }</ul></div>
-            <div style="margin-top:.3rem;"><strong>If True</strong><div class="muted">${escapeHtml(a.if_true||'')}</div></div>
-            <div style="margin-top:.3rem;"><strong>If False (Alternative Thesis)</strong><div class="muted">${escapeHtml(a.if_false_alternative_thesis||'')}</div></div>`;
-        }catch(err){
-            if (mountEval) mountEval.innerHTML = `<span class="error">Evaluation failed: ${escapeHtml(err.message||String(err))}</span>`;
-        }
-        }
+      // 2) Evaluate thesis
+      if (mountEval) mountEval.textContent = 'Evaluating thesis…';
+      try{
+        const res = await postJSON(EP_THESIS_EVAL, {
+          email, thesis_id: thesis.id, model: 'gpt-5-mini-2025-08-07', save: true
+        }, 180000);
+        const a = res?.analysis || {};
+        const ver = Array.isArray(a.verification) ? a.verification : [];
+        mountEval.innerHTML =
+          `<div><strong>Verification / Falsification</strong><ul>${
+            ver.map(v=>`<li>${escapeHtml(v)}</li>`).join('')
+          }</ul></div>
+          <div style="margin-top:.3rem;"><strong>If True</strong><div class="muted">${escapeHtml(a.if_true||'')}</div></div>
+          <div style="margin-top:.3rem;"><strong>If False (Alternative Thesis)</strong><div class="muted">${escapeHtml(a.if_false_alternative_thesis||'')}</div></div>`;
+      }catch(err){
+        if (mountEval) mountEval.innerHTML = `<span class="error">Evaluation failed: ${escapeHtml(err.message||String(err))}</span>`;
+      }
+    }
 
-
+    // ------- Dimensions -------
     async function generateDimsForDomain(domainId, count=3){
       const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
       if (!domainId) return;
@@ -221,18 +254,15 @@
               const nm = el('div', { className:'dim-name', text: d.name || 'Dimension' });
               const th = el('div', { className:'muted', text: d.thesis || '' });
               const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
-
-              // NEW: mounts for thesis + evaluation
-                const thesisMount = el('div', { className:'muted', attrs:{ id:`thesis-${d.id}` } });
-                const evalMount   = el('div', { className:'muted', attrs:{ id:`eval-${d.id}` } });
-
-                it.append(nm, th, tg, thesisMount, evalMount);
-                mount.append(it);
+              const thesisMount = el('div', { className:'muted', attrs:{ id:`thesis-${d.id}` } });
+              const evalMount   = el('div', { className:'muted', attrs:{ id:`eval-${d.id}` } });
+              it.append(nm, th, tg, thesisMount, evalMount);
+              mount.append(it);
             });
             for (const dim of dims) {
-                if (dim?.id) {
-                    await generateThesisAndEval(dim.id);
-                }
+              if (dim?.id) {
+                await generateThesisAndEval(dim.id);
+              }
             }
           }
         }
@@ -241,11 +271,64 @@
       }
     }
 
-    // ------- Submit (Draw) -------
+    // ------- Domain Architect (single call helper) -------
+    async function runDomainArchitect(email, title, description, model='gpt-5-mini-2025-08-07'){
+      return postJSON(EP_DOMAIN_ARCH, {
+        email: email || '',
+        core_title: title,
+        core_description: description,
+        model
+      }, 600000);
+    }
+
+    // ------- Draw All (sequential multi-core) -------
+    async function drawAllSequential(){
+      const email = (elEmail?.value || readEmailFromStorage() || '').trim().toLowerCase();
+      const multiStatus = document.getElementById('multiStatus');
+      if (!email){ alert('Enter owner email first.'); return; }
+
+      const pairs = readCorePairs();
+      if (!pairs.length){ alert('Add at least one core.'); return; }
+
+      let done = 0;
+      multiStatus.textContent = `Starting… 0 / ${pairs.length}`;
+
+      for (const p of pairs){
+        try{
+          multiStatus.textContent = `Drawing "${p.title}"… (${done+1}/${pairs.length})`;
+
+          // 1) Domain Architect
+          const arch = await runDomainArchitect(email, p.title, p.description);
+
+          // 2) Render the result (stacked)
+          render(arch.core || { title: p.title, description: p.description, owner_email: email }, arch.groups || []);
+
+          // 3) For each domain -> dimensions -> thesis/eval
+          const groups = arch.groups || [];
+          for (const g of groups){
+            for (const d of (g.domains||[])){
+              if (d?.id) await generateDimsForDomain(d.id, 3);
+            }
+          }
+
+          done += 1;
+          multiStatus.textContent = `Done "${p.title}". ${done} / ${pairs.length}`;
+          await new Promise(r=>setTimeout(r, 300)); // small breather
+        }catch(err){
+          console.error(err);
+          container.append(el('div',{className:'error',text:`Failed on "${p.title}": ${err.message||err}`}));
+        }
+      }
+
+      multiStatus.textContent = `All done. ${done} / ${pairs.length} succeeded.`;
+      if (email) saveEmailToStorage(email);
+    }
+
+    // ------- Single-core Submit (Draw) -------
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
+      status.className = 'meta';
       status.textContent = '';
-      container.innerHTML = '';
 
       const title = (elTitle.value || '').trim();
       const description = (elDesc.value || '').trim();
@@ -256,18 +339,12 @@
 
       try {
         status.textContent = 'Drawing domains…';
-        const data = await postJSON(EP_DOMAIN_ARCH, {
-          email: email || '',
-          core_title: title,
-          core_description: description,
-          model: 'gpt-5-mini-2025-08-07'
-        });
+        const data = await runDomainArchitect(email, title, description);
         if (!data?.ok) throw new Error(data?.error || 'Unknown error');
 
         render(data.core || { title, description, owner_email: email }, data.groups || []);
         status.textContent = 'Drawing dimensions…';
 
-        // Auto-generate dimensions for each domain returned
         const allDomains = (data.groups||[]).flatMap(g => g.domains || []);
         for (const d of allDomains) {
           if (d?.id) await generateDimsForDomain(d.id, 3);
@@ -288,9 +365,13 @@
       saveEmailToStorage(em);
       const old = btnSave.textContent; btnSave.textContent = 'Saved'; setTimeout(()=> btnSave.textContent = old, 1200);
     });
-    function saveEmailToStorage(v){ const s = String(v||'').trim().toLowerCase(); if (s) localStorage.setItem(EMAIL_KEY, s); }
-    function readEmailFromStorage(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
-    (function prefill(){ const v = readEmailFromStorage(); if (v && !elEmail.value) elEmail.value = v; })();
+    (function init(){
+      prefillEmail();
+      // seed one empty row for multi-core
+      addCoreRow();
+      document.getElementById('addCoreBtn').addEventListener('click', addCoreRow);
+      document.getElementById('drawAllBtn').addEventListener('click', drawAllSequential);
+    })();
   </script>
 </body>
 </html>

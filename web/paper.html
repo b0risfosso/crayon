@@ -2,337 +2,375 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Fantasiagenesis · Paper (Reader)</title>
+  <title>Fantasiagenesis · Crayon</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { color-scheme: light dark; }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background: Canvas; color: CanvasText; }
-    header { padding: 1rem 1.25rem; border-bottom: 1px solid color-mix(in oklab, CanvasText 10%, transparent); display:flex; align-items:baseline; gap:1rem; }
-    header h1 { margin:0; font-size: clamp(1.2rem, 2.2vw, 1.6rem); }
-    main { display:grid; grid-template-columns: 320px 1fr; gap:1rem; padding:1rem; }
-    @media (max-width: 900px){ main { grid-template-columns: 1fr; } }
-    .panel { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.6rem; background: color-mix(in oklab, Canvas 92%, CanvasText 8%); }
-    .panel header { border:0; padding:.8rem 1rem; font-weight:600; }
-    .panel .content { padding: .8rem 1rem 1rem; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; margin: 2rem; max-width: 1100px; }
+    header h1 { margin: 0 0 .35rem 0; font-size: clamp(1.25rem, 2.4vw, 1.75rem); }
     .muted { opacity:.85; font-size:.9rem; }
-    input[type="email"], input[type="text"] { width:100%; height:2.5rem; padding:.6rem .7rem; border:1px solid #c9c9c9; border-radius:.55rem; }
-    button { padding:.6rem .9rem; border:0; border-radius:.55rem; background:#0b5cff; color:#fff; cursor:pointer; }
+    .row { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; }
+    .panel { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.6rem; padding: .8rem 1rem; background: color-mix(in oklab, Canvas 92%, CanvasText 8%); }
+    .panel.blue { border-color: color-mix(in oklab, dodgerblue 40%, CanvasText 20%); background: color-mix(in oklab, Canvas 88%, dodgerblue 12%); box-shadow: 0 1px 0 rgba(30,144,255,.12) inset; }
+    input[type="text"], input[type="email"], textarea { width: min(92vw, 56rem); padding:.6rem .7rem; border:1px solid #c9c9c9; border-radius:.55rem; }
+    input[type="text"], input[type="email"] { height: 2.5rem; }
+    textarea { min-height: 6rem; }
+    button { padding:.65rem .95rem; border:0; border-radius:.55rem; cursor:pointer; background:#0b5cff; color:#fff; }
     button.secondary { background:#444; }
-    .row { display:flex; gap:.5rem; align-items:center; }
-    .list { display:grid; gap:.4rem; }
-    .item { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.55rem; padding:.55rem .65rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); cursor:pointer; }
-    .item:hover { outline:2px solid color-mix(in oklab, #0b5cff 35%, transparent); }
-    .title { font-weight:600; }
-    .meta { font-size:.9rem; opacity:.9; margin-top:.2rem; }
-    .badge { font-size:.8rem; padding:.1rem .4rem; border:1px solid #ddd; border-radius:.4rem; }
-    .group { border:1px solid #e2e2e2; border-radius:.55rem; padding:.6rem .75rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
-    .groups { display:grid; gap:.7rem; }
-    .domains { display:grid; gap:.5rem; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); }
-    .domain { border:1px solid #e5e5e5; border-radius:.55rem; padding:.55rem .7rem; }
-    .dim-list { margin-top:.45rem; display:grid; gap:.35rem; }
-    .dim-item { border:1px dashed #d5d5d5; border-radius:.5rem; padding:.45rem .55rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
-    details { margin-top:.6rem; }
-    pre { background:#f6f6f6; padding:.65rem; border-radius:.5rem; overflow:auto; }
+    .badge { font-size:.8rem; padding:.15rem .45rem; border:1px solid #ddd; border-radius:.4rem; }
+    .grid { display:grid; gap:.9rem; }
+    .columns { display:grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .group-block { border:1px solid #e2e2e2; border-radius:.6rem; padding:.75rem .9rem; background: rgba(0,0,0,.02); }
+    .group-title { font-weight:600; display:flex; align-items:center; gap:.45rem; margin-bottom:.4rem; }
+    .domain-card { border:1px solid #e5e5e5; border-radius:.6rem; padding:.6rem .75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
+    .domain-head { font-weight:600; margin-bottom:.25rem; display:flex; align-items:center; gap:.4rem; justify-content:space-between; }
+    .meta { font-size:.9rem; opacity:.9; margin:.5rem 0 .8rem; }
     .error { color:#b00020; white-space:pre-wrap; }
-    /* Thesis + evaluation styling */
-    .thesis-label { font-weight: 600; margin-top:.25rem; margin-bottom:.25rem; }
-    .thesis-box  { background:#eaf3ff; border:1px solid #cfe3ff; border-left:3px solid #8bbcff; border-radius:.5rem; padding:.5rem .6rem; }
-    .verify-box  { background:#fff8db; border:1px solid #f5e7a3; border-left:3px solid #e2c85a; border-radius:.5rem; padding:.5rem .6rem; }
-    .true-box    { background:#e9f7ef; border:1px solid #c9ecd6; border-left:3px solid #88d19e; border-radius:.5rem; padding:.5rem .6rem; }
-    .false-box   { background:#fdecea; border:1px solid #f7c7c3; border-left:3px solid #f39a93; border-radius:.5rem; padding:.5rem .6rem; }
-    .thesis-box + .verify-box,
-    .verify-box + .true-box,
-    .true-box + .false-box { margin-top:.5rem; }
-
+    .dim-list { margin-top:.5rem; display:grid; gap:.35rem; }
+    .dim-item { border:1px dashed #d5d5d5; border-radius:.5rem; padding:.45rem .55rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
+    .dim-name { font-weight:600; }
+    pre { background:#f6f6f6; padding:.75rem; border-radius:.5rem; overflow-x:auto; }
+    .core-row{border:1px solid #e1e1e1;border-radius:.55rem;padding:.6rem .7rem;background:color-mix(in oklab, Canvas 97%, CanvasText 3%);display:grid;gap:.4rem}
+    .core-row .row{gap:.4rem}
   </style>
 </head>
 <body>
   <header>
-    <h1>Fantasiagenesis · Paper</h1>
-    <div class="muted">See drawings</div>
+    <h1>Fantasiagenesis · Crayon</h1>
+    <p class="muted">Enter one or more <strong>core titles</strong> with <strong>descriptions</strong>, then click <em>Draw</em> (single) or <em>Draw All</em> (sequential).</p>
   </header>
 
-  <main>
-    <!-- Left: controls + core list -->
-    <section class="panel" aria-labelledby="left-head">
-      <header id="left-head">Owner</header>
-      <div class="content">
-        <div class="row" style="gap:.4rem; margin-bottom:.6rem;">
-          <input id="emailInput" type="email" placeholder="you@example.com" />
-          <button id="saveEmail" class="secondary" title="Save email locally">Save</button>
-        </div>
-        <div class="row" style="gap:.4rem; margin-bottom:.6rem;">
-          <input id="searchInput" type="text" placeholder="Filter cores by title…" />
-          <button id="loadBtn">Load Paper</button>
-        </div>
-        <div id="leftStatus" class="muted"></div>
-        <div id="coreList" class="list" role="list" aria-label="Cores"></div>
-      </div>
-    </section>
+  <section class="panel blue" aria-labelledby="h-how">
+    <header><p id="h-how" style="margin:0;font-weight:600;">Flow</p></header>
+    <div class="content" style="font-size:.92rem; line-height:1.45;">
+      <ol style="margin:.4rem 0 0; padding-left:1.1rem;">
+        <li>Save your email (recommended) so results persist.</li>
+        <li>Add one or more cores below.</li>
+        <li>Press <strong>Draw</strong> (single) or <strong>Draw All</strong> (sequential). We’ll architect domains → dimensions → theses → evaluations.</li>
+      </ol>
+    </div>
+  </section>
 
-    <!-- Right: details -->
-    <section class="panel" aria-labelledby="right-head">
-      <header id="right-head">Details</header>
-      <div class="content">
-        <div id="detailStatus" class="muted"></div>
-        <div id="details"></div>
+  <div class="row">
+    <input type="email" id="emailInput" placeholder="Email (saves results under your account — optional but recommended)" />
+    <button type="button" id="saveEmailBtn" class="secondary" title="Save email locally">Save email</button>
+  </div>
+
+  <section class="panel" aria-labelledby="core-head">
+    <header id="core-head">Cores</header>
+    <div class="content">
+      <div id="coresRepeater" class="list"></div>
+      <div class="row" style="margin-top:.5rem;">
+        <button id="addCoreBtn" type="button">+ Add core</button>
+        <button id="drawAllBtn" type="button" style="margin-left:auto;">Draw All</button>
       </div>
-    </section>
-  </main>
+      <div id="multiStatus" class="muted" style="margin-top:.5rem;"></div>
+    </div>
+  </section>
+
+  <!-- Single-core quick form still supported -->
+  <form id="form" autocomplete="off" style="display:grid; gap:.8rem; margin:1rem 0 1.25rem;">
+    <input id="coreTitle" type="text" placeholder="Core title (e.g., Chicago Microgrids)" />
+    <textarea id="coreDescription" placeholder="Core description (what are you creating / exploring / building? - 'building solar microgrids in the city of Chicago')"></textarea>
+    <div class="row">
+      <button type="submit" id="drawBtn">Draw</button>
+    </div>
+  </form>
+
+  <div id="globalStatus" class="meta"></div>
+  <div id="container"></div>
 
   <script>
-    // ---- config ----
+    // ------- Config -------
     const EMAIL_KEY = 'fg_user_email';
-    const EP_LIST_CORES = '/api/cores';
-    const EP_READ_CORE  = (id, email) => `/api/cores/${id}/domains?email=${encodeURIComponent(email)}`;
-    const EP_READ_DIMS  = (domainId, email) => `/api/domains/${domainId}/dimensions?email=${encodeURIComponent(email)}`;
+    const EP_DOMAIN_ARCH = '/api/domain-architect';
+    const EP_DIM_GEN     = '/api/dimensions/generate';
+    const EP_THESIS_GEN  = '/api/thesis/generate';
+    const EP_THESIS_EVAL = '/api/thesis/evaluate';
     const EP_LIST_THESES = (dimensionId, email) => `/api/dimensions/${dimensionId}/theses?email=${encodeURIComponent(email)}`;
 
-    // ---- utils ----
-    const $ = sel => document.querySelector(sel);
-    function el(tag, opts={}){ const n=document.createElement(tag);
+    // ------- Elements -------
+    const elTitle = document.getElementById('coreTitle');
+    const elDesc  = document.getElementById('coreDescription');
+    const elEmail = document.getElementById('emailInput');
+    const btnSave = document.getElementById('saveEmailBtn');
+    const form    = document.getElementById('form');
+    const status  = document.getElementById('globalStatus');
+    const container = document.getElementById('container');
+
+    // ------- Utils -------
+    function el(tag, opts={}) {
+      const n = document.createElement(tag);
       if (opts.className) n.className = opts.className;
       if ('text' in opts) n.textContent = opts.text;
       if ('html' in opts) n.innerHTML = opts.html;
-      if (opts.attrs) for (const [k,v] of Object.entries(opts.attrs)) n.setAttribute(k,v);
+      if (opts.attrs) Object.entries(opts.attrs).forEach(([k,v])=> n.setAttribute(k,v));
       return n;
     }
     function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
-    async function fetchJSON(url, opts={}){
-      const r = await fetch(url, { headers:{'Accept':'application/json'}, ...opts });
-      let data; try { data = await r.json(); } catch { throw new Error(`Non-JSON from ${url} (HTTP ${r.status})`); }
-      if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
+    async function fetchWithTimeout(url, options={}, timeoutMs=180000){
+      const controller = new AbortController();
+      const id = setTimeout(()=> controller.abort(), timeoutMs);
+      try { return await fetch(url, { ...options, signal: controller.signal }); }
+      finally { clearTimeout(id); }
+    }
+    async function postJSON(url, body, timeoutMs=180000){
+      const resp = await fetchWithTimeout(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }, timeoutMs);
+      let data; try { data = await resp.json(); } catch { throw new Error(`Non-JSON response from ${url} (status ${resp.status})`); }
+      if (!resp.ok || data?.ok === false) {
+        const msg = (data && (data.error||data.detail)) ? `${data.error||''} ${data.detail||''}`.trim() : `HTTP ${resp.status}`;
+        throw new Error(msg);
+      }
       return data;
     }
-    function saveEmail(v){ v = (v||'').trim().toLowerCase(); if (v) localStorage.setItem(EMAIL_KEY, v); }
-    function readEmail(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
+    function saveEmailToStorage(v){ const s = String(v||'').trim().toLowerCase(); if (s) localStorage.setItem(EMAIL_KEY, s); else localStorage.removeItem(EMAIL_KEY); }
+    function readEmailFromStorage(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
+    function prefillEmail(){ const v = readEmailFromStorage(); if (v && elEmail && !elEmail.value) elEmail.value = v; }
 
-    // ---- elements ----
-    const elEmail = $('#emailInput');
-    const elSave  = $('#saveEmail');
-    const elSearch= $('#searchInput');
-    const elLoad  = $('#loadBtn');
-    const coreList= $('#coreList');
-    const leftStatus = $('#leftStatus');
-    const detailStatus = $('#detailStatus');
-    const details = $('#details');
+    // ------- Multi-core inputs -------
+    function coreRowTemplate(i){
+      const wrap  = el('div', { className:'core-row', attrs:{ 'data-idx': String(i) }});
+      const title = el('input', { attrs:{ type:'text', placeholder:'Core title…', name:`core_title_${i}` }});
+      const desc  = el('input', { attrs:{ type:'text', placeholder:'Core description…', name:`core_desc_${i}` }});
+      const row   = el('div', { className:'row' });
+      const del   = el('button', { className:'secondary', text:'Remove', attrs:{ type:'button' }});
+      del.addEventListener('click', ()=> wrap.remove());
+      row.append(del);
+      wrap.append(title, desc, row);
+      return wrap;
+    }
+    function addCoreRow(){
+      const cont = document.getElementById('coresRepeater');
+      const i = cont.children.length + 1;
+      cont.append(coreRowTemplate(i));
+    }
+    function readCorePairs(){
+      const cont = document.getElementById('coresRepeater');
+      const pairs = [];
+      cont.querySelectorAll('.core-row').forEach(row=>{
+        const title = row.querySelector('input[name^="core_title_"]')?.value?.trim();
+        const desc  = row.querySelector('input[name^="core_desc_"]')?.value?.trim();
+        if (title) pairs.push({ title, description: desc || '' });
+      });
+      return pairs;
+    }
 
-    // ---- state ----
-    let cores = [];
-    let selectedCoreId = null;
+    // ------- Renderer -------
+    function render(core, groups){
+      // For multi-run, do not wipe previous results completely; add a separator if there is content
+      if (container.children.length) container.append(el('hr'));
+      const h2 = el('h2', { text: core.title });
+      const desc = el('div', { className: 'muted', text: core.description || '' });
+      container.append(h2, desc);
 
-    // ---- render cores list ----
-    function renderCores(){
-      coreList.innerHTML = '';
-      const q = (elSearch.value||'').toLowerCase();
-      const filtered = !q ? cores : cores.filter(c => (c.title||'').toLowerCase().includes(q));
-      if (!filtered.length){
-        coreList.append(el('div', { className:'muted', text:'No cores.' }));
+      const meta = el('div', { className:'meta', html:
+        `Core ID: <code>${escapeHtml(String(core.id || ''))}</code> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'openai')}</span>`
+      });
+      container.append(meta);
+
+      if (!Array.isArray(groups) || !groups.length){
+        container.append(el('div', { className:'muted', text:'No domain groups returned.' }));
         return;
       }
-      filtered.forEach(c=>{
-        const item = el('div', { className:'item', attrs:{ role:'listitem', tabindex:'0', 'data-id':String(c.id) } });
-        const t = el('div', { className:'title', html:`${escapeHtml(c.title)} <span class="badge">#${c.id}</span>` });
-        const m = el('div', { className:'meta', html:`Owner: <code>${escapeHtml(c.owner_email||'')}</code> · ${escapeHtml((c.created_at||'').replace('T',' ').replace('Z',''))}` });
-        item.append(t, m);
-        item.addEventListener('click', ()=> loadCore(c.id));
-        item.addEventListener('keypress', (e)=>{ if(e.key==='Enter') loadCore(c.id); });
-        coreList.append(item);
+
+      groups.forEach(g=>{
+        const block = el('div', { className:'group-block' });
+        const head = el('div', { className:'group-title', html: `${escapeHtml(g.title || 'Domains')} <span class="badge">group</span>` });
+        const cols = el('div', { className:'columns' });
+
+        (g.domains||[]).forEach(d=>{
+          const card = el('div', { className:'domain-card' });
+          const domTitle = el('div', { className:'domain-head', html:
+            `${escapeHtml(d.name || 'Untitled domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>` : ''}`
+          });
+          const domDesc = el('div', { className:'muted', text: d.description || '' });
+          const dimList = el('div', { className:'dim-list', attrs: { id: `dim-${d.id}` } });
+          card.append(domTitle, domDesc, dimList);
+          cols.append(card);
+        });
+
+        block.append(head, cols);
+        container.append(block);
       });
     }
 
-    // ---- render core view (domains + dimensions) ----
-    function renderCoreView(payload){
-        details.innerHTML = '';
-        if (!payload?.core){
-            details.append(el('div',{className:'muted', text:'No details.'}));
-            return;
-        }
-        const { core, groups } = payload;
+    // ------- Thesis + Evaluation -------
+    async function generateThesisAndEval(dimensionId){
+      const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
+      const mountThesis = document.getElementById(`thesis-${dimensionId}`);
+      const mountEval   = document.getElementById(`eval-${dimensionId}`);
+      if (mountThesis) mountThesis.textContent = 'Generating thesis…';
+      if (mountEval)   mountEval.textContent   = '';
 
-        const h2 = el('h2', { text: core.title || 'Untitled core' });
-        const meta = el('div', { className:'meta', html:
-            `Core ID: <span class="badge">${escapeHtml(String(core.id))}</span> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'')}</span>`
-        });
-        const desc = el('div', { className:'muted', text: core.description || '' });
-        details.append(h2, meta, desc);
-
-        const groupsWrap = el('div', { className:'groups', attrs:{ 'aria-label':'Domain groups' } });
-        (groups || []).forEach(g=>{
-            const block = el('div', { className:'group' });
-            const gt = el('div', { className:'title', text: g.title || 'Group' });
-            const doms = el('div', { className:'domains' });
-
-            (g.domains || []).forEach(d=>{
-            const card = el('div', { className:'domain' });
-            const head = el('div', { className:'title', html:
-                `${escapeHtml(d.name||'Domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>`:''}`
-            });
-            const dd = el('div', { className:'muted', text: d.description || '' });
-
-            // per-domain dimensions mount + button
-            const dimMount = el('div', { className:'dim-list', attrs:{ id:`dims-${d.id}` } });
-            const btn = el('button', { text:'Show picture', attrs:{ type:'button' }});
-            btn.addEventListener('click', ()=> loadDimensions(d.id));
-
-            // 🔧 append the parts to the card (this was missing)
-            card.append(head, dd, btn, dimMount);
-
-            doms.append(card);
-            });
-
-            block.append(gt, doms);
-            groupsWrap.append(block);
-        });
-        details.append(groupsWrap);
-
-        const det = el('details');
-        det.append(el('summary',{text:'Raw JSON (debug)'}), el('pre',{text: JSON.stringify(payload,null,2)}));
-        details.append(det);
-        }
-
-
-    // ---- actions ----
-    async function loadCores(){
-      leftStatus.className='muted'; leftStatus.textContent='Loading cores…';
-      coreList.innerHTML=''; details.innerHTML=''; detailStatus.textContent='';
-      const email = (elEmail.value || readEmail()).trim().toLowerCase();
-      if (!email){ leftStatus.className='error'; leftStatus.textContent='Please enter an email.'; return; }
+      // 1) Generate thesis
+      let thesis;
       try{
-        const data = await fetchJSON(`${EP_LIST_CORES}?email=${encodeURIComponent(email)}`);
-        cores = data.cores || [];
-        renderCores();
-        leftStatus.textContent = `Loaded ${cores.length} cores.`;
-        if (cores.length) loadCore(cores[0].id);
-        saveEmail(email);
+        const res = await postJSON(EP_THESIS_GEN, {
+          email, dimension_id: dimensionId, model: 'gpt-4o-2024-08-06'
+        }, 180000);
+        thesis = res?.thesis;
+        if (!thesis?.id) throw new Error('No thesis id');
+        if (mountThesis) mountThesis.innerHTML = `<strong>Thesis:</strong> ${escapeHtml(thesis.text || '')}`;
       }catch(err){
-        leftStatus.className='error';
-        leftStatus.textContent = `Failed to load cores: ${err.message||err}`;
+        if (mountThesis) mountThesis.innerHTML = `<span class="error">Thesis failed: ${escapeHtml(err.message||String(err))}</span>`;
+        return;
+      }
+
+      // 2) Evaluate thesis
+      if (mountEval) mountEval.textContent = 'Evaluating thesis…';
+      try{
+        const res = await postJSON(EP_THESIS_EVAL, {
+          email, thesis_id: thesis.id, model: 'gpt-4o-2024-08-06', save: true
+        }, 180000);
+        const a = res?.analysis || {};
+        const ver = Array.isArray(a.verification) ? a.verification : [];
+        mountEval.innerHTML =
+          `<div><strong>Verification / Falsification</strong><ul>${
+            ver.map(v=>`<li>${escapeHtml(v)}</li>`).join('')
+          }</ul></div>
+          <div style="margin-top:.3rem;"><strong>If True</strong><div class="muted">${escapeHtml(a.if_true||'')}</div></div>
+          <div style="margin-top:.3rem;"><strong>If False (Alternative Thesis)</strong><div class="muted">${escapeHtml(a.if_false_alternative_thesis||'')}</div></div>`;
+      }catch(err){
+        if (mountEval) mountEval.innerHTML = `<span class="error">Evaluation failed: ${escapeHtml(err.message||String(err))}</span>`;
       }
     }
 
-    async function loadCore(id){
-      selectedCoreId = id;
-      details.innerHTML=''; detailStatus.className='muted'; detailStatus.textContent='Loading core details…';
-      const email = (elEmail.value || readEmail()).trim().toLowerCase();
-      if (!email){ detailStatus.className='error'; detailStatus.textContent='Email required to read core.'; return; }
+    // ------- Dimensions -------
+    async function generateDimsForDomain(domainId, count=3){
+      const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
+      if (!domainId) return;
       try{
-        const data = await fetchJSON(EP_READ_CORE(id, email));
-        renderCoreView(data);
-        detailStatus.textContent='Done.';
-      }catch(err){
-        detailStatus.className='error';
-        detailStatus.textContent = `Failed to load core: ${err.message||err}`;
-      }
-    }
-
-    async function loadDimensions(domainId){
-        const email = (elEmail.value || readEmail()).trim().toLowerCase();
-        const mount = document.getElementById(`dims-${domainId}`);
-        if (!email || !mount) return;
-        mount.innerHTML = '<div class="muted">Loading dimensions…</div>';
-        try{
-            const data = await fetchJSON(EP_READ_DIMS(domainId, email));
-            const dims = data.dimensions || [];
-            mount.innerHTML = '';
-            if (!dims.length) {
-            mount.append(el('div', { className:'muted', text:'No dimensions yet.' }));
-            } else {
-            // Render dimension items first
+        const res = await postJSON(EP_DIM_GEN, { email, domain_id: domainId, count, model: 'gpt-4o-2024-08-06' });
+        const dims = res.dimensions || [];
+        const mount = document.getElementById(`dim-${domainId}`);
+        if (mount) {
+          mount.innerHTML = '';
+          if (!dims.length) {
+            mount.append(el('div', { className:'muted', text:'No dimensions returned.' }));
+          } else {
             dims.forEach(d=>{
-                const it = el('div', { className:'dim-item' });
-                const nm = el('div', { className:'title', text: d.name || 'Dimension' });
-                const th = el('div', { className:'muted', text: d.thesis || '' });
-                const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
-
-                // theses mount per dimension (ID matches loader below)
-                const tMount = el('div', { className:'dim-list', attrs:{ id:`theses-${d.id}` } });
-
-                it.append(nm, th, tg, tMount);
-                mount.append(it);
-                });
-
-            // Then fetch theses+evals per dimension and render under #theses-<id>
-            for (const d of dims) {
-                await loadThesesForDimension(d.id, email);
+              const it = el('div', { className:'dim-item' });
+              const nm = el('div', { className:'dim-name', text: d.name || 'Dimension' });
+              const th = el('div', { className:'muted', text: d.thesis || '' });
+              const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
+              const thesisMount = el('div', { className:'muted', attrs:{ id:`thesis-${d.id}` } });
+              const evalMount   = el('div', { className:'muted', attrs:{ id:`eval-${d.id}` } });
+              it.append(nm, th, tg, thesisMount, evalMount);
+              mount.append(it);
+            });
+            for (const dim of dims) {
+              if (dim?.id) {
+                await generateThesisAndEval(dim.id);
+              }
             }
-            }
-        }catch(err){
-            mount.innerHTML = '';
-            mount.append(el('div', { className:'error', text:`Failed to load dimensions: ${err.message||err}` }));
+          }
         }
+      }catch(err){
+        alert(`Failed to draw dimensions: ${err.message || err}`);
+      }
     }
 
-    async function loadThesesForDimension(dimensionId, email){
-        const tMount = document.getElementById(`theses-${dimensionId}`);
-        if (!tMount) return;
-        tMount.innerHTML = '<div class="muted">Loading theses…</div>';
+    // ------- Domain Architect (single call helper) -------
+    async function runDomainArchitect(email, title, description, model='gpt-4o-mini'){
+      return postJSON(EP_DOMAIN_ARCH, {
+        email: email || '',
+        core_title: title,
+        core_description: description,
+        model
+      }, 600000);
+    }
+
+    // ------- Draw All (sequential multi-core) -------
+    async function drawAllSequential(){
+      const email = (elEmail?.value || readEmailFromStorage() || '').trim().toLowerCase();
+      const multiStatus = document.getElementById('multiStatus');
+      if (!email){ alert('Enter owner email first.'); return; }
+
+      const pairs = readCorePairs();
+      if (!pairs.length){ alert('Add at least one core.'); return; }
+
+      let done = 0;
+      multiStatus.textContent = `Starting… 0 / ${pairs.length}`;
+
+      for (const p of pairs){
         try{
-            const res = await fetchJSON(EP_LIST_THESES(dimensionId, email));
-            const theses = res.theses || [];
-            tMount.innerHTML = '';
+          multiStatus.textContent = `Drawing "${p.title}"… (${done+1}/${pairs.length})`;
 
-            if (!theses.length){
-            tMount.append(el('div', { className:'muted', text:'No theses yet.' }));
-            return;
+          // 1) Domain Architect
+          const arch = await runDomainArchitect(email, p.title, p.description);
+
+          // 2) Render the result (stacked)
+          render(arch.core || { title: p.title, description: p.description, owner_email: email }, arch.groups || []);
+
+          // 3) For each domain -> dimensions -> thesis/eval
+          const groups = arch.groups || [];
+          for (const g of groups){
+            for (const d of (g.domains||[])){
+              if (d?.id) await generateDimsForDomain(d.id, 3);
             }
+          }
 
-            theses.forEach(t=>{
-                const wrap = el('div', { className:'dim-item' });
-
-                // Thesis label + text
-                wrap.append(
-                    el('div', { className:'thesis-label', text:'Thesis' }),
-                    el('div', { className:'thesis-box',  text: t.text || '(no thesis text)' })
-                );
-
-                // Evaluation (if present)
-                if (t.analysis){
-                    const v = Array.isArray(t.analysis.verification) ? t.analysis.verification : [];
-                    const verHTML = v.length
-                    ? `<ul>${v.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul>`
-                    : '<div class="muted">(no steps)</div>';
-
-                    const verify = el('div', { className:'verify-box', html:
-                    `<strong>Verification / Falsification</strong>${verHTML}`
-                    });
-
-                    const ifTrue  = el('div', { className:'true-box',
-                    html: `<strong>If True</strong><div class="muted">${escapeHtml(t.analysis.if_true||'')}</div>` });
-
-                    const ifFalse = el('div', { className:'false-box',
-                    html: `<strong>If False (Alternative Thesis)</strong><div class="muted">${escapeHtml(t.analysis.if_false_alternative_thesis||'')}</div>` });
-
-                    wrap.append(verify, ifTrue, ifFalse);
-                } else {
-                    wrap.append(el('div', { className:'muted', text:'(no evaluation yet)' }));
-                }
-
-                tMount.append(wrap);
-                });
-
+          done += 1;
+          multiStatus.textContent = `Done "${p.title}". ${done} / ${pairs.length}`;
+          await new Promise(r=>setTimeout(r, 300)); // small breather
         }catch(err){
-            tMount.innerHTML = `<span class="error">Failed to load theses: ${escapeHtml(err.message||String(err))}</span>`;
+          console.error(err);
+          container.append(el('div',{className:'error',text:`Failed on "${p.title}": ${err.message||err}`}));
         }
+      }
+
+      multiStatus.textContent = `All done. ${done} / ${pairs.length} succeeded.`;
+      if (email) saveEmailToStorage(email);
     }
 
+    // ------- Single-core Submit (Draw) -------
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      status.className = 'meta';
+      status.textContent = '';
 
+      const title = (elTitle.value || '').trim();
+      const description = (elDesc.value || '').trim();
+      const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
 
-    // ---- events ----
-    $('#loadBtn').addEventListener('click', loadCores);
-    $('#saveEmail').addEventListener('click', ()=>{
-      const v = (elEmail.value||'').trim().toLowerCase();
-      if (!v) return alert('Enter an email to save.');
-      saveEmail(v);
-      const btn = $('#saveEmail'); const old = btn.textContent; btn.textContent='Saved'; setTimeout(()=> btn.textContent=old, 1000);
+      if (!title) { status.textContent = 'Please enter a core title.'; return; }
+      if (!email) status.textContent = 'No email entered — results may not be saved to your account.';
+
+      try {
+        status.textContent = 'Drawing domains…';
+        const data = await runDomainArchitect(email, title, description);
+        if (!data?.ok) throw new Error(data?.error || 'Unknown error');
+
+        render(data.core || { title, description, owner_email: email }, data.groups || []);
+        status.textContent = 'Drawing dimensions…';
+
+        const allDomains = (data.groups||[]).flatMap(g => g.domains || []);
+        for (const d of allDomains) {
+          if (d?.id) await generateDimsForDomain(d.id, 3);
+        }
+
+        status.textContent = 'Done.';
+        if (email) saveEmailToStorage(email);
+      } catch (err) {
+        status.className = 'meta error';
+        status.textContent = `Draw failed: ${err.message || err}`;
+      }
     });
-    $('#searchInput').addEventListener('input', renderCores);
 
-    // ---- init ----
+    // ------- Init -------
+    btnSave?.addEventListener('click', ()=>{
+      const em = (elEmail?.value||'').trim().toLowerCase();
+      if (!em) { alert('Enter an email to save.'); return; }
+      saveEmailToStorage(em);
+      const old = btnSave.textContent; btnSave.textContent = 'Saved'; setTimeout(()=> btnSave.textContent = old, 1200);
+    });
     (function init(){
-      const saved = readEmail();
-      if (saved && !elEmail.value) elEmail.value = saved;
+      prefillEmail();
+      // seed one empty row for multi-core
+      addCoreRow();
+      document.getElementById('addCoreBtn').addEventListener('click', addCoreRow);
+      document.getElementById('drawAllBtn').addEventListener('click', drawAllSequential);
     })();
   </script>
 </body>
