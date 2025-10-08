@@ -255,7 +255,7 @@ def _get_openai_client() -> Any:
         raise RuntimeError("openai SDK not installed. `pip install openai` (v1).")
     return OpenAI(api_key=api_key)
 
-def _openai_json(system_msg: str, user_msg: str, model: str = "gpt-4o-mini") -> Dict[str, Any]:
+def _openai_json(system_msg: str, user_msg: str, model: str = "gpt-5-mini-2025-08-07") -> Dict[str, Any]:
     """
     Calls OpenAI with system+user messages and expects STRICT JSON back.
     Your system/user prompt already instructs 'Return ONLY JSON'.
@@ -409,14 +409,14 @@ def api_domain_architect():
       "email": "user@example.com",
       "core_title": "string",
       "core_description": "string",
-      "model": "gpt-4o-mini"   // optional
+      "model": "gpt-5-mini-2025-08-07"   // optional
     }
     """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip()
     core_title = (payload.get("core_title") or "").strip()
     core_desc = (payload.get("core_description") or "").strip()
-    model = (payload.get("model") or "gpt-4o-mini").strip()
+    model = (payload.get("model") or "gpt-5-mini-2025-08-07").strip()
 
     if not email or not core_title:
         return jsonify(ok=False, error="Missing required fields: email, core_title"), 400
@@ -605,31 +605,36 @@ def api_generate_dimensions():
       "email": "owner@example.com",
       "domain_id": 123,
       "count": 3,
-      "model": "gpt-4o-2024-08-06"
+      "model": "gpt-5-mini-2025-08-07"
     }
     """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip().lower()
     domain_id = payload.get("domain_id")
     count = int(payload.get("count") or 3)
-    model = (payload.get("model") or "gpt-4o-2024-08-06").strip()
+    model = (payload.get("model") or "gpt-5-mini-2025-08-07").strip()
 
     if not email or not domain_id:
         return jsonify(ok=False, error="Missing required fields: email, domain_id"), 400
 
     # Fetch + auth
     with connect() as conn:
-        row = conn.execute(
-            """
-            SELECT d.id AS domain_id, d.name AS domain_name,
-                   COALESCE(d.description,'') AS domain_description,
-                   c.id AS core_id, c.owner_email
-            FROM fantasia_domain d
-            JOIN fantasia_core c ON c.id = d.core_id
-            WHERE d.id = ?
-            """,
-            (domain_id,)
-        ).fetchone()
+    row = conn.execute(
+        """
+        SELECT
+          d.id   AS domain_id,
+          d.name AS domain_name,
+          COALESCE(d.description,'') AS domain_description,
+          c.id   AS core_id,
+          c.title AS core_name,
+          COALESCE(c.description,'') AS core_description,
+          c.owner_email
+        FROM fantasia_domain d
+        JOIN fantasia_core   c ON c.id = d.core_id
+        WHERE d.id = ?
+        """,
+        (domain_id,)
+    ).fetchone()
 
         if not row:
             return jsonify(ok=False, error="Domain not found"), 404
@@ -639,9 +644,11 @@ def api_generate_dimensions():
     # Build prompt (brace-safe)
     user_msg = render_prompt(
         DIM_USER_TEMPLATE,
+        core_name=row["core_name"],
+        core_description=row["core_description"],
         domain_name=row["domain_name"],
         domain_description=row["domain_description"],
-        count=count
+        count=count,
     )
 
     # Call OpenAI with Pydantic parsing; fall back to JSON mode if unavailable

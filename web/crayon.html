@@ -120,46 +120,44 @@
 
     // ------- Renderer -------
     function render(core, groups){
-      container.innerHTML = '';
-      const h2 = el('h2', { text: core.title });
-      const desc = el('div', { className: 'muted', text: core.description || '' });
-      container.append(h2, desc);
+        container.innerHTML = '';
+        const h2 = el('h2', { text: core.title });
+        const desc = el('div', { className: 'muted', text: core.description || '' });
+        container.append(h2, desc);
 
-      const meta = el('div', { className:'meta', html:
+        const meta = el('div', { className:'meta', html:
         `Core ID: <code>${escapeHtml(String(core.id || ''))}</code> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">openai</span>`
-      });
-      container.append(meta);
+        });
+        container.append(meta);
 
-      if (!Array.isArray(groups) || !groups.length){
+        if (!Array.isArray(groups) || !groups.length){
         container.append(el('div', { className:'muted', text:'No domain groups returned.' }));
         return;
-      }
+        }
 
-      groups.forEach(g=>{
+        groups.forEach(g=>{
         const block = el('div', { className:'group-block' });
         const head = el('div', { className:'group-title', html: `${escapeHtml(g.title || 'Domains')} <span class="badge">group</span>` });
         const cols = el('div', { className:'columns' });
 
         (g.domains||[]).forEach(d=>{
-          const card = el('div', { className:'domain-card' });
-          const domTitle = el('div', { className:'domain-head' });
-          const left = el('div', { html:
+            const card = el('div', { className:'domain-card' });
+
+            // header without per-domain Draw button
+            const domTitle = el('div', { className:'domain-head', html:
             `${escapeHtml(d.name || 'Untitled domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>` : ''}`
-          });
-          const drawBtn = el('button', { text: 'Draw', attrs:{ type:'button', 'data-id': String(d.id||'') }});
-          drawBtn.addEventListener('click', ()=> generateDimsForDomain(d.id));
-          domTitle.append(left, drawBtn);
+            });
 
-          const domDesc = el('div', { className:'muted', text: d.description || '' });
-          const dimList = el('div', { className:'dim-list', attrs: { id: `dim-${d.id}` } });
+            const domDesc = el('div', { className:'muted', text: d.description || '' });
+            const dimList = el('div', { className:'dim-list', attrs: { id: `dim-${d.id}` } });
 
-          card.append(domTitle, domDesc, dimList);
-          cols.append(card);
+            card.append(domTitle, domDesc, dimList);
+            cols.append(card);
         });
 
         block.append(head, cols);
         container.append(block);
-      });
+        });
     }
 
     async function generateDimsForDomain(domainId, count=3){

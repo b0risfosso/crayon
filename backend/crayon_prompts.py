@@ -56,6 +56,9 @@ Generate 3–4 narrative dimensions unless otherwise requested.
 """
 
 DIM_USER_TEMPLATE = r"""
+Core: {core_name}
+Core Description: {core_description}
+
 Domain: {domain_name}
 Domain Description: {domain_description}
 
