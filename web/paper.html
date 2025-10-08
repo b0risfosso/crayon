@@ -30,15 +30,17 @@
     .groups { display:grid; gap:.7rem; }
     .domains { display:grid; gap:.5rem; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); }
     .domain { border:1px solid #e5e5e5; border-radius:.55rem; padding:.55rem .7rem; }
-    .error { color:#b00020; white-space:pre-wrap; }
+    .dim-list { margin-top:.45rem; display:grid; gap:.35rem; }
+    .dim-item { border:1px dashed #d5d5d5; border-radius:.5rem; padding:.45rem .55rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
     details { margin-top:.6rem; }
     pre { background:#f6f6f6; padding:.65rem; border-radius:.5rem; overflow:auto; }
+    .error { color:#b00020; white-space:pre-wrap; }
   </style>
 </head>
 <body>
   <header>
     <h1>Fantasiagenesis · Paper</h1>
-    <div class="muted">Read cores & domains by owner email</div>
+    <div class="muted">Read cores, domains, and dimensions by owner email</div>
   </header>
 
   <main>
@@ -72,8 +74,9 @@
   <script>
     // ---- config ----
     const EMAIL_KEY = 'fg_user_email';
-    const ENDPOINT_LIST = '/api/cores';                   // ?email=...
-    const ENDPOINT_READ = (id, email) => `/api/cores/${id}/domains?email=${encodeURIComponent(email)}`;
+    const EP_LIST_CORES = '/api/cores';
+    const EP_READ_CORE  = (id, email) => `/api/cores/${id}/domains?email=${encodeURIComponent(email)}`;
+    const EP_READ_DIMS  = (domainId, email) => `/api/domains/${domainId}/dimensions?email=${encodeURIComponent(email)}`;
 
     // ---- utils ----
     const $ = sel => document.querySelector(sel);
@@ -108,7 +111,7 @@
     let cores = [];
     let selectedCoreId = null;
 
-    // ---- render ----
+    // ---- render cores list ----
     function renderCores(){
       coreList.innerHTML = '';
       const q = (elSearch.value||'').toLowerCase();
@@ -128,12 +131,10 @@
       });
     }
 
+    // ---- render core view (domains + dimensions) ----
     function renderCoreView(payload){
       details.innerHTML = '';
-      if (!payload?.core){
-        details.append(el('div',{className:'muted', text:'No details.'}));
-        return;
-      }
+      if (!payload?.core){ details.append(el('div',{className:'muted', text:'No details.'})); return; }
       const { core, groups } = payload;
 
       const h2 = el('h2', { text: core.title || 'Untitled core' });
@@ -141,7 +142,6 @@
         `Core ID: <span class="badge">${escapeHtml(String(core.id))}</span> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'')}</span>`
       });
       const desc = el('div', { className:'muted', text: core.description || '' });
-
       details.append(h2, meta, desc);
 
       const groupsWrap = el('div', { className:'groups', attrs:{ 'aria-label':'Domain groups' } });
@@ -153,7 +153,13 @@
           const card = el('div', { className:'domain' });
           const head = el('div', { className:'title', html:`${escapeHtml(d.name||'Domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>`:''}` });
           const dd = el('div', { className:'muted', text: d.description || '' });
-          card.append(head, dd);
+
+          // dimensions mount + load button
+          const dimMount = el('div', { className:'dim-list', attrs:{ id:`dims-${d.id}` } });
+          const btn = el('button', { text:'Show dimensions', attrs:{ type:'button' }});
+          btn.addEventListener('click', ()=> loadDimensions(d.id));
+
+          card.append(head, dd, btn, dimMount);
           doms.append(card);
         });
         block.append(gt, doms);
@@ -169,12 +175,11 @@
     // ---- actions ----
     async function loadCores(){
       leftStatus.className='muted'; leftStatus.textContent='Loading cores…';
-      coreList.innerHTML='';
-      details.innerHTML=''; detailStatus.textContent='';
+      coreList.innerHTML=''; details.innerHTML=''; detailStatus.textContent='';
       const email = (elEmail.value || readEmail()).trim().toLowerCase();
       if (!email){ leftStatus.className='error'; leftStatus.textContent='Please enter an email.'; return; }
       try{
-        const data = await fetchJSON(`${ENDPOINT_LIST}?email=${encodeURIComponent(email)}`);
+        const data = await fetchJSON(`${EP_LIST_CORES}?email=${encodeURIComponent(email)}`);
         cores = data.cores || [];
         renderCores();
         leftStatus.textContent = `Loaded ${cores.length} cores.`;
@@ -192,12 +197,39 @@
       const email = (elEmail.value || readEmail()).trim().toLowerCase();
       if (!email){ detailStatus.className='error'; detailStatus.textContent='Email required to read core.'; return; }
       try{
-        const data = await fetchJSON(ENDPOINT_READ(id, email));
+        const data = await fetchJSON(EP_READ_CORE(id, email));
         renderCoreView(data);
         detailStatus.textContent='Done.';
       }catch(err){
         detailStatus.className='error';
         detailStatus.textContent = `Failed to load core: ${err.message||err}`;
+      }
+    }
+
+    async function loadDimensions(domainId){
+      const email = (elEmail.value || readEmail()).trim().toLowerCase();
+      const mount = document.getElementById(`dims-${domainId}`);
+      if (!email || !mount) return;
+      mount.innerHTML = '<div class="muted">Loading dimensions…</div>';
+      try{
+        const data = await fetchJSON(EP_READ_DIMS(domainId, email));
+        const dims = data.dimensions || [];
+        mount.innerHTML = '';
+        if (!dims.length) {
+          mount.append(el('div', { className:'muted', text:'No dimensions yet.' }));
+        } else {
+          dims.forEach(d=>{
+            const it = el('div', { className:'dim-item' });
+            const nm = el('div', { className:'title', text: d.name || 'Dimension' });
+            const th = el('div', { className:'muted', text: d.thesis || '' });
+            const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
+            it.append(nm, th, tg);
+            mount.append(it);
+          });
+        }
+      }catch(err){
+        mount.innerHTML = '';
+        mount.append(el('div', { className:'error', text:`Failed to load dimensions: ${err.message||err}` }));
       }
     }
 
