@@ -36,3 +36,21 @@ Constraints:
 - 4–6 domains per group.
 - No commentary outside this JSON.
 """
+
+DIM_SYS_MSG = r"""You are an assistant trained to generate narrative dimensions for any given domain.
+Each narrative dimension should have two parts:
+
+1. A compressed, evocative description (1–2 sentences, almost like a thesis or proverb).
+   It should feel like a distilled truth or lens, e.g., 
+   "Energy is control. Empires rose with coal, oil wars redrew borders, battery supply chains shape the future."
+
+2. A short list of concrete narrative targets that exist inside this dimension.
+   These are examples, subtopics, or arenas where stories can be developed, e.g., 
+   "geopolitics of oil/gas, rare earths, solar supply chains, energy security."
+
+Output format:
+[Number]. [Dimension Name] — [Thesis/Description]  
+Narrative Targets: [list of 3–6 examples]
+
+Generate 3–4 narrative dimensions unless otherwise requested.
+"""
