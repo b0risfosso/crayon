@@ -77,6 +77,7 @@
     const EP_LIST_CORES = '/api/cores';
     const EP_READ_CORE  = (id, email) => `/api/cores/${id}/domains?email=${encodeURIComponent(email)}`;
     const EP_READ_DIMS  = (domainId, email) => `/api/domains/${domainId}/dimensions?email=${encodeURIComponent(email)}`;
+    const EP_LIST_THESES = (dimensionId, email) => `/api/dimensions/${dimensionId}/theses?email=${encodeURIComponent(email)}`;
 
     // ---- utils ----
     const $ = sel => document.querySelector(sel);
@@ -156,10 +157,11 @@
 
           // dimensions mount + load button
           const dimMount = el('div', { className:'dim-list', attrs:{ id:`dims-${d.id}` } });
+          const thesesMount = el('div', { className:'dim-list', attrs:{ id:`theses-${d.id}` } });
           const btn = el('button', { text:'Show dimensions', attrs:{ type:'button' }});
           btn.addEventListener('click', ()=> loadDimensions(d.id));
 
-          card.append(head, dd, btn, dimMount);
+          card.append(head, dd, btn, dimMount, thesesMount);
           doms.append(card);
         });
         block.append(gt, doms);
@@ -207,31 +209,76 @@
     }
 
     async function loadDimensions(domainId){
-      const email = (elEmail.value || readEmail()).trim().toLowerCase();
-      const mount = document.getElementById(`dims-${domainId}`);
-      if (!email || !mount) return;
-      mount.innerHTML = '<div class="muted">Loading dimensions…</div>';
-      try{
-        const data = await fetchJSON(EP_READ_DIMS(domainId, email));
-        const dims = data.dimensions || [];
-        mount.innerHTML = '';
-        if (!dims.length) {
-          mount.append(el('div', { className:'muted', text:'No dimensions yet.' }));
-        } else {
-          dims.forEach(d=>{
-            const it = el('div', { className:'dim-item' });
-            const nm = el('div', { className:'title', text: d.name || 'Dimension' });
-            const th = el('div', { className:'muted', text: d.thesis || '' });
-            const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
-            it.append(nm, th, tg);
-            mount.append(it);
-          });
+        const email = (elEmail.value || readEmail()).trim().toLowerCase();
+        const mount = document.getElementById(`dims-${domainId}`);
+        if (!email || !mount) return;
+        mount.innerHTML = '<div class="muted">Loading dimensions…</div>';
+        try{
+            const data = await fetchJSON(EP_READ_DIMS(domainId, email));
+            const dims = data.dimensions || [];
+            mount.innerHTML = '';
+            if (!dims.length) {
+            mount.append(el('div', { className:'muted', text:'No dimensions yet.' }));
+            } else {
+            // Render dimension items first
+            dims.forEach(d=>{
+                const it = el('div', { className:'dim-item' });
+                const nm = el('div', { className:'title', text: d.name || 'Dimension' });
+                const th = el('div', { className:'muted', text: d.thesis || '' });
+                const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
+                it.append(nm, th, tg);
+                mount.append(it);
+            });
+
+            // Then fetch theses+evals per dimension and render under #theses-<id>
+            for (const d of dims) {
+                await loadThesesForDimension(d.id, email);
+            }
+            }
+        }catch(err){
+            mount.innerHTML = '';
+            mount.append(el('div', { className:'error', text:`Failed to load dimensions: ${err.message||err}` }));
         }
-      }catch(err){
-        mount.innerHTML = '';
-        mount.append(el('div', { className:'error', text:`Failed to load dimensions: ${err.message||err}` }));
-      }
     }
+
+    async function loadThesesForDimension(dimensionId, email){
+        const tMount = document.getElementById(`theses-${dimensionId}`);
+        if (!tMount) return;
+        tMount.innerHTML = '<div class="muted">Loading theses…</div>';
+        try{
+            const res = await fetchJSON(EP_LIST_THESES(dimensionId, email));
+            const theses = res.theses || [];
+            tMount.innerHTML = '';
+
+            if (!theses.length){
+            tMount.append(el('div', { className:'muted', text:'No theses yet.' }));
+            return;
+            }
+
+            theses.forEach(t=>{
+            const wrap = el('div', { className:'dim-item' });
+            wrap.append(el('div', { className:'title', text: t.text || 'Thesis' }));
+            if (t.analysis){
+                const v = Array.isArray(t.analysis.verification) ? t.analysis.verification : [];
+                const verUL = `<ul>${v.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul>`;
+                const it = el('div', { className:'muted',
+                html:
+                `<div style="margin-top:.3rem;"><strong>Verification / Falsification</strong>${verUL}</div>
+                    <div style="margin-top:.3rem;"><strong>If True</strong><div>${escapeHtml(t.analysis.if_true||'')}</div></div>
+                    <div style="margin-top:.3rem;"><strong>If False (Alternative Thesis)</strong><div>${escapeHtml(t.analysis.if_false_alternative_thesis||'')}</div></div>`
+                });
+                wrap.append(it);
+            } else {
+                wrap.append(el('div', { className:'muted', text:'(no evaluation yet)' }));
+            }
+            tMount.append(wrap);
+            });
+        }catch(err){
+            tMount.innerHTML = `<span class="error">Failed to load theses: ${escapeHtml(err.message||String(err))}</span>`;
+        }
+    }
+
+
 
     // ---- events ----
     $('#loadBtn').addEventListener('click', loadCores);

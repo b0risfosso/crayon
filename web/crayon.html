@@ -73,6 +73,10 @@
     const EMAIL_KEY = 'fg_user_email';
     const EP_DOMAIN_ARCH = '/api/domain-architect';
     const EP_DIM_GEN = '/api/dimensions/generate';
+    const EP_THESIS_GEN = '/api/thesis/generate';
+    const EP_THESIS_EVAL = '/api/thesis/evaluate';
+    const EP_LIST_THESES = (dimensionId, email) => `/api/dimensions/${dimensionId}/theses?email=${encodeURIComponent(email)}`; // optional debug
+
 
     // ------- Elements -------
     const elTitle = document.getElementById('coreTitle');
@@ -160,6 +164,47 @@
         });
     }
 
+    async function generateThesisAndEval(dimensionId){
+        const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
+        const mountThesis = document.getElementById(`thesis-${dimensionId}`);
+        const mountEval   = document.getElementById(`eval-${dimensionId}`);
+        if (mountThesis) mountThesis.textContent = 'Generating thesis…';
+        if (mountEval)   mountEval.textContent   = '';
+
+        // 1) Generate thesis
+        let thesis;
+        try{
+            const res = await postJSON(EP_THESIS_GEN, {
+            email, dimension_id: dimensionId, model: 'gpt-4o-2024-08-06'
+            }, 180000);
+            thesis = res?.thesis;
+            if (!thesis?.id) throw new Error('No thesis id');
+            if (mountThesis) mountThesis.innerHTML = `<strong>Thesis:</strong> ${escapeHtml(thesis.text || '')}`;
+        }catch(err){
+            if (mountThesis) mountThesis.innerHTML = `<span class="error">Thesis failed: ${escapeHtml(err.message||String(err))}</span>`;
+            return;
+        }
+
+        // 2) Evaluate thesis
+        if (mountEval) mountEval.textContent = 'Evaluating thesis…';
+        try{
+            const res = await postJSON(EP_THESIS_EVAL, {
+            email, thesis_id: thesis.id, model: 'gpt-4o-2024-08-06', save: true
+            }, 180000);
+            const a = res?.analysis || {};
+            const ver = Array.isArray(a.verification) ? a.verification : [];
+            mountEval.innerHTML =
+            `<div><strong>Verification / Falsification</strong><ul>${
+                ver.map(v=>`<li>${escapeHtml(v)}</li>`).join('')
+            }</ul></div>
+            <div style="margin-top:.3rem;"><strong>If True</strong><div class="muted">${escapeHtml(a.if_true||'')}</div></div>
+            <div style="margin-top:.3rem;"><strong>If False (Alternative Thesis)</strong><div class="muted">${escapeHtml(a.if_false_alternative_thesis||'')}</div></div>`;
+        }catch(err){
+            if (mountEval) mountEval.innerHTML = `<span class="error">Evaluation failed: ${escapeHtml(err.message||String(err))}</span>`;
+        }
+        }
+
+
     async function generateDimsForDomain(domainId, count=3){
       const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
       if (!domainId) return;
@@ -177,9 +222,19 @@
               const nm = el('div', { className:'dim-name', text: d.name || 'Dimension' });
               const th = el('div', { className:'muted', text: d.thesis || '' });
               const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
-              it.append(nm, th, tg);
-              mount.append(it);
+
+              // NEW: mounts for thesis + evaluation
+                const thesisMount = el('div', { className:'muted', attrs:{ id:`thesis-${d.id}` } });
+                const evalMount   = el('div', { className:'muted', attrs:{ id:`eval-${d.id}` } });
+
+                it.append(nm, th, tg, thesisMount, evalMount);
+                mount.append(it);
             });
+            for (const dim of dims) {
+                if (dim?.id) {
+                    await generateThesisAndEval(dim.id);
+                }
+            }
           }
         }
       }catch(err){
