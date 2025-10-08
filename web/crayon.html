@@ -24,26 +24,29 @@
     .group-block { border:1px solid #e2e2e2; border-radius:.6rem; padding:.75rem .9rem; background: rgba(0,0,0,.02); }
     .group-title { font-weight:600; display:flex; align-items:center; gap:.45rem; margin-bottom:.4rem; }
     .domain-card { border:1px solid #e5e5e5; border-radius:.6rem; padding:.6rem .75rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
-    .domain-head { font-weight:600; margin-bottom:.25rem; display:flex; align-items:center; gap:.4rem; }
+    .domain-head { font-weight:600; margin-bottom:.25rem; display:flex; align-items:center; gap:.4rem; justify-content:space-between; }
     .meta { font-size:.9rem; opacity:.9; margin:.5rem 0 .8rem; }
     .error { color:#b00020; white-space:pre-wrap; }
+    .dim-list { margin-top:.5rem; display:grid; gap:.35rem; }
+    .dim-item { border:1px dashed #d5d5d5; border-radius:.5rem; padding:.45rem .55rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
+    .dim-name { font-weight:600; }
     pre { background:#f6f6f6; padding:.75rem; border-radius:.5rem; overflow-x:auto; }
   </style>
 </head>
 <body>
   <header>
     <h1>Fantasiagenesis · Crayon</h1>
-    <p class="muted">Enter <strong>a single core</strong> (title + description). We’ll call the Domain Architect and display its groups & domains.</p>
+    <p class="muted">Enter a single <strong>core title</strong> and <strong>description</strong>, click <em>Draw</em>. We’ll architect domains, then draw 3 dimensions per domain.</p>
   </header>
 
   <section class="panel blue" aria-labelledby="h-how">
-    <header><p id="h-how" style="margin:0;font-weight:600;">How this page works</p></header>
+    <header><p id="h-how" style="margin:0;font-weight:600;">Flow</p></header>
     <div class="content" style="font-size:.92rem; line-height:1.45;">
-      <ul style="margin: .4rem 0 0; padding-left:1.1rem; display:grid; gap:.35rem;">
-        <li>Provide a <strong>core title</strong> and <strong>core description</strong>.</li>
-        <li>Optionally add your <strong>email</strong> (recommended) so results are saved to the new schema.</li>
-        <li>Click <em>Generate Domains</em> to call <code>/api/domain-architect</code> (OpenAI).</li>
-      </ul>
+      <ol style="margin:.4rem 0 0; padding-left:1.1rem;">
+        <li>Save your email (recommended) so results persist.</li>
+        <li>Press <strong>Draw</strong> → creates core & domains via <code>/api/domain-architect</code>.</li>
+        <li>Automatically creates 3 dimensions for each domain via <code>/api/dimensions/generate</code>.</li>
+      </ol>
     </div>
   </section>
 
@@ -57,8 +60,8 @@
     </div>
 
     <div class="row">
-      <button type="submit">Generate Domains</button>
-      <span id="hint" class="muted">Provider: <span class="badge">openai</span> · Endpoint: <code>/api/domain-architect</code></span>
+      <button type="submit" id="drawBtn">Draw</button>
+      <span id="hint" class="muted">Write: <code>/api/domain-architect</code>, then <code>/api/dimensions/generate</code></span>
     </div>
   </form>
 
@@ -67,8 +70,9 @@
 
   <script>
     // ------- Config -------
-    const EMAIL_KEY = 'fg_user_email'; // reuse same key as other pages
-    const ENDPOINT = '/api/domain-architect'; // new OpenAI-only route
+    const EMAIL_KEY = 'fg_user_email';
+    const EP_DOMAIN_ARCH = '/api/domain-architect';
+    const EP_DIM_GEN = '/api/dimensions/generate';
 
     // ------- Elements -------
     const elTitle = document.getElementById('coreTitle');
@@ -98,14 +102,12 @@
     async function postJSON(url, body, timeoutMs=180000){
       const resp = await fetchWithTimeout(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }, timeoutMs);
       let data; try { data = await resp.json(); } catch { throw new Error(`Non-JSON response from ${url} (status ${resp.status})`); }
-      if (!resp.ok) {
+      if (!resp.ok || data?.ok === false) {
         const msg = (data && (data.error||data.detail)) ? `${data.error||''} ${data.detail||''}`.trim() : `HTTP ${resp.status}`;
         throw new Error(msg);
       }
       return data;
     }
-
-    // ------- Email storage -------
     function saveEmailToStorage(email){
       const v = String(email||'').trim().toLowerCase();
       if(v) localStorage.setItem(EMAIL_KEY, v); else localStorage.removeItem(EMAIL_KEY);
@@ -115,15 +117,9 @@
       const v = readEmailFromStorage();
       if (v && elEmail && !elEmail.value) elEmail.value = v;
     }
-    btnSave?.addEventListener('click', ()=>{
-      const em = (elEmail?.value||'').trim().toLowerCase();
-      if (!em) { alert('Enter an email to save.'); return; }
-      saveEmailToStorage(em);
-      const old = btnSave.textContent; btnSave.textContent = 'Saved'; setTimeout(()=> btnSave.textContent = old, 1200);
-    });
 
-    // ------- Render -------
-    function renderResult(core, result){
+    // ------- Renderer -------
+    function render(core, groups){
       container.innerHTML = '';
       const h2 = el('h2', { text: core.title });
       const desc = el('div', { className: 'muted', text: core.description || '' });
@@ -134,8 +130,7 @@
       });
       container.append(meta);
 
-      const groups = Array.isArray(result?.groups) ? result.groups : [];
-      if (!groups.length) {
+      if (!Array.isArray(groups) || !groups.length){
         container.append(el('div', { className:'muted', text:'No domain groups returned.' }));
         return;
       }
@@ -144,32 +139,57 @@
         const block = el('div', { className:'group-block' });
         const head = el('div', { className:'group-title', html: `${escapeHtml(g.title || 'Domains')} <span class="badge">group</span>` });
         const cols = el('div', { className:'columns' });
-        block.append(head, cols);
 
-        const doms = Array.isArray(g.domains) ? g.domains : [];
-        doms.forEach(d=>{
+        (g.domains||[]).forEach(d=>{
           const card = el('div', { className:'domain-card' });
-          const domHead = el('div', { className:'domain-head', html:
+          const domTitle = el('div', { className:'domain-head' });
+          const left = el('div', { html:
             `${escapeHtml(d.name || 'Untitled domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>` : ''}`
           });
+          const drawBtn = el('button', { text: 'Draw', attrs:{ type:'button', 'data-id': String(d.id||'') }});
+          drawBtn.addEventListener('click', ()=> generateDimsForDomain(d.id));
+          domTitle.append(left, drawBtn);
+
           const domDesc = el('div', { className:'muted', text: d.description || '' });
-          card.append(domHead, domDesc);
+          const dimList = el('div', { className:'dim-list', attrs: { id: `dim-${d.id}` } });
+
+          card.append(domTitle, domDesc, dimList);
           cols.append(card);
         });
 
+        block.append(head, cols);
         container.append(block);
       });
-
-      // raw JSON toggle (debug)
-      const details = el('details');
-      const sum = el('summary', { text: 'Raw JSON (debug)' });
-      const pre = el('pre');
-      pre.textContent = JSON.stringify({ core, groups: result.groups }, null, 2);
-      details.append(sum, pre);
-      container.append(details);
     }
 
-    // ------- Submit -------
+    async function generateDimsForDomain(domainId, count=3){
+      const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
+      if (!domainId) return;
+      try{
+        const res = await postJSON(EP_DIM_GEN, { email, domain_id: domainId, count, model: 'gpt-5-mini-2025-08-07' });
+        const dims = res.dimensions || [];
+        const mount = document.getElementById(`dim-${domainId}`);
+        if (mount) {
+          mount.innerHTML = '';
+          if (!dims.length) {
+            mount.append(el('div', { className:'muted', text:'No dimensions returned.' }));
+          } else {
+            dims.forEach(d=>{
+              const it = el('div', { className:'dim-item' });
+              const nm = el('div', { className:'dim-name', text: d.name || 'Dimension' });
+              const th = el('div', { className:'muted', text: d.thesis || '' });
+              const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
+              it.append(nm, th, tg);
+              mount.append(it);
+            });
+          }
+        }
+      }catch(err){
+        alert(`Failed to draw dimensions: ${err.message || err}`);
+      }
+    }
+
+    // ------- Submit (Draw) -------
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
       status.textContent = '';
@@ -182,29 +202,43 @@
       if (!title) { status.textContent = 'Please enter a core title.'; return; }
       if (!email) status.textContent = 'No email entered — results may not be saved to your account.';
 
-      const body = {
-        email: email || '',                 // backend accepts empty, but saving requires it
-        core_title: title,
-        core_description: description,
-        model: 'gpt-5-mini-2025-08-07'
-      };
-
       try {
-        status.textContent = 'Architecting domains…';
-        const data = await postJSON(ENDPOINT, body);
-        // data shape from crayon.py: { ok, provider, model, core:{...}, groups:[{title, domains:[{id,name,description}]}] }
+        status.textContent = 'Drawing domains…';
+        const data = await postJSON(EP_DOMAIN_ARCH, {
+          email: email || '',
+          core_title: title,
+          core_description: description,
+          model: 'gpt-4o-mini'
+        });
         if (!data?.ok) throw new Error(data?.error || 'Unknown error');
-        renderResult(data.core || { title, description, owner_email: email }, { groups: data.groups || [] });
+
+        render(data.core || { title, description, owner_email: email }, data.groups || []);
+        status.textContent = 'Drawing dimensions…';
+
+        // Auto-generate dimensions for each domain returned
+        const allDomains = (data.groups||[]).flatMap(g => g.domains || []);
+        for (const d of allDomains) {
+          if (d?.id) await generateDimsForDomain(d.id, 3);
+        }
+
         status.textContent = 'Done.';
         if (email) saveEmailToStorage(email);
       } catch (err) {
         status.className = 'meta error';
-        status.textContent = `Domain architecture failed: ${err.message || err}`;
+        status.textContent = `Draw failed: ${err.message || err}`;
       }
     });
 
     // ------- Init -------
-    prefillEmail();
+    btnSave?.addEventListener('click', ()=>{
+      const em = (elEmail?.value||'').trim().toLowerCase();
+      if (!em) { alert('Enter an email to save.'); return; }
+      saveEmailToStorage(em);
+      const old = btnSave.textContent; btnSave.textContent = 'Saved'; setTimeout(()=> btnSave.textContent = old, 1200);
+    });
+    function saveEmailToStorage(v){ const s = String(v||'').trim().toLowerCase(); if (s) localStorage.setItem(EMAIL_KEY, s); }
+    function readEmailFromStorage(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
+    (function prefill(){ const v = readEmailFromStorage(); if (v && !elEmail.value) elEmail.value = v; })();
   </script>
 </body>
 </html>
