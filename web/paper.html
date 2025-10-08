@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fantasiagenesis · Paper (Reader)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background: Canvas; color: CanvasText; }
+    header { padding: 1rem 1.25rem; border-bottom: 1px solid color-mix(in oklab, CanvasText 10%, transparent); display:flex; align-items:baseline; gap:1rem; }
+    header h1 { margin:0; font-size: clamp(1.2rem, 2.2vw, 1.6rem); }
+    main { display:grid; grid-template-columns: 320px 1fr; gap:1rem; padding:1rem; }
+    @media (max-width: 900px){ main { grid-template-columns: 1fr; } }
+    .panel { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.6rem; background: color-mix(in oklab, Canvas 92%, CanvasText 8%); }
+    .panel header { border:0; padding:.8rem 1rem; font-weight:600; }
+    .panel .content { padding: .8rem 1rem 1rem; }
+    .muted { opacity:.85; font-size:.9rem; }
+    input[type="email"], input[type="text"] { width:100%; height:2.5rem; padding:.6rem .7rem; border:1px solid #c9c9c9; border-radius:.55rem; }
+    button { padding:.6rem .9rem; border:0; border-radius:.55rem; background:#0b5cff; color:#fff; cursor:pointer; }
+    button.secondary { background:#444; }
+    .row { display:flex; gap:.5rem; align-items:center; }
+    .list { display:grid; gap:.4rem; }
+    .item { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.55rem; padding:.55rem .65rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); cursor:pointer; }
+    .item:hover { outline:2px solid color-mix(in oklab, #0b5cff 35%, transparent); }
+    .title { font-weight:600; }
+    .meta { font-size:.9rem; opacity:.9; margin-top:.2rem; }
+    .badge { font-size:.8rem; padding:.1rem .4rem; border:1px solid #ddd; border-radius:.4rem; }
+    .group { border:1px solid #e2e2e2; border-radius:.55rem; padding:.6rem .75rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
+    .groups { display:grid; gap:.7rem; }
+    .domains { display:grid; gap:.5rem; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); }
+    .domain { border:1px solid #e5e5e5; border-radius:.55rem; padding:.55rem .7rem; }
+    .error { color:#b00020; white-space:pre-wrap; }
+    details { margin-top:.6rem; }
+    pre { background:#f6f6f6; padding:.65rem; border-radius:.5rem; overflow:auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fantasiagenesis · Paper</h1>
+    <div class="muted">Read cores & domains by owner email</div>
+  </header>
+
+  <main>
+    <!-- Left: controls + core list -->
+    <section class="panel" aria-labelledby="left-head">
+      <header id="left-head">Owner</header>
+      <div class="content">
+        <div class="row" style="gap:.4rem; margin-bottom:.6rem;">
+          <input id="emailInput" type="email" placeholder="you@example.com" />
+          <button id="saveEmail" class="secondary" title="Save email locally">Save</button>
+        </div>
+        <div class="row" style="gap:.4rem; margin-bottom:.6rem;">
+          <input id="searchInput" type="text" placeholder="Filter cores by title…" />
+          <button id="loadBtn">Load Cores</button>
+        </div>
+        <div id="leftStatus" class="muted"></div>
+        <div id="coreList" class="list" role="list" aria-label="Cores"></div>
+      </div>
+    </section>
+
+    <!-- Right: details -->
+    <section class="panel" aria-labelledby="right-head">
+      <header id="right-head">Details</header>
+      <div class="content">
+        <div id="detailStatus" class="muted"></div>
+        <div id="details"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ---- config ----
+    const EMAIL_KEY = 'fg_user_email';
+    const ENDPOINT_LIST = '/api/cores';                   // ?email=...
+    const ENDPOINT_READ = (id, email) => `/api/cores/${id}/domains?email=${encodeURIComponent(email)}`;
+
+    // ---- utils ----
+    const $ = sel => document.querySelector(sel);
+    function el(tag, opts={}){ const n=document.createElement(tag);
+      if (opts.className) n.className = opts.className;
+      if ('text' in opts) n.textContent = opts.text;
+      if ('html' in opts) n.innerHTML = opts.html;
+      if (opts.attrs) for (const [k,v] of Object.entries(opts.attrs)) n.setAttribute(k,v);
+      return n;
+    }
+    function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+    async function fetchJSON(url, opts={}){
+      const r = await fetch(url, { headers:{'Accept':'application/json'}, ...opts });
+      let data; try { data = await r.json(); } catch { throw new Error(`Non-JSON from ${url} (HTTP ${r.status})`); }
+      if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
+      return data;
+    }
+    function saveEmail(v){ v = (v||'').trim().toLowerCase(); if (v) localStorage.setItem(EMAIL_KEY, v); }
+    function readEmail(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
+
+    // ---- elements ----
+    const elEmail = $('#emailInput');
+    const elSave  = $('#saveEmail');
+    const elSearch= $('#searchInput');
+    const elLoad  = $('#loadBtn');
+    const coreList= $('#coreList');
+    const leftStatus = $('#leftStatus');
+    const detailStatus = $('#detailStatus');
+    const details = $('#details');
+
+    // ---- state ----
+    let cores = [];
+    let selectedCoreId = null;
+
+    // ---- render ----
+    function renderCores(){
+      coreList.innerHTML = '';
+      const q = (elSearch.value||'').toLowerCase();
+      const filtered = !q ? cores : cores.filter(c => (c.title||'').toLowerCase().includes(q));
+      if (!filtered.length){
+        coreList.append(el('div', { className:'muted', text:'No cores.' }));
+        return;
+      }
+      filtered.forEach(c=>{
+        const item = el('div', { className:'item', attrs:{ role:'listitem', tabindex:'0', 'data-id':String(c.id) } });
+        const t = el('div', { className:'title', html:`${escapeHtml(c.title)} <span class="badge">#${c.id}</span>` });
+        const m = el('div', { className:'meta', html:`Owner: <code>${escapeHtml(c.owner_email||'')}</code> · ${escapeHtml((c.created_at||'').replace('T',' ').replace('Z',''))}` });
+        item.append(t, m);
+        item.addEventListener('click', ()=> loadCore(c.id));
+        item.addEventListener('keypress', (e)=>{ if(e.key==='Enter') loadCore(c.id); });
+        coreList.append(item);
+      });
+    }
+
+    function renderCoreView(payload){
+      details.innerHTML = '';
+      if (!payload?.core){
+        details.append(el('div',{className:'muted', text:'No details.'}));
+        return;
+      }
+      const { core, groups } = payload;
+
+      const h2 = el('h2', { text: core.title || 'Untitled core' });
+      const meta = el('div', { className:'meta', html:
+        `Core ID: <span class="badge">${escapeHtml(String(core.id))}</span> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'')}</span>`
+      });
+      const desc = el('div', { className:'muted', text: core.description || '' });
+
+      details.append(h2, meta, desc);
+
+      const groupsWrap = el('div', { className:'groups', attrs:{ 'aria-label':'Domain groups' } });
+      (groups || []).forEach(g=>{
+        const block = el('div', { className:'group' });
+        const gt = el('div', { className:'title', text: g.title || 'Group' });
+        const doms = el('div', { className:'domains' });
+        (g.domains || []).forEach(d=>{
+          const card = el('div', { className:'domain' });
+          const head = el('div', { className:'title', html:`${escapeHtml(d.name||'Domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>`:''}` });
+          const dd = el('div', { className:'muted', text: d.description || '' });
+          card.append(head, dd);
+          doms.append(card);
+        });
+        block.append(gt, doms);
+        groupsWrap.append(block);
+      });
+      details.append(groupsWrap);
+
+      const det = el('details');
+      det.append(el('summary',{text:'Raw JSON (debug)'}), el('pre',{text: JSON.stringify(payload,null,2)}));
+      details.append(det);
+    }
+
+    // ---- actions ----
+    async function loadCores(){
+      leftStatus.className='muted'; leftStatus.textContent='Loading cores…';
+      coreList.innerHTML='';
+      details.innerHTML=''; detailStatus.textContent='';
+      const email = (elEmail.value || readEmail()).trim().toLowerCase();
+      if (!email){ leftStatus.className='error'; leftStatus.textContent='Please enter an email.'; return; }
+      try{
+        const data = await fetchJSON(`${ENDPOINT_LIST}?email=${encodeURIComponent(email)}`);
+        cores = data.cores || [];
+        renderCores();
+        leftStatus.textContent = `Loaded ${cores.length} cores.`;
+        if (cores.length) loadCore(cores[0].id);
+        saveEmail(email);
+      }catch(err){
+        leftStatus.className='error';
+        leftStatus.textContent = `Failed to load cores: ${err.message||err}`;
+      }
+    }
+
+    async function loadCore(id){
+      selectedCoreId = id;
+      details.innerHTML=''; detailStatus.className='muted'; detailStatus.textContent='Loading core details…';
+      const email = (elEmail.value || readEmail()).trim().toLowerCase();
+      if (!email){ detailStatus.className='error'; detailStatus.textContent='Email required to read core.'; return; }
+      try{
+        const data = await fetchJSON(ENDPOINT_READ(id, email));
+        renderCoreView(data);
+        detailStatus.textContent='Done.';
+      }catch(err){
+        detailStatus.className='error';
+        detailStatus.textContent = `Failed to load core: ${err.message||err}`;
+      }
+    }
+
+    // ---- events ----
+    $('#loadBtn').addEventListener('click', loadCores);
+    $('#saveEmail').addEventListener('click', ()=>{
+      const v = (elEmail.value||'').trim().toLowerCase();
+      if (!v) return alert('Enter an email to save.');
+      saveEmail(v);
+      const btn = $('#saveEmail'); const old = btn.textContent; btn.textContent='Saved'; setTimeout(()=> btn.textContent=old, 1000);
+    });
+    $('#searchInput').addEventListener('input', renderCores);
+
+    // ---- init ----
+    (function init(){
+      const saved = readEmail();
+      if (saved && !elEmail.value) elEmail.value = saved;
+    })();
+  </script>
+</body>
+</html>
