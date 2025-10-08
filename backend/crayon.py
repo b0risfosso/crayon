@@ -432,8 +432,8 @@ def api_domain_architect():
             ]
         ), 200
 
-@app.get("/api/cores")
-def list_cores():
+@app.get("/api/cores/<int:core_id>/domains")
+def crayon_read_core_with_domains(core_id: int):
     """
     GET /api/cores?email=...
     Returns a lightweight list of cores for that owner.
@@ -466,7 +466,7 @@ def list_cores():
     )
 
 @app.get("/api/cores")
-def list_cores():
+def crayon_list_cores():
     """
     GET /api/cores?email=...
     Returns a lightweight list of cores for that owner.
