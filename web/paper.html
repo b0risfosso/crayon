@@ -40,7 +40,7 @@
 <body>
   <header>
     <h1>Fantasiagenesis · Paper</h1>
-    <div class="muted">Read cores, domains, and dimensions by owner email</div>
+    <div class="muted">See drawings</div>
   </header>
 
   <main>
@@ -54,7 +54,7 @@
         </div>
         <div class="row" style="gap:.4rem; margin-bottom:.6rem;">
           <input id="searchInput" type="text" placeholder="Filter cores by title…" />
-          <button id="loadBtn">Load Cores</button>
+          <button id="loadBtn">Load Paper</button>
         </div>
         <div id="leftStatus" class="muted"></div>
         <div id="coreList" class="list" role="list" aria-label="Cores"></div>
@@ -134,43 +134,54 @@
 
     // ---- render core view (domains + dimensions) ----
     function renderCoreView(payload){
-      details.innerHTML = '';
-      if (!payload?.core){ details.append(el('div',{className:'muted', text:'No details.'})); return; }
-      const { core, groups } = payload;
+        details.innerHTML = '';
+        if (!payload?.core){
+            details.append(el('div',{className:'muted', text:'No details.'}));
+            return;
+        }
+        const { core, groups } = payload;
 
-      const h2 = el('h2', { text: core.title || 'Untitled core' });
-      const meta = el('div', { className:'meta', html:
-        `Core ID: <span class="badge">${escapeHtml(String(core.id))}</span> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'')}</span>`
-      });
-      const desc = el('div', { className:'muted', text: core.description || '' });
-      details.append(h2, meta, desc);
-
-      const groupsWrap = el('div', { className:'groups', attrs:{ 'aria-label':'Domain groups' } });
-      (groups || []).forEach(g=>{
-        const block = el('div', { className:'group' });
-        const gt = el('div', { className:'title', text: g.title || 'Group' });
-        const doms = el('div', { className:'domains' });
-        (g.domains || []).forEach(d=>{
-          const card = el('div', { className:'domain' });
-          const head = el('div', { className:'title', html:`${escapeHtml(d.name||'Domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>`:''}` });
-          const dd = el('div', { className:'muted', text: d.description || '' });
-
-          // dimensions mount + load button
-          const dimMount = el('div', { className:'dim-list', attrs:{ id:`dims-${d.id}` } });
-          const btn = el('button', { text:'Show dimensions', attrs:{ type:'button' }});
-          btn.addEventListener('click', ()=> loadDimensions(d.id));
-
-          doms.append(card);
+        const h2 = el('h2', { text: core.title || 'Untitled core' });
+        const meta = el('div', { className:'meta', html:
+            `Core ID: <span class="badge">${escapeHtml(String(core.id))}</span> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'')}</span>`
         });
-        block.append(gt, doms);
-        groupsWrap.append(block);
-      });
-      details.append(groupsWrap);
+        const desc = el('div', { className:'muted', text: core.description || '' });
+        details.append(h2, meta, desc);
 
-      const det = el('details');
-      det.append(el('summary',{text:'Raw JSON (debug)'}), el('pre',{text: JSON.stringify(payload,null,2)}));
-      details.append(det);
-    }
+        const groupsWrap = el('div', { className:'groups', attrs:{ 'aria-label':'Domain groups' } });
+        (groups || []).forEach(g=>{
+            const block = el('div', { className:'group' });
+            const gt = el('div', { className:'title', text: g.title || 'Group' });
+            const doms = el('div', { className:'domains' });
+
+            (g.domains || []).forEach(d=>{
+            const card = el('div', { className:'domain' });
+            const head = el('div', { className:'title', html:
+                `${escapeHtml(d.name||'Domain')} ${d.id ? `<span class="badge">id ${escapeHtml(String(d.id))}</span>`:''}`
+            });
+            const dd = el('div', { className:'muted', text: d.description || '' });
+
+            // per-domain dimensions mount + button
+            const dimMount = el('div', { className:'dim-list', attrs:{ id:`dims-${d.id}` } });
+            const btn = el('button', { text:'Show picture', attrs:{ type:'button' }});
+            btn.addEventListener('click', ()=> loadDimensions(d.id));
+
+            // 🔧 append the parts to the card (this was missing)
+            card.append(head, dd, btn, dimMount);
+
+            doms.append(card);
+            });
+
+            block.append(gt, doms);
+            groupsWrap.append(block);
+        });
+        details.append(groupsWrap);
+
+        const det = el('details');
+        det.append(el('summary',{text:'Raw JSON (debug)'}), el('pre',{text: JSON.stringify(payload,null,2)}));
+        details.append(det);
+        }
+
 
     // ---- actions ----
     async function loadCores(){
