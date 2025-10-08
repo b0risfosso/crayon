@@ -432,6 +432,73 @@ def api_domain_architect():
             ]
         ), 200
 
+@app.get("/api/cores")
+def list_cores():
+    """
+    GET /api/cores?email=...
+    Returns a lightweight list of cores for that owner.
+    """
+    q_email = (request.args.get("email") or "").strip().lower()
+    if not q_email:
+        return jsonify(ok=False, error="Missing required query param: email"), 400
+
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, title, description, owner_email, provider, created_at
+            FROM fantasia_core
+            WHERE lower(owner_email) = ?
+            ORDER BY created_at DESC
+            """,
+            (q_email,)
+        ).fetchall()
+
+    return jsonify(
+        ok=True,
+        cores=[{
+            "id": r["id"],
+            "title": r["title"],
+            "description": r["description"] or "",
+            "owner_email": r["owner_email"],
+            "provider": r["provider"] or None,
+            "created_at": r["created_at"],
+        } for r in rows]
+    )
+
+@app.get("/api/cores")
+def list_cores():
+    """
+    GET /api/cores?email=...
+    Returns a lightweight list of cores for that owner.
+    """
+    q_email = (request.args.get("email") or "").strip().lower()
+    if not q_email:
+        return jsonify(ok=False, error="Missing required query param: email"), 400
+
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, title, description, owner_email, provider, created_at
+            FROM fantasia_core
+            WHERE lower(owner_email) = ?
+            ORDER BY created_at DESC
+            """,
+            (q_email,)
+        ).fetchall()
+
+    return jsonify(
+        ok=True,
+        cores=[{
+            "id": r["id"],
+            "title": r["title"],
+            "description": r["description"] or "",
+            "owner_email": r["owner_email"],
+            "provider": r["provider"] or None,
+            "created_at": r["created_at"],
+        } for r in rows]
+    )
+
+
 
 if __name__ == "__main__":
     # Initialize on boot, then serve
