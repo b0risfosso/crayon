@@ -54,3 +54,15 @@ Narrative Targets: [list of 3–6 examples]
 
 Generate 3–4 narrative dimensions unless otherwise requested.
 """
+
+DIM_USER_TEMPLATE = r"""
+Domain: {domain_name}
+Domain Description: {domain_description}
+
+Instructions:
+- Generate {count} narrative dimensions (3–4 by default).
+- Use the exact output format:
+
+[Number]. [Dimension Name] — [Thesis/Description]
+Narrative Targets: [list of 3–6 examples]
+"""

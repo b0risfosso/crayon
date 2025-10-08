@@ -3,7 +3,7 @@ import os
 from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request, Response
-from typing import List, Optional, Literal, Any, Dict
+from typing import List, Optional, Literal, Any, Dict, Tuple
 from pydantic import BaseModel, Field, conlist
 from openai import OpenAI, OpenAIError
 # app.py (top-level, after Flask app creation)
@@ -23,6 +23,7 @@ import time
 from datetime import datetime
 from crayon_prompts import (
     DIM_SYS_MSG,
+    DIM_USER_TEMPLATE,
     DOMAIN_ARCHITECT_SYS_MSG,
     DOMAIN_ARCHITECT_USER_TEMPLATE,
 )
