@@ -39,14 +39,6 @@ app = Flask(__name__)
 # crayon.py
 # Minimal Flask service + SQLite initializer for the new Fantasia schema.
 
-from __future__ import annotations
-import os
-import json
-import sqlite3
-from pathlib import Path
-from datetime import datetime
-from flask import Flask, jsonify, request
-
 DB_PATH = "/var/www/site/data/crayon_data.db"
 DATA_DIR = str(Path(DB_PATH).parent)
 
