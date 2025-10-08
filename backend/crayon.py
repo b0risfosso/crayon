@@ -313,6 +313,18 @@ def create_domain(conn: sqlite3.Connection, core_id: int, name: str, description
     )
     return int(cur.lastrowid)
 
+def render_prompt(template: str, **vars) -> str:
+    """
+    Safely render a template that contains literal JSON braces.
+    Escapes all braces, then restores the two known placeholders.
+    """
+    safe = template.replace("{", "{{").replace("}", "}}")
+    # restore actual placeholders
+    for k in ("fantasia_core", "fantasia_core_description"):
+        safe = safe.replace("{{" + k + "}}", "{" + k + "}")
+    return safe.format(**vars)
+
+
 
 # --- API: Domain Architect (OpenAI only) ---
 @app.post("/api/domain-architect")
@@ -336,10 +348,12 @@ def api_domain_architect():
         return jsonify(ok=False, error="Missing required fields: email, core_title"), 400
 
     # Prepare the LLM user message from your template
-    user_msg = DOMAIN_ARCHITECT_USER_TEMPLATE.format(
+    user_msg = render_prompt(
+        DOMAIN_ARCHITECT_USER_TEMPLATE,
         fantasia_core=core_title,
         fantasia_core_description=core_desc or "",
     )
+
 
     # Run the model
     try:
