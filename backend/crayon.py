@@ -619,22 +619,22 @@ def api_generate_dimensions():
 
     # Fetch + auth
     with connect() as conn:
-    row = conn.execute(
-        """
-        SELECT
-          d.id   AS domain_id,
-          d.name AS domain_name,
-          COALESCE(d.description,'') AS domain_description,
-          c.id   AS core_id,
-          c.title AS core_name,
-          COALESCE(c.description,'') AS core_description,
-          c.owner_email
-        FROM fantasia_domain d
-        JOIN fantasia_core   c ON c.id = d.core_id
-        WHERE d.id = ?
-        """,
-        (domain_id,)
-    ).fetchone()
+        row = conn.execute(
+            """
+            SELECT
+            d.id   AS domain_id,
+            d.name AS domain_name,
+            COALESCE(d.description,'') AS domain_description,
+            c.id   AS core_id,
+            c.title AS core_name,
+            COALESCE(c.description,'') AS core_description,
+            c.owner_email
+            FROM fantasia_domain d
+            JOIN fantasia_core   c ON c.id = d.core_id
+            WHERE d.id = ?
+            """,
+            (domain_id,)
+        ).fetchone()
 
         if not row:
             return jsonify(ok=False, error="Domain not found"), 404
