@@ -85,12 +85,20 @@
     const EP_THESIS_GEN  = '/api/thesis/generate';
     const EP_THESIS_EVAL = '/api/thesis/evaluate';
     const EP_LIST_THESES = (dimensionId, email) => `/api/dimensions/${dimensionId}/theses?email=${encodeURIComponent(email)}`;
-
+  
     // ------- Elements -------
     const elEmail = document.getElementById('emailInput');
     const btnSave = document.getElementById('saveEmailBtn');
     const container = document.getElementById('container');
-
+  
+    // NEW: central inline status helper (no popups)
+    function setStatus(msg, level='info', nodeId='multiStatus'){
+      const n = document.getElementById(nodeId);
+      if (!n) return;
+      n.textContent = msg || '';
+      n.style.color = (level === 'error') ? '#b00020' : 'inherit';
+    }
+  
     // ------- Utils -------
     function el(tag, opts={}) {
       const n = document.createElement(tag);
@@ -116,40 +124,40 @@
       }
       return data;
     }
-
+  
     // Run an async iterator over items with at most `limit` in-flight
     async function mapLimit(items, limit, iteratee) {
-        const results = new Array(items.length);
-        let next = 0, active = 0;
-        return new Promise((resolve, reject) => {
-            const launch = () => {
-            while (active < limit && next < items.length) {
-                const i = next++;
-                active++;
-                Promise.resolve()
-                .then(() => iteratee(items[i], i))
-                .then(r => { results[i] = r; })
-                .catch(reject)
-                .finally(() => {
-                    active--;
-                    if (results.length === items.length && next >= items.length && active === 0) resolve(results);
-                    else launch();
-                });
-            }
-            };
-            launch();
-        });
+      const results = new Array(items.length);
+      let next = 0, active = 0;
+      return new Promise((resolve, reject) => {
+        const launch = () => {
+          while (active < limit && next < items.length) {
+            const i = next++;
+            active++;
+            Promise.resolve()
+              .then(() => iteratee(items[i], i))
+              .then(r => { results[i] = r; })
+              .catch(reject)
+              .finally(() => {
+                active--;
+                if (results.length === items.length && next >= items.length && active === 0) resolve(results);
+                else launch();
+              });
+          }
+        };
+        launch();
+      });
     }
-
+  
     function saveEmailToStorage(v){ const s = String(v||'').trim().toLowerCase(); if (s) localStorage.setItem(EMAIL_KEY, s); else localStorage.removeItem(EMAIL_KEY); }
     function readEmailFromStorage(){ return (localStorage.getItem(EMAIL_KEY)||'').trim().toLowerCase(); }
     function prefillEmail(){ const v = readEmailFromStorage(); if (v && elEmail && !elEmail.value) elEmail.value = v; }
-
+  
     // ------- Multi-core inputs -------
     function coreRowTemplate(i){
       const wrap  = el('div', { className:'core-row', attrs:{ 'data-idx': String(i) }});
       const title = el('input', { attrs:{ type:'text', placeholder:'Core title… (e.g., Chicago Microgrids)', name:`core_title_${i}` }});
-      const desc  = el('input', { attrs:{ type:'text', placeholder:'Core description… (what are you creating / exploring / building? - "building solar microgrids in the city of Chicago")', name:`core_desc_${i}` }});
+      const desc  = el('input', { attrs:{ type:'text', placeholder:'Core description… (what you are creating / exploring / building? - "building solar microgrids in the city of Chicago")', name:`core_desc_${i}` }});
       const row   = el('div', { className:'row' });
       const del   = el('button', { className:'secondary', text:'Remove', attrs:{ type:'button' }});
       del.addEventListener('click', ()=> wrap.remove());
@@ -172,29 +180,29 @@
       });
       return pairs;
     }
-
+  
     // ------- Renderer -------
     function render(core, groups){
       if (container.children.length) container.append(el('hr'));
       const h2 = el('h2', { text: core.title });
       const desc = el('div', { className: 'muted', text: core.description || '' });
       container.append(h2, desc);
-
+  
       const meta = el('div', { className:'meta', html:
         `Core ID: <code>${escapeHtml(String(core.id || ''))}</code> · Owner: <code>${escapeHtml(core.owner_email||'')}</code> · Provider: <span class="badge">${escapeHtml(core.provider||'openai')}</span>`
       });
       container.append(meta);
-
+  
       if (!Array.isArray(groups) || !groups.length){
         container.append(el('div', { className:'muted', text:'No domain groups returned.' }));
         return;
       }
-
+  
       groups.forEach(g=>{
         const block = el('div', { className:'group-block' });
         const head = el('div', { className:'group-title', html: `${escapeHtml(g.title || 'Domains')} <span class="badge">group</span>` });
         const cols = el('div', { className:'columns' });
-
+  
         (g.domains||[]).forEach(d=>{
           const card = el('div', { className:'domain-card' });
           const domTitle = el('div', { className:'domain-head', html:
@@ -205,12 +213,12 @@
           card.append(domTitle, domDesc, dimList);
           cols.append(card);
         });
-
+  
         block.append(head, cols);
         container.append(block);
       });
     }
-
+  
     // ------- Thesis + Evaluation -------
     async function generateThesisAndEval(dimensionId){
       const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
@@ -218,7 +226,7 @@
       const mountEval   = document.getElementById(`eval-${dimensionId}`);
       if (mountThesis) mountThesis.textContent = 'Generating thesis…';
       if (mountEval)   mountEval.textContent   = '';
-
+  
       // 1) Generate thesis
       let thesis;
       try{
@@ -229,10 +237,11 @@
         if (!thesis?.id) throw new Error('No thesis id');
         if (mountThesis) mountThesis.innerHTML = `<strong>Thesis:</strong> ${escapeHtml(thesis.text || '')}`;
       }catch(err){
+        console.error('Thesis failed:', err);
         if (mountThesis) mountThesis.innerHTML = `<span class="error">Thesis failed: ${escapeHtml(err.message||String(err))}</span>`;
         return;
       }
-
+  
       // 2) Evaluate thesis
       if (mountEval) mountEval.textContent = 'Evaluating thesis…';
       try{
@@ -248,10 +257,11 @@
           <div style="margin-top:.3rem;"><strong>If True</strong><div class="muted">${escapeHtml(a.if_true||'')}</div></div>
           <div style="margin-top:.3rem;"><strong>If False (Alternative Thesis)</strong><div class="muted">${escapeHtml(a.if_false_alternative_thesis||'')}</div></div>`;
       }catch(err){
+        console.error('Evaluation failed:', err);
         if (mountEval) mountEval.innerHTML = `<span class="error">Evaluation failed: ${escapeHtml(err.message||String(err))}</span>`;
       }
     }
-
+  
     // ------- Dimensions -------
     async function generateDimsForDomain(domainId, count=3){
       const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
@@ -283,10 +293,11 @@
           }
         }
       }catch(err){
-        alert(`Failed to draw dimensions: ${err.message || err}`);
+        console.error('Failed to draw dimensions:', err);
+        setStatus(`Failed to draw dimensions for domain ${domainId}: ${err.message || err}`, 'error');
       }
     }
-
+  
     // ------- Domain Architect (single call helper) -------
     async function runDomainArchitect(email, title, description, model='gpt-5-mini-2025-08-07'){
       return postJSON(EP_DOMAIN_ARCH, {
@@ -296,69 +307,79 @@
         model
       }, 600000);
     }
-
+  
     // ------- Draw All (sequential multi-core) -------
     async function processSingleCore(p, email, multiStatus, idx, total) {
-        multiStatus.textContent = `Drawing "${p.title}"… (${idx+1}/${total})`;
-
-        // 1) Domain Architect
-        const arch = await runDomainArchitect(email, p.title, p.description);
-
-        // 2) Render the result (stacked)
-        render(arch.core || { title: p.title, description: p.description, owner_email: email }, arch.groups || []);
-
-        // 3) For each domain -> dimensions -> thesis/eval (limit concurrency inside a core)
-        const groups = arch.groups || [];
-        const domains = groups.flatMap(g => g.domains || []).filter(d => d?.id);
-
-        const innerLimit = Math.min(2, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2);
-        await mapLimit(domains, innerLimit, async (d) => {
-            await generateDimsForDomain(d.id, 3);
-        });
-
-        multiStatus.textContent = `Done "${p.title}". (${idx+1}/${total})`;
-        }
-
-    async function drawAllSequential(){ // keeps the same id hook
-        const email = (elEmail?.value || readEmailFromStorage() || '').trim().toLowerCase();
-        const multiStatus = document.getElementById('multiStatus');
-        if (!email){ alert('Enter owner email first.'); return; }
-
-        const pairs = readCorePairs();
-        if (!pairs.length){ alert('Add at least one core.'); return; }
-
-        // Read pool size from UI; fallback to 2 if missing
-        const n = Math.max(1, Math.min(8, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2));
-
-        let completed = 0;
-        multiStatus.textContent = `Starting… 0 / ${pairs.length} (concurrency ${n})`;
-
-        try {
-            await mapLimit(pairs, n, async (p, i) => {
-            try {
-                await processSingleCore(p, email, multiStatus, i, pairs.length);
-            } catch (err) {
-                console.error(err);
-                container.append(el('div',{className:'error',text:`Failed on "${p.title}": ${err.message||err}`}));
-            } finally {
-                completed++;
-                multiStatus.textContent = `Progress: ${completed} / ${pairs.length} (concurrency ${n})`;
-                await new Promise(r=>setTimeout(r, 100)); // small breather for UI paints
-            }
-            });
-        } finally {
-            multiStatus.textContent = `All done. ${completed} / ${pairs.length} succeeded.`;
-            if (email) saveEmailToStorage(email);
-        }
+      multiStatus.textContent = `Drawing "${p.title}"… (${idx+1}/${total})`;
+  
+      // 1) Domain Architect
+      const arch = await runDomainArchitect(email, p.title, p.description);
+  
+      // 2) Render the result (stacked)
+      render(arch.core || { title: p.title, description: p.description, owner_email: email }, arch.groups || []);
+  
+      // 3) For each domain -> dimensions -> thesis/eval (limit concurrency inside a core)
+      const groups = arch.groups || [];
+      const domains = groups.flatMap(g => g.domains || []).filter(d => d?.id);
+  
+      const innerLimit = Math.min(2, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2);
+      await mapLimit(domains, innerLimit, async (d) => {
+        await generateDimsForDomain(d.id, 3);
+      });
+  
+      multiStatus.textContent = `Done "${p.title}". (${idx+1}/${total})`;
     }
-
-
+  
+    async function drawAllSequential(){ // keeps the same id hook
+      const email = (elEmail?.value || readEmailFromStorage() || '').trim().toLowerCase();
+      const multiStatus = document.getElementById('multiStatus');
+  
+      if (!email){
+        setStatus('Enter owner email first.', 'error');
+        return;
+      }
+  
+      const pairs = readCorePairs();
+      if (!pairs.length){
+        setStatus('Add at least one core.', 'error');
+        return;
+      }
+  
+      // Read pool size from UI; fallback to 2 if missing
+      const n = Math.max(1, Math.min(8, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2));
+  
+      let completed = 0;
+      setStatus(`Starting… 0 / ${pairs.length} (concurrency ${n})`);
+  
+      try {
+        await mapLimit(pairs, n, async (p, i) => {
+          try {
+            await processSingleCore(p, email, multiStatus, i, pairs.length);
+          } catch (err) {
+            console.error(err);
+            container.append(el('div',{className:'error',text:`Failed on "${p.title}": ${err.message||err}`}));
+          } finally {
+            completed++;
+            setStatus(`Progress: ${completed} / ${pairs.length} (concurrency ${n})`);
+            await new Promise(r=>setTimeout(r, 100)); // small breather for UI paints
+          }
+        });
+      } finally {
+        setStatus(`All done. ${completed} / ${pairs.length} succeeded.`);
+        if (email) saveEmailToStorage(email);
+      }
+    }
+  
     // ------- Init -------
     btnSave?.addEventListener('click', ()=>{
       const em = (elEmail?.value||'').trim().toLowerCase();
-      if (!em) { alert('Enter an email to save.'); return; }
+      if (!em) {
+        setStatus('Enter an email to save.', 'error');
+        return;
+      }
       saveEmailToStorage(em);
       const old = btnSave.textContent; btnSave.textContent = 'Saved'; setTimeout(()=> btnSave.textContent = old, 1200);
+      setStatus('Email saved.');
     });
     (function init(){
       prefillEmail();
@@ -368,5 +389,6 @@
       document.getElementById('drawAllBtn').addEventListener('click', drawAllSequential);
     })();
   </script>
+  
 </body>
 </html>
