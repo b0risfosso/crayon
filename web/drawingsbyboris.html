@@ -5,45 +5,156 @@
   <title>Fantasiagenesis · Drawings by Boris</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      color-scheme: light dark;
+
+      /* LIGHT defaults */
+      --bg: #ffffff;
+      --text: #101114;
+      --muted: 0.75;
+      --border: #e4e7ee;
+      --surface: #f7f8fb;
+      --surface-2: #f3f5f9;
+      --elev: #ffffff;
+      --accent: #0b5cff;
+      --accent-contrast: #ffffff;
+
+      /* Info blocks (light) */
+      --info-bg: #eaf3ff;   --info-bd: #cfe3ff;   --info-bar: #8bbcff;
+      --warn-bg: #fff8db;   --warn-bd: #f5e7a3;   --warn-bar: #e2c85a;
+      --true-bg: #e9f7ef;   --true-bd: #c9ecd6;   --true-bar: #88d19e;
+      --false-bg:#fdecea;   --false-bd:#f7c7c3;   --false-bar:#f39a93;
+
+      --radius: .6rem;
+      --radius-sm: .55rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        /* DARK defaults when in Auto */
+        --bg: #0f1115;
+        --text: #e9ecf1;
+        --muted: 0.85;
+        --border: #2a2f3a;
+        --surface: #141821;
+        --surface-2: #171b25;
+        --elev: #181d27;
+        --accent: #6aa4ff;
+        --accent-contrast: #0c1220;
+
+        /* Info blocks (dark tuned) */
+        --info-bg:#0f213a;  --info-bd:#1a355a;  --info-bar:#305b9a;
+        --warn-bg:#2b2410;  --warn-bd:#4a3e19;  --warn-bar:#7a6425;
+        --true-bg:#11281d;  --true-bd:#1d3c2b;  --true-bar:#2c6a49;
+        --false-bg:#2a1412; --false-bd:#46231f; --false-bar:#7a3a34;
+      }
+    }
+
+    /* Manual override support */
+    html[data-theme="light"] { color-scheme: light; }
+    html[data-theme="dark"]  { color-scheme: dark; }
+    html[data-theme="light"] :root,
+    html[data-theme="light"] body {
+      --bg:#ffffff; --text:#101114; --border:#e4e7ee; --surface:#f7f8fb; --surface-2:#f3f5f9; --elev:#ffffff;
+      --accent:#0b5cff; --accent-contrast:#ffffff;
+    }
+    html[data-theme="dark"] :root,
+    html[data-theme="dark"] body {
+      --bg:#0f1115; --text:#e9ecf1; --border:#2a2f3a; --surface:#141821; --surface-2:#171b25; --elev:#181d27;
+      --accent:#6aa4ff; --accent-contrast:#0c1220;
+    }
+
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background: Canvas; color: CanvasText; }
-    header { padding: 1rem 1.25rem; border-bottom: 1px solid color-mix(in oklab, CanvasText 10%, transparent); display:flex; align-items:baseline; gap:1rem; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display:flex; align-items:baseline; gap:1rem;
+    }
     header h1 { margin:0; font-size: clamp(1.2rem, 2.2vw, 1.6rem); }
     header nav { margin-left:auto; display:flex; gap:.8rem; align-items:center; }
     header a { color:inherit; text-decoration:none; }
-    header a:hover { text-decoration: underline; color: color-mix(in oklab, dodgerblue 60%, CanvasText 40%); }
+    header a:hover { text-decoration: underline; color: var(--accent); }
+
     main { display:grid; grid-template-columns: 320px 1fr; gap:1rem; padding:1rem; }
     @media (max-width: 900px){ main { grid-template-columns: 1fr; } }
-    .panel { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.6rem; background: color-mix(in oklab, Canvas 92%, CanvasText 8%); }
+
+    .panel {
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
     .panel header { border:0; padding:.8rem 1rem; font-weight:600; }
     .panel .content { padding: .8rem 1rem 1rem; }
-    .muted { opacity:.85; font-size:.9rem; }
-    input[type="text"] { width:100%; height:2.5rem; padding:.6rem .7rem; border:1px solid #c9c9c9; border-radius:.55rem; }
-    button { padding:.6rem .9rem; border:0; border-radius:.55rem; background:#0b5cff; color:#fff; cursor:pointer; }
-    button.secondary { background:#444; }
+
+    .muted { opacity: var(--muted); font-size:.9rem; }
+
+    input[type="text"] {
+      width:100%; height:2.5rem; padding:.6rem .7rem;
+      border:1px solid var(--border);
+      border-radius:.55rem;
+      background: var(--elev);
+      color: var(--text);
+      accent-color: var(--accent);
+    }
+    button {
+      padding:.6rem .9rem; border:0; border-radius:.55rem;
+      background: var(--accent); color: var(--accent-contrast);
+      cursor:pointer;
+    }
+    button.secondary { background: var(--surface-2); color: var(--text); border:1px solid var(--border); }
+
     .row { display:flex; gap:.5rem; align-items:center; }
     .list { display:grid; gap:.4rem; }
-    .item { border:1px solid color-mix(in oklab, CanvasText 20%, transparent); border-radius:.55rem; padding:.55rem .65rem; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); cursor:pointer; }
-    .item:hover { outline:2px solid color-mix(in oklab, #0b5cff 35%, transparent); }
+
+    .item {
+      border:1px solid var(--border);
+      border-radius:.55rem;
+      padding:.55rem .65rem;
+      background: var(--elev);
+      cursor:pointer;
+    }
+    .item:hover { outline:2px solid color-mix(in oklab, var(--accent) 35%, transparent); }
     .title { font-weight:600; }
     .meta { font-size:.9rem; opacity:.9; margin-top:.2rem; }
-    .badge { font-size:.8rem; padding:.1rem .4rem; border:1px solid #ddd; border-radius:.4rem; }
-    .group { border:1px solid #e2e2e2; border-radius:.55rem; padding:.6rem .75rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
+    .badge { font-size:.8rem; padding:.1rem .4rem; border:1px solid var(--border); border-radius:.4rem; }
+
+    .group { border:1px solid var(--border); border-radius:.55rem; padding:.6rem .75rem; background: var(--surface-2); }
     .groups { display:grid; gap:.7rem; }
     .domains { display:grid; gap:.5rem; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); }
-    .domain { border:1px solid #e5e5e5; border-radius:.55rem; padding:.55rem .7rem; }
+    .domain { border:1px solid var(--border); border-radius:.55rem; padding:.55rem .7rem; }
     .dim-list { margin-top:.45rem; display:grid; gap:.35rem; }
-    .dim-item { border:1px dashed #d5d5d5; border-radius:.5rem; padding:.45rem .55rem; background: color-mix(in oklab, Canvas 98%, CanvasText 2%); }
+    .dim-item { border:1px dashed var(--border); border-radius:.5rem; padding:.45rem .55rem; background: var(--surface-2); }
+
     details { margin-top:.6rem; }
-    pre { background:#f6f6f6; padding:.65rem; border-radius:.5rem; overflow:auto; }
-    .error { color:#b00020; white-space:pre-wrap; }
+    pre {
+      background: var(--surface);
+      padding:.65rem; border-radius:.5rem; overflow:auto;
+      border:1px solid var(--border);
+      color: var(--text);
+    }
+    .error { color:#ff6b6b; white-space:pre-wrap; }
+
     .thesis-label { font-weight: 600; margin-top:.25rem; margin-bottom:.25rem; }
-    .thesis-box  { background:#eaf3ff; border:1px solid #cfe3ff; border-left:3px solid #8bbcff; border-radius:.5rem; padding:.5rem .6rem; }
-    .verify-box  { background:#fff8db; border:1px solid #f5e7a3; border-left:3px solid #e2c85a; border-radius:.5rem; padding:.5rem .6rem; }
-    .true-box    { background:#e9f7ef; border:1px solid #c9ecd6; border-left:3px solid #88d19e; border-radius:.5rem; padding:.5rem .6rem; }
-    .false-box   { background:#fdecea; border:1px solid #f7c7c3; border-left:3px solid #f39a93; border-radius:.5rem; padding:.5rem .6rem; }
+
+    /* Colored callouts keep their backgrounds, but text is ALWAYS black for legibility */
+    .thesis-box  { background: var(--info-bg);  border:1px solid var(--info-bd);  border-left:3px solid var(--info-bar);  border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
+    .verify-box  { background: var(--warn-bg);  border:1px solid var(--warn-bd);  border-left:3px solid var(--warn-bar);  border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
+    .true-box    { background: var(--true-bg);  border:1px solid var(--true-bd);  border-left:3px solid var(--true-bar);  border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
+    .false-box   { background: var(--false-bg); border:1px solid var(--false-bd); border-left:3px solid var(--false-bar); border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
     .thesis-box + .verify-box, .verify-box + .true-box, .true-box + .false-box { margin-top:.5rem; }
+
+    /* Higher-contrast preference tweaks */
+    @media (prefers-contrast: more) {
+      :root { --border: color-mix(in oklab, var(--text) 30%, transparent); }
+      .item:hover { outline-width: 3px; }
+    }
   </style>
 </head>
 <body>
@@ -53,6 +164,7 @@
       <p>Create your own</p>
       <a href="/crayon" target="_blank">🖍️ Crayon</a>
       <a href="/paper" target="_blank">📄 Paper</a>
+      <button id="themeToggle" class="secondary" title="Toggle theme">Theme: Auto</button>
     </nav>
   </header>
 
@@ -79,6 +191,35 @@
       </div>
     </section>
   </main>
+
+  <script>
+    /* Theme toggle (Auto → Light → Dark), persisted */
+    (function themeInit(){
+      const KEY = 'fg_theme'; // 'auto' | 'light' | 'dark'
+      const btn = document.getElementById('themeToggle');
+      const apply = (mode)=>{
+        document.documentElement.removeAttribute('data-theme');
+        if (mode === 'light' || mode === 'dark') {
+          document.documentElement.setAttribute('data-theme', mode);
+        }
+        if (btn) btn.textContent = `Theme: ${mode[0].toUpperCase()}${mode.slice(1)}`;
+      };
+      const read = ()=> localStorage.getItem(KEY) || 'auto';
+      const save = (v)=> localStorage.setItem(KEY, v);
+
+      let mode = read();
+      apply(mode);
+
+      btn?.addEventListener('click', ()=>{
+        mode = (mode === 'auto') ? 'light' : (mode === 'light' ? 'dark' : 'auto');
+        save(mode); apply(mode);
+      });
+
+      // React to OS changes while in Auto
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener?.('change', ()=> { if (read()==='auto') apply('auto'); });
+    })();
+  </script>
 
   <script>
     // ---- fixed identity ----
@@ -215,7 +356,7 @@
         leftStatus.textContent = `Loaded ${cores.length} cores for ${FIXED_EMAIL}.`;
 
         let idToOpen = preselectId ?? getDeeplinkCoreId();
-        if (idToOpen && !cores.some(c=>c.id===idToOpen)) idToOpen = null; // invalid id
+        if (idToOpen && !cores.some(c=>c.id===idToOpen)) idToOpen = null;
         if (!idToOpen && cores.length) idToOpen = cores[0].id;
 
         if (idToOpen) {
