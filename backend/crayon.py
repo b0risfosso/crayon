@@ -299,16 +299,16 @@ class PDTargetList(BaseModel):
 class PDDimension(BaseModel):
     name: str = Field(..., description="Dimension name")
     thesis: str = Field(..., description="1–2 sentence distilled thesis")
-    targets: List[str] = Field(..., min_items=3, max_items=6, description="Short target phrases")
+    targets: List[str] = Field(..., min_length=3, max_length=6, description="Short target phrases")
 
 class PDDimensionsResponse(BaseModel):
-    dimensions: List[PDDimension] = Field(..., min_items=1)
+    dimensions: List[PDDimension] = Field(..., min_length=1)
 
 class PDThesis(BaseModel):
     thesis: str = Field(..., description="Precise thesis. 2-3 sentences")
 
 class PDThesisEval(BaseModel):
-    verification: List[str] = Field(..., min_items=1, description="Steps to verify/falsify")
+    verification: List[str] = Field(..., min_length=1, description="Steps to verify/falsify")
     if_true: str = Field(..., description="Next steps if thesis holds")
     if_false_alternative_thesis: str = Field(..., description="Alternative thesis if falsified")
 
@@ -318,7 +318,7 @@ class PDFantasiaItem(BaseModel):
     human_interest: constr(strip_whitespace=True, min_length=5)
 
 class PDFantasiaResponse(BaseModel):
-    fantasia: conlist(PDFantasiaItem, min_items=6, max_items=8)
+    fantasia: conlist(PDFantasiaItem, min_length=6, max_length=8)
 
 
 # --- add this helper to ensure we can store the LLM "group" label on domains ---
