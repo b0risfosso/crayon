@@ -987,9 +987,9 @@ def api_thesis_generate():
         core_description=row["core_description"],
         domain_name=row["domain_description"],
         domain_description=row["domain_description"],
-        domain_name=row["domain_name"],
+        dimension_name=(row["dimension_name"] or ""),
         dimension_description=(row["dimension_description"] or row["dimension_thesis"] or row["dimension_name"] or ""),
-        dimension_targets=(row["dimension_targets"],
+        dimension_targets=(row["dimension_targets"] or ""),
     )
 
     # Generate thesis
