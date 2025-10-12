@@ -4,7 +4,7 @@ from openai import OpenAI
 import sqlite3
 from flask import Flask, jsonify, abort, request, Response
 from typing import List, Optional, Literal, Any, Dict, Tuple
-from pydantic import BaseModel, Field, conlist
+from pydantic import BaseModel, Field, conlist, constr
 from openai import OpenAI, OpenAIError
 # app.py (top-level, after Flask app creation)
 import sqlite3, json, os
@@ -30,6 +30,8 @@ from crayon_prompts import (
     THESIS_USER_TEMPLATE,
     THESIS_EVAL_SYS_MSG, 
     THESIS_EVAL_USER_TEMPLATE,
+    FANTASIA_SYS_MSG, 
+    FANTASIA_USER_TEMPLATE,
 )
 
 
@@ -162,6 +164,28 @@ SCHEMA = [
 
 MIGRATION_NAME = "001_crayon_initial"
 
+def _init_llm_usage_table(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS llm_usage_counters (
+        date TEXT PRIMARY KEY,                      -- 'YYYY-MM-DD' or 'ALL_TIME'
+        input_tokens  INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        total_tokens  INTEGER NOT NULL DEFAULT 0
+    );
+    """)
+    # Ensure ALL_TIME row exists
+    conn.execute("""
+    INSERT OR IGNORE INTO llm_usage_counters(date, input_tokens, output_tokens, total_tokens)
+    VALUES ('ALL_TIME', 0, 0, 0)
+    """)
+    conn.commit()
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    return conn
 
 
 def already_applied(conn: sqlite3.Connection, name: str) -> bool:
@@ -288,7 +312,13 @@ class PDThesisEval(BaseModel):
     if_true: str = Field(..., description="Next steps if thesis holds")
     if_false_alternative_thesis: str = Field(..., description="Alternative thesis if falsified")
 
+class PDFantasiaItem(BaseModel):
+    title: constr(strip_whitespace=True, min_length=1)
+    description: constr(strip_whitespace=True, min_length=10)
+    human_interest: constr(strip_whitespace=True, min_length=5)
 
+class PDFantasiaResponse(BaseModel):
+    fantasia: conlist(PDFantasiaItem, min_items=6, max_items=8)
 
 
 # --- add this helper to ensure we can store the LLM "group" label on domains ---
@@ -313,6 +343,15 @@ def init_db_cli():
 
 
 # --- OpenAI utilities (OpenAI-only provider) ---
+def _usage_from_resp(resp) -> dict:
+    u = getattr(resp, "usage", None)
+    get = (lambda k: (u.get(k) if isinstance(u, dict) else getattr(u, k, None)) if u else None)
+    inp  = get("prompt_tokens") or get("input_tokens")  or 0
+    outp = get("completion_tokens") or get("output_tokens") or 0
+    tot  = get("total_tokens") or (inp + outp)
+    return {"input": int(inp), "output": int(outp), "total": int(tot)}
+
+
 def _get_openai_client() -> Any:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
@@ -321,10 +360,10 @@ def _get_openai_client() -> Any:
         raise RuntimeError("openai SDK not installed. `pip install openai` (v1).")
     return OpenAI(api_key=api_key)
 
-def _openai_json(system_msg: str, user_msg: str, model: str = "gpt-5-mini-2025-08-07") -> Dict[str, Any]:
+def _openai_json(system_msg: str, user_msg: str, model: str = "gpt-5-mini-2025-08-07") -> dict:
     """
     Calls OpenAI with system+user messages and expects STRICT JSON back.
-    Your system/user prompt already instructs 'Return ONLY JSON'.
+    Records token usage to the local SQLite counters table.
     """
     client = _get_openai_client()
     resp = client.chat.completions.create(
@@ -335,6 +374,16 @@ def _openai_json(system_msg: str, user_msg: str, model: str = "gpt-5-mini-2025-0
         ],
         response_format={"type": "json_object"},
     )
+
+    # --- new: extract usage and record ---
+    usage = _usage_from_resp(resp)
+    try:
+        conn = get_db()
+        _record_llm_usage(conn, usage)
+    except Exception as e:
+        print(f"[warn] failed to record llm usage: {e}")
+
+    # --- parse JSON payload ---
     content = resp.choices[0].message.content
     return json.loads(content)
 
@@ -444,6 +493,7 @@ def create_dimension(conn: sqlite3.Connection, domain_id: int, name: str,
 def _openai_parse_with_pydantic(system_msg: str, user_msg: str, model: str, schema: type[BaseModel]) -> BaseModel:
     """
     Uses OpenAI Responses API with Pydantic parsing (openai>=1.51).
+    Records token usage to the local SQLite counters table.
     """
     client = _get_openai_client()
     try:
@@ -456,11 +506,56 @@ def _openai_parse_with_pydantic(system_msg: str, user_msg: str, model: str, sche
             text_format=schema,
         )
     except Exception as e:
-        # Surface SDK / API errors cleanly
         raise RuntimeError(f"OpenAI parse failed: {e}")
+
     if not hasattr(resp, "output_parsed") or resp.output_parsed is None:
         raise RuntimeError("OpenAI did not return parsed output")
-    return resp.output_parsed  # This is an instance of `schema`
+
+    # --- new: extract and record token usage ---
+    try:
+        usage = _usage_from_resp(resp)
+        conn = get_db()
+        _record_llm_usage(conn, usage)
+    except Exception as e:
+        print(f"[warn] failed to record llm usage: {e}")
+
+    return resp.output_parsed  # instance of `schema`
+
+
+
+def _record_llm_usage(conn, usage: dict):
+    if not usage: 
+        return
+    inp  = int(usage.get("input")  or 0)
+    outp = int(usage.get("output") or 0)
+    tot  = int(usage.get("total")  or (inp + outp))
+    if (inp + outp + tot) == 0:
+        return
+    today = datetime.now(ZoneInfo("America/Chicago")).strftime("%Y-%m-%d")
+
+    with conn:  # atomic transaction
+        # Ensure today's row exists
+        conn.execute("""
+            INSERT OR IGNORE INTO llm_usage_counters(date, input_tokens, output_tokens, total_tokens)
+            VALUES (?, 0, 0, 0)
+        """, (today,))
+        # Bump today's counters
+        conn.execute("""
+            UPDATE llm_usage_counters
+            SET input_tokens  = input_tokens  + ?,
+                output_tokens = output_tokens + ?,
+                total_tokens  = total_tokens  + ?
+            WHERE date = ?
+        """, (inp, outp, tot, today))
+        # Bump ALL_TIME counters
+        conn.execute("""
+            UPDATE llm_usage_counters
+            SET input_tokens  = input_tokens  + ?,
+                output_tokens = output_tokens + ?,
+                total_tokens  = total_tokens  + ?
+            WHERE date = 'ALL_TIME'
+        """, (inp, outp, tot))
+
 
 
 
@@ -733,6 +828,8 @@ def api_generate_dimensions():
                 text_format=PDDimensionsResponse,
             )
             parsed = resp.output_parsed  # PDDimensionsResponse
+            usage = _usage_from_resp(resp)
+            _record_llm_usage(conn, usage)
         except Exception as e_parse:
             return jsonify(ok=False, error=f"OpenAI parse failed: {e_parse}"), 502
 
@@ -1036,3 +1133,36 @@ def list_theses_for_dimension(dimension_id: int):
             (dimension_id,)
         ).fetchall()
     return jsonify(ok=True, theses=[{"id":r["id"], "text":r["thesis_text"], "analysis": (json.loads(r["analysis_json"]) if r["analysis_json"] else None), "created_at": r["created_at"]} for r in rows])
+
+
+@app.get("/api/admin/llm-usage")
+def get_llm_usage():
+    conn = get_db()
+    rows = conn.execute("SELECT date, input_tokens, output_tokens, total_tokens FROM llm_usage_counters ORDER BY date DESC").fetchall()
+    return jsonify(ok=True, usage=[dict(r) for r in rows])
+
+
+@app.post("/api/fantasia/generate")
+def api_fantasia_generate():
+    """
+    Generate 6–8 fantasia via Pydantic parsing.
+    Token usage is recorded by _openai_parse_with_pydantic.
+    """
+    data = request.get_json(force=True) or {}
+    focus = (data.get("focus") or "").strip()
+    excerpt = (data.get("excerpt") or "").strip()
+    if not excerpt:
+        return jsonify(ok=False, error="excerpt is required"), 400
+
+    model = data.get("model") or "gpt-5-mini-2025-08-07"
+    user_msg = FANTASIA_USER_TEMPLATE.format(focus=focus, excerpt=excerpt)
+
+    try:
+        parsed: PDFantasiaResponse = _openai_parse_with_pydantic(
+            FANTASIA_SYS_MSG, user_msg, model=model, schema=PDFantasiaResponse
+        )
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+    # Optionally persist here if desired later.
+    return jsonify(ok=True, model=model, fantasia=[fi.model_dump() for fi in parsed.fantasia]), 200

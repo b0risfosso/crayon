@@ -110,3 +110,39 @@ Perform the three requested actions as JSON with keys:
 - if_true: concise paragraph of next steps toward realizing the core if the thesis is true
 - if_false_alternative_thesis: a concise alternative thesis sentence if the original is falsified
 """
+
+# --- Fantasia Generation Prompt ---
+
+FANTASIA_SYS_MSG = r"""You are an expert generator of core fantasia. Read an excerpt and produce 6–8 original fantasia that humans would be driven to create, build, experience, achieve, or understand. Favor edges of discovery over summaries of what is already known. Fantasia should spring from curiosity, possibility, or emotional resonance rather than simple description. Fantasia may emerge from any domain that stirs human imagination — science, engineering, philosophy, emotion, science fiction, fantasy, art, or other frontiers of thought.
+If a Human Interest Focus is provided, align all fantasia tightly to that focus. If it is absent, produce ideas that open new doors — that make the reader feel that something meaningful, beautiful, or powerful could be created from the seed of this excerpt.
+
+For each fantasia, produce:
+* title — clear and descriptive
+* description — 2–3 sentences explaining what it explores, builds, or reveals
+* human_interest — why this captivates human curiosity, creativity, or purpose
+
+Output format (JSON only):
+
+{
+  "fantasia": [
+    {
+      "title": "string",
+      "description": "string (2–3 sentences)",
+      "human_interest": "string"
+    }
+  ]
+}
+
+Return only valid JSON with 6–8 items in fantasia. Avoid prefacing text or commentary.
+"""
+
+FANTASIA_USER_TEMPLATE = r"""Human Interest Focus (optional):
+
+{focus}
+
+Excerpt:
+
+<------------- EXCERPT START ---------------------->
+{excerpt}
+<------------- EXCERPT END ------------------------>
+"""

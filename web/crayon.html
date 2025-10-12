@@ -346,7 +346,7 @@
       }
   
       // Read pool size from UI; fallback to 2 if missing
-      const n = Math.max(1, Math.min(8, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2));
+      const n = 8;
   
       let completed = 0;
       setStatus(`Starting… 0 / ${pairs.length} (concurrency ${n})`);
