@@ -322,7 +322,7 @@
       const groups = arch.groups || [];
       const domains = groups.flatMap(g => g.domains || []).filter(d => d?.id);
   
-      const innerLimit = Math.min(2, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2);
+      const innerLimit = 8 // Math.min(2, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2);
       await mapLimit(domains, innerLimit, async (d) => {
         await generateDimsForDomain(d.id, 3);
       });
@@ -346,7 +346,7 @@
       }
   
       // Read pool size from UI; fallback to 2 if missing
-      const n = 8;
+      const n = 2 // Math.max(1, Math.min(8, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2));
   
       let completed = 0;
       setStatus(`Starting… 0 / ${pairs.length} (concurrency ${n})`);
