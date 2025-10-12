@@ -81,8 +81,8 @@ Output only a concise thesis (no lists, no extra commentary).
 
 THESIS_USER_TEMPLATE = r"""
 Fantasia Core: {core_name} — {core_description}
-Fantasia Domain: {domain_description}
-Fantasia Dimension: {dimension_description}
+Fantasia Domain: {domain_name} - {domain_description}
+Fantasia Dimension: {dimension_name} - {dimension_description} - {dimension_targets}
 
 Produce a single thesis that drives understanding, creating, and/or engineering the fantasia core based on the given domain and dimension.
 """

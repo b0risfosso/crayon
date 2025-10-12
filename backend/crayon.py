@@ -959,8 +959,9 @@ def api_thesis_generate():
               COALESCE(dim.name,'') AS dimension_name,
               COALESCE(dim.thesis,'') AS dimension_thesis,
               COALESCE(dim.description,'') AS dimension_description,
+              COALESCE(dim.targets_json,'') AS dimension_targets,
               d.id   AS domain_id,
-              d.name AS domain_name,
+              COALESCE(d.name,'') AS domain_name,
               COALESCE(d.description,'') AS domain_description,
               c.id   AS core_id,
               c.title AS core_name,
@@ -984,8 +985,11 @@ def api_thesis_generate():
         THESIS_USER_TEMPLATE,
         core_name=row["core_name"],
         core_description=row["core_description"],
+        domain_name=row["domain_description"],
         domain_description=row["domain_description"],
+        domain_name=row["domain_name"],
         dimension_description=(row["dimension_description"] or row["dimension_thesis"] or row["dimension_name"] or ""),
+        dimension_targets=(row["dimension_targets"],
     )
 
     # Generate thesis
@@ -1057,8 +1061,9 @@ def api_thesis_evaluate():
               COALESCE(dim.name,'') AS dimension_name,
               COALESCE(dim.thesis,'') AS dimension_thesis,
               COALESCE(dim.description,'') AS dimension_description,
+              COALESCE(dim.targets_json,'') AS dimension_targets,
               d.id   AS domain_id,
-              d.name AS domain_name,
+              COALESCE(d.name,'') AS domain_name,
               COALESCE(d.description,'') AS domain_description,
               c.id   AS core_id,
               c.title AS core_name,
@@ -1082,8 +1087,11 @@ def api_thesis_evaluate():
         THESIS_EVAL_USER_TEMPLATE,
         core_name=row["core_name"],
         core_description=row["core_description"],
+        domain_name=row["domain_name"],
         domain_description=row["domain_description"],
-        dimension_description=(row["dimension_description"] or row["dimension_thesis"] or row["dimension_name"] or ""),
+        dimension_name=(row["dimension_name"] or ""),
+        dimension_description=(row["dimension_description"] or row["dimension_thesis"] or ""),
+        dimension_targets=(row["dimension_targets"] or ""),
         thesis=row["thesis_text"],
     )
 
