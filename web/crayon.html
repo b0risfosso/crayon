@@ -115,7 +115,7 @@
       try { return await fetch(url, { ...options, signal: controller.signal }); }
       finally { clearTimeout(id); }
     }
-    async function postJSON(url, body, timeoutMs=180000){
+    async function postJSON(url, body, timeoutMs=600000){
       const resp = await fetchWithTimeout(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }, timeoutMs);
       let data; try { data = await resp.json(); } catch { throw new Error(`Non-JSON response from ${url} (status ${resp.status})`); }
       if (!resp.ok || data?.ok === false) {
@@ -232,7 +232,7 @@
       try{
         const res = await postJSON(EP_THESIS_GEN, {
           email, dimension_id: dimensionId, model: 'gpt-5-mini-2025-08-07'
-        }, 180000);
+        }, 600000);
         thesis = res?.thesis;
         if (!thesis?.id) throw new Error('No thesis id');
         if (mountThesis) mountThesis.innerHTML = `<strong>Thesis:</strong> ${escapeHtml(thesis.text || '')}`;
@@ -247,7 +247,7 @@
       try{
         const res = await postJSON(EP_THESIS_EVAL, {
           email, thesis_id: thesis.id, model: 'gpt-5-mini-2025-08-07', save: true
-        }, 180000);
+        }, 600000);
         const a = res?.analysis || {};
         const ver = Array.isArray(a.verification) ? a.verification : [];
         mountEval.innerHTML =
@@ -267,7 +267,7 @@
       const email = (elEmail.value || readEmailFromStorage() || '').trim().toLowerCase();
       if (!domainId) return;
       try{
-        const res = await postJSON(EP_DIM_GEN, { email, domain_id: domainId, count, model: 'gpt-5-mini-2025-08-07' });
+        const res = await postJSON(EP_DIM_GEN, { email, domain_id: domainId, count, model: 'gpt-5-mini-2025-08-07' }, 600000);
         const dims = res.dimensions || [];
         const mount = document.getElementById(`dim-${domainId}`);
         if (mount) {
@@ -346,7 +346,7 @@
       }
   
       // Read pool size from UI; fallback to 2 if missing
-      const n = 4 // Math.max(1, Math.min(8, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2));
+      const n = 2 // Math.max(1, Math.min(8, parseInt(document.getElementById('concurrencyInput')?.value || '2', 10) || 2));
   
       let completed = 0;
       setStatus(`Starting… 0 / ${pairs.length} (concurrency ${n})`);

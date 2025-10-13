@@ -101,8 +101,8 @@ Output strictly the three labeled sections in JSON under keys: "verification", "
 
 THESIS_EVAL_USER_TEMPLATE = r"""
 Fantasia Core: {core_name} — {core_description}
-Fantasia Domain: {domain_description}
-Fantasia Dimension: {dimension_description}
+Fantasia Domain: {domain_name} - {domain_description}
+Fantasia Dimension: {dimension_name} - {dimension_description} - {dimension_targets}
 Thesis: {thesis}
 
 Perform the three requested actions as JSON with keys:
