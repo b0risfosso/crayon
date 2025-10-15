@@ -20,7 +20,7 @@ def run_ritual_atomizer(core_title: str, core_description: str):
 
     response = client.responses.parse(
         model="gpt-5-mini-2025-08-07",
-        messages=[
+        input=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
