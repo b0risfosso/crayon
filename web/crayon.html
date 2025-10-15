@@ -261,7 +261,7 @@
               const th = el('div', { className:'muted', text: d.thesis || '' });
               const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
               const thesisMount = el('div', { className:'muted', attrs:{ id:`thesis-${d.id}` } });
-              it.append(nm, th, tg, thesisMount, evalMount);
+              it.append(nm, th, tg, thesisMount);
               mount.append(it);
             });
             for (const dim of dims) {
