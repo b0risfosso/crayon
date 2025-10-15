@@ -18,7 +18,7 @@ def run_ritual_atomizer(core_title: str, core_description: str):
         core_title=core_title, core_description=core_description
     )
 
-    response = client.chat.completions.create(
+    response = client.responses.parse(
         model="gpt-5-mini-2025-08-07",
         messages=[
             {"role": "system", "content": system_prompt},
@@ -27,7 +27,7 @@ def run_ritual_atomizer(core_title: str, core_description: str):
         text_format=RitualAtomizerOutput,
     )
 
-    return response.choices[0].message.content.strip()
+    return resp.output_parsed
 
 @app.route("/api/run_ritual_atomizer", methods=["POST"])
 def run_atomizer_api():
