@@ -14,26 +14,25 @@ Method atoms (mechanisms, techniques, feedback, data)
 Anti-atoms (failure modes to suppress)
 Output format: return a single JSON object with the schema below. Keep each list tight (3–6 items unless stated).
 
-{
-  "core": {
+{{
+  "core": {{
     "title": "",
     "description": ""
-  },
-  "context_anchors": {
+  }},
+  "context_anchors": {{
     "users": [],
     "jobs_to_be_done": [],
     "must_haves": [],
     "guardrails": []
-  },
-  "atoms": {
+  }},
+  "atoms": {{
     "commands": [],
     "constraints": [],
     "personas": [],
     "methods": [],
     "anti_atoms": []
-  }
-}
-
+  }}
+}}
 """
 
 ritual_atomizer_user_prompt = r"""
