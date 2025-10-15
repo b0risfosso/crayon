@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fantasiagenesis · Core Production</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      margin: 2rem;
+      max-width: 800px;
+    }
+    h1 { margin-bottom: 0.3rem; }
+    p.muted { opacity: 0.8; font-size: 0.9rem; }
+    input, textarea, button {
+      width: 100%;
+      padding: 0.6rem 0.7rem;
+      margin-top: 0.4rem;
+      border-radius: 0.5rem;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+    textarea { min-height: 6rem; }
+    button {
+      background: #0b5cff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    button:hover { background: #0848c5; }
+    pre {
+      background: #f6f6f6;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin-top: 1.2rem;
+      font-size: 0.9rem;
+    }
+    .error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>Fantasiagenesis · Core Production</h1>
+  <p class="muted">Enter a <strong>core title</strong> and <strong>description</strong> to generate a structured atom set.</p>
+
+  <label>Core Title</label>
+  <input type="text" id="coreTitle" placeholder="e.g., Rate of Learning" />
+
+  <label>Core Description</label>
+  <textarea id="coreDescription" placeholder="Describe your core..."></textarea>
+
+  <button id="runBtn">Run Ritual Atomizer</button>
+
+  <pre id="result"></pre>
+
+  <script>
+    async function runAtomizer() {
+      const title = document.getElementById("coreTitle").value.trim();
+      const desc = document.getElementById("coreDescription").value.trim();
+      const resultBox = document.getElementById("result");
+      resultBox.textContent = "Running Ritual Atomizer...";
+
+      try {
+        const resp = await fetch("/api/run_ritual_atomizer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ core_title: title, core_description: desc })
+        });
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`HTTP ${resp.status}: ${errText}`);
+        }
+
+        const data = await resp.json();
+        resultBox.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        console.error(err);
+        resultBox.innerHTML = `<span class="error">${err.message}</span>`;
+      }
+    }
+
+    document.getElementById("runBtn").addEventListener("click", runAtomizer);
+  </script>
+</body>
+</html>
