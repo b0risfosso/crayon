@@ -269,6 +269,27 @@
       history.replaceState(null, '', u.toString());
     }
 
+    function getDeeplinkFilterText(){
+      const u = new URL(window.location.href);
+      const q = u.searchParams.get('filter');
+      if (q !== null) return q;           // allow empty string to clear filter
+      // optional hash support: #filter=...
+      const h = (u.hash||'').replace(/^#/, '');
+      const hm = h.match(/^filter=(.*)$/);
+      return hm ? decodeURIComponent(hm[1]) : null;
+    }
+
+    function setDeeplinkFilterText(text){
+      const u = new URL(window.location.href);
+      if (text === null || text === undefined || text === '') {
+        u.searchParams.delete('filter');
+      } else {
+        u.searchParams.set('filter', text);
+      }
+      history.replaceState(null, '', u.toString());
+    }
+
+
     // ---- render cores list ----
     function renderCores(){
       coreList.innerHTML = '';
@@ -432,18 +453,32 @@
 
     // ---- events ----
     elReload.addEventListener('click', ()=> loadCores(getDeeplinkCoreId()));
-    elSearch.addEventListener('input', renderCores);
-    window.addEventListener('hashchange', ()=> {
-      const id = getDeeplinkCoreId();
-      if (id && id !== selectedCoreId && cores.some(c=>c.id===id)) loadCore(id);
+    elSearch.addEventListener('input', ()=>{
+      renderCores();
+      setDeeplinkFilterText(elSearch.value);
     });
-    window.addEventListener('popstate', ()=> {
+
+    window.addEventListener('hashchange', ()=>{
       const id = getDeeplinkCoreId();
+      const f  = getDeeplinkFilterText();
+      if (f !== null) elSearch.value = f; else elSearch.value = '';
+      renderCores();
       if (id && id !== selectedCoreId && cores.some(c=>c.id===id)) loadCore(id);
     });
 
+    window.addEventListener('popstate', ()=>{
+      const id = getDeeplinkCoreId();
+      const f  = getDeeplinkFilterText();
+      if (f !== null) elSearch.value = f; else elSearch.value = '';
+      renderCores();
+      if (id && id !== selectedCoreId && cores.some(c=>c.id===id)) loadCore(id);
+    });
+
+
     // ---- init ----
     (function init(){
+      const preloadFilter = getDeeplinkFilterText();
+      if (preloadFilter !== null) elSearch.value = preloadFilter; // set the box if present
       loadCores(getDeeplinkCoreId());
     })();
   </script>
