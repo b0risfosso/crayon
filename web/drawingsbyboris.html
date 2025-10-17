@@ -31,7 +31,6 @@
 
     @media (prefers-color-scheme: dark) {
       :root {
-        /* DARK defaults when in Auto */
         --bg: #0f1115;
         --text: #e9ecf1;
         --muted: 0.85;
@@ -42,7 +41,6 @@
         --accent: #6aa4ff;
         --accent-contrast: #0c1220;
 
-        /* Info blocks (dark tuned) */
         --info-bg:#0f213a;  --info-bd:#1a355a;  --info-bar:#305b9a;
         --warn-bg:#2b2410;  --warn-bd:#4a3e19;  --warn-bar:#7a6425;
         --true-bg:#11281d;  --true-bd:#1d3c2b;  --true-bar:#2c6a49;
@@ -143,12 +141,8 @@
 
     .thesis-label { font-weight: 600; margin-top:.25rem; margin-bottom:.25rem; }
 
-    /* Colored callouts remain (if you reuse later), but we no longer render them */
+    /* Keep callout styles in case you re-enable evaluations later */
     .thesis-box  { background: var(--info-bg);  border:1px solid var(--info-bd);  border-left:3px solid var(--info-bar);  border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
-    .verify-box  { background: var(--warn-bg);  border:1px solid var(--warn-bd);  border-left:3px solid var(--warn-bar);  border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
-    .true-box    { background: var(--true-bg);  border:1px solid var(--true-bd);  border-left:3px solid var(--true-bar);  border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
-    .false-box   { background: var(--false-bg); border:1px solid var(--false-bd); border-left:3px solid var(--false-bar); border-radius:.5rem; padding:.5rem .6rem; color:#000 !important; }
-    .thesis-box + .verify-box, .verify-box + .true-box, .true-box + .false-box { margin-top:.5rem; }
 
     @media (prefers-contrast: more) {
       :root { --border: color-mix(in oklab, var(--text) 30%, transparent); }
@@ -168,7 +162,7 @@
   </header>
 
   <main>
-    <!-- Left: controls + core list (email removed; hardcoded) -->
+    <!-- Left: controls + core list -->
     <section class="panel" aria-labelledby="left-head">
       <header id="left-head">Cores</header>
       <div class="content">
@@ -194,7 +188,7 @@
   <script>
     /* Theme toggle (Auto → Light → Dark), persisted */
     (function themeInit(){
-      const KEY = 'fg_theme'; // 'auto' | 'light' | 'dark'
+      const KEY = 'fg_theme';
       const btn = document.getElementById('themeToggle');
       const apply = (mode)=>{
         document.documentElement.removeAttribute('data-theme');
@@ -214,7 +208,6 @@
         save(mode); apply(mode);
       });
 
-      // React to OS changes while in Auto
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener?.('change', ()=> { if (read()==='auto') apply('auto'); });
     })();
@@ -228,7 +221,7 @@
     const EP_LIST_CORES  = '/api/cores';
     const EP_READ_CORE   = (id, email) => `/api/cores/${id}/domains?email=${encodeURIComponent(email)}`;
     const EP_READ_DIMS   = (domainId, email) => `/api/domains/${domainId}/dimensions?email=${encodeURIComponent(email)}`;
-    /* REMOVED: const EP_LIST_THESES = ... */
+    const EP_LIST_THESES = (dimensionId, email) => `/api/dimensions/${dimensionId}/theses?email=${encodeURIComponent(email)}`;
 
     // ---- utils ----
     const $ = sel => document.querySelector(sel);
@@ -396,14 +389,44 @@
             const nm = el('div', { className:'title', text: d.name || 'Dimension' });
             const th = el('div', { className:'muted', text: d.thesis || '' });
             const tg = el('div', { className:'muted', text: (d.targets||[]).join(', ') });
-            /* Removed thesis/evaluation mounting and loading */
-            it.append(nm, th, tg);
+            const tMount = el('div', { className:'dim-list', attrs:{ id:`theses-${d.id}` } });
+            it.append(nm, th, tg, tMount);
             mount.append(it);
           });
+
+          for (const d of dims) {
+            await loadThesesForDimension(d.id);
+          }
         }
       }catch(err){
         mount.innerHTML = '';
         mount.append(el('div', { className:'error', text:`Failed to load dimensions: ${err.message||err}` }));
+      }
+    }
+
+    async function loadThesesForDimension(dimensionId){
+      const tMount = document.getElementById(`theses-${dimensionId}`);
+      if (!tMount) return;
+      tMount.innerHTML = '<div class="muted">Loading theses…</div>';
+      try{
+        const res = await fetchJSON(EP_LIST_THESES(dimensionId, FIXED_EMAIL));
+        const theses = res.theses || [];
+        tMount.innerHTML = '';
+        if (!theses.length){
+          tMount.append(el('div', { className:'muted', text:'No theses yet.' }));
+          return;
+        }
+        theses.forEach(t=>{
+          const wrap = el('div', { className:'dim-item' });
+          wrap.append(
+            el('div', { className:'thesis-label', text:'Thesis' }),
+            el('div', { className:'thesis-box',  text: t.text || '(no thesis text)' })
+          );
+          // NOTE: intentionally do NOT render t.analysis (evaluations)
+          tMount.append(wrap);
+        });
+      }catch(err){
+        tMount.innerHTML = `<span class="error">Failed to load theses: ${escapeHtml(err.message||String(err))}</span>`;
       }
     }
 
