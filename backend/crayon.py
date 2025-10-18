@@ -52,6 +52,26 @@ def connect(db_path: str = DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
 
+# One-time WAL switch (guard with a flag or run at startup)
+with sqlite3.connect(DB_PATH) as c:
+    c.execute("PRAGMA journal_mode=WAL;")
+    c.execute("PRAGMA synchronous=NORMAL;")
+    c.execute("PRAGMA wal_autocheckpoint=2000;")
+
+def get_conn_write():
+    # per-request or per-thread connection
+    uri = f"file:{DB_PATH}?cache=shared"
+    conn = sqlite3.connect(uri, uri=True, check_same_thread=False, isolation_level=None)
+    conn.execute("PRAGMA busy_timeout=5000;")
+    return conn
+
+
+def get_conn_read():
+    uri = f"file:{DB_PATH}?mode=ro&cache=shared"
+    conn = sqlite3.connect(uri, uri=True, check_same_thread=False, isolation_level=None)
+    conn.execute("PRAGMA busy_timeout=5000;")
+    return conn
+
 # --- Base schema (idempotent) ---
 SCHEMA = [
     # migrations meta
