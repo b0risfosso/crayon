@@ -570,7 +570,7 @@ def run_pipeline():
     })
 
 
-@app.get("/jid/files")
+@app.get("/files")
 def list_files():
     db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
     with sqlite3.connect(db_path) as conn:
@@ -579,7 +579,7 @@ def list_files():
         rows = [r[0] for r in cur.fetchall()]
     return jsonify(rows)
 
-@app.get("/jid/fantasias")
+@app.get("/fantasias")
 def list_fantasias():
     db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
     q = (request.args.get("q") or "").strip()
