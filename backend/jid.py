@@ -9,6 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional, Iterable
 import sqlite3
+import subprocess
+from pathlib import Path
+import tempfile
+import shutil
 
 from flask import Flask, request, jsonify
 
@@ -71,32 +75,123 @@ class FantasiaBatch(BaseModel):
 def read_text_file(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore")
 
-def read_pdf(path: Path) -> str:
+def read_pdf_pypdf(path: Path) -> Optional[str]:
     try:
         import pypdf
-        reader = pypdf.PdfReader(str(path))
+        reader = pypdf.PdfReader(str(path), strict=False)  # be permissive
         pages = []
         for p in reader.pages:
             try:
                 pages.append(p.extract_text() or "")
             except Exception:
+                # if one page fails, keep going; we'll still try pdftotext if result is too empty
                 pages.append("")
-        return "\n".join(pages)
+        txt = "\n".join(pages)
+        # if pypdf produced very little, trigger fallback
+        if len(txt.strip()) < 50:
+            return None
+        return txt
     except Exception:
-        # Optional secondary path via `pdftotext` CLI if installed
-        import shutil, subprocess, tempfile
+        return None
+
+
+def read_pdf_pdftotext(path: Path) -> str:
+    """
+    Extract text from a PDF using the Poppler 'pdftotext' command-line tool.
+    Returns the extracted text as a string, or an empty string on failure.
+    Requires `pdftotext` (from poppler-utils) to be installed on the system.
+    """
+    try:
+        # ensure Poppler is available
         if not shutil.which("pdftotext"):
+            print("⚠️  pdftotext not found — skipping Poppler extraction.")
             return ""
+
+        # Use a temp file to store the plain text
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp_out:
+            tmp_out_path = Path(tmp_out.name)
+
+        # Run pdftotext quietly (-q), preserving layout (-layout)
+        subprocess.run(
+            ["pdftotext", "-layout", "-q", str(path), str(tmp_out_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+
+        # Read the extracted text
+        text = tmp_out_path.read_text(encoding="utf-8", errors="ignore")
+
+        # Cleanup temporary file
+        tmp_out_path.unlink(missing_ok=True)
+
+        # Return stripped text
+        return text.strip()
+    except Exception as e:
+        print(f"⚠️  pdftotext failed on {path}: {e}")
+        return ""
+
+def ocr_pdf_if_needed(path: Path) -> str:
+    """
+    If a PDF has no extractable text, run OCR to produce a searchable version
+    and re-extract text from it using Poppler's pdftotext.
+    Requires `ocrmypdf` and `pdftotext` to be installed.
+    Returns the OCR-extracted text as a string (empty string on failure).
+    """
+    try:
+        # Verify required tools exist
+        if not shutil.which("ocrmypdf"):
+            print("⚠️  ocrmypdf not found — skipping OCR fallback.")
+            return ""
+        if not shutil.which("pdftotext"):
+            print("⚠️  pdftotext not found — OCR fallback requires it.")
+            return ""
+
+        # Create temporary files
         with tempfile.TemporaryDirectory() as td:
-            out = Path(td) / "out.txt"
-            try:
-                subprocess.run(
-                    ["pdftotext", "-layout", str(path), str(out)],
-                    check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                )
-                return out.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
-                return ""
+            out_pdf = Path(td) / "ocr.pdf"
+            out_txt = Path(td) / "ocr.txt"
+
+            # Run OCR (quiet mode, skip if already searchable)
+            subprocess.run(
+                ["ocrmypdf", "--skip-text", "--quiet", str(path), str(out_pdf)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+
+            # Extract text from OCR’d PDF
+            subprocess.run(
+                ["pdftotext", "-layout", "-q", str(out_pdf), str(out_txt)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+
+            # Read text result
+            if out_txt.exists():
+                text = out_txt.read_text(encoding="utf-8", errors="ignore").strip()
+                return text
+            return ""
+
+    except Exception as e:
+        print(f"⚠️  OCR extraction failed on {path}: {e}")
+        return ""
+
+def read_pdf(path: Path) -> str:
+    # Prefer pdftotext first (better accuracy and fewer errors)
+    txt = read_pdf_pdftotext(path)
+    if txt.strip():
+        return txt
+
+    # Fallback to pypdf if Poppler result is empty
+    txt = read_pdf_pypdf(path)
+    if txt.strip():
+        return txt
+
+    # Final fallback (optional OCR)
+    return ocr_pdf_if_needed(path) or ""
+
 
 def normalize_ws(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -575,7 +670,7 @@ def list_files():
     db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
     with sqlite3.connect(db_path) as conn:
         cur = conn.cursor()
-        cur.execute("SELECT DISTINCT file_name FROM fantasias ORDER BY file_name ASC")
+        cur.execute("SELECT DISTINCT file_name FROM fantasia_cores ORDER BY file_name ASC")
         rows = [r[0] for r in cur.fetchall()]
     return jsonify(rows)
 
@@ -587,7 +682,7 @@ def list_fantasias():
     limit = int(request.args.get("limit") or 500)
     limit = max(1, min(limit, 5000))
 
-    sql = "SELECT file_name, title, description, rationale, created_at FROM fantasias"
+    sql = "SELECT file_name, title, description, rationale, created_at FROM fantasia_cores"
     where, params = [], []
     if file_name:
         where.append("file_name = ?"); params.append(file_name)
