@@ -508,7 +508,7 @@ def run_pipeline():
         try:
             log.info(f"📄 Processing file: {fp.name}")
             if not force and file_already_processed(db_path, fp):
-                log.info(f"📄 Processing file: {fp.name}")
+                log.info(f"⏩ Skipping already processed file: {fp.name}")
                 skipped_files += 1
                 skipped_details.append({"source_name": fp.name, "reason": "already_processed"})
                 continue
