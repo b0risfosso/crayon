@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fantasiagenesis · JID Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      color-scheme: light dark;
+      --bg:#0b0c10; --panel:#11131a; --elev:#171a23; --text:#e9ecf1; --muted:#9aa3b2; --accent:#6ea8fe; --ok:#42d392; --warn:#ffb454; --err:#ff6a69; --border:#2a2f3a;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji";}
+    .wrap{display:grid;grid-template-columns: 280px 1fr;gap:16px;height:100%;}
+    header{grid-column:1/-1;padding:14px 18px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);}
+    h1{margin:0;font-size:18px;letter-spacing:.3px}
+    .sub{color:var(--muted);font-size:12px;margin-top:2px}
+    aside{border-right:1px solid var(--border);padding:14px;overflow:auto;background:var(--panel)}
+    main{padding:14px;overflow:auto}
+    .card{background:var(--elev);border:1px solid var(--border);border-radius:12px;padding:12px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .row > *{flex:0 0 auto}
+    input,select,button{background:#0f1320;border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:10px;font-size:13px;outline:none}
+    input:focus,select:focus{border-color:var(--accent)}
+    button{cursor:pointer}
+    .btn{background:#0f1526}
+    .btn:hover{background:#121a31}
+    .pill{display:inline-flex;gap:6px;align-items:center;background:#0f1526;border:1px solid var(--border);padding:6px 10px;border-radius:999px;color:var(--muted);font-size:12px}
+    .list{margin:10px 0 0;display:flex;flex-direction:column;gap:8px}
+    .file{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#0f1320;cursor:pointer}
+    .file.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(110,168,254,.2) inset}
+    .hint{color:var(--muted);font-size:12px;margin-top:8px}
+    .grid{display:grid;grid-template-columns: 1fr 2fr 1.5fr 140px;gap:10px;align-items:start}
+    .thead{position:sticky;top:0;background:linear-gradient(180deg,rgba(0,0,0,.4),rgba(0,0,0,0));padding:8px 6px;border-bottom:1px solid var(--border);z-index:2}
+    .cell{padding:8px 6px;border-bottom:1px solid var(--border)}
+    .title{font-weight:600}
+    .desc,.hi{color:#cfd6e3}
+    .muted{color:var(--muted)}
+    .empty{padding:18px;border:1px dashed var(--border);border-radius:10px;color:var(--muted);text-align:center}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:#0e1425;color:#b9c3d9;font-size:11px}
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    a{color:var(--accent);text-decoration:none}
+    .right{margin-left:auto}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fantasiagenesis · JID Viewer</h1>
+    <div class="sub">See documents processed and the fantasia cores created (from <code>jid.db</code>).</div>
+  </header>
+
+  <div class="wrap">
+    <aside>
+      <div class="card">
+        <div class="row" style="margin-bottom:8px">
+          <strong>Files</strong>
+          <span class="pill" id="fileCount">0 files</span>
+          <button class="btn right" id="refreshFiles">Refresh</button>
+        </div>
+        <input id="fileFilter" type="text" placeholder="Filter files…" />
+        <div class="list" id="fileList"></div>
+        <div class="hint">
+          This panel calls <code>/jid/files</code>. If the endpoint isn’t live yet, create it in your Flask app to list distinct <code>file_name</code> from <code>fantasias</code>.
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="row" style="margin-bottom:8px">
+          <strong>Quick Filters</strong>
+        </div>
+        <input id="searchText" type="text" placeholder="Search title / description / interest…" />
+        <div class="row" style="margin-top:8px">
+          <label class="muted">Limit</label>
+          <select id="limit">
+            <option>100</option><option selected>250</option><option>500</option><option>1000</option>
+          </select>
+          <label class="muted">Sort</label>
+          <select id="sortBy">
+            <option value="new">Newest first</option>
+            <option value="old">Oldest first</option>
+            <option value="title">Title A→Z</option>
+          </select>
+        </div>
+        <button class="btn" style="margin-top:8px" id="applyFilters">Apply</button>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div><strong>Status</strong></div>
+        <div id="status" class="hint">Idle.</div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="card" style="margin-bottom:12px">
+        <div class="stats">
+          <span class="badge" id="statTotal">0 items</span>
+          <span class="badge" id="statFiles">0 files</span>
+          <span class="badge" id="statDate">—</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="grid thead">
+          <div class="muted">Title</div>
+          <div class="muted">Description</div>
+          <div class="muted">Human Interest</div>
+          <div class="muted">Created</div>
+        </div>
+        <div id="rows"></div>
+        <div id="empty" class="empty" style="display:none">No items found. Try refreshing or clearing filters.</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const el = id => document.getElementById(id);
+    const fileList = el('fileList');
+    const fileFilter = el('fileFilter');
+    const refreshFiles = el('refreshFiles');
+    const searchText = el('searchText');
+    const limitSel = el('limit');
+    const sortBySel = el('sortBy');
+    const applyFilters = el('applyFilters');
+    const rows = el('rows');
+    const empty = el('empty');
+    const status = el('status');
+    const statTotal = el('statTotal');
+    const statFiles = el('statFiles');
+    const statDate = el('statDate');
+    const fileCount = el('fileCount');
+
+    let files = [];
+    let activeFile = null;
+    let items = []; // displayed items
+
+    function setStatus(msg){ status.textContent = msg; }
+    function fmtDate(s){
+      try {
+        const d = new Date(s);
+        if (isNaN(d)) return s;
+        return d.toLocaleString();
+      } catch { return s; }
+    }
+
+    function renderFiles(){
+      const q = fileFilter.value.toLowerCase().trim();
+      fileList.innerHTML = "";
+      let vis = 0;
+      files
+        .filter(f => !q || f.toLowerCase().includes(q))
+        .sort((a,b)=>a.localeCompare(b))
+        .forEach(name=>{
+          const div = document.createElement('div');
+          div.className = 'file' + (name === activeFile ? ' active':'');
+          div.textContent = name;
+          div.onclick = () => { activeFile = name; renderFiles(); fetchItems(); };
+          fileList.appendChild(div);
+          vis++;
+        });
+      fileCount.textContent = `${vis} files`;
+    }
+
+    function renderItems(){
+      rows.innerHTML = "";
+      if (!items.length){
+        empty.style.display = 'block';
+        statTotal.textContent = `0 items`;
+        statFiles.textContent = activeFile ? `1 file` : `${files.length} files`;
+        statDate.textContent = '—';
+        return;
+      }
+      empty.style.display = 'none';
+
+      let first = items[0]?.created_at;
+      let last  = items[items.length-1]?.created_at;
+      const minD = items.reduce((m,x)=> m && m < x.created_at ? m : x.created_at, null) || first;
+      const maxD = items.reduce((m,x)=> m && m > x.created_at ? m : x.created_at, null) || last;
+
+      statTotal.textContent = `${items.length} items`;
+      statFiles.textContent = activeFile ? `1 file` : `${files.length} files`;
+      statDate.textContent = `${fmtDate(minD)} → ${fmtDate(maxD)}`;
+
+      for (const it of items){
+        const row = document.createElement('div');
+        row.className = 'grid';
+        row.innerHTML = `
+          <div class="cell title">${escapeHtml(it.title)}</div>
+          <div class="cell desc">${escapeHtml(it.description)}</div>
+          <div class="cell hi">${escapeHtml(it.human_interest)}</div>
+          <div class="cell muted">${escapeHtml(fmtDate(it.created_at))}</div>
+        `;
+        rows.appendChild(row);
+      }
+    }
+
+    function applyClientFilters(raw){
+      const q = searchText.value.toLowerCase().trim();
+      let list = raw.slice();
+      // sort
+      const sortBy = sortBySel.value;
+      list.sort((a,b)=>{
+        if (sortBy==='new') return (b.created_at||'').localeCompare(a.created_at||'');
+        if (sortBy==='old') return (a.created_at||'').localeCompare(b.created_at||'');
+        if (sortBy==='title') return (a.title||'').localeCompare(b.title||'');
+        return 0;
+      });
+      if (q){
+        list = list.filter(it =>
+          (it.title||'').toLowerCase().includes(q) ||
+          (it.description||'').toLowerCase().includes(q) ||
+          (it.human_interest||'').toLowerCase().includes(q)
+        );
+      }
+      const lim = parseInt(limitSel.value||"250", 10);
+      return list.slice(0, lim);
+    }
+
+    async function fetchFiles(){
+      setStatus("Loading files…");
+      try{
+        const r = await fetch('/jid/files');
+        if (!r.ok) throw new Error(`GET /jid/files ${r.status}`);
+        files = await r.json();
+        if (!Array.isArray(files)) files = [];
+        renderFiles();
+        if (!activeFile && files.length) {
+          activeFile = files[0];
+          renderFiles();
+        }
+        setStatus(`Loaded ${files.length} files.`);
+      }catch(err){
+        files = [];
+        renderFiles();
+        setStatus("Could not load /jid/files. Create that endpoint in Flask to list distinct file_name values from SQLite (table: fantasias).");
+      }
+    }
+
+    async function fetchItems(){
+      setStatus("Loading fantasia items…");
+      try{
+        const params = new URLSearchParams();
+        const lim = parseInt(limitSel.value||"250", 10);
+        if (activeFile) params.set('file_name', activeFile);
+        params.set('limit', String(Math.max(lim, 250))); // ask for a bit more; we trim client-side
+        const q = searchText.value.trim();
+        if (q) params.set('q', q);
+
+        const url = `/jid/fantasias?${params.toString()}`;
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`GET ${url} ${r.status}`);
+        const raw = await r.json();
+        if (!Array.isArray(raw)) throw new Error("Invalid JSON format from /jid/fantasias");
+        items = applyClientFilters(raw);
+        renderItems();
+        setStatus(`Loaded ${items.length} items.`);
+      }catch(err){
+        items = [];
+        renderItems();
+        setStatus("Could not load /jid/fantasias. Expose a read endpoint in Flask that SELECTs from SQLite (table: fantasias).");
+      }
+    }
+
+    function escapeHtml(s){
+      return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // events
+    refreshFiles.onclick = () => fetchFiles().then(fetchItems);
+    fileFilter.oninput = () => renderFiles();
+    applyFilters.onclick = () => fetchItems();
+    searchText.addEventListener('keydown', e => { if (e.key==='Enter') fetchItems(); });
+
+    // boot
+    fetchFiles().then(fetchItems);
+  </script>
+</body>
+</html>
