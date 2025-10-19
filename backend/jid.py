@@ -273,7 +273,7 @@ def ensure_db(db_path: Path) -> None:
                 file_name TEXT NOT NULL,
                 title TEXT NOT NULL,
                 description TEXT NOT NULL,
-                human_interest TEXT NOT NULL,
+                rationale TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
             """
@@ -336,7 +336,7 @@ def mark_file_processed(db_path: Path, path: Path, run_id: str) -> None:
 
 def insert_fantasia_rows(db_path: Path, rows: list[tuple[str, str, str, str, str]]) -> None:
     """
-    rows: List of tuples (file_name, title, description, human_interest, created_at)
+    rows: List of tuples (file_name, title, description, rationale, created_at)
     """
     if not rows:
         return
@@ -344,7 +344,7 @@ def insert_fantasia_rows(db_path: Path, rows: list[tuple[str, str, str, str, str
         cur = conn.cursor()
         cur.executemany(
             """
-            INSERT INTO fantasia_cores (file_name, title, description, human_interest, created_at)
+            INSERT INTO fantasia_cores (file_name, title, description, rationale, created_at)
             VALUES (?, ?, ?, ?, ?)
             """,
             rows,
@@ -468,7 +468,7 @@ def run_pipeline():
                     # --- NEW: write each fantasia item into SQLite ---
                     created_at = record_base["created_at"]
                     rows_for_db = [
-                        (fp.name, it.title, it.description, it.human_interest, created_at)
+                        (fp.name, it.title, it.description, it.rationale, created_at)
                         for it in parsed.items
                     ]
                     insert_fantasia_rows(db_path, rows_for_db)
@@ -587,13 +587,13 @@ def list_fantasias():
     limit = int(request.args.get("limit") or 500)
     limit = max(1, min(limit, 5000))
 
-    sql = "SELECT file_name, title, description, human_interest, created_at FROM fantasias"
+    sql = "SELECT file_name, title, description, rationale, created_at FROM fantasias"
     where, params = [], []
     if file_name:
         where.append("file_name = ?"); params.append(file_name)
     if q:
         like = f"%{q}%"
-        where.append("(title LIKE ? OR description LIKE ? OR human_interest LIKE ?)")
+        where.append("(title LIKE ? OR description LIKE ? OR rationale LIKE ?)")
         params += [like, like, like]
     if where:
         sql += " WHERE " + " AND ".join(where)
