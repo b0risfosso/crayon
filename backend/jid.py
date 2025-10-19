@@ -548,7 +548,7 @@ def run_pipeline():
             "results_jsonl": str(results_jsonl),
             "errors_jsonl": str(errors_jsonl),
             "per_file": per_file_summaries,
-            "db_path": str(db_path)   # <-- small convenience echo
+            "db_path": str(db_path),   # <-- small convenience echo
             "skipped_files": skipped_files,          # <-- NEW
             "skipped_details": skipped_details,
             "usage": usage_snapshot,
