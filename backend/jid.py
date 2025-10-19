@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 import tempfile
 import shutil
+import logging
 
 from flask import Flask, request, jsonify
 
@@ -39,6 +40,12 @@ DEFAULT_MODEL = "gpt-5-mini-2025-08-07"
 SUPPORTED_TXT_EXT = {".txt", ".md", ".rst", ".log"}
 SUPPORTED_PDF_EXT = {".pdf"}
 DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+log = logging.getLogger("jid")
 
 SYSTEM_MSG = (
     "You are an expert creative-technical ideation model that produces structured, "
@@ -469,7 +476,10 @@ def run_pipeline():
     db_path = Path(data.get("db_path", DB_PATH_DEFAULT))
     force = bool(data.get("force", False))   # <-- NEW
 
+    log.info(f"🟢 /run called — source={source_dir}, model={model}, dry_run={dry_run}, force={force}")
+
     if not source_dir.exists():
+        log.error(f"❌ Source directory does not exist: {source_dir}")
         return jsonify({"error": f"source does not exist: {source_dir}"}), 400
 
     # Ensure DB exists (safe even if already created)
@@ -479,8 +489,11 @@ def run_pipeline():
     if max_files > 0:
         files = files[:max_files]
 
+    log.info(f"Found {len(files)} files to process in {source_dir}")
+
     job_started = datetime.utcnow().isoformat() + "Z"
     run_id = short_hash(job_started + str(source_dir))
+    log.info(f"Run ID: {run_id}")
 
     results_jsonl = out_dir / f"fantasia_core_results.{run_id}.jsonl"
     errors_jsonl = out_dir / f"errors.{run_id}.jsonl"
@@ -493,7 +506,9 @@ def run_pipeline():
 
     for fp in files:
         try:
+            log.info(f"📄 Processing file: {fp.name}")
             if not force and file_already_processed(db_path, fp):
+                log.info(f"📄 Processing file: {fp.name}")
                 skipped_files += 1
                 skipped_details.append({"source_name": fp.name, "reason": "already_processed"})
                 continue
@@ -513,12 +528,14 @@ def run_pipeline():
                 continue
 
             chunks = chunk_text(text, chunk_chars)
+            log.info(f"Split into {len(chunks)} chunks of ~{chunk_chars} chars")
             file_out_dir = out_dir / fp.stem
             ensure_dir(file_out_dir)
 
             file_chunk_summaries = []
 
             for idx, (start, end, seg) in enumerate(chunks):
+                log.info(f"⚙️  Chunk {idx+1}/{len(chunks)} for {fp.name}")
                 total_chunks += 1
                 record_base = {
                     "run_id": run_id,
@@ -551,6 +568,7 @@ def run_pipeline():
 
                 try:
                     parsed: FantasiaBatch = run_llm_on_chunk(seg, model=model, db_path=db_path)
+                    log.info(f"✅ Completed LLM for chunk {idx+1}/{len(chunks)}")
                     out_obj = {
                         **record_base,
                         "fantasia_core": parsed.model_dump(),
@@ -594,6 +612,7 @@ def run_pipeline():
                         "created_at": datetime.utcnow().isoformat() + "Z",
                     }
                     append_jsonl(errors_jsonl, err)
+            log.info(f"✔️  Finished file: {fp.name} (chunks={len(chunks)})")
 
             # ... existing per-file manifest write and counters ...
             write_json(
@@ -618,6 +637,7 @@ def run_pipeline():
             mark_file_processed(db_path, fp, run_id)
 
         except Exception as e:
+            log.error(f"💥 Error processing {fp.name}: {e}", exc_info=True)
             err = {
                 "run_id": run_id,
                 "source_path": str(fp),
@@ -649,6 +669,8 @@ def run_pipeline():
             "usage": usage_snapshot,
         },
     )
+    log.info(f"🏁 Run {run_id} complete — {processed_files} files processed, {skipped_files} skipped, {total_chunks} chunks total.")
+
 
     return jsonify({
         "run_id": run_id,
