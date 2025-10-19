@@ -570,5 +570,42 @@ def run_pipeline():
     })
 
 
+@app.get("/jid/files")
+def list_files():
+    db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT DISTINCT file_name FROM fantasias ORDER BY file_name ASC")
+        rows = [r[0] for r in cur.fetchall()]
+    return jsonify(rows)
+
+@app.get("/jid/fantasias")
+def list_fantasias():
+    db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
+    q = (request.args.get("q") or "").strip()
+    file_name = (request.args.get("file_name") or "").strip()
+    limit = int(request.args.get("limit") or 500)
+    limit = max(1, min(limit, 5000))
+
+    sql = "SELECT file_name, title, description, human_interest, created_at FROM fantasias"
+    where, params = [], []
+    if file_name:
+        where.append("file_name = ?"); params.append(file_name)
+    if q:
+        like = f"%{q}%"
+        where.append("(title LIKE ? OR description LIKE ? OR human_interest LIKE ?)")
+        params += [like, like, like]
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY datetime(created_at) DESC LIMIT ?"; params.append(limit)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(sql, params)
+        data = [dict(r) for r in cur.fetchall()]
+    return jsonify(data)
+
+
 # No `if __name__ == "__main__":` per your hosting mode. Run with gunicorn:
 # gunicorn -w 4 -k gthread --threads 8 --bind 127.0.0.1:9013 jid:app
