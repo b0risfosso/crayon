@@ -1,25 +1,25 @@
 
 #!/usr/bin/env python3
 
-ingest_tester.py — scan a directory and test whether PDFs, EPUBs, and text files
-can be opened and minimally read by your ingest pipeline.
+#ingest_tester.py — scan a directory and test whether PDFs, EPUBs, and text files
+#can be opened and minimally read by your ingest pipeline.
 
-- PDFs: attempts to open with pypdf and extract text from the first few pages.
-- EPUBs: opens with ebooklib and extracts concatenated text of the first items.
-- Text: opens using utf-8 (errors="replace") and reads first N bytes.
+#- PDFs: attempts to open with pypdf and extract text from the first few pages.
+#- EPUBs: opens with ebooklib and extracts concatenated text of the first items.
+#- Text: opens using utf-8 (errors="replace") and reads first N bytes.
 
-Outputs:
-- A JSONL file with one record per file: status, error (if any), and basic stats.
-- A CSV summary with per-type pass/fail counts.
-- Exit code is nonzero if any file fails.
+#Outputs:
+#- A JSONL file with one record per file: status, error (if any), and basic stats.
+#- A CSV summary with per-type pass/fail counts.
+#- Exit code is nonzero if any file fails.
 
-Usage:
-    python ingest_tester.py --root /var/www/site/data/source --out ./ingest_test_out
-    python ingest_tester.py --root /some/path --workers 4 --sample-pages 3
+#Usage:
+#    python ingest_tester.py --root /var/www/site/data/source --out ./ingest_test_out
+#    python ingest_tester.py --root /some/path --workers 4 --sample-pages 3
 
-Requirements (see requirements.txt):
-    pypdf>=4.2.0
-    ebooklib>=0.18
+#Requirements (see requirements.txt):
+#    pypdf>=4.2.0
+#    ebooklib>=0.18
 
 import argparse
 import csv
