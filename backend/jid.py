@@ -52,15 +52,24 @@ SYSTEM_MSG = (
     "actionable 'fantasia cores' (ideas, visions, aspirations, imaginations, emotions, experiences, achievements) that open new doors for builders."
 )
 
-USER_PROMPT_TEMPLATE = """Task: Read the following excerpt carefully. Then, generate 6–8 fantasia cores inspired by it. Each fantasia cores should orbit around something that humans would be driven to create, build, experience, achieve, or understand — what is already well-understood or complete is out of scope. Fantasia should spring from curiosity, possibility, or emotional resonance rather than simple description. Fantasia may emerge from any domain that stirs human imagination — science, engineering, philosophy, emotion, science fiction, fantasy, art, or other frontiers of thought. For each fantasia, include:
-- Title: A clear, descriptive title (not cryptic or abstract).
-- Description (2–3 sentences): Explain the fantasia — what it explores, builds, or reveals.
-- Rationale: A short rationale for why this fantasia would captivate human curiosity, creativity, or purpose.
 
-push the limits of what is possible, known, and understood.
+
+USER_PROMPT_TEMPLATE = """Task: Read the following excerpt carefully. Then, generate 6–8 core fantasia inspired by it. Each fantasia should orbit around something that someone {VISION} would be driven to create, build, experience, achieve, or understand — not what is already well-understood or complete. 
+
+Fantasia should spring from curiosity, possibility, or emotional resonance rather than simple description. Fantasia may emerge from any domain that stirs someone {VISION}'s imagination — science, engineering, philosophy, emotion, science fiction, fantasy, art, or other frontiers of thought. 
+
+For each fantasia, include:
+
+Title: A clear, descriptive title (not cryptic or abstract).  
+Description (2–3 sentences): Explain the fantasia — what it explores, builds, or reveals.  
+Rationale: A short rationale for why this fantasia would captivate someone {VISION}'s curiosity, creativity, or purpose.  
+
+Goal: Produce ideas that open new doors — that make someone {VISION} feel that something meaningful, beautiful, or powerful could be created from the seed of this excerpt.  
+
+Push the limits of what is possible, known, and understood.
 
 <------------- EXCERPT START ---------------------->
-{excerpt}
+{EXCERPT}
 <------------- EXCERPT END ---------------------->
 """
 
@@ -244,8 +253,8 @@ def stat_fingerprint(p: Path) -> tuple[int, int]:
 
 # ---------- LLM call (structured) ----------
 
-def run_llm_on_chunk(chunk: str, model: str = DEFAULT_MODEL) -> FantasiaBatch:
-    user_msg = USER_PROMPT_TEMPLATE.format(excerpt=chunk)
+def run_llm_on_chunk(chunk: str, vision: str = "exploring the betterment of humanity", model: str = DEFAULT_MODEL) -> FantasiaBatch:
+    user_msg = USER_PROMPT_TEMPLATE.format(EXCERPT=chunk, VISION=vision)
     schema = FantasiaBatch  # Pydantic model as text_format schema
 
     resp = _client.responses.parse(  # type: ignore[attr-defined]
@@ -475,6 +484,7 @@ def run_pipeline():
     max_files = int(data.get("max_files", 0))
     db_path = Path(data.get("db_path", DB_PATH_DEFAULT))
     force = bool(data.get("force", False))   # <-- NEW
+    vision = data.get("vision", "exploring the betterment of humanity")
 
     log.info(f"🟢 /run called — source={source_dir}, model={model}, dry_run={dry_run}, force={force}")
 
@@ -494,6 +504,8 @@ def run_pipeline():
     job_started = datetime.utcnow().isoformat() + "Z"
     run_id = short_hash(job_started + str(source_dir))
     log.info(f"Run ID: {run_id}")
+
+    ensure_dir(out_dir)
 
     results_jsonl = out_dir / f"fantasia_core_results.{run_id}.jsonl"
     errors_jsonl = out_dir / f"errors.{run_id}.jsonl"
@@ -567,7 +579,7 @@ def run_pipeline():
                     continue
 
                 try:
-                    parsed: FantasiaBatch = run_llm_on_chunk(seg, model=model, db_path=db_path)
+                    parsed: FantasiaBatch = run_llm_on_chunk(seg, vision, model=model)
                     log.info(f"✅ Completed LLM for chunk {idx+1}/{len(chunks)}")
                     out_obj = {
                         **record_base,
@@ -670,6 +682,7 @@ def run_pipeline():
         },
     )
     log.info(f"🏁 Run {run_id} complete — {processed_files} files processed, {skipped_files} skipped, {total_chunks} chunks total.")
+
 
 
     return jsonify({
