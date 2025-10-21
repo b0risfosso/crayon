@@ -2,8 +2,7 @@
 # jid.py — Flask app to chunk PDFs/TXT, run LLM with Pydantic schema, and persist results.
 
 import os
-import re
-import json
+import json, re, hashlib
 import time
 from datetime import datetime
 from pathlib import Path
