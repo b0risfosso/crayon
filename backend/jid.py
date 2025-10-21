@@ -263,18 +263,18 @@ def chunk_text(text: str, chunk_size: int, *, fast: bool = False) -> List[Tuple[
     if not text:
         return []
         if fast:
-        # Minimal processing to avoid pathological regex cost
-        text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
-        n = len(text)
-        chunks = []
-        i = 0
-        while i < n:
-            j = min(i + chunk_size, n)
-            seg = text[i:j]
-            if seg:
-                chunks.append((i, j, seg))
-            i = j
-        return chunks
+            # Minimal processing to avoid pathological regex cost
+            text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+            n = len(text)
+            chunks = []
+            i = 0
+            while i < n:
+                j = min(i + chunk_size, n)
+                seg = text[i:j]
+                if seg:
+                    chunks.append((i, j, seg))
+                i = j
+            return chunks
     # Default path with nicer boundaries
     text = normalize_ws(text)
     chunks = []
