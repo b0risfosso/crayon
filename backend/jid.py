@@ -16,6 +16,8 @@ import shutil
 import logging
 
 from flask import Flask, request, jsonify
+import uuid
+
 
 # --- Pydantic (v2 preferred; v1 shim) ---
 try:
@@ -724,188 +726,203 @@ def health():
 @app.post("/run")
 def run_pipeline():
     """
-    Run fantasia-core generation over saved writings (not files).
-    One LLM call per writing per vision, using ONLY DEFAULT_MODEL (gpt-5-mini).
-    Stop when gpt-5-mini token budget is reached. No switching.
+    Writings-mode: for each vision in `visions`, generate Fantasia cores for each writing (once per (vision, writing_id)).
+    Uses ONLY DEFAULT_MODEL (gpt-5-mini-*). Stops when `mini_token_limit` is reached. No model switching.
     """
     data = request.get_json(silent=True) or {}
 
-    # Inputs / defaults (mirrors your style)
-    db_path        = Path(data.get("db_path", DB_PATH_DEFAULT))
-    out_dir        = Path(data.get("out", DEFAULT_OUT))
-    model          = str(data.get("model", DEFAULT_MODEL))  # should be gpt-5-mini-*
-    vision         = data.get("vision", "exploring the betterment of humanity")
-    dry_run        = bool(data.get("dry_run", False))
-    max_writings   = int(data.get("max_writings", 0))       # 0 = no cap
-    mini_token_limit = int(data.get("mini_token_limit", SWITCH_MODEL_LIMIT_DEFAULT))  # hard stop for mini
-    force          = bool(data.get("force", False))         # if True, ignore done table and rerun all pairs
+    # --- Inputs / defaults ---
+    db_path          = Path(data.get("db_path", DB_PATH_DEFAULT))
+    out_dir          = Path(data.get("out", DEFAULT_OUT))
+    model            = str(data.get("model", DEFAULT_MODEL))  # expect gpt-5-mini-*
+    dry_run          = bool(data.get("dry_run", False))
+    force            = bool(data.get("force", False))
+    max_writings     = int(data.get("max_writings", 0))       # 0 = no cap
+    mini_token_limit = int(data.get("mini_token_limit", SWITCH_MODEL_LIMIT_DEFAULT))  # daily hard stop for mini
 
-    # Unused/removed in this mode:
-    # - source_dir, file discovery, chunking, OCR, model switching, fallback gpt-5, etc.
+    # Normalize visions: support single "vision" or list "visions"
+    visions_input = data.get("visions")
+    if isinstance(visions_input, str):
+        visions = [v.strip() for v in visions_input.split(",") if v.strip()]
+    elif isinstance(visions_input, list):
+        visions = [str(v).strip() for v in visions_input if str(v).strip()]
+    else:
+        v_single = str(data.get("vision", "exploring the betterment of humanity")).strip()
+        visions = [v_single] if v_single else []
+
+    if not visions:
+        return jsonify({"error": "No visions provided (use 'vision' or 'visions')."}), 400
 
     log.info(
-        "🟢 /run (writings-mode) — model=%s, vision=%s, dry_run=%s, force=%s, mini_token_limit=%s, max_writings=%s",
-        model, vision, dry_run, force, mini_token_limit, max_writings
+        "🟢 /run (writings-mode, multi-vision) — model=%s, dry_run=%s, force=%s, mini_token_limit=%s, max_writings=%s, visions=%s",
+        model, dry_run, force, mini_token_limit, max_writings, visions
     )
 
     ensure_db(db_path)
     ensure_dir(out_dir)
 
     job_started = datetime.utcnow().isoformat() + "Z"
-    run_id = short_hash(job_started + vision + model)
+    run_id = short_hash(job_started + "|".join(visions) + model)
     run_out_dir = out_dir / f"run_writings_{run_id}"
     ensure_dir(run_out_dir)
 
     results_jsonl = run_out_dir / f"fantasia_core_results.{run_id}.jsonl"
     errors_jsonl  = run_out_dir / f"errors.{run_id}.jsonl"
 
-    # Hard-stop guard before any processing (only mini matters)
+    # Hard-stop guard before any processing (mini only)
     gptmini_today = _today_for_model(db_path, model)
     if gptmini_today.get("total", 0) >= mini_token_limit:
         stop_reason = f"mini_token_budget_exceeded ({gptmini_today.get('total')} >= {mini_token_limit})"
         usage_snapshot = _read_usage_snapshot(db_path)
-        write_json(
-            run_out_dir / f"_run_{run_id}.json",
-            {
-                "run_id": run_id,
-                "job_started": job_started,
-                "model": model,
-                "vision": vision,
-                "writings_processed": 0,
-                "results_jsonl": str(results_jsonl),
-                "errors_jsonl": str(errors_jsonl),
-                "db_path": str(db_path),
-                "usage": usage_snapshot,
-                "stopped_early": True,
-                "stop_reason": stop_reason,
-            },
-        )
-        return jsonify({
+        manifest = {
             "run_id": run_id,
+            "job_started": job_started,
+            "model": model,
+            "visions": visions,
             "writings_processed": 0,
+            "writings_skipped": 0,
             "results_jsonl": str(results_jsonl),
             "errors_jsonl": str(errors_jsonl),
             "db_path": str(db_path),
             "usage": usage_snapshot,
             "stopped_early": True,
             "stop_reason": stop_reason,
-        })
+            "per_vision": [],
+            "per_item": [],
+        }
+        write_json(run_out_dir / f"_run_{run_id}.json", manifest)
+        return jsonify(manifest), 200
 
     # Load writings
-    all_writings = fetch_writings(db_path, limit=10_000)
+    all_writings = fetch_writings(db_path, limit=10_000)  # [(id, topic, description, document)]
     if max_writings > 0:
         all_writings = all_writings[:max_writings]
     log.info("Found %d writings to consider.", len(all_writings))
 
-    processed = 0
-    skipped   = 0
+    # Aggregates
+    processed_total = 0
+    skipped_total   = 0
     skipped_details = []
     per_item_summary = []
+    per_vision_stats = []  # [{vision, processed, skipped}]
     stopped_early = False
-    stop_reason = None
+    stop_reason   = None
 
-    for (wid, topic, desc, doc) in all_writings:
+    for vision in visions:
         if stopped_early:
             break
 
-        if not force and writing_vision_already_done(db_path, wid, vision):
-            skipped += 1
-            skipped_details.append({"writing_id": wid, "topic": topic, "reason": "already_done_for_vision"})
-            continue
+        v_processed = 0
+        v_skipped   = 0
 
-        # Budget check BEFORE the call
-        gptmini_today = _today_for_model(db_path, model)
-        if gptmini_today.get("total", 0) >= mini_token_limit:
-            stopped_early = True
-            stop_reason = f"mini_token_budget_reached ({gptmini_today.get('total')} >= {mini_token_limit})"
-            log.warning("⛔ Stopping before writing_id=%s: %s", wid, stop_reason)
-            break
+        for (wid, topic, desc, doc) in all_writings:
+            if stopped_early:
+                break
 
-        record_base = {
-            "run_id": run_id,
-            "writing_id": wid,
-            "topic": topic,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "model": model,
-            "vision": vision,
-        }
+            # Skip if already done for this (writing, vision), unless force
+            if not force and writing_vision_already_done(db_path, wid, vision):
+                v_skipped += 1
+                skipped_total += 1
+                skipped_details.append({"writing_id": wid, "topic": topic, "vision": vision, "reason": "already_done_for_vision"})
+                continue
 
-        if dry_run:
-            out_obj = {**record_base, "dry_run": True}
-            append_jsonl(results_jsonl, out_obj)
-            processed += 1
-            # Do NOT mark done in dry_run
-            per_item_summary.append({"writing_id": wid, "topic": topic, "items": 0, "dry_run": True})
-            continue
-
-        try:
-            # Reuse your structured FantasiaBatch call;
-            # one call over the WHOLE writing text (no chunking).
-            parsed: FantasiaBatch = run_llm_on_chunk(doc, vision, model=model, db_path=db_path)
-
-            out_obj = {
-                **record_base,
-                "fantasia_core": parsed.model_dump(),
-                "excerpt_hash": parsed.excerpt_hash,
-                "dry_run": False,
-            }
-            append_jsonl(results_jsonl, out_obj)
-
-            # Persist fantasia items
-            created_at = record_base["created_at"]
-            rows_for_db = [
-                (f"writing#{wid}", it.title, it.description, it.rationale, created_at, vision)
-                for it in parsed.items
-            ]
-            insert_fantasia_rows(db_path, rows_for_db)
-
-            # Mark (vision, writing_id) done
-            mark_writing_vision_done(db_path, wid, vision)
-
-            processed += 1
-            per_item_summary.append({
-                "writing_id": wid,
-                "topic": topic,
-                "items": len(parsed.items),
-                "excerpt_hash": parsed.excerpt_hash,
-                "vision": vision,
-            })
-
-            # Budget check AFTER accounting (run_llm_on_chunk already recorded usage)
+            # Budget check BEFORE each call
             gptmini_today = _today_for_model(db_path, model)
             if gptmini_today.get("total", 0) >= mini_token_limit:
                 stopped_early = True
                 stop_reason = f"mini_token_budget_reached ({gptmini_today.get('total')} >= {mini_token_limit})"
-                log.warning("⛔ Stopping after writing_id=%s: %s", wid, stop_reason)
+                log.warning("⛔ Stopping before writing_id=%s (vision=%s): %s", wid, vision, stop_reason)
                 break
 
-        except ValidationError as ve:
-            err = {
-                **record_base,
-                "error": "validation_error",
-                "details": json.loads(ve.json()),
+            record_base = {
+                "run_id": run_id,
+                "writing_id": wid,
+                "topic": topic,
+                "created_at": datetime.utcnow().isoformat() + "Z",
+                "model": model,
+                "vision": vision,
             }
-            append_jsonl(errors_jsonl, err)
-        except Exception as e:
-            err = {
-                **record_base,
-                "error": type(e).__name__,
-                "details": str(e),
-            }
-            append_jsonl(errors_jsonl, err)
+
+            if dry_run:
+                append_jsonl(results_jsonl, {**record_base, "dry_run": True})
+                v_processed += 1
+                processed_total += 1
+                per_item_summary.append({"writing_id": wid, "topic": topic, "items": 0, "dry_run": True, "vision": vision})
+                continue
+
+            try:
+                # One structured call per writing (full document as the "chunk")
+                parsed: FantasiaBatch = run_llm_on_chunk(doc, vision, model=model, db_path=db_path)
+
+                out_obj = {
+                    **record_base,
+                    "fantasia_core": parsed.model_dump(),
+                    "excerpt_hash": parsed.excerpt_hash,
+                    "dry_run": False,
+                }
+                append_jsonl(results_jsonl, out_obj)
+
+                # Persist fantasia items
+                created_at = record_base["created_at"]
+                rows_for_db = [
+                    (f"writing#{wid}", it.title, it.description, it.rationale, created_at, vision)
+                    for it in parsed.items
+                ]
+                insert_fantasia_rows(db_path, rows_for_db)
+
+                # Mark (vision, writing_id) done
+                mark_writing_vision_done(db_path, wid, vision)
+
+                v_processed += 1
+                processed_total += 1
+                per_item_summary.append({
+                    "writing_id": wid,
+                    "topic": topic,
+                    "items": len(parsed.items),
+                    "excerpt_hash": parsed.excerpt_hash,
+                    "vision": vision,
+                })
+
+                # Budget check AFTER accounting (run_llm_on_chunk already recorded usage)
+                gptmini_today = _today_for_model(db_path, model)
+                if gptmini_today.get("total", 0) >= mini_token_limit:
+                    stopped_early = True
+                    stop_reason = f"mini_token_budget_reached ({gptmini_today.get('total')} >= {mini_token_limit})"
+                    log.warning("⛔ Stopping after writing_id=%s (vision=%s): %s", wid, vision, stop_reason)
+                    break
+
+            except ValidationError as ve:
+                append_jsonl(errors_jsonl, {
+                    **record_base,
+                    "error": "validation_error",
+                    "details": json.loads(ve.json()),
+                })
+            except Exception as e:
+                append_jsonl(errors_jsonl, {
+                    **record_base,
+                    "error": type(e).__name__,
+                    "details": str(e),
+                })
+
+        per_vision_stats.append({
+            "vision": vision,
+            "processed": v_processed,
+            "skipped": v_skipped,
+        })
 
     usage_snapshot = _read_usage_snapshot(db_path)
     manifest = {
         "run_id": run_id,
         "job_started": job_started,
-        "model": model,                       # only mini
-        "vision": vision,
-        "writings_processed": processed,
-        "writings_skipped": skipped,
+        "model": model,                 # only mini
+        "visions": visions,
+        "writings_processed": processed_total,
+        "writings_skipped": skipped_total,
         "skipped_details": skipped_details,
         "results_jsonl": str(results_jsonl),
         "errors_jsonl": str(errors_jsonl),
         "per_item": per_item_summary,
+        "per_vision": per_vision_stats,
         "db_path": str(db_path),
         "usage": usage_snapshot,
         "stopped_early": bool(stopped_early),
@@ -913,10 +930,11 @@ def run_pipeline():
     }
     write_json(run_out_dir / f"_run_{run_id}.json", manifest)
     log.info(
-        "🏁 Run %s complete — processed=%s, skipped=%s, stopped_early=%s, reason=%s",
-        run_id, processed, skipped, stopped_early, stop_reason
+        "🏁 Run %s complete — processed=%s, skipped=%s, visions=%s, stopped_early=%s, reason=%s",
+        run_id, processed_total, skipped_total, len(visions), stopped_early, stop_reason
     )
-    return jsonify(manifest)
+    return jsonify(manifest), 200
+
 
 
 
@@ -979,11 +997,6 @@ def get_usage():
         return jsonify({"model": model, "today": m_today, "all_time": m_all})
     return jsonify(snap)
 
-
-from flask import Flask, request, jsonify
-import uuid
-
-app = Flask(__name__)
 
 @app.route("/write", methods=["POST", "GET"])
 def write_by_gpt():
