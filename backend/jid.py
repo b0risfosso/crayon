@@ -450,6 +450,9 @@ def _record_llm_usage(conn: sqlite3.Connection, usage: dict) -> None:
         WHERE date = 'ALL_TIME'
     """, (inp, outp, tot))
 
+
+
+
 def _read_usage_snapshot(db_path: Path) -> dict:
     with sqlite3.connect(db_path) as conn:
         cur = conn.cursor()
