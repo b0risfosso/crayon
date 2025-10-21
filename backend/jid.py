@@ -13,6 +13,7 @@ from pathlib import Path
 import tempfile
 import shutil
 import logging
+import random
 
 from flask import Flask, request, jsonify
 import uuid
@@ -870,9 +871,18 @@ def run_pipeline():
 
     # Load writings
     all_writings = fetch_writings(db_path, limit=10_000)  # [(id, topic, description, document)]
-    if max_writings > 0:
-        all_writings = all_writings[:max_writings]
-    log.info("Found %d writings to consider.", len(all_writings))
+    log.info("Fetched %d writings total.", len(all_writings))
+
+    #seed = int(datetime.utcnow().timestamp())  # or None if not needed
+    #random.seed(seed)
+    #manifest_seed = seed
+
+    # --- random sampling logic ---
+    if max_writings > 0 and len(all_writings) > max_writings:
+        sampled_writings = random.sample(all_writings, max_writings)
+        log.info("Randomly sampled %d of %d writings for this run.", len(sampled_writings), len(all_writings))
+    else:
+        sampled_writings = all_writings
 
     # Aggregates
     processed_total = 0
@@ -979,6 +989,7 @@ def run_pipeline():
         "usage": usage_snapshot,
         "stopped_early": bool(stopped_early),
         "stop_reason": stop_reason,
+        #"sampling_seed": manifest_seed,
     }
     write_json(run_out_dir / f"_run_{run_id}.json", manifest)
     log.info(
