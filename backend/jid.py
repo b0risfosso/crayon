@@ -392,7 +392,7 @@ def _usage_from_resp(resp) -> dict:
 
 
 def _record_llm_usage_by_model(conn: sqlite3.Connection, model: str, usage: dict) -> None:
-   """
+    """
     Per-model counters: increment today's row and ALL_TIME for this model.
     """
     inp, outp, tot = usage.get("input", 0), usage.get("output", 0), usage.get("total", 0)
