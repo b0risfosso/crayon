@@ -727,17 +727,22 @@ def writing_vision_already_done(db_path: Path, writing_id: int, vision: str) -> 
         )
         return cur.fetchone() is not None
 
-def fetch_writings(db_path: Path, limit: int = 1000) -> list[tuple[int, str, str, str]]:
+def fetch_writings(db_path: Path, limit: int = 10000) -> list[tuple[int, str, str | None, str]]:
     """
-    Returns [(id, topic, description, document), ...] newest first.
+    Returns [(id, topic, description, document)] newest-first.
+    No filtering by model, date, or size.
     """
     with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute(
-            "SELECT id, topic, description, document FROM writings ORDER BY id DESC LIMIT ?",
-            (limit,),
-        )
-        return cur.fetchall()
+        cur.execute("""
+            SELECT id, topic, description, document
+            FROM writings
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+        """, (limit,))
+        return [(r["id"], r["topic"], r["description"], r["document"]) for r in cur.fetchall()]
+
 
 
 
