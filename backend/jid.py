@@ -476,52 +476,79 @@ def _record_llm_usage(conn: sqlite3.Connection, usage: dict) -> None:
     """, (inp, outp, tot))
 
 
-
-
 def _read_usage_snapshot(db_path: Path) -> dict:
+    """
+    Snapshot of token usage.
+
+    Returns:
+    {
+      "totals": { "today": {...}, "all_time": {...} },     # legacy aggregate (if table exists)
+      "by_model": {
+        "<modelA>": { "today": {...}, "all_time": {...} },
+        "<modelB>": { "today": {...}, "all_time": {...} }
+      }
+    }
+    """
     with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         today = datetime.utcnow().strftime("%Y-%m-%d")
-        def row(d):
-            cur.execute("SELECT input_tokens, output_tokens, total_tokens FROM llm_usage_counters WHERE date = ?", (d,))
-            r = cur.fetchone()
-            return {"input": r[0], "output": r[1], "total": r[2]} if r else {"input": 0, "output": 0, "total": 0}
-        return {"today": row(today), "all_time": row("ALL_TIME")}
 
+        # --- Legacy totals (llm_usage_counters) ---
+        def legacy_row(date_val: str) -> dict:
+            try:
+                cur.execute(
+                    "SELECT input_tokens, output_tokens, total_tokens "
+                    "FROM llm_usage_counters WHERE date = ?",
+                    (date_val,),
+                )
+                r = cur.fetchone()
+                return {"input": r["input_tokens"], "output": r["output_tokens"], "total": r["total_tokens"]} if r else {"input": 0, "output": 0, "total": 0}
+            except sqlite3.OperationalError:
+                # table might not exist yet; return zeros gracefully
+                return {"input": 0, "output": 0, "total": 0}
 
-def _record_llm_usage_by_model(conn: sqlite3.Connection, model: str, usage: dict) -> None:
-    """
-    Per-model counters: increment today's row and ALL_TIME for this model.
-    """
-    inp, outp, tot = usage.get("input", 0), usage.get("output", 0), usage.get("total", 0)
-    if not (inp or outp or tot):
-        return
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    # Today/model
-    conn.execute("""
-        INSERT OR IGNORE INTO llm_usage_counters_by_model(date, model, input_tokens, output_tokens, total_tokens)
-        VALUES (?, ?, 0, 0, 0)
-    """, (today, model))
-    conn.execute("""
-        UPDATE llm_usage_counters_by_model
-        SET input_tokens  = input_tokens  + ?,
-            output_tokens = output_tokens + ?,
-            total_tokens  = total_tokens  + ?
-        WHERE date = ? AND model = ?
-    """, (inp, outp, tot, today, model))
-    # ALL_TIME/model
-    conn.execute("""
-        INSERT OR IGNORE INTO llm_usage_counters_by_model(date, model, input_tokens, output_tokens, total_tokens)
-        VALUES ('ALL_TIME', ?, 0, 0, 0)
-    """, (model,))
-    conn.execute("""
-        UPDATE llm_usage_counters_by_model
-        SET input_tokens  = input_tokens  + ?,
-            output_tokens = output_tokens + ?,
-            total_tokens  = total_tokens  + ?
-        WHERE date = 'ALL_TIME' AND model = ?
-    """, (inp, outp, tot, model))
-    conn.commit()
+        totals = {
+            "today": legacy_row(today),
+            "all_time": legacy_row("ALL_TIME"),
+        }
+
+        # --- Per-model (llm_usage_counters_by_model) ---
+        def fetch_by_model(date_val: str) -> dict:
+            try:
+                cur.execute(
+                    "SELECT model, input_tokens, output_tokens, total_tokens "
+                    "FROM llm_usage_counters_by_model WHERE date = ?",
+                    (date_val,),
+                )
+                rows = cur.fetchall()
+            except sqlite3.OperationalError:
+                # table might not exist yet
+                rows = []
+
+            out = {}
+            for r in rows:
+                out[r["model"]] = {
+                    "input": r["input_tokens"],
+                    "output": r["output_tokens"],
+                    "total": r["total_tokens"],
+                }
+            return out
+
+        today_by = fetch_by_model(today)
+        all_by   = fetch_by_model("ALL_TIME")
+
+        models = set(today_by.keys()) | set(all_by.keys())
+        by_model = {
+            m: {
+                "today":   today_by.get(m, {"input": 0, "output": 0, "total": 0}),
+                "all_time": all_by.get(m,   {"input": 0, "output": 0, "total": 0}),
+            }
+            for m in sorted(models)
+        }
+
+        return {"totals": totals, "by_model": by_model}
+
 
 
 def _today_totals(db_path: Path) -> dict:
