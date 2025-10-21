@@ -318,14 +318,36 @@ def stat_fingerprint(p: Path) -> tuple[int, int]:
 
 # ---------- LLM call (structured) ----------
 
-def run_llm_on_chunk(
-    chunk: str,
-    vision: str = "exploring the betterment of humanity",
-    model: str = DEFAULT_MODEL,
-    db_path: Optional[Path] = None,   # <--- NEW: pass db_path in explicitly
-) -> FantasiaBatch:
+def _extract_json_text_from_responses(resp: Any) -> str:
+    # Preferred: built-in convenience
+    text = getattr(resp, "output_text", None)
+    if isinstance(text, str) and text.strip():
+        return text
 
-    user_msg = USER_PROMPT_TEMPLATE.format(EXCERPT=chunk, VISION=vision)
+    # Fallback: walk outputs to find a message text
+    try:
+        outs = getattr(resp, "output", None) or resp.get("output", [])
+        for part in outs:
+            if part.get("type") == "message":
+                content = part.get("content") or []
+                for c in content:
+                    t = c.get("text")
+                    if t and t.strip():
+                        return t
+    except Exception:
+        pass
+
+    # Last resort: stringify entire object
+    return str(resp)
+
+
+def run_llm_on_chunk(doc: str, vision: str, *, model: str, db_path: Path) -> Tuple[FantasiaBatch, str]:
+    """
+    Calls the Responses API with text_format=FantasiaBatch so the SDK parses directly into our schema.
+    Returns (parsed_model, raw_text_for_debug).
+    """
+
+    user_msg = USER_PROMPT_TEMPLATE.format(EXCERPT=doc, VISION=vision)
     schema = FantasiaBatch  # Pydantic model as text_format schema
 
     resp = _client.responses.parse(  # type: ignore[attr-defined]
@@ -334,8 +356,26 @@ def run_llm_on_chunk(
             {"role": "system", "content": SYSTEM_MSG},
             {"role": "user", "content": user_msg},
         ],
-        text_format=schema,
+        text_format=FantasiaBatch,
     )
+
+    parsed = getattr(resp, "output_parsed", None) or getattr(resp, "parsed", None)
+    raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
+
+    if parsed is None:
+        # Fallback: parse the raw text as JSON (strip code fences if present)
+        m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.S)
+        raw_json = m.group(1) if m else raw_text
+        parsed = FantasiaBatch.model_validate(json.loads(raw_json))
+
+    # Ensure we really have the right type (SDKs sometimes return dicts)
+    if not isinstance(parsed, FantasiaBatch):
+        parsed = FantasiaBatch.model_validate(parsed)
+
+    # Optional: attach a short content hash if your caller wants it
+    excerpt_hash = hashlib.sha1(doc.encode("utf-8")).hexdigest()[:12]
+    # if your downstream expects parsed.excerpt_hash, you can do:
+    setattr(parsed, "excerpt_hash", excerpt_hash)
 
     # --- crayon-style token accounting ---
     try:
@@ -347,6 +387,10 @@ def run_llm_on_chunk(
     except Exception as e:
         # non-fatal; keep processing
         log.warning(f"failed to record llm usage: {e}")
+
+    return parsed, raw_text
+
+
 
         
     # SDK returns parsed object mapped to Pydantic. If your SDK returns dict, validate explicitly:
@@ -884,57 +928,34 @@ def run_pipeline():
 
             try:
                 # One structured call per writing (full document as the "chunk")
-                parsed: FantasiaBatch = run_llm_on_chunk(doc, vision, model=model, db_path=db_path)
+                parsed, raw_text = run_llm_on_chunk(doc, vision, model=model, db_path=db_path)
 
-                out_obj = {
-                    **record_base,
-                    "fantasia_core": parsed.model_dump(),
-                    "excerpt_hash": parsed.excerpt_hash,
-                    "dry_run": False,
-                }
-                append_jsonl(results_jsonl, out_obj)
-
-                # Persist fantasia items
                 created_at = record_base["created_at"]
+
                 rows_for_db = [
                     (f"writing#{wid}", it.title, it.description, it.rationale, created_at, vision)
                     for it in parsed.items
                 ]
-                insert_fantasia_rows(db_path, rows_for_db)
+                log.info("parsed %d fantasia items for writing_id=%s vision=%s", len(rows_for_db), wid, vision)
 
-                # Mark (vision, writing_id) done
-                mark_writing_vision_done(db_path, wid, vision)
-
-                v_processed += 1
-                processed_total += 1
-                per_item_summary.append({
-                    "writing_id": wid,
-                    "topic": topic,
-                    "items": len(parsed.items),
-                    "excerpt_hash": parsed.excerpt_hash,
-                    "vision": vision,
-                })
-
-                # Budget check AFTER accounting (run_llm_on_chunk already recorded usage)
-                gptmini_today = _today_for_model(db_path, model)
-                if gptmini_today.get("total", 0) >= mini_token_limit:
-                    stopped_early = True
-                    stop_reason = f"mini_token_budget_reached ({gptmini_today.get('total')} >= {mini_token_limit})"
-                    log.warning("⛔ Stopping after writing_id=%s (vision=%s): %s", wid, vision, stop_reason)
-                    break
-
+                if rows_for_db:
+                    insert_fantasia_rows(db_path, rows_for_db)
+                    mark_writing_vision_done(db_path, wid, vision)
+                    v_processed += 1
+                    processed_total += 1
+                else:
+                    log.warning("0 items; not marking done for writing_id=%s vision=%s", wid, vision)
             except ValidationError as ve:
                 append_jsonl(errors_jsonl, {
                     **record_base,
                     "error": "validation_error",
                     "details": json.loads(ve.json()),
+                    "raw_model_text": (raw_text or "")[:8000],
                 })
+            except sqlite3.IntegrityError as ie:
+                append_jsonl(errors_jsonl, {**record_base, "error": "IntegrityError", "details": str(ie)})
             except Exception as e:
-                append_jsonl(errors_jsonl, {
-                    **record_base,
-                    "error": type(e).__name__,
-                    "details": str(e),
-                })
+                append_jsonl(errors_jsonl, {**record_base, "error": type(e).__name__, "details": str(e)})
 
         per_vision_stats.append({
             "vision": vision,
