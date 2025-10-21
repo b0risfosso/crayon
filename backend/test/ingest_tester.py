@@ -3,23 +3,26 @@
 ingest_tester.py — scan a directory and test whether PDFs, EPUBs, and text files
 can be opened and minimally read by your ingest pipeline.
 
-- PDFs: attempts to open with pypdf and extract text from the first few pages.
-- EPUBs: opens with ebooklib and extracts concatenated text of the first items.
-- Text: opens using utf-8 (errors="replace") and reads first N bytes.
+- PDFs: choose extractor (--pdf-extractor {auto,fitz,pypdf,pdfminer}) and sample first N pages.
+- EPUBs: ebooklib + BeautifulSoup to extract text from first items.
+- Text: utf-8 (errors="replace"), read first N bytes.
+- Optional OCR fallback for PDFs: --ocr to OCR pages with too-few chars.
 
 Outputs:
-- A JSONL file with one record per file: status, error (if any), and basic stats.
-- A CSV summary with per-type pass/fail counts.
-- Exit code is nonzero if any file fails.
+- JSONL: one record per file (status, error, basic stats).
+- CSV summary.
+- Exit is non-zero if any file fails (and optionally if any are skipped).
 
-Usage:
-    python ingest_tester.py --root /var/www/site/data/source --out ./ingest_test_out
-    python ingest_tester.py --root /some/path --workers 4 --sample-pages 3
-
-Requirements:
+Requirements (pick what you need):
     pypdf>=4.2.0
     ebooklib>=0.18
     beautifulsoup4>=4.12.0
+    pymupdf          # for --pdf-extractor fitz or auto
+    pdfminer.six     # for --pdf-extractor pdfminer or auto
+    pdf2image        # for --ocr
+    pytesseract      # for --ocr
+System deps for OCR:
+    poppler (for pdf2image), tesseract-ocr
 """
 import argparse
 import csv
@@ -31,12 +34,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 # ---- Config ----
 TEXT_EXTS = {".txt", ".text", ".md", ".rst", ".tex", ".csv", ".tsv", ".log"}
-MIN_CHARS_PDF = 100     # stricter success criterion for PDFs
-MIN_CHARS_EPUB = 100    # stricter success criterion for EPUBs
+MIN_CHARS_PDF = 100      # success criterion for PDFs (total sample length > 100)
+MIN_CHARS_EPUB = 100     # success criterion for EPUBs (total sample length > 100)
+
+# OCR defaults
+DEFAULT_OCR_PAGES = 2
+DEFAULT_OCR_THRESHOLD = 10  # if a page has <10 chars from extractor, consider it for OCR
 
 
 # ---- Helpers ----
@@ -65,39 +72,122 @@ class TestResult:
     mtime: str
     sha256: Optional[str]
     sample_len: int
-    pages_scanned: Optional[int]  # for epub this will be "items scanned"
+    pages_scanned: Optional[int]  # for epub, this is "items scanned"
     error: Optional[str]
 
 
-# lazy imports inside handlers
-def test_pdf(path: Path, sample_pages: int) -> Tuple[str, int]:
-    from pypdf import PdfReader  # type: ignore
+# ---- PDF extractors ----
+def extract_pdf_text_fitz(path: Path, sample_pages: int) -> Tuple[str, int, List[int]]:
+    import fitz  # PyMuPDF
+    doc = fitz.open(str(path))
+    n_pages = min(sample_pages, doc.page_count)
+    parts, per_page_counts = [], []
+    for i in range(n_pages):
+        page = doc.load_page(i)
+        txt = page.get_text("text") or ""
+        parts.append(txt)
+        per_page_counts.append(len(txt))
+        print(f"[{now_iso()}] PAGE(pdf:fitz) {path.name} p={i+1} chars={len(txt)}")
+    return "\n".join(parts), n_pages, per_page_counts
+
+
+def extract_pdf_text_pypdf(path: Path, sample_pages: int) -> Tuple[str, int, List[int]]:
+    from pypdf import PdfReader
     reader = PdfReader(str(path))
     n_pages = min(sample_pages, len(reader.pages))
-    sample_text_parts = []
+    parts, per_page_counts = [], []
     for i in range(n_pages):
         try:
-            sample_text_parts.append(reader.pages[i].extract_text() or "")
+            t = reader.pages[i].extract_text() or ""
         except Exception:
-            # continue; leave empty string for this page
-            sample_text_parts.append("")
-    sample_text = "\n".join(sample_text_parts)
-    return sample_text, n_pages
+            t = ""
+        parts.append(t)
+        per_page_counts.append(len(t))
+        print(f"[{now_iso()}] PAGE(pdf:pypdf) {path.name} p={i+1} chars={len(t)}")
+    return "\n".join(parts), n_pages, per_page_counts
 
 
+def extract_pdf_text_pdfminer(path: Path, sample_pages: int) -> Tuple[str, int, List[int]]:
+    from pdfminer.high_level import extract_pages
+    from pdfminer.layout import LTTextContainer
+    parts, per_page_counts, count = [], [], 0
+    for page_layout in extract_pages(str(path)):
+        txt_chunks = []
+        for el in page_layout:
+            if isinstance(el, LTTextContainer):
+                txt_chunks.append(el.get_text())
+        text = "".join(txt_chunks)
+        count += 1
+        parts.append(text)
+        per_page_counts.append(len(text))
+        print(f"[{now_iso()}] PAGE(pdf:pdfminer) {path.name} p={count} chars={len(text)}")
+        if count >= sample_pages:
+            break
+    return "\n".join(parts), count, per_page_counts
+
+
+def extract_pdf_text(path: Path, sample_pages: int, which: str) -> Tuple[str, int, List[int]]:
+    """
+    which: 'fitz' | 'pypdf' | 'pdfminer' | 'auto'
+    auto tries: fitz -> pypdf -> pdfminer
+    """
+    if which == "fitz":
+        return extract_pdf_text_fitz(path, sample_pages)
+    if which == "pypdf":
+        return extract_pdf_text_pypdf(path, sample_pages)
+    if which == "pdfminer":
+        return extract_pdf_text_pdfminer(path, sample_pages)
+
+    # auto
+    try:
+        text, n, counts = extract_pdf_text_fitz(path, sample_pages)
+        if len(text.strip()) >= 20:
+            return text, n, counts
+    except Exception:
+        pass
+    try:
+        text, n, counts = extract_pdf_text_pypdf(path, sample_pages)
+        if len(text.strip()) >= 20:
+            return text, n, counts
+    except Exception:
+        pass
+    # last resort
+    return extract_pdf_text_pdfminer(path, sample_pages)
+
+
+# ---- OCR fallback (optional) ----
+def ocr_pdf_first_pages(path: Path, pages_to_ocr: int) -> Tuple[str, List[int]]:
+    """
+    OCR first 'pages_to_ocr' pages into text, returns (joined_text, per_page_char_counts).
+    Requires: pdf2image (with poppler), pytesseract, and tesseract system binary.
+    """
+    from pdf2image import convert_from_path
+    import pytesseract
+
+    images = convert_from_path(str(path), first_page=1, last_page=pages_to_ocr)
+    parts, counts = [], []
+    for idx, img in enumerate(images, start=1):
+        txt = pytesseract.image_to_string(img) or ""
+        parts.append(txt)
+        counts.append(len(txt))
+        print(f"[{now_iso()}] PAGE(pdf:ocr) {path.name} p={idx} chars={len(txt)}")
+    return "\n".join(parts), counts
+
+
+# ---- EPUB/Text ----
 def test_epub(path: Path, max_items: int) -> Tuple[str, int]:
-    from ebooklib import epub  # type: ignore
-    from bs4 import BeautifulSoup  # type: ignore
+    from ebooklib import epub
+    from bs4 import BeautifulSoup
     book = epub.read_epub(str(path))
-    items = [i for i in book.get_items() if i.get_type() == 9]  # 9 == DOCUMENT
+    items = [i for i in book.get_items() if i.get_type() == 9]  # DOCUMENT
     n = min(len(items), max_items)
-    sample_text_parts = []
+    parts = []
     for i in range(n):
         content = items[i].get_content()
         soup = BeautifulSoup(content, "html.parser")
-        sample_text_parts.append(soup.get_text(" ", strip=True))
-    sample_text = "\n".join(sample_text_parts)
-    return sample_text, n
+        parts.append(soup.get_text(" ", strip=True))
+    txt = "\n".join(parts)
+    return txt, n
 
 
 def test_text(path: Path, sample_bytes: int) -> Tuple[str, int]:
@@ -106,6 +196,7 @@ def test_text(path: Path, sample_bytes: int) -> Tuple[str, int]:
     return sample, len(sample)
 
 
+# ---- Orchestration ----
 def detect_type(path: Path) -> str:
     ext = path.suffix.lower()
     if ext == ".pdf":
@@ -124,11 +215,14 @@ def process_one(
     epub_items: int,
     text_bytes: int,
     compute_hash: bool,
+    pdf_extractor: str,
+    use_ocr: bool,
+    ocr_pages: int,
+    ocr_threshold: int,
 ) -> TestResult:
     stat = path.stat()
     ftype = detect_type(path)
 
-    # default result
     res = TestResult(
         path=str(path),
         relpath=str(path.relative_to(root)),
@@ -144,29 +238,41 @@ def process_one(
 
     try:
         if ftype == "pdf":
-            sample, n_pages = test_pdf(path, sample_pages)
-            res.sample_len = len(sample)
+            text, n_pages, per_page_counts = extract_pdf_text(path, sample_pages, pdf_extractor)
+            # Consider OCR on pages with very low char counts
+            if use_ocr:
+                # OCR only first `ocr_pages` pages; replace text for pages with < threshold
+                ocr_needed_indices = [i for i, c in enumerate(per_page_counts[:ocr_pages]) if c < ocr_threshold]
+                if ocr_needed_indices:
+                    # OCR sequentially first ocr_pages (simpler: OCR 1..ocr_pages; reuse counts for others)
+                    ocr_text, ocr_counts = ocr_pdf_first_pages(path, pages_to_ocr=len(range(1, ocr_pages + 1)))
+                    # Split ocr_text into pages by naive heuristic (Tesseract returns with form feeds inconsistently).
+                    # Simplify: divide by number of OCR pages evenly to compute counts we already have.
+                    # We already have per-page counts; we only need total replacement text for summary success length.
+                    # Merge: for pages <= ocr_pages with low counts, just add OCR text to total.
+                    # (Crude but effective for success criterion.)
+                    # We'll just add the entire OCR text once if any page needed OCR and avoid double-counting.
+                    if ocr_text:
+                        text = (text + "\n" + ocr_text).strip()
+                        print(f"[{now_iso()}] OCR applied to {path.name} pages<= {ocr_pages}; added_chars={len(ocr_text)}")
+
+            total_chars = len(text)
+            res.sample_len = total_chars
             res.pages_scanned = n_pages
-            # PRINT: number of characters read
-            print(f"[{now_iso()}] READ pdf {res.relpath} chars={res.sample_len}")
-            # stricter success criterion
-            res.status = "ok" if res.sample_len > MIN_CHARS_PDF else "fail"
+            print(f"[{now_iso()}] READ pdf {res.relpath} chars={total_chars}")
+            res.status = "ok" if total_chars > MIN_CHARS_PDF else "fail"
 
         elif ftype == "epub":
             sample, n_items = test_epub(path, epub_items)
             res.sample_len = len(sample)
             res.pages_scanned = n_items
-            # PRINT: number of characters read
             print(f"[{now_iso()}] READ epub {res.relpath} chars={res.sample_len}")
-            # stricter success criterion
             res.status = "ok" if res.sample_len > MIN_CHARS_EPUB else "fail"
 
         elif ftype == "text":
             sample, n_read = test_text(path, text_bytes)
             res.sample_len = n_read
-            # PRINT: number of characters read (n_read == chars from utf-8 decode)
             print(f"[{now_iso()}] READ text {res.relpath} chars={res.sample_len}")
-            # keep original criterion for text: any readable content counts
             res.status = "ok" if n_read > 0 else "fail"
 
         else:
@@ -199,12 +305,24 @@ def main():
     ap.add_argument("--root", required=True, type=Path, help="Root directory to scan")
     ap.add_argument("--out", type=Path, default=Path("./ingest_test_out"), help="Output directory for reports")
     ap.add_argument("--workers", type=int, default=4, help="Concurrent worker threads")
+
     ap.add_argument("--sample-pages", type=int, default=2, help="PDF pages to sample per file")
+    ap.add_argument("--pdf-extractor", choices=["auto", "fitz", "pypdf", "pdfminer"], default="auto",
+                    help="PDF text extractor to use")
+
     ap.add_argument("--epub-items", type=int, default=3, help="EPUB document items to sample")
     ap.add_argument("--text-bytes", type=int, default=65536, help="Text bytes to read from text files")
+
     ap.add_argument("--hash", action="store_true", help="Compute SHA256 for each file (slower)")
-    ap.add_argument("--fail-on-skip", action="store_true", help="Treat skipped (unsupported) as failures for exit code")
-    ap.add_argument("--extensions", nargs="*", help="Override extensions (e.g. .pdf .epub .txt .md)")
+    ap.add_argument("--fail-on-skip", action="store_true", help="Treat skipped as failures for exit code")
+    ap.add_argument("--extensions", nargs="*", help="Override text extensions (e.g. .pdf .epub .txt .md)")
+
+    # OCR flags
+    ap.add_argument("--ocr", action="store_true", help="Enable OCR fallback for low-text PDF pages")
+    ap.add_argument("--ocr-pages", type=int, default=DEFAULT_OCR_PAGES, help="Max number of first pages to OCR")
+    ap.add_argument("--ocr-threshold", type=int, default=DEFAULT_OCR_THRESHOLD,
+                    help="OCR any first-page whose extracted chars are below this threshold")
+
     args = ap.parse_args()
 
     root = args.root
@@ -223,14 +341,17 @@ def main():
     total = len(paths)
     print(f"[{now_iso()}] Scanning {total} files under {root} ...")
 
-    results = []
+    results: List[TestResult] = []
     fails = 0
     skips = 0
 
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     with ThreadPoolExecutor(max_workers=args.workers) as ex, jsonl_path.open("w", encoding="utf-8") as jf:
         futs = {
-            ex.submit(process_one, p, root, args.sample_pages, args.epub_items, args.text_bytes, args.hash): p
+            ex.submit(
+                process_one,
+                p, root, args.sample_pages, args.epub_items, args.text_bytes,
+                args.hash, args.pdf_extractor, args.ocr, args.ocr_pages, args.ocr_threshold
+            ): p
             for p in paths
         }
         for fut in as_completed(futs):
@@ -242,7 +363,7 @@ def main():
             elif res.status == "skipped":
                 skips += 1
 
-    # Write summary CSV
+    # Summary CSV
     by_type = {}
     for r in results:
         by_type.setdefault(r.type, {"ok": 0, "fail": 0, "skipped": 0, "count": 0})
