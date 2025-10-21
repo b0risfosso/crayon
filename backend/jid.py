@@ -255,13 +255,27 @@ def normalize_ws(text: str) -> str:
     text = re.sub(r"\n\s+\n", "\n\n", text)
     return text.strip()
 
-def chunk_text(text: str, chunk_size: int) -> List[Tuple[int, int, str]]:
+def chunk_text(text: str, chunk_size: int, *, fast: bool = False) -> List[Tuple[int, int, str]]:
     """
     Return list of (start_idx, end_idx, chunk_text) near chunk_size chars,
     preferring sentence/space boundaries close to the edge.
     """
     if not text:
         return []
+        if fast:
+        # Minimal processing to avoid pathological regex cost
+        text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        n = len(text)
+        chunks = []
+        i = 0
+        while i < n:
+            j = min(i + chunk_size, n)
+            seg = text[i:j]
+            if seg:
+                chunks.append((i, j, seg))
+            i = j
+        return chunks
+    # Default path with nicer boundaries
     text = normalize_ws(text)
     chunks = []
     i, n = 0, len(text)
@@ -634,6 +648,7 @@ def run_pipeline():
     db_path = Path(data.get("db_path", DB_PATH_DEFAULT))
     force = bool(data.get("force", False))   # <-- NEW
     vision = data.get("vision", "exploring the betterment of humanity")
+    fast_chunk = bool(data.get("fast_chunk", False))
 
     # --- NEW: budget control overrides (optional) ---
     switch_from_model = str(data.get("switch_from_model", SWITCH_FROM_MODEL_DEFAULT))
@@ -771,8 +786,10 @@ def run_pipeline():
                 skipped_details.append({"source_name": fp.name, "reason": "epub_text_too_short"})
                 continue
 
-            chunks = chunk_text(text, chunk_chars)
-            log.info(f"Split into {len(chunks)} chunks of ~{chunk_chars} chars")
+            t0 = time.time()
+            chunks = chunk_text(text, chunk_chars, fast=fast_chunk)
+            log.info("Split into %d chunks of ~%d chars (fast_chunk=%s, %.2fs)",
+                     len(chunks), chunk_chars, fast_chunk, time.time() - t0)
             file_out_dir = out_dir / fp.stem
             ensure_dir(file_out_dir)
 
@@ -841,7 +858,9 @@ def run_pipeline():
                     continue
 
                 try:
+                    log.info("🚀 LLM start | model=%s | %s chunk %d/%d", current_model, fp.name, idx+1, len(chunks))
                     parsed: FantasiaBatch = run_llm_on_chunk(seg, vision, model=current_model, db_path=db_path)
+                    log.info("✅ LLM done  | model=%s | %s chunk %d/%d", current_model, fp.name, idx+1, len(chunks))
                     log.info(f"✅ Completed LLM for chunk {idx+1}/{len(chunks)}")
                     out_obj = {
                         **record_base,
