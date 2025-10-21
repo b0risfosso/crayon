@@ -46,7 +46,7 @@ DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
 # ---- Token budget controls (defaults; can be overridden per /run) ----
 SWITCH_FROM_MODEL_DEFAULT = DEFAULT_MODEL
 FALLBACK_MODEL_DEFAULT = "gpt-5"
-SWITCH_MODEL_LIMIT_DEFAULT = 10_000_000   # if today's tokens for default model > this, switch model
+SWITCH_MODEL_LIMIT_DEFAULT = 1_000_000   # if today's tokens for default model > this, switch model
 STOP_RUN_LIMIT_DEFAULT    = 1_000_000     # if today's TOTAL tokens > this, abort run
 
 logging.basicConfig(
@@ -1005,7 +1005,7 @@ def write_by_gpt():
     target_count = max(8, min(12, target_count))  # must fit schema
     dry_run      = bool(data.get("dry_run", False))
     topic_batch_size = int(data.get("topic_batch_size", 10))
-    max_token_count = int(data.get("max_token_count", 500_000))    # stop when gpt-5 exceeds this
+    max_token_count = int(data.get("max_token_count", 100_000))    # stop when gpt-5 exceeds this
 
     log.info(f"🟢 /write called — model_write={model_write}, model_topics={model_topics}, max_token_count={max_token_count}")
 
