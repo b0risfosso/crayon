@@ -1,266 +1,262 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Fantasiagenesis · JID Viewer</title>
+  <title>jid · Writings · Visions · Fantasia Cores</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{
-      color-scheme: light;
-      --bg:#f8f9fb;
-      --panel:#ffffff;
-      --elev:#ffffff;
-      --text:#1b1e23;
-      --muted:#5b626e;
-      --accent:#2b6ef7;
-      --border:#dce1ea;
-      --ok:#2ecc71;
-      --warn:#f1c40f;
-      --err:#e74c3c;
+    :root {
+      --bg: #f7f7fb;
+      --card: #ffffff;
+      --ink: #222;
+      --muted: #666;
+      --accent: #0a7bd7;
+      --line: #e6e6ef;
     }
-    html,body{
-      height:100%;
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
-      font:14px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
-    }
-    header{
-      grid-column:1/-1;
-      padding:14px 18px;
-      border-bottom:1px solid var(--border);
-      background:#fdfdfd;
-      box-shadow:0 1px 2px rgba(0,0,0,.04);
-    }
-    h1{margin:0;font-size:18px;font-weight:600;}
-    .sub{color:var(--muted);font-size:12px;margin-top:2px}
-    .wrap{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100% - 70px);}
-    aside{
-      border-right:1px solid var(--border);
-      padding:14px;
-      overflow:auto;
-      background:var(--panel);
-    }
-    main{padding:14px;overflow:auto;background:var(--bg);}
-    .card{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:12px;
-      box-shadow:0 1px 2px rgba(0,0,0,.04);
-    }
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .row>*{flex:0 0 auto}
-    input,select,button{
-      background:#fff;
-      border:1px solid var(--border);
-      color:var(--text);
-      padding:8px 10px;
-      border-radius:8px;
-      font-size:13px;
-      outline:none;
-    }
-    input:focus,select:focus{border-color:var(--accent)}
-    button{cursor:pointer;background:var(--accent);color:#fff;border:none}
-    button:hover{opacity:0.9}
-    .pill{
-      display:inline-flex;gap:6px;align-items:center;
-      background:#f3f6ff;border:1px solid #ccd8ff;
-      padding:5px 10px;border-radius:999px;color:#345;
-      font-size:12px
-    }
-    .list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
-    .file{
-      padding:8px 10px;
-      border:1px solid var(--border);
-      border-radius:8px;
-      background:#fff;
-      cursor:pointer;
-      transition:background .15s;
-    }
-    .file:hover{background:#f3f6ff}
-    .file.active{border-color:var(--accent);background:#eaf1ff}
-    .hint{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.4}
-    .grid{display:grid;grid-template-columns:1fr 2fr 1.5fr 140px;gap:10px;align-items:start}
-    .thead{
-      position:sticky;top:0;background:#f8f9fb;
-      padding:8px 6px;border-bottom:1px solid var(--border);z-index:2;
-      font-weight:600;font-size:13px;color:var(--muted);
-    }
-    .cell{padding:8px 6px;border-bottom:1px solid var(--border)}
-    .title{font-weight:600;color:#111}
-    .desc,.hi{color:#333}
-    .muted{color:var(--muted)}
-    .empty{
-      padding:18px;border:1px dashed var(--border);
-      border-radius:10px;color:var(--muted);
-      text-align:center;background:#fff;
-    }
-    .badge{
-      display:inline-block;padding:3px 9px;border-radius:999px;
-      border:1px solid var(--border);
-      background:#f4f7fd;color:#333;font-size:11px
-    }
-    .stats{display:flex;gap:10px;flex-wrap:wrap}
-    a{color:var(--accent);text-decoration:none}
-    .right{margin-left:auto}
+    html, body { margin:0; padding:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+    header { position: sticky; top:0; background: var(--card); border-bottom: 1px solid var(--line); z-index: 10; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 12px 16px; }
+    h1 { font-size: 18px; margin: 8px 0; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 16px; margin-top: 12px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display:flex; flex-direction:column; min-height: 300px; }
+    .card header { padding: 10px 12px; border-bottom: 1px solid var(--line); display:flex; gap:8px; align-items: center; }
+    .card h2 { font-size: 15px; margin: 0; }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; }
+    input[type="text"], select { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px; background: #fff; color: var(--ink); }
+    button { border:1px solid var(--line); background:#fff; color:var(--ink); padding:7px 12px; border-radius:8px; cursor:pointer; }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .list { padding: 8px 10px; overflow:auto; flex:1; }
+    .item { border-bottom:1px dashed var(--line); padding:8px 4px; }
+    .item:last-child { border-bottom:0; }
+    .small { color: var(--muted); font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .pill { display:inline-block; padding:2px 8px; border:1px solid var(--line); border-radius:999px; font-size:11px; color:var(--muted); }
+    .muted { color: var(--muted); }
+    .row { display:flex; gap:8px; align-items:center; }
+    .break { word-break: break-word; }
+    .doc { white-space: pre-wrap; line-height: 1.35; }
+    .filters { display:flex; gap:8px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Fantasiagenesis · JID Viewer</h1>
-    <div class="sub">Explore processed documents and generated fantasia cores.</div>
+    <div class="container">
+      <h1>jid dashboard · <span class="small">Writings · Visions · Fantasia Cores</span></h1>
+    </div>
   </header>
 
-  <div class="wrap">
-    <aside>
-      <div class="card">
-        <div class="row" style="margin-bottom:8px">
-          <strong>Files</strong>
-          <span class="pill" id="fileCount">0 files</span>
-          <button class="right" id="refreshFiles">Refresh</button>
-        </div>
-        <input id="fileFilter" type="text" placeholder="Filter files…" />
-        <div class="list" id="fileList"></div>
-        <div class="hint">
-          This calls <code>/jid/files</code>.  
-          Implement in Flask to list distinct file names from <code>jid.db</code>.
-        </div>
-      </div>
+  <main class="container">
+    <div class="grid">
 
-      <div class="card" style="margin-top:12px">
-        <strong>Filters</strong>
-        <input id="searchText" type="text" placeholder="Search text…" style="margin-top:8px;width:100%"/>
-        <div class="row" style="margin-top:8px">
-          <label class="muted">Limit</label>
-          <select id="limit">
-            <option>100</option><option selected>250</option><option>500</option><option>1000</option>
-          </select>
-          <label class="muted">Sort</label>
-          <select id="sortBy">
-            <option value="new">Newest</option>
-            <option value="old">Oldest</option>
-            <option value="title">Title A–Z</option>
-          </select>
+      <!-- Writings -->
+      <section class="card" id="writings-card">
+        <header>
+          <h2>Writings</h2>
+        </header>
+        <div class="toolbar" style="padding:8px 10px;">
+          <input id="w-q" type="text" placeholder="Search topic/description…" />
+          <input id="w-limit" type="text" value="100" class="mono" style="width:70px" />
+          <button id="w-refresh">Refresh</button>
         </div>
-        <button style="margin-top:10px" id="applyFilters">Apply</button>
-      </div>
+        <div class="list" id="writings-list" aria-live="polite"></div>
+      </section>
 
-      <div class="card" style="margin-top:12px">
-        <strong>Status</strong>
-        <div id="status" class="hint">Idle.</div>
-      </div>
-    </aside>
+      <!-- Visions -->
+      <section class="card" id="visions-card">
+        <header>
+          <h2>Visions</h2>
+        </header>
+        <div class="toolbar" style="padding:8px 10px;">
+          <button id="v-refresh">Refresh</button>
+        </div>
+        <div class="list" id="visions-list" aria-live="polite"></div>
+      </section>
 
-    <main>
-      <div class="card" style="margin-bottom:12px">
-        <div class="stats">
-          <span class="badge" id="statTotal">0 items</span>
-          <span class="badge" id="statFiles">0 files</span>
-          <span class="badge" id="statDate">—</span>
+      <!-- Fantasia Cores -->
+      <section class="card" id="cores-card">
+        <header>
+          <h2>Fantasia Cores</h2>
+        </header>
+        <div class="toolbar" style="padding:8px 10px;">
+          <div class="filters">
+            <input id="f-q" type="text" placeholder="Search title/description/rationale…" />
+            <select id="f-file"></select>
+            <select id="f-vision"></select>
+            <input id="f-limit" type="text" value="200" class="mono" style="width:70px" />
+            <button id="f-refresh">Refresh</button>
+          </div>
         </div>
-      </div>
+        <div class="list" id="cores-list" aria-live="polite"></div>
+      </section>
 
-      <div class="card">
-        <div class="grid thead">
-          <div>Title</div><div>Description</div><div>Rationale</div><div>Created</div>
-        </div>
-        <div id="rows"></div>
-        <div id="empty" class="empty" style="display:none">
-          No items found. Try refreshing or clearing filters.
-        </div>
+    </div>
+
+    <!-- Writing drawer -->
+    <section class="card" id="writing-view" style="margin-top:16px; display:none;">
+      <header>
+        <h2 id="wv-title">Writing</h2>
+        <div style="margin-left:auto"></div>
+        <button id="wv-close">Close</button>
+      </header>
+      <div class="list" style="padding:12px 14px;">
+        <div class="small" id="wv-meta"></div>
+        <pre class="doc break" id="wv-doc"></pre>
       </div>
-    </main>
-  </div>
+    </section>
+  </main>
 
   <script>
-    const el=id=>document.getElementById(id);
-    const fileList=el('fileList'),fileFilter=el('fileFilter'),
-          refreshFiles=el('refreshFiles'),searchText=el('searchText'),
-          limitSel=el('limit'),sortBySel=el('sortBy'),
-          applyFilters=el('applyFilters'),rows=el('rows'),
-          empty=el('empty'),status=el('status'),
-          statTotal=el('statTotal'),statFiles=el('statFiles'),
-          statDate=el('statDate'),fileCount=el('fileCount');
-    let files=[],activeFile=null,items=[];
-    function setStatus(msg){status.textContent=msg;}
-    function fmtDate(s){try{const d=new Date(s);if(isNaN(d))return s;return d.toLocaleString();}catch{return s;}}
-    function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-    function renderFiles(){
-      const q=fileFilter.value.toLowerCase().trim();
-      fileList.innerHTML="";let vis=0;
-      files.filter(f=>!q||f.toLowerCase().includes(q))
-        .sort((a,b)=>a.localeCompare(b))
-        .forEach(name=>{
-          const div=document.createElement('div');
-          div.className='file'+(name===activeFile?' active':'');
-          div.textContent=name;
-          div.onclick=()=>{activeFile=name;renderFiles();fetchItems();};
-          fileList.appendChild(div);vis++;
+    const API_BASE = "/jid"; // nginx will proxy /jid/* → Flask
+
+    const el = sel => document.querySelector(sel);
+    const mk = (tag, attrs={}, children=[]) => {
+      const n = document.createElement(tag);
+      for (const [k,v] of Object.entries(attrs)) {
+        if (k === "class") n.className = v;
+        else if (k === "text") n.textContent = v;
+        else n.setAttribute(k, v);
+      }
+      for (const c of children) n.appendChild(c);
+      return n;
+    };
+
+    async function fetchJSON(url) {
+      const res = await fetch(url, {headers: {"Accept":"application/json"}});
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      return res.json();
+    }
+
+    // Populate Files and Visions filters
+    async function loadFiles() {
+      try {
+        const files = await fetchJSON(`${API_BASE}/files`);
+        const sel = el("#f-file");
+        sel.innerHTML = "";
+        sel.appendChild(new Option("All files", ""));
+        for (const f of files) sel.appendChild(new Option(f, f));
+      } catch (e) { console.error(e); }
+    }
+    async function loadVisions() {
+      try {
+        const visions = await fetchJSON(`${API_BASE}/visions`);
+        const sel = el("#f-vision");
+        sel.innerHTML = "";
+        sel.appendChild(new Option("All visions", ""));
+        for (const v of visions) sel.appendChild(new Option(v, v));
+        // also fill the Visions panel list
+        const list = el("#visions-list");
+        list.innerHTML = "";
+        visions.forEach(v => {
+          const item = mk("div", {class:"item"}, [
+            mk("div", {text: v}),
+          ]);
+          list.appendChild(item);
         });
-      fileCount.textContent=`${vis} files`;
+      } catch (e) { console.error(e); }
     }
-    function renderItems(){
-      rows.innerHTML="";
-      if(!items.length){empty.style.display='block';statTotal.textContent='0 items';return;}
-      empty.style.display='none';
-      statTotal.textContent=`${items.length} items`;
-      for(const it of items){
-        const row=document.createElement('div');
-        row.className='grid';
-        row.innerHTML=`
-          <div class="cell title">${escapeHtml(it.title)}</div>
-          <div class="cell desc">${escapeHtml(it.description)}</div>
-          <div class="cell hi">${escapeHtml(it.rationale)}</div>
-          <div class="cell muted">${escapeHtml(fmtDate(it.created_at))}</div>`;
-        rows.appendChild(row);
+
+    // Load Writings list (no doc)
+    async function loadWritings() {
+      const q = encodeURIComponent(el("#w-q").value.trim());
+      const limit = encodeURIComponent(el("#w-limit").value.trim() || "100");
+      const url = `${API_BASE}/writings?limit=${limit}${q ? `&q=${q}` : ""}`;
+      const list = el("#writings-list");
+      list.innerHTML = "Loading…";
+      try {
+        const rows = await fetchJSON(url);
+        list.innerHTML = "";
+        rows.forEach(r => {
+          const head = mk("div", {}, [
+            mk("strong", {text: r.topic || "(untitled)"}),
+            mk("span", {class:"small", style:"margin-left:8px;", text: `· ${r.created_at}`}),
+          ]);
+          const desc = mk("div", {class:"small break"}, []);
+          desc.textContent = r.description || "";
+          const meta = mk("div", {class:"small muted"}, []);
+          meta.textContent = `id=${r.id} · model=${r.model || "?"} · run=${r.run_id || "-"}`;
+          const btn = mk("button", {text:"Open", style:"margin-left:auto;"});
+          const rowDiv = mk("div", {class:"row"});
+          rowDiv.appendChild(head);
+          rowDiv.appendChild(btn);
+          const item = mk("div", {class:"item"}, [rowDiv, desc, meta]);
+          btn.addEventListener("click", () => openWriting(r.id, r.topic, r.created_at, r.model, r.run_id));
+          list.appendChild(item);
+        });
+      } catch (e) {
+        list.innerHTML = `Error: ${e.message}`;
       }
     }
-    function applyClientFilters(raw){
-      const q=searchText.value.toLowerCase().trim();
-      let list=raw.slice();
-      const sortBy=sortBySel.value;
-      list.sort((a,b)=>{
-        if(sortBy==='new')return(b.created_at||'').localeCompare(a.created_at||'');
-        if(sortBy==='old')return(a.created_at||'').localeCompare(b.created_at||'');
-        if(sortBy==='title')return(a.title||'').localeCompare(b.title||'');return 0;
-      });
-      if(q){list=list.filter(it=>(it.title||'').toLowerCase().includes(q)||(it.description||'').toLowerCase().includes(q)||(it.rationale||'').toLowerCase().includes(q));}
-      const lim=parseInt(limitSel.value||"250",10);
-      return list.slice(0,lim);
-    }
-    async function fetchFiles(){
-      setStatus("Loading files…");
-      try{
-        const r=await fetch('/jid/files');
-        if(!r.ok)throw new Error(r.status);
-        files=await r.json();if(!Array.isArray(files))files=[];
-        renderFiles();if(!activeFile&&files.length){activeFile=files[0];renderFiles();}
-        setStatus(`Loaded ${files.length} files.`);
-      }catch(e){
-        files=[];renderFiles();
-        setStatus("Cannot load /jid/files. Add that endpoint in Flask.");
+
+    // Load Fantasia cores with filters
+    async function loadCores() {
+      const q = encodeURIComponent(el("#f-q").value.trim());
+      const file = encodeURIComponent(el("#f-file").value.trim());
+      const vision = encodeURIComponent(el("#f-vision").value.trim());
+      const limit = encodeURIComponent(el("#f-limit").value.trim() || "200");
+      let url = `${API_BASE}/fantasias?limit=${limit}`;
+      if (q) url += `&q=${q}`;
+      if (file) url += `&file_name=${file}`;
+      if (vision) url += `&vision=${vision}`;
+
+      const list = el("#cores-list");
+      list.innerHTML = "Loading…";
+      try {
+        const rows = await fetchJSON(url);
+        list.innerHTML = "";
+        rows.forEach(r => {
+          const title = mk("div", {}, [
+            mk("strong", {text: r.title}),
+            r.vision ? mk("span", {class:"pill", style:"margin-left:8px;", text: r.vision}) : mk("span"),
+          ]);
+          const meta = mk("div", {class:"small muted"}, []);
+          meta.textContent = `${r.file_name || "(no file)"} · ${r.created_at}`;
+          const desc = mk("div", {class:"break small"}, []); desc.textContent = r.description || "";
+          const rat = mk("div", {class:"break small muted"}, []); rat.textContent = r.rationale || "";
+          const item = mk("div", {class:"item"}, [title, meta, desc, rat]);
+          list.appendChild(item);
+        });
+      } catch (e) {
+        list.innerHTML = `Error: ${e.message}`;
       }
     }
-    async function fetchItems(){
-      setStatus("Loading fantasia cores…");
-      try{
-        const params=new URLSearchParams();
-        if(activeFile)params.set('file_name',activeFile);
-        params.set('limit',limitSel.value);
-        const r=await fetch(`/jid/fantasias?${params.toString()}`);
-        if(!r.ok)throw new Error(r.status);
-        const raw=await r.json();items=applyClientFilters(raw);renderItems();
-        setStatus(`Loaded ${items.length} fantasia cores.`);
-      }catch(e){
-        items=[];renderItems();setStatus("Cannot load /jid/fantasias. Add that endpoint in Flask.");
+
+    // Open a single writing
+    async function openWriting(id, topic, created_at, model, run_id) {
+      const url = `${API_BASE}/writing/${encodeURIComponent(id)}`;
+      const card = el("#writing-view");
+      const title = el("#wv-title");
+      const meta = el("#wv-meta");
+      const doc = el("#wv-doc");
+      title.textContent = topic || `Writing ${id}`;
+      meta.textContent = `id=${id} · ${created_at} · model=${model || "?"} · run=${run_id || "-"}`;
+      doc.textContent = "Loading…";
+      card.style.display = "";
+      try {
+        const r = await fetchJSON(url);
+        doc.textContent = r.document || "";
+      } catch (e) {
+        doc.textContent = `Error: ${e.message}`;
       }
     }
-    refreshFiles.onclick=()=>fetchFiles().then(fetchItems);
-    fileFilter.oninput=()=>renderFiles();
-    applyFilters.onclick=()=>fetchItems();
-    searchText.addEventListener('keydown',e=>{if(e.key==='Enter')fetchItems();});
-    fetchFiles().then(fetchItems);
+
+    // Close drawer
+    el("#wv-close").addEventListener("click", () => {
+      el("#writing-view").style.display = "none";
+      el("#wv-doc").textContent = "";
+    });
+
+    // Wire up buttons
+    el("#w-refresh").addEventListener("click", loadWritings);
+    el("#v-refresh").addEventListener("click", loadVisions);
+    el("#f-refresh").addEventListener("click", loadCores);
+
+    // Initial load
+    (async function init() {
+      await loadFiles();
+      await loadVisions();
+      await loadWritings();
+      await loadCores();
+    })();
   </script>
 </body>
 </html>
