@@ -6,7 +6,8 @@ can be opened and minimally read by your ingest pipeline.
 - PDFs: choose extractor (--pdf-extractor {auto,fitz,pypdf,pdfminer}) and sample first N pages.
 - EPUBs: ebooklib + BeautifulSoup to extract text from first items.
 - Text: utf-8 (errors="replace"), read first N bytes.
-- Optional OCR fallback for PDFs: --ocr to OCR pages with too-few chars.
+- Optional OCR fallback for PDFs: --ocr to OCR first K pages *only if* total extracted
+  characters across sampled pages ≤ MIN_CHARS_PDF.
 
 Outputs:
 - JSONL: one record per file (status, error, basic stats).
@@ -42,8 +43,7 @@ MIN_CHARS_PDF = 100      # success criterion for PDFs (total sample length > 100
 MIN_CHARS_EPUB = 100     # success criterion for EPUBs (total sample length > 100)
 
 # OCR defaults
-DEFAULT_OCR_PAGES = 2
-DEFAULT_OCR_THRESHOLD = 10  # if a page has <10 chars from extractor, consider it for OCR
+DEFAULT_OCR_PAGES = 2    # max first pages to OCR if total extracted chars are too low
 
 
 # ---- Helpers ----
@@ -155,7 +155,7 @@ def extract_pdf_text(path: Path, sample_pages: int, which: str) -> Tuple[str, in
     return extract_pdf_text_pdfminer(path, sample_pages)
 
 
-# ---- OCR fallback (optional) ----
+# ---- OCR fallback (file-level trigger) ----
 def ocr_pdf_first_pages(path: Path, pages_to_ocr: int) -> Tuple[str, List[int]]:
     """
     OCR first 'pages_to_ocr' pages into text, returns (joined_text, per_page_char_counts).
@@ -218,7 +218,6 @@ def process_one(
     pdf_extractor: str,
     use_ocr: bool,
     ocr_pages: int,
-    ocr_threshold: int,
 ) -> TestResult:
     stat = path.stat()
     ftype = detect_type(path)
@@ -238,25 +237,19 @@ def process_one(
 
     try:
         if ftype == "pdf":
-            text, n_pages, per_page_counts = extract_pdf_text(path, sample_pages, pdf_extractor)
-            # Consider OCR on pages with very low char counts
-            if use_ocr:
-                # OCR only first `ocr_pages` pages; replace text for pages with < threshold
-                ocr_needed_indices = [i for i, c in enumerate(per_page_counts[:ocr_pages]) if c < ocr_threshold]
-                if ocr_needed_indices:
-                    # OCR sequentially first ocr_pages (simpler: OCR 1..ocr_pages; reuse counts for others)
-                    ocr_text, ocr_counts = ocr_pdf_first_pages(path, pages_to_ocr=len(range(1, ocr_pages + 1)))
-                    # Split ocr_text into pages by naive heuristic (Tesseract returns with form feeds inconsistently).
-                    # Simplify: divide by number of OCR pages evenly to compute counts we already have.
-                    # We already have per-page counts; we only need total replacement text for summary success length.
-                    # Merge: for pages <= ocr_pages with low counts, just add OCR text to total.
-                    # (Crude but effective for success criterion.)
-                    # We'll just add the entire OCR text once if any page needed OCR and avoid double-counting.
-                    if ocr_text:
-                        text = (text + "\n" + ocr_text).strip()
-                        print(f"[{now_iso()}] OCR applied to {path.name} pages<= {ocr_pages}; added_chars={len(ocr_text)}")
-
+            text, n_pages, _counts = extract_pdf_text(path, sample_pages, pdf_extractor)
             total_chars = len(text)
+            # File-level OCR fallback: only if total chars across sampled pages too low
+            if use_ocr and total_chars <= MIN_CHARS_PDF:
+                pages_to_ocr = min(ocr_pages, max(1, n_pages))
+                ocr_text, ocr_counts = ocr_pdf_first_pages(path, pages_to_ocr)
+                if ocr_text:
+                    text = (text + "\n" + ocr_text).strip()
+                    added = len(ocr_text)
+                    total_chars = len(text)
+                    print(f"[{now_iso()}] OCR fallback applied to {path.name} "
+                          f"(pages<= {pages_to_ocr}); added_chars={added}, total_after_ocr={total_chars}")
+
             res.sample_len = total_chars
             res.pages_scanned = n_pages
             print(f"[{now_iso()}] READ pdf {res.relpath} chars={total_chars}")
@@ -317,11 +310,10 @@ def main():
     ap.add_argument("--fail-on-skip", action="store_true", help="Treat skipped as failures for exit code")
     ap.add_argument("--extensions", nargs="*", help="Override text extensions (e.g. .pdf .epub .txt .md)")
 
-    # OCR flags
-    ap.add_argument("--ocr", action="store_true", help="Enable OCR fallback for low-text PDF pages")
-    ap.add_argument("--ocr-pages", type=int, default=DEFAULT_OCR_PAGES, help="Max number of first pages to OCR")
-    ap.add_argument("--ocr-threshold", type=int, default=DEFAULT_OCR_THRESHOLD,
-                    help="OCR any first-page whose extracted chars are below this threshold")
+    # OCR flags (file-level trigger)
+    ap.add_argument("--ocr", action="store_true", help="Enable OCR fallback if total PDF chars ≤ MIN_CHARS_PDF")
+    ap.add_argument("--ocr-pages", type=int, default=DEFAULT_OCR_PAGES,
+                    help="Max number of first pages to OCR when fallback triggers")
 
     args = ap.parse_args()
 
@@ -350,7 +342,7 @@ def main():
             ex.submit(
                 process_one,
                 p, root, args.sample_pages, args.epub_items, args.text_bytes,
-                args.hash, args.pdf_extractor, args.ocr, args.ocr_pages, args.ocr_threshold
+                args.hash, args.pdf_extractor, args.ocr, args.ocr_pages
             ): p
             for p in paths
         }
