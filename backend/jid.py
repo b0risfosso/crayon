@@ -1070,10 +1070,10 @@ def write_by_gpt():
         log.info(f"🧠 Generating topic batch {batch_index}")
         # --- 1) Generate topics that validate against your ListOfTopics schema ---
         try:
-            # Prefer the new SDK style: messages + output_format
+            # SDK expects: input=[...], text_format=Schema
             topics_resp = _client.responses.parse(  # type: ignore[attr-defined]
                 model=model_topics,
-                messages=[
+                input=[
                     {
                         "role": "system",
                         "content": (
@@ -1085,40 +1085,35 @@ def write_by_gpt():
                     {
                         "role": "user",
                         "content": (
-                            "Produce fields exactly as: { 'items': [ { 'topic': str, 'description': str }, ... ] }. "
+                            "Produce fields exactly as: {\"items\": [{\"topic\": str, \"description\": str}, ...]}. "
                             f"Length must be between 8 and 12 items (aim for {topic_batch_size})."
                         ),
                     },
                 ],
-                output_format=ListOfTopics,   # ✅ use output_format (new SDK)
+                text_format=ListOfTopics,  # <- your schema
             )
 
-            # --- unwrap the parsed model correctly ---
-            # New SDK returns a ParsedResponse[T] with .output_parsed
+            # --- unwrap ParsedResponse[ListOfTopics] safely ---
             topics_model = getattr(topics_resp, "output_parsed", None)
             if topics_model is None:
-                # older alias used by some builds
                 topics_model = getattr(topics_resp, "parsed", None)
 
             if topics_model is None:
-                # As a last resort, try to parse the raw text back into JSON and validate
+                # fallback: parse raw text as JSON and validate
                 raw_text = getattr(topics_resp, "output_text", None) or getattr(topics_resp, "text", None) or ""
-                # try to pull JSON from code fences if present
                 m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw_text, re.S)
                 raw_json = m.group(1) if m else raw_text
                 topics_model = ListOfTopics.model_validate(json.loads(raw_json))
 
-            # If the SDK already gave you a Pydantic instance, we’re good.
-            # If it’s a dict-like (rare), coerce into the schema:
             if not isinstance(topics_model, ListOfTopics):
                 topics_model = ListOfTopics.model_validate(topics_model)
 
             topics_list: List[Topic] = topics_model.items
+            topics_batch = topics_list  # <- define for downstream code
 
         except Exception as e:
             log.error(f"💥 Error generating topics: {e}", exc_info=True)
             append_jsonl(errors_jsonl, {"run_id": run_id, "error": "topic_generation", "details": str(e)})
-            # Bail out of this batch cleanly
             return jsonify({"run_id": run_id, "error": f"Failed to generate topics: {e}"}), 500
 
         # append to master list
