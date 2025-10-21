@@ -1277,3 +1277,100 @@ def write_by_gpt():
 
     log.info(f"🏁 /write complete — {total_written} writings, stopped_early={stopped_early}, reason={stop_reason}")
     return jsonify(manifest)
+
+
+# --- NEW: lightweight read APIs for the dashboard ---
+
+@app.get("/writings")
+def list_writings():
+    """
+    List writings with light metadata (no full document) and optional filtering.
+    Query params:
+      q:        substring match in topic or description
+      limit:    max rows (default 100, max 2000)
+      since:    ISO8601 timestamp (UTC) to filter created_at >= since
+      run_id:   exact match filter
+      model:    exact match filter
+    """
+    db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
+    q       = (request.args.get("q") or "").strip()
+    limit   = int(request.args.get("limit") or 100)
+    limit   = max(1, min(2000, limit))
+    since   = (request.args.get("since") or "").strip()
+    run_id  = (request.args.get("run_id") or "").strip()
+    model   = (request.args.get("model") or "").strip()
+
+    sql = """
+      SELECT id, topic, description, created_at, model, run_id
+      FROM writings
+    """
+    where, params = [], []
+    if q:
+        like = f"%{q}%"
+        where.append("(topic LIKE ? OR IFNULL(description,'') LIKE ?)")
+        params += [like, like]
+    if since:
+        where.append("created_at >= ?")
+        params.append(since)
+    if run_id:
+        where.append("run_id = ?")
+        params.append(run_id)
+    if model:
+        where.append("model = ?")
+        params.append(model)
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY datetime(created_at) DESC LIMIT ?"
+    params.append(limit)
+
+    ensure_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(sql, params)
+        rows = [dict(r) for r in cur.fetchall()]
+    return jsonify(rows)
+
+
+@app.get("/writing/<int:writing_id>")
+def get_writing(writing_id: int):
+    """
+    Fetch a single writing including the full document text.
+    """
+    db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
+    ensure_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, topic, description, document, created_at, model, run_id
+            FROM writings
+            WHERE id = ?
+            LIMIT 1
+        """, (writing_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "writing not found"}), 404
+        return jsonify(dict(row))
+
+
+@app.get("/visions")
+def list_visions():
+    """
+    List distinct 'vision' strings seen so far, ordered case-insensitively.
+    Combines fantasia_cores.vision and writing_vision_done.vision.
+    """
+    db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
+    ensure_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT vision FROM (
+                SELECT vision FROM fantasia_cores WHERE IFNULL(vision,'') <> ''
+                UNION ALL
+                SELECT vision FROM writing_vision_done WHERE IFNULL(vision,'') <> ''
+            )
+            ORDER BY LOWER(vision) ASC
+        """)
+        visions = [r[0] for r in cur.fetchall()]
+    return jsonify(visions)
