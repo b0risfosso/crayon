@@ -1090,7 +1090,7 @@ def write_by_gpt():
                 text_format=ListOfTopics,
             )
             if isinstance(topics_resp, ListOfTopics):
-                topics_model = topics_resp
+                topics_model = topics_resp.output_parsed
             else:
                 topics_model = ListOfTopics.model_validate(topics_resp)  # type: ignore
             topics_batch = topics_model.items
@@ -1133,6 +1133,7 @@ def write_by_gpt():
                 resp = _client.responses.create(
                     model=model_write,
                     tools=[{"type": "web_search"}],
+                    reasoning={ "effort": "medium" },
                     input=[{"role": "user", "content": write_instruct}],
                 )
                 writing = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
