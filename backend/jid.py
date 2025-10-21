@@ -1068,27 +1068,32 @@ def write_by_gpt():
     while not stopped_early:
         batch_index += 1
         log.info(f"🧠 Generating topic batch {batch_index}")
+        # --- 1) Generate topics that validate against your ListOfTopics schema ---
         try:
+            # Prefer the new SDK style: messages + output_format
             topics_resp = _client.responses.parse(  # type: ignore[attr-defined]
                 model=model_topics,
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            f"Return a JSON object matching ListOfTopics. "
-                            f"Generate {topic_batch_size} distinct, randomly selected topics across disciplines."
+                            "Return a JSON object that matches the Pydantic schema ListOfTopics. "
+                            f"Generate {topic_batch_size} distinct topics across diverse disciplines. "
+                            "Use concise, informative descriptions."
                         ),
                     },
                     {
                         "role": "user",
                         "content": (
-                            "Return a list of topics with fields 'topic' and 'description'. "
-                            "They must validate against the ListOfTopics schema."
+                            "Produce fields exactly as: { 'items': [ { 'topic': str, 'description': str }, ... ] }. "
+                            f"Length must be between 8 and 12 items (aim for {topic_batch_size})."
                         ),
                     },
                 ],
-                output_format=ListOfTopics,
+                output_format=ListOfTopics,   # ✅ use output_format (new SDK)
             )
+
+            # --- unwrap the parsed model correctly ---
             # New SDK returns a ParsedResponse[T] with .output_parsed
             topics_model = getattr(topics_resp, "output_parsed", None)
             if topics_model is None:
