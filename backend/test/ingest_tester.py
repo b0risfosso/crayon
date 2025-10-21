@@ -1,26 +1,26 @@
-
 #!/usr/bin/env python3
+"""
+ingest_tester.py — scan a directory and test whether PDFs, EPUBs, and text files
+can be opened and minimally read by your ingest pipeline.
 
-#ingest_tester.py — scan a directory and test whether PDFs, EPUBs, and text files
-#can be opened and minimally read by your ingest pipeline.
+- PDFs: attempts to open with pypdf and extract text from the first few pages.
+- EPUBs: opens with ebooklib and extracts concatenated text of the first items.
+- Text: opens using utf-8 (errors="replace") and reads first N bytes.
 
-#- PDFs: attempts to open with pypdf and extract text from the first few pages.
-#- EPUBs: opens with ebooklib and extracts concatenated text of the first items.
-#- Text: opens using utf-8 (errors="replace") and reads first N bytes.
+Outputs:
+- A JSONL file with one record per file: status, error (if any), and basic stats.
+- A CSV summary with per-type pass/fail counts.
+- Exit code is nonzero if any file fails.
 
-#Outputs:
-#- A JSONL file with one record per file: status, error (if any), and basic stats.
-#- A CSV summary with per-type pass/fail counts.
-#- Exit code is nonzero if any file fails.
+Usage:
+    python ingest_tester.py --root /var/www/site/data/source --out ./ingest_test_out
+    python ingest_tester.py --root /some/path --workers 4 --sample-pages 3
 
-#Usage:
-#    python ingest_tester.py --root /var/www/site/data/source --out ./ingest_test_out
-#    python ingest_tester.py --root /some/path --workers 4 --sample-pages 3
-
-#Requirements (see requirements.txt):
-#    pypdf>=4.2.0
-#    ebooklib>=0.18
-
+Requirements:
+    pypdf>=4.2.0
+    ebooklib>=0.18
+    beautifulsoup4>=4.12.0
+"""
 import argparse
 import csv
 import hashlib
@@ -33,8 +33,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
-# ---- Helpers ----
+# ---- Config ----
+TEXT_EXTS = {".txt", ".text", ".md", ".rst", ".tex", ".csv", ".tsv", ".log"}
+MIN_CHARS_PDF = 100     # stricter success criterion for PDFs
+MIN_CHARS_EPUB = 100    # stricter success criterion for EPUBs
 
+
+# ---- Helpers ----
 def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -45,8 +50,10 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 def now_iso() -> str:
     return datetime.utcnow().isoformat() + "Z"
+
 
 @dataclass
 class TestResult:
@@ -58,8 +65,9 @@ class TestResult:
     mtime: str
     sha256: Optional[str]
     sample_len: int
-    pages_scanned: Optional[int]
+    pages_scanned: Optional[int]  # for epub this will be "items scanned"
     error: Optional[str]
+
 
 # lazy imports inside handlers
 def test_pdf(path: Path, sample_pages: int) -> Tuple[str, int]:
@@ -70,20 +78,20 @@ def test_pdf(path: Path, sample_pages: int) -> Tuple[str, int]:
     for i in range(n_pages):
         try:
             sample_text_parts.append(reader.pages[i].extract_text() or "")
-        except Exception as e:
-            # try to continue with remaining pages
+        except Exception:
+            # continue; leave empty string for this page
             sample_text_parts.append("")
     sample_text = "\n".join(sample_text_parts)
     return sample_text, n_pages
 
+
 def test_epub(path: Path, max_items: int) -> Tuple[str, int]:
-    # Extract text from first few document items
     from ebooklib import epub  # type: ignore
     from bs4 import BeautifulSoup  # type: ignore
     book = epub.read_epub(str(path))
     items = [i for i in book.get_items() if i.get_type() == 9]  # 9 == DOCUMENT
-    sample_text_parts = []
     n = min(len(items), max_items)
+    sample_text_parts = []
     for i in range(n):
         content = items[i].get_content()
         soup = BeautifulSoup(content, "html.parser")
@@ -91,14 +99,12 @@ def test_epub(path: Path, max_items: int) -> Tuple[str, int]:
     sample_text = "\n".join(sample_text_parts)
     return sample_text, n
 
+
 def test_text(path: Path, sample_bytes: int) -> Tuple[str, int]:
     with path.open("r", encoding="utf-8", errors="replace") as f:
         sample = f.read(sample_bytes)
     return sample, len(sample)
 
-# ---- Core ----
-
-TEXT_EXTS = {".txt", ".text", ".md", ".rst", ".tex", ".csv", ".tsv", ".log"}
 
 def detect_type(path: Path) -> str:
     ext = path.suffix.lower()
@@ -110,7 +116,15 @@ def detect_type(path: Path) -> str:
         return "text"
     return "other"
 
-def process_one(path: Path, root: Path, sample_pages: int, epub_items: int, text_bytes: int, compute_hash: bool) -> TestResult:
+
+def process_one(
+    path: Path,
+    root: Path,
+    sample_pages: int,
+    epub_items: int,
+    text_bytes: int,
+    compute_hash: bool,
+) -> TestResult:
     stat = path.stat()
     ftype = detect_type(path)
 
@@ -131,21 +145,34 @@ def process_one(path: Path, root: Path, sample_pages: int, epub_items: int, text
     try:
         if ftype == "pdf":
             sample, n_pages = test_pdf(path, sample_pages)
-            res.status = "ok" if sample.strip() != "" or n_pages > 0 else "fail"
             res.sample_len = len(sample)
             res.pages_scanned = n_pages
+            # PRINT: number of characters read
+            print(f"[{now_iso()}] READ pdf {res.relpath} chars={res.sample_len}")
+            # stricter success criterion
+            res.status = "ok" if res.sample_len > MIN_CHARS_PDF else "fail"
+
         elif ftype == "epub":
             sample, n_items = test_epub(path, epub_items)
-            res.status = "ok" if sample.strip() != "" or n_items > 0 else "fail"
             res.sample_len = len(sample)
             res.pages_scanned = n_items
+            # PRINT: number of characters read
+            print(f"[{now_iso()}] READ epub {res.relpath} chars={res.sample_len}")
+            # stricter success criterion
+            res.status = "ok" if res.sample_len > MIN_CHARS_EPUB else "fail"
+
         elif ftype == "text":
             sample, n_read = test_text(path, text_bytes)
-            res.status = "ok" if n_read > 0 else "fail"
             res.sample_len = n_read
+            # PRINT: number of characters read (n_read == chars from utf-8 decode)
+            print(f"[{now_iso()}] READ text {res.relpath} chars={res.sample_len}")
+            # keep original criterion for text: any readable content counts
+            res.status = "ok" if n_read > 0 else "fail"
+
         else:
             res.status = "skipped"
             res.error = "Unsupported extension"
+
     except Exception as e:
         res.status = "fail"
         res.error = f"{type(e).__name__}: {e}"
@@ -154,19 +181,18 @@ def process_one(path: Path, root: Path, sample_pages: int, epub_items: int, text
         try:
             res.sha256 = sha256_file(path)
         except Exception as e:
-            # hashing failure shouldn't override core test status
             if res.status == "ok":
                 res.status = "fail"
             res.error = f"HashError {type(e).__name__}: {e}"
 
     return res
 
+
 def walk_files(root: Path):
     for dirpath, _dirnames, filenames in os.walk(root):
         for name in filenames:
-            p = Path(dirpath) / name
-            # skip obvious binary junk if needed; here we include all
-            yield p
+            yield Path(dirpath) / name
+
 
 def main():
     ap = argparse.ArgumentParser(description="Test ingestability of PDFs, EPUBs, and text files.")
@@ -201,6 +227,7 @@ def main():
     fails = 0
     skips = 0
 
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     with ThreadPoolExecutor(max_workers=args.workers) as ex, jsonl_path.open("w", encoding="utf-8") as jf:
         futs = {
             ex.submit(process_one, p, root, args.sample_pages, args.epub_items, args.text_bytes, args.hash): p
@@ -227,7 +254,6 @@ def main():
         w.writerow(["type", "count", "ok", "fail", "skipped"])
         for t, d in sorted(by_type.items()):
             w.writerow([t, d["count"], d["ok"], d["fail"], d["skipped"]])
-        # totals
         total_ok = sum(d["ok"] for d in by_type.values())
         total_fail = sum(d["fail"] for d in by_type.values())
         total_skipped = sum(d["skipped"] for d in by_type.values())
@@ -235,9 +261,9 @@ def main():
         w.writerow(["TOTAL", total_ok + total_fail + total_skipped, total_ok, total_fail, total_skipped])
 
     print(f"[{now_iso()}] Done. Results -> {jsonl_path}  Summary -> {csv_path}")
-    # Exit code
     exit_fail = fails + (skips if args.fail_on_skip else 0)
     sys.exit(1 if exit_fail > 0 else 0)
+
 
 if __name__ == "__main__":
     main()
