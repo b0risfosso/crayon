@@ -1017,5 +1017,24 @@ def list_fantasias():
     return jsonify(data)
 
 
+@app.get("/usage")
+def get_usage():
+    """
+    Simple token counter endpoint.
+    - GET /usage                             -> full snapshot: {"totals": {...}, "by_model": {...}}
+    - GET /usage?model=gpt-5-mini-2025-08-07 -> just that model's {"today": {...}, "all_time": {...}}
+    Optional: &db_path=/path/to/jid.db
+    """
+    db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
+    model = (request.args.get("model") or "").strip()
+    snap = _read_usage_snapshot(db_path)
+    if model:
+        m = snap.get("by_model", {}).get(model, None)
+        # Always return the shape; default to zeros if not present
+        m_today = (m or {}).get("today", {"input": 0, "output": 0, "total": 0})
+        m_all   = (m or {}).get("all_time", {"input": 0, "output": 0, "total": 0})
+        return jsonify({"model": model, "today": m_today, "all_time": m_all})
+    return jsonify(snap)
+
 # No `if __name__ == "__main__":` per your hosting mode. Run with gunicorn:
 # gunicorn -w 4 -k gthread --threads 8 --bind 127.0.0.1:9013 jid:app
