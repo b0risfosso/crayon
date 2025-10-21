@@ -997,10 +997,10 @@ def write_by_gpt():
       }
     """
     # --- config / inputs ---
-    payload = request.get_json(silent=True) or {}
-    model_write  = payload.get("model_write", "gpt-5")
-    model_topics = payload.get("model_topics", DEFAULT_MODEL)
-    target_count = int(payload.get("count", 10))
+    data = request.get_json(silent=True) or {}
+    model_write  = data.get("model_write", "gpt-5")
+    model_topics = data.get("model_topics", DEFAULT_MODEL)
+    target_count = int(data.get("count", 10))
     out_dir      = Path(data.get("out", DEFAULT_OUT))
     target_count = max(8, min(12, target_count))  # must fit schema
     dry_run      = bool(data.get("dry_run", False))
