@@ -1071,7 +1071,7 @@ def write_by_gpt():
         try:
             topics_resp = _client.responses.parse(  # type: ignore[attr-defined]
                 model=model_topics,
-                input=[
+                messages=[
                     {
                         "role": "system",
                         "content": (
