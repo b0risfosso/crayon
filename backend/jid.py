@@ -900,7 +900,7 @@ def run_pipeline():
         v_processed = 0
         v_skipped   = 0
 
-        for (wid, topic, desc, doc) in all_writings:
+        for (wid, topic, desc, doc) in sampled_writings:
             if stopped_early:
                 break
 
