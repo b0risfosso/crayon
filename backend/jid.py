@@ -813,7 +813,7 @@ def run_pipeline():
     model            = str(data.get("model", DEFAULT_MODEL))  # expect gpt-5-mini-*
     dry_run          = bool(data.get("dry_run", False))
     force            = bool(data.get("force", False))
-    max_writings     = int(data.get("max_writings", 0))       # 0 = no cap
+    max_writings     = int(data.get("max_writings", 20))       # 0 = no cap
     mini_token_limit = int(data.get("mini_token_limit", SWITCH_MODEL_LIMIT_DEFAULT))  # daily hard stop for mini
 
     # Normalize visions: support single "vision" or list "visions"
