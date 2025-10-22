@@ -48,7 +48,7 @@ DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
 # ---- Token budget controls (defaults; can be overridden per /run) ----
 SWITCH_FROM_MODEL_DEFAULT = DEFAULT_MODEL
 FALLBACK_MODEL_DEFAULT = "gpt-5"
-SWITCH_MODEL_LIMIT_DEFAULT = 1_000_000   # if today's tokens for default model > this, switch model
+SWITCH_MODEL_LIMIT_DEFAULT = 10_000_000   # if today's tokens for default model > this, switch model
 STOP_RUN_LIMIT_DEFAULT    = 1_000_000     # if today's TOTAL tokens > this, abort run
 
 logging.basicConfig(
