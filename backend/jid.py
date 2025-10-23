@@ -1081,7 +1081,7 @@ def write_by_gpt():
     target_count = max(8, min(12, target_count))  # must fit schema
     dry_run      = bool(data.get("dry_run", False))
     topic_batch_size = int(data.get("topic_batch_size", 10))
-    max_token_count = int(data.get("max_token_count", 100_000))    # stop when gpt-5 exceeds this
+    max_token_count = int(data.get("max_token_count", 1000000))    # stop when gpt-5 exceeds this
 
     log.info(f"🟢 /write called — model_write={model_write}, model_topics={model_topics}, max_token_count={max_token_count}")
 
@@ -1226,7 +1226,7 @@ def write_by_gpt():
                 resp = _client.responses.create(
                     model=model_write,
                     tools=[{"type": "web_search"}],
-                    reasoning={ "effort": "medium" },
+                    reasoning={ "effort": "low" },
                     input=[{"role": "user", "content": write_instruct}],
                 )
                 writing = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
