@@ -105,6 +105,23 @@ class ListOfTopics(BaseModel):
         ..., min_items=8, max_items=12,
         description="8-12 topics")
 
+class ExistingPick(BaseModel):
+    writing_id: int
+    reason: Optional[str] = None
+    score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+class ProposedTopic(BaseModel):
+    topic: str
+    description: str
+    reason: Optional[str] = None
+    score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+class CuratedPlan(BaseModel):
+    vision: str
+    selected_existing: List[ExistingPick] = Field(default_factory=list)
+    proposed_new: List[ProposedTopic] = Field(default_factory=list)
+    rationale: Optional[str] = None
+
 # ---------- Text extraction & chunking ----------
 
 MIN_CHARS_PDF = 100     # total extracted chars across sampled/full text must exceed
@@ -788,6 +805,137 @@ def fetch_writings(db_path: Path, limit: int = 10000) -> list[tuple[int, str, st
         return [(r["id"], r["topic"], r["description"], r["document"]) for r in cur.fetchall()]
 
 
+def _fetch_all_topics(conn: sqlite3.Connection, limit: int = 100000):
+    """
+    Returns list[(id, topic, description, document)] from writings table.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, topic, description, document FROM writings ORDER BY datetime(created_at) DESC LIMIT ?",
+        (limit,),
+    )
+    return cur.fetchall()
+
+def _select_topics_for_vision(
+    vision: str,
+    all_topics: List[tuple],
+    model: str,
+    total_limit: int,
+    db_path: Path,
+) -> CuratedPlan:
+    """
+    Calls mini model to curate existing topics and propose new topics.
+    `all_topics` is list of tuples: (id, topic, description, document)
+    """
+    # compress payload for the model
+    topics_compact = [
+        {"id": wid, "topic": t, "description": (d or "")[:500]}
+        for (wid, t, d, _doc) in all_topics
+    ]
+
+    system_msg = (
+        "You are a curator selecting topics that best explore a given vision.\n"
+        "Return JSON that matches the CuratedPlan schema. Prefer diversity and coverage.\n"
+        "You may choose ANY number of existing topics (including zero). Propose new topics to fill blind spots.\n"
+        f"The TOTAL count (len(selected_existing) + len(proposed_new)) MUST be <= {total_limit}.\n"
+        "Include optional 'score' in [0,1] to indicate priority."
+    )
+    user_msg = (
+        "VISION:\n"
+        f"{vision}\n\n"
+        "ALL_TOPICS (existing):\n"
+        f"{json.dumps(topics_compact)[:120000]}\n\n"
+        "INSTRUCTIONS:\n"
+        "- Choose only as many existing topics as are truly relevant.\n"
+        "- If gaps remain, propose new topics to reach the total limit.\n"
+        "- Provide brief 'reason' fields to justify high-priority picks.\n"
+        "- Output must be valid JSON for CuratedPlan."
+    )
+
+    # Use your parse path (same pattern as /write)
+    resp = _client.responses.parse(  # type: ignore[attr-defined]
+        model=model,  # e.g., gpt-5-mini-*
+        input=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ],
+        text_format=CuratedPlan,
+    )
+
+    try:
+        usage = _usage_from_resp(resp)
+        with sqlite3.connect(db_path) as conn:
+            _record_llm_usage_by_model(conn, model, usage)  # per-model totals
+            _record_llm_usage(conn, usage)                  # global totals
+        log.debug("Curator usage recorded: %s", usage)
+    except Exception as ue:
+        log.warning("curator usage accounting failed: %s", ue)
+
+    parsed = getattr(resp, "output_parsed", None) or getattr(resp, "parsed", None)
+    if parsed is None:
+        raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
+        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw_text, re.S)
+        raw_json = m.group(1) if m else raw_text
+        parsed = CuratedPlan.model_validate(json.loads(raw_json))
+
+    if not isinstance(parsed, CuratedPlan):
+        parsed = CuratedPlan.model_validate(parsed)
+
+    return parsed
+
+def _commission_single_writing(topic: str, description: str, model_write: str, db_path: Path) -> tuple:
+    """
+    Creates one new writing doc via gpt-5 (or chosen writer model),
+    persists to DB, returns (id, topic, description, document).
+    """
+    write_llm_input = """ROLE
+        You are a subject-matter expert writing a rigorous, self-contained 2-page synthesis on {topic}.
+        DELIVERABLE
+        A cohesive document (~1000 words) with the following sections:
+        A. Abstract (≤120 words)
+        B. Background
+        C. Core Analysis (2–4 subsections)
+        D. Evidence Review (3–6 primary sources, discuss convergence/divergence)
+        E. Counterarguments / Open Questions
+        F. Implications
+        G. References ([Author, Year] with working links or DOIs)
+        REQUIREMENTS
+        - Every factual claim must have a reputable source
+        - Precise, formal language; logical flow
+        - Include at least one figure description or quantitative comparison
+        - Mark uncertainty explicitly
+        """
+    write_instruct = write_llm_input.format(topic=f"{topic} — {description}")
+    resp = _client.responses.create(
+        model=model_write,
+        tools=[{"type": "web_search"}],
+        input=[{"role": "user", "content": write_instruct}],
+    )
+    writing = getattr(resp, "output_text", None) or getattr(resp, "text", None) or "[No content returned]"
+    created_at = datetime.utcnow().isoformat() + "Z"
+
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO writings(topic, description, document, created_at, model, run_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (topic, description, writing, created_at, model_write, f"curate-{short_hash(topic+created_at)}"),
+        )
+        wid = cur.lastrowid
+
+        # usage accounting (best-effort)
+        try:
+            usage = _usage_from_resp(resp)
+            _record_llm_usage_by_model(conn, model_write, usage)
+            _record_llm_usage(conn, usage)
+        except Exception as ue:
+            log.warning(f"usage accounting failed: {ue}")
+
+        conn.commit()
+
+        return (wid, topic, description, writing)
 
 
 # ---------- Flask app ----------
@@ -802,22 +950,32 @@ def health():
 @app.post("/run")
 def run_pipeline():
     """
-    Writings-mode: for each vision in `visions`, generate Fantasia cores for each writing (once per (vision, writing_id)).
-    Uses ONLY DEFAULT_MODEL (gpt-5-mini-*). Stops when `mini_token_limit` is reached. No model switching.
+    Curated writings-mode:
+    - If selection_mode="curate": pass ALL topics+descriptions + the vision to mini LLM to choose n existing and propose (m-n) new.
+    - Optionally commission new writings (gpt-5) for proposed topics, then generate fantasia cores for all selected (existing + new).
+    - If selection_mode="random": preserve old behavior (random sample) for compatibility.
     """
     data = request.get_json(silent=True) or {}
 
     # --- Inputs / defaults ---
     db_path          = Path(data.get("db_path", DB_PATH_DEFAULT))
     out_dir          = Path(data.get("out", DEFAULT_OUT))
-    model            = str(data.get("model", DEFAULT_MODEL))  # expect gpt-5-mini-*
+    model            = str(data.get("model", DEFAULT_MODEL))  # curator model (mini)
     dry_run          = bool(data.get("dry_run", False))
     force            = bool(data.get("force", False))
-    max_writings     = int(data.get("max_writings", 20))       # 0 = no cap
-    mini_token_limit = int(data.get("mini_token_limit", SWITCH_MODEL_LIMIT_DEFAULT))  # daily hard stop for mini
+    mini_token_limit = int(data.get("mini_token_limit", SWITCH_MODEL_LIMIT_DEFAULT))
+    selection_mode   = str(data.get("selection_mode", "curate")).lower()
+    # total_limit is the only hard cap; LLM decides how many existing to keep
+    total_limit      = int(data.get("total_limit", 12))  # cap on existing+new combined
+    n_select_raw     = data.get("n_select", None)        # optional; if provided, behaves as before
+    n_select         = int(n_select_raw) if n_select_raw is not None else None
+    commission_new   = bool(data.get("commission_new", True))               # create writings for proposed_new?
+    model_write      = data.get("model_write", "gpt-5")                     # writer model for new topics
+    max_token_count  = int(data.get("max_token_count", 1_000_000))          # daily budget for writer
+    max_writings     = int(data.get("max_writings", 0))                     # used only in random mode
+    visions_input    = data.get("visions")
 
-    # Normalize visions: support single "vision" or list "visions"
-    visions_input = data.get("visions")
+    # Normalize visions
     if isinstance(visions_input, str):
         visions = [v.strip() for v in visions_input.split(",") if v.strip()]
     elif isinstance(visions_input, list):
@@ -830,22 +988,22 @@ def run_pipeline():
         return jsonify({"error": "No visions provided (use 'vision' or 'visions')."}), 400
 
     log.info(
-        "🟢 /run (writings-mode, multi-vision) — model=%s, dry_run=%s, force=%s, mini_token_limit=%s, max_writings=%s, visions=%s",
-        model, dry_run, force, mini_token_limit, max_writings, visions
+        "🟢 /run (mode=%s) — curator_model=%s, writer_model=%s, dry_run=%s, force=%s, mini_limit=%s, n_select=%s, m_total=%s, commission_new=%s",
+        selection_mode, model, model_write, dry_run, force, mini_token_limit, n_select, m_total, commission_new
     )
 
     ensure_db(db_path)
     ensure_dir(out_dir)
 
     job_started = datetime.utcnow().isoformat() + "Z"
-    run_id = short_hash(job_started + "|".join(visions) + model)
+    run_id = short_hash(job_started + "|".join(visions) + model + selection_mode)
     run_out_dir = out_dir / f"run_writings_{run_id}"
     ensure_dir(run_out_dir)
 
     results_jsonl = run_out_dir / f"fantasia_core_results.{run_id}.jsonl"
     errors_jsonl  = run_out_dir / f"errors.{run_id}.jsonl"
 
-    # Hard-stop guard before any processing (mini only)
+    # Hard-stop guard (mini curator)
     gptmini_today = _today_for_model(db_path, model)
     if gptmini_today.get("total", 0) >= mini_token_limit:
         stop_reason = f"mini_token_budget_exceeded ({gptmini_today.get('total')} >= {mini_token_limit})"
@@ -853,7 +1011,8 @@ def run_pipeline():
         manifest = {
             "run_id": run_id,
             "job_started": job_started,
-            "model": model,
+            "curator_model": model,
+            "writer_model": model_write,
             "visions": visions,
             "writings_processed": 0,
             "writings_skipped": 0,
@@ -869,27 +1028,16 @@ def run_pipeline():
         write_json(run_out_dir / f"_run_{run_id}.json", manifest)
         return jsonify(manifest), 200
 
-    # Load writings
-    all_writings = fetch_writings(db_path, limit=10_000)  # [(id, topic, description, document)]
+    # Load writings (ALL)
+    with sqlite3.connect(db_path) as conn:
+        all_writings = _fetch_all_topics(conn, limit=10_000)  # [(id, topic, description, document)]
     log.info("Fetched %d writings total.", len(all_writings))
 
-    #seed = int(datetime.utcnow().timestamp())  # or None if not needed
-    #random.seed(seed)
-    #manifest_seed = seed
-
-    # --- random sampling logic ---
-    if max_writings > 0 and len(all_writings) > max_writings:
-        sampled_writings = random.sample(all_writings, max_writings)
-        log.info("Randomly sampled %d of %d writings for this run.", len(sampled_writings), len(all_writings))
-    else:
-        sampled_writings = all_writings
-
-    # Aggregates
     processed_total = 0
     skipped_total   = 0
     skipped_details = []
     per_item_summary = []
-    per_vision_stats = []  # [{vision, processed, skipped}]
+    per_vision_stats = []
     stopped_early = False
     stop_reason   = None
 
@@ -897,21 +1045,107 @@ def run_pipeline():
         if stopped_early:
             break
 
+        # Build the plan
+        if selection_mode == "random":
+            # legacy behavior
+            if max_writings > 0 and len(all_writings) > max_writings:
+                sampled = random.sample(all_writings, max_writings)
+            else:
+                sampled = all_writings
+            selected_existing_ids = [wid for (wid, _t, _d, _doc) in sampled]
+            proposed_new = []
+            plan_rationale = "Random sample (legacy mode)."
+
+        else:
+            # curated behavior
+            # budget check before each curator call
+            # curated behavior
+            gptmini_today = _today_for_model(db_path, model)
+            if gptmini_today.get("total", 0) >= mini_token_limit:
+                stopped_early = True
+                stop_reason = f"mini_token_budget_reached ({gptmini_today.get('total')} >= {mini_token_limit})"
+                log.warning("⛔ Stopping before curator for vision=%s: %s", vision, stop_reason)
+                break
+
+            try:
+                plan = _select_topics_for_vision(vision, all_writings, model=model, total_limit=total_limit, db_path=db_path)
+            except Exception as e:
+                append_jsonl(errors_jsonl, {"vision": vision, "error": "curation_failed", "details": str(e)})
+                return jsonify({"error": f"curation failed for vision '{vision}': {e}"}), 500
+
+            # If user explicitly provided n_select, honor it by trimming existing picks
+            selected_existing_ids = [p.writing_id for p in plan.selected_existing]
+            if n_select is not None:
+                # sort by score desc if present, else keep order
+                selected_existing_ids = sorted(
+                    plan.selected_existing,
+                    key=lambda p: (p.score if p.score is not None else 0.0),
+                    reverse=True
+                )
+                selected_existing_ids = [p.writing_id for p in selected_existing_ids][:max(0, n_select)]
+
+            # Enforce total_limit: fill with new proposals, trim excess if curator exceeded cap
+            need_slots = max(0, total_limit - len(selected_existing_ids))
+
+            proposed_new = plan.proposed_new
+            # sort proposals by score desc if provided
+            proposed_new_sorted = sorted(
+                proposed_new,
+                key=lambda x: (x.score if x.score is not None else 0.0),
+                reverse=True
+            )
+            proposed_new = proposed_new_sorted[:need_slots]
+
+            # If LLM selected more existing than total_limit (possible when n_select is None), trim
+            if len(selected_existing_ids) > total_limit:
+                selected_existing_ids = selected_existing_ids[:total_limit]
+                proposed_new = []
+
+            plan_rationale = plan.rationale
+
+
+        # Optionally commission proposed new writings (writer budget check)
+        commissioned = []
+        if proposed_new and commission_new and not dry_run:
+            gpt5_today = _today_for_model(db_path, model_write)
+            if gpt5_today.get("total", 0) >= max_token_count:
+                stop_reason = f"writer_daily_token_budget_exceeded ({gpt5_today.get('total')} >= {max_token_count})"
+                log.warning("⛔ Skipping commissioning new writings: %s", stop_reason)
+            else:
+                for pt in proposed_new:
+                    # recheck writer budget before each
+                    gpt5_today = _today_for_model(db_path, model_write)
+                    if gpt5_today.get("total", 0) >= max_token_count:
+                        stop_reason = f"writer_token_budget_reached ({gpt5_today.get('total')} >= {max_token_count})"
+                        log.warning("⛔ Stopping commissioning loop: %s", stop_reason)
+                        break
+                    try:
+                        commissioned.append(_commission_single_writing(pt.topic, pt.description, model_write, db_path))
+                    except Exception as e:
+                        append_jsonl(errors_jsonl, {
+                            "vision": vision, "topic": pt.topic, "error": "commission_failed", "details": str(e)
+                        })
+
+        # Collate the final set of writings for fantasia generation
+        id_to_row = {wid: (wid, t, d, doc) for (wid, t, d, doc) in all_writings}
+        selected_existing_rows = [id_to_row[i] for i in selected_existing_ids if i in id_to_row]
+        final_rows = selected_existing_rows + commissioned  # [(id, topic, desc, doc)]
+
+        # Generate fantasia cores for each selected writing
         v_processed = 0
         v_skipped   = 0
 
-        for (wid, topic, desc, doc) in sampled_writings:
+        for (wid, topic, desc, doc) in final_rows:
             if stopped_early:
                 break
 
-            # Skip if already done for this (writing, vision), unless force
             if not force and writing_vision_already_done(db_path, wid, vision):
                 v_skipped += 1
                 skipped_total += 1
                 skipped_details.append({"writing_id": wid, "topic": topic, "vision": vision, "reason": "already_done_for_vision"})
                 continue
 
-            # Budget check BEFORE each call
+            # Budget check BEFORE each mini call
             gptmini_today = _today_for_model(db_path, model)
             if gptmini_today.get("total", 0) >= mini_token_limit:
                 stopped_early = True
@@ -926,6 +1160,8 @@ def run_pipeline():
                 "created_at": datetime.utcnow().isoformat() + "Z",
                 "model": model,
                 "vision": vision,
+                "selection_mode": selection_mode,
+                "plan_rationale": plan_rationale,
             }
 
             if dry_run:
@@ -936,11 +1172,9 @@ def run_pipeline():
                 continue
 
             try:
-                # One structured call per writing (full document as the "chunk")
                 parsed, raw_text = run_llm_on_chunk(doc, vision, model=model, db_path=db_path)
 
                 created_at = record_base["created_at"]
-
                 rows_for_db = [
                     (f"writing#{wid}", it.title, it.description, it.rationale, created_at, vision)
                     for it in parsed.items
@@ -970,13 +1204,18 @@ def run_pipeline():
             "vision": vision,
             "processed": v_processed,
             "skipped": v_skipped,
+            "selected_existing": selected_existing_ids,
+            "proposed_new_count": len(proposed_new),
+            "commissioned_new_count": len(commissioned),
+            "plan_rationale": plan_rationale,
         })
 
     usage_snapshot = _read_usage_snapshot(db_path)
     manifest = {
         "run_id": run_id,
         "job_started": job_started,
-        "model": model,                 # only mini
+        "curator_model": model,
+        "writer_model": model_write,
         "visions": visions,
         "writings_processed": processed_total,
         "writings_skipped": skipped_total,
@@ -989,7 +1228,6 @@ def run_pipeline():
         "usage": usage_snapshot,
         "stopped_early": bool(stopped_early),
         "stop_reason": stop_reason,
-        #"sampling_seed": manifest_seed,
     }
     write_json(run_out_dir / f"_run_{run_id}.json", manifest)
     log.info(
