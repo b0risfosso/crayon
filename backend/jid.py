@@ -50,7 +50,7 @@ DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
  
 # ---- Token budget controls (defaults; can be overridden per /run) ----
 SWITCH_FROM_MODEL_DEFAULT = DEFAULT_MODEL
-FALLBACK_MODEL_DEFAULT = "gpt-5"
+FALLBACK_MODEL_DEFAULT = "gpt-5-mini-2025-08-07"
 SWITCH_MODEL_LIMIT_DEFAULT = 10_000_000   # if today's tokens for default model > this, switch model
 STOP_RUN_LIMIT_DEFAULT    = 1_000_000     # if today's TOTAL tokens > this, abort run
 
@@ -67,17 +67,17 @@ SYSTEM_MSG = (
 
 
 
-USER_PROMPT_TEMPLATE = """Task: Read the following excerpt carefully. Then, generate 6–8 core fantasia inspired by it. Each fantasia should orbit around something that someone {VISION} would be driven to create, build, experience, achieve, or understand — not what is already well-understood or complete. 
+USER_PROMPT_TEMPLATE = """Task: Read the following excerpt carefully. Then, generate 4–5 core fantasia inspired by it. Each fantasia should orbit around something that someone [creating] {VISION} would be driven to create, build, experience, achieve, or understand — not what is already well-understood or complete. 
 
-Fantasia should spring from curiosity, possibility, or emotional resonance rather than simple description. Fantasia may emerge from any domain that stirs someone {VISION}'s imagination — science, engineering, philosophy, emotion, science fiction, fantasy, art, or other frontiers of thought. 
+Fantasia should spring from curiosity, possibility, or emotional resonance rather than simple description. Fantasia may emerge from any domain that stirs someone [creating] {VISION}'s imagination — science, engineering, philosophy, emotion, science fiction, fantasy, art, or other frontiers of thought. 
 
 For each fantasia, include:
 
 Title: A clear, descriptive title (not cryptic or abstract).  
 Description (2–3 sentences): Explain the fantasia — what it explores, builds, or reveals.  
-Rationale: A short rationale for why this fantasia would captivate someone {VISION}'s curiosity, creativity, or purpose.  
+Rationale: A short rationale for why this fantasia would captivate someone [creating] {VISION}'s curiosity, creativity, or purpose.  
 
-Goal: Produce ideas that open new doors — that make someone {VISION} feel that something meaningful, beautiful, or powerful could be created from the seed of this excerpt.  
+Goal: Produce ideas that open new doors — that make someone [creating] {VISION} feel that something meaningful, beautiful, or powerful could be created from the seed of this excerpt.  
 
 Push the limits of what is possible, known, and understood.
 
@@ -996,8 +996,8 @@ def run_pipeline():
     n_select_raw     = data.get("n_select", None)        # optional; if provided, behaves as before
     n_select         = int(n_select_raw) if n_select_raw is not None else None
     commission_new   = bool(data.get("commission_new", True))               # create writings for proposed_new?
-    model_write      = data.get("model_write", "gpt-5")                     # writer model for new topics
-    max_token_count  = int(data.get("max_token_count", 1_000_000))          # daily budget for writer
+    model_write      = data.get("model_write", "gpt-5-mini-2025-08-07")                     # writer model for new topics
+    max_token_count  = int(data.get("max_token_count", 10_000_000))          # daily budget for writer
     max_writings     = int(data.get("max_writings", 0))                     # used only in random mode
     visions_input    = data.get("visions")
 
@@ -1081,7 +1081,8 @@ def run_pipeline():
 
     # Load writings (ALL)
     with sqlite3.connect(db_path) as conn:
-        all_writings = _fetch_all_topics(conn, limit=10_000)  # [(id, topic, description, document)]
+        #all_writings = _fetch_all_topics(conn, limit=10_000)  # [(id, topic, description, document)]
+        all_writings = []
     R.ev("📚 writings.inventory", total=len(all_writings))
 
     processed_total = 0
@@ -1425,7 +1426,7 @@ def write_by_gpt():
     """
     # --- config / inputs ---
     data = request.get_json(silent=True) or {}
-    model_write  = data.get("model_write", "gpt-5")
+    model_write  = data.get("model_write", "gpt-5-mini-2025-08-07")
     model_topics = data.get("model_topics", DEFAULT_MODEL)
     target_count = int(data.get("count", 10))
     out_dir      = Path(data.get("out", DEFAULT_OUT))
