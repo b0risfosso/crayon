@@ -18,6 +18,9 @@ import random
 from flask import Flask, request, jsonify
 import uuid
 
+import time
+import traceback
+
 
 # --- Pydantic (v2 preferred; v1 shim) ---
 try:
@@ -937,6 +940,29 @@ def _commission_single_writing(topic: str, description: str, model_write: str, d
 
         return (wid, topic, description, writing)
 
+# --- Structured logging helper (keeps your emoji style) ---
+def _log_event(event: str, **fields):
+    """
+    Emit a single-line structured log with compact JSON for fields.
+    Use for searchable logs without losing your friendly emojis.
+    """
+    try:
+        payload = {k: v for k, v in fields.items() if v is not None}
+        log.info("%s %s", event, json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+    except Exception:
+        log.info("%s %s", event, str(fields))
+
+class RunLogger:
+    """Logger adapter that tags every line with run_id (and optional vision/writing)."""
+    def __init__(self, run_id: str):
+        self.run_id = run_id
+    def ev(self, event: str, **fields):
+        _log_event(event, run_id=self.run_id, **fields)
+    def ev_v(self, event: str, vision: str, **fields):
+        _log_event(event, run_id=self.run_id, vision=vision, **fields)
+    def ev_w(self, event: str, vision: str, writing_id: int, **fields):
+        _log_event(event, run_id=self.run_id, vision=vision, writing_id=writing_id, **fields)
+
 
 # ---------- Flask app ----------
 
@@ -987,10 +1013,30 @@ def run_pipeline():
     if not visions:
         return jsonify({"error": "No visions provided (use 'vision' or 'visions')."}), 400
 
-    log.info(
-        "🟢 /run (mode=%s) — curator_model=%s, writer_model=%s, dry_run=%s, force=%s, mini_limit=%s, n_select=%s, total_limit=%s, commission_new=%s",
-        selection_mode, model, model_write, dry_run, force, mini_token_limit, n_select, total_limit, commission_new
-    )
+    run_wall_start = time.perf_counter()
+
+    _run_ctx = {
+        "mode": selection_mode,
+        "curator_model": model,
+        "writer_model": model_write,
+        "dry_run": dry_run,
+        "force": force,
+        "mini_limit": mini_token_limit,
+        "writer_limit": max_token_count,
+        "total_limit": total_limit,
+        "n_select": n_select,
+        "commission_new": commission_new,
+        "max_writings_random": max_writings,
+        "visions_count": len(visions),
+    }
+
+    # create run_id as you already do
+    job_started = datetime.utcnow().isoformat() + "Z"
+    run_id = short_hash(job_started + "|".join(visions) + model + selection_mode)
+    R = RunLogger(run_id)
+
+    R.ev("🟢 /run.start", **_run_ctx, visions=visions, db_path=str(db_path), out_dir=str(out_dir))
+
 
     ensure_db(db_path)
     ensure_dir(out_dir)
@@ -1002,6 +1048,10 @@ def run_pipeline():
 
     results_jsonl = run_out_dir / f"fantasia_core_results.{run_id}.jsonl"
     errors_jsonl  = run_out_dir / f"errors.{run_id}.jsonl"
+
+    R.ev("📁 /run.paths", run_out_dir=str(run_out_dir),
+     results_jsonl=str(results_jsonl), errors_jsonl=str(errors_jsonl))
+
 
     # Hard-stop guard (mini curator)
     gptmini_today = _today_for_model(db_path, model)
@@ -1026,12 +1076,13 @@ def run_pipeline():
             "per_item": [],
         }
         write_json(run_out_dir / f"_run_{run_id}.json", manifest)
+        R.ev("⛔ /run.abort.mini_budget", today=_today_for_model(db_path, model), limit=mini_token_limit)
         return jsonify(manifest), 200
 
     # Load writings (ALL)
     with sqlite3.connect(db_path) as conn:
         all_writings = _fetch_all_topics(conn, limit=10_000)  # [(id, topic, description, document)]
-    log.info("Fetched %d writings total.", len(all_writings))
+    R.ev("📚 writings.inventory", total=len(all_writings))
 
     processed_total = 0
     skipped_total   = 0
@@ -1042,6 +1093,9 @@ def run_pipeline():
     stop_reason   = None
 
     for vision in visions:
+        vision_wall_start = time.perf_counter()
+        R.ev_v("🎯 vision.begin", vision=vision)
+
         if stopped_early:
             break
 
@@ -1055,12 +1109,16 @@ def run_pipeline():
             selected_existing_ids = [wid for (wid, _t, _d, _doc) in sampled]
             proposed_new = []
             plan_rationale = "Random sample (legacy mode)."
+            R.ev_v("🎲 vision.plan.random", selected_existing=len(sampled),
+                max_writings=max_writings, rationale="Random sample (legacy mode)")
+
 
         else:
             # curated behavior
             # budget check before each curator call
             # curated behavior
             gptmini_today = _today_for_model(db_path, model)
+            R.ev_v("🧮 budget.check.curator", today=gptmini_today, limit=mini_token_limit)
             if gptmini_today.get("total", 0) >= mini_token_limit:
                 stopped_early = True
                 stop_reason = f"mini_token_budget_reached ({gptmini_today.get('total')} >= {mini_token_limit})"
@@ -1069,6 +1127,11 @@ def run_pipeline():
 
             try:
                 plan = _select_topics_for_vision(vision, all_writings, model=model, total_limit=total_limit, db_path=db_path)
+                R.ev_v("🧭 vision.plan.curated.raw",
+                    selected_existing=len(plan.selected_existing),
+                    proposed_new=len(plan.proposed_new),
+                    rationale=plan.rationale)
+
             except Exception as e:
                 append_jsonl(errors_jsonl, {"vision": vision, "error": "curation_failed", "details": str(e)})
                 return jsonify({"error": f"curation failed for vision '{vision}': {e}"}), 500
@@ -1103,16 +1166,28 @@ def run_pipeline():
 
             plan_rationale = plan.rationale
 
+            R.ev_v("🧭 vision.plan.curated.enforced",
+                selected_existing=len(selected_existing_ids),
+                proposed_new=len(proposed_new),
+                total_limit=total_limit,
+                n_select=n_select)
+
 
         # Optionally commission proposed new writings (writer budget check)
         commissioned = []
         if proposed_new and commission_new and not dry_run:
+            if proposed_new and commission_new and not dry_run:
+                R.ev_v("✍️ commission.begin", proposed=len(proposed_new))
             gpt5_today = _today_for_model(db_path, model_write)
             if gpt5_today.get("total", 0) >= max_token_count:
                 stop_reason = f"writer_daily_token_budget_exceeded ({gpt5_today.get('total')} >= {max_token_count})"
                 log.warning("⛔ Skipping commissioning new writings: %s", stop_reason)
             else:
                 for pt in proposed_new:
+                    R.ev_v("🧮 budget.check.writer",
+                        today=_today_for_model(db_path, model_write),
+                        limit=max_token_count)
+                    R.ev_v("✍️ commission.request", topic=pt.topic, description=pt.description[:160])
                     # recheck writer budget before each
                     gpt5_today = _today_for_model(db_path, model_write)
                     if gpt5_today.get("total", 0) >= max_token_count:
@@ -1120,11 +1195,18 @@ def run_pipeline():
                         log.warning("⛔ Stopping commissioning loop: %s", stop_reason)
                         break
                     try:
-                        commissioned.append(_commission_single_writing(pt.topic, pt.description, model_write, db_path))
+                        t0 = time.perf_counter()
+                        row = _commission_single_writing(pt.topic, pt.description, model_write, db_path)
+                        dt = time.perf_counter() - t0
+                        commissioned.append(row)
+                        R.ev_v("✅ commission.ok", writing_id=row[0], topic=row[1], ms=int(dt*1000))
                     except Exception as e:
+                        R.ev_v("💥 commission.error", topic=pt.topic, error=str(e))
                         append_jsonl(errors_jsonl, {
                             "vision": vision, "topic": pt.topic, "error": "commission_failed", "details": str(e)
                         })
+                R.ev_v("✍️ commission.end", commissioned=len(commissioned))
+
 
         # Collate the final set of writings for fantasia generation
         id_to_row = {wid: (wid, t, d, doc) for (wid, t, d, doc) in all_writings}
@@ -1143,6 +1225,7 @@ def run_pipeline():
                 v_skipped += 1
                 skipped_total += 1
                 skipped_details.append({"writing_id": wid, "topic": topic, "vision": vision, "reason": "already_done_for_vision"})
+                R.ev_w("⤴️ fantasia.skip.already_done", vision=vision, writing_id=wid)
                 continue
 
             # Budget check BEFORE each mini call
@@ -1172,6 +1255,12 @@ def run_pipeline():
                 continue
 
             try:
+                R.ev_w("🧮 budget.check.curator", vision=vision,
+                    writing_id=wid, today=_today_for_model(db_path, model), limit=mini_token_limit)
+
+                R.ev_w("🌱 fantasia.begin", vision=vision, writing_id=wid, topic=topic)
+                t_write_start = time.perf_counter()
+
                 parsed, raw_text = run_llm_on_chunk(doc, vision, model=model, db_path=db_path)
 
                 created_at = record_base["created_at"]
@@ -1181,13 +1270,18 @@ def run_pipeline():
                 ]
                 log.info("parsed %d fantasia items for writing_id=%s vision=%s", len(rows_for_db), wid, vision)
 
+                items_count = len(rows_for_db)
+                dt = time.perf_counter() - t_write_start
+                R.ev_w("🌱 fantasia.parsed", vision=vision, writing_id=wid, items=items_count, ms=int(dt*1000))
+
                 if rows_for_db:
                     insert_fantasia_rows(db_path, rows_for_db)
                     mark_writing_vision_done(db_path, wid, vision)
+                    R.ev_w("💾 fantasia.persisted", vision=vision, writing_id=wid, items=items_count)
                     v_processed += 1
                     processed_total += 1
                 else:
-                    log.warning("0 items; not marking done for writing_id=%s vision=%s", wid, vision)
+                    R.ev_w("⚠️ fantasia.zero_items", vision=vision, writing_id=wid)
             except ValidationError as ve:
                 append_jsonl(errors_jsonl, {
                     **record_base,
@@ -1195,10 +1289,16 @@ def run_pipeline():
                     "details": json.loads(ve.json()),
                     "raw_model_text": (raw_text or "")[:8000],
                 })
+                
             except sqlite3.IntegrityError as ie:
                 append_jsonl(errors_jsonl, {**record_base, "error": "IntegrityError", "details": str(ie)})
             except Exception as e:
                 append_jsonl(errors_jsonl, {**record_base, "error": type(e).__name__, "details": str(e)})
+                R.ev_w("💥 fantasia.error", vision=vision, writing_id=wid,
+                    error=type(e).__name__, details=str(e))
+                log.error("Fantasia error (vision=%s, writing_id=%s): %s\n%s",
+                        vision, wid, e, traceback.format_exc())
+
 
         per_vision_stats.append({
             "vision": vision,
@@ -1209,8 +1309,16 @@ def run_pipeline():
             "commissioned_new_count": len(commissioned),
             "plan_rationale": plan_rationale,
         })
+        R.ev_v("🎯 vision.end", vision=vision,
+            processed=v_processed, skipped=v_skipped,
+            ms=int((time.perf_counter()-vision_wall_start)*1000))
+
 
     usage_snapshot = _read_usage_snapshot(db_path)
+    R.ev("📊 usage.snapshot.end", by_model=usage_snapshot.get("by_model", {}))
+
+    manifest_path = run_out_dir / f"_run_{run_id}.json"
+
     manifest = {
         "run_id": run_id,
         "job_started": job_started,
@@ -1229,11 +1337,16 @@ def run_pipeline():
         "stopped_early": bool(stopped_early),
         "stop_reason": stop_reason,
     }
-    write_json(run_out_dir / f"_run_{run_id}.json", manifest)
-    log.info(
-        "🏁 Run %s complete — processed=%s, skipped=%s, visions=%s, stopped_early=%s, reason=%s",
-        run_id, processed_total, skipped_total, len(visions), stopped_early, stop_reason
-    )
+    write_json(manifest_path, manifest)
+    R.ev("🏁 /run.complete",
+        processed=processed_total,
+        skipped=skipped_total,
+        visions=len(visions),
+        stopped_early=bool(stopped_early),
+        stop_reason=stop_reason,
+        manifest=str(manifest_path),
+        ms=int((time.perf_counter()-run_wall_start)*1000))
+
     return jsonify(manifest), 200
 
 
@@ -1606,20 +1719,34 @@ def get_writing(writing_id: int):
 @app.get("/visions")
 def list_visions():
     """
-    List distinct 'vision' strings seen so far, ordered case-insensitively.
-    Combines fantasia_cores.vision and writing_vision_done.vision.
+    Return visions with temporal metadata so the UI can sort by recency.
+    ?order=last_seen|first_seen|alpha   (default: last_seen)
+    Optional: &db_path=...
     """
     db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
-    ensure_db(db_path)
+    order = (request.args.get("order") or "last_seen").lower()
+    order_sql = {
+        "last_seen":  "ORDER BY datetime(last_seen) DESC",
+        "first_seen": "ORDER BY datetime(first_seen) DESC",
+        "alpha":      "ORDER BY vision COLLATE NOCASE ASC",
+    }.get(order, "ORDER BY datetime(last_seen) DESC")
+
+    sql = f"""
+    SELECT
+      vision,
+      MIN(datetime(created_at)) AS first_seen,
+      MAX(datetime(created_at)) AS last_seen,
+      COUNT(*)                  AS core_count
+    FROM fantasia_cores
+    WHERE vision IS NOT NULL AND TRIM(vision) != ''
+    GROUP BY vision
+    {order_sql}
+    """
+
     with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute("""
-            SELECT DISTINCT vision FROM (
-                SELECT vision FROM fantasia_cores WHERE IFNULL(vision,'') <> ''
-                UNION ALL
-                SELECT vision FROM writing_vision_done WHERE IFNULL(vision,'') <> ''
-            )
-            ORDER BY LOWER(vision) ASC
-        """)
-        visions = [r[0] for r in cur.fetchall()]
-    return jsonify(visions)
+        cur.execute(sql)
+        rows = [dict(r) for r in cur.fetchall()]
+    return jsonify(rows)
+

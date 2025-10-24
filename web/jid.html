@@ -129,15 +129,20 @@
     const sel = el("#vision-select");
     sel.innerHTML = "<option>Loading…</option>";
     try {
-      const visions = await fetchJSON(`${API_BASE}/visions`);
-      sel.innerHTML = "";
-      sel.appendChild(new Option("— Choose a vision —", ""));
-      visions.forEach(v => sel.appendChild(new Option(v, v)));
+        const visions = await fetchJSON(`/jid/visions?order=last_seen`);
+        sel.innerHTML = "";
+        sel.appendChild(new Option("— Choose a vision —", ""));
+        visions.forEach(v => {
+        const label = `${v.vision}  ·  ${v.core_count} cores  ·  last ${v.last_seen}`;
+        const opt = new Option(label, v.vision);
+        sel.appendChild(opt);
+        });
     } catch (e) {
-      sel.innerHTML = "";
-      sel.appendChild(new Option(`Error: ${e.message}`, ""));
+        sel.innerHTML = "";
+        sel.appendChild(new Option(`Error: ${e.message}`, ""));
     }
-  }
+    }
+
 
   async function onVisionChange() {
     selectedVision = el("#vision-select").value;
