@@ -988,8 +988,8 @@ def run_pipeline():
         return jsonify({"error": "No visions provided (use 'vision' or 'visions')."}), 400
 
     log.info(
-        "🟢 /run (mode=%s) — curator_model=%s, writer_model=%s, dry_run=%s, force=%s, mini_limit=%s, n_select=%s, m_total=%s, commission_new=%s",
-        selection_mode, model, model_write, dry_run, force, mini_token_limit, n_select, m_total, commission_new
+        "🟢 /run (mode=%s) — curator_model=%s, writer_model=%s, dry_run=%s, force=%s, mini_limit=%s, n_select=%s, total_limit=%s, commission_new=%s",
+        selection_mode, model, model_write, dry_run, force, mini_token_limit, n_select, total_limit, commission_new
     )
 
     ensure_db(db_path)
