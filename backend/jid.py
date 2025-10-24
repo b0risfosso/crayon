@@ -1109,7 +1109,7 @@ def run_pipeline():
             selected_existing_ids = [wid for (wid, _t, _d, _doc) in sampled]
             proposed_new = []
             plan_rationale = "Random sample (legacy mode)."
-            R.ev_v("🎲 vision.plan.random", selected_existing=len(sampled),
+            R.ev_v("🎲 vision.plan.random", vision=vision, selected_existing=len(sampled),
                 max_writings=max_writings, rationale="Random sample (legacy mode)")
 
 
@@ -1118,7 +1118,7 @@ def run_pipeline():
             # budget check before each curator call
             # curated behavior
             gptmini_today = _today_for_model(db_path, model)
-            R.ev_v("🧮 budget.check.curator", today=gptmini_today, limit=mini_token_limit)
+            R.ev_v("🧮 budget.check.curator", vision=vision, today=gptmini_today, limit=mini_token_limit)
             if gptmini_today.get("total", 0) >= mini_token_limit:
                 stopped_early = True
                 stop_reason = f"mini_token_budget_reached ({gptmini_today.get('total')} >= {mini_token_limit})"
@@ -1127,7 +1127,7 @@ def run_pipeline():
 
             try:
                 plan = _select_topics_for_vision(vision, all_writings, model=model, total_limit=total_limit, db_path=db_path)
-                R.ev_v("🧭 vision.plan.curated.raw",
+                R.ev_v("🧭 vision.plan.curated.raw", vision=vision,
                     selected_existing=len(plan.selected_existing),
                     proposed_new=len(plan.proposed_new),
                     rationale=plan.rationale)
@@ -1166,7 +1166,7 @@ def run_pipeline():
 
             plan_rationale = plan.rationale
 
-            R.ev_v("🧭 vision.plan.curated.enforced",
+            R.ev_v("🧭 vision.plan.curated.enforced", vision=vision,
                 selected_existing=len(selected_existing_ids),
                 proposed_new=len(proposed_new),
                 total_limit=total_limit,
@@ -1177,17 +1177,17 @@ def run_pipeline():
         commissioned = []
         if proposed_new and commission_new and not dry_run:
             if proposed_new and commission_new and not dry_run:
-                R.ev_v("✍️ commission.begin", proposed=len(proposed_new))
+                R.ev_v("✍️ commission.begin", vision=vision, proposed=len(proposed_new))
             gpt5_today = _today_for_model(db_path, model_write)
             if gpt5_today.get("total", 0) >= max_token_count:
                 stop_reason = f"writer_daily_token_budget_exceeded ({gpt5_today.get('total')} >= {max_token_count})"
                 log.warning("⛔ Skipping commissioning new writings: %s", stop_reason)
             else:
                 for pt in proposed_new:
-                    R.ev_v("🧮 budget.check.writer",
+                    R.ev_v("🧮 budget.check.writer", vision=vision,
                         today=_today_for_model(db_path, model_write),
                         limit=max_token_count)
-                    R.ev_v("✍️ commission.request", topic=pt.topic, description=pt.description[:160])
+                    R.ev_v("✍️ commission.request", vision=vision, topic=pt.topic, description=pt.description[:160])
                     # recheck writer budget before each
                     gpt5_today = _today_for_model(db_path, model_write)
                     if gpt5_today.get("total", 0) >= max_token_count:
@@ -1199,13 +1199,13 @@ def run_pipeline():
                         row = _commission_single_writing(pt.topic, pt.description, model_write, db_path)
                         dt = time.perf_counter() - t0
                         commissioned.append(row)
-                        R.ev_v("✅ commission.ok", writing_id=row[0], topic=row[1], ms=int(dt*1000))
+                        R.ev_v("✅ commission.ok", vision=vision, writing_id=row[0], topic=row[1], ms=int(dt*1000))
                     except Exception as e:
-                        R.ev_v("💥 commission.error", topic=pt.topic, error=str(e))
+                        R.ev_v("💥 commission.error", vision=vision, topic=pt.topic, error=str(e))
                         append_jsonl(errors_jsonl, {
                             "vision": vision, "topic": pt.topic, "error": "commission_failed", "details": str(e)
                         })
-                R.ev_v("✍️ commission.end", commissioned=len(commissioned))
+                R.ev_v("✍️ commission.end", vision=vision, commissioned=len(commissioned))
 
 
         # Collate the final set of writings for fantasia generation
