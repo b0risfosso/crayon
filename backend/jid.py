@@ -907,11 +907,14 @@ def _commission_single_writing(topic: str, description: str, model_write: str, d
         - Precise, formal language; logical flow
         - Include at least one figure description or quantitative comparison
         - Mark uncertainty explicitly
+
+
+        Ensure high accuracy and critical thinking in your response.
         """
     write_instruct = write_llm_input.format(topic=f"{topic} — {description}")
     resp = _client.responses.create(
         model=model_write,
-        tools=[{"type": "web_search"}],
+        #tools=[{"type": "web_search"}],
         input=[{"role": "user", "content": write_instruct}],
     )
     writing = getattr(resp, "output_text", None) or getattr(resp, "text", None) or "[No content returned]"
@@ -1577,8 +1580,8 @@ def write_by_gpt():
             try:
                 resp = _client.responses.create(
                     model=model_write,
-                    tools=[{"type": "web_search"}],
-                    reasoning={ "effort": "low" },
+                    #tools=[{"type": "web_search"}],
+                    #reasoning={ "effort": "low" },
                     input=[{"role": "user", "content": write_instruct}],
                 )
                 writing = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
