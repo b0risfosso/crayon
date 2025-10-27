@@ -51,7 +51,7 @@ try:
     for r in rows:
         dst.execute("""
             INSERT OR IGNORE INTO fantasia_thesis (id, dimension_id, text, author_email, provider, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (r["id"], r["dimension_id"], r["text"], r["author_email"], r["provider"], r["created_at"]))
     dst.commit()
 finally:
