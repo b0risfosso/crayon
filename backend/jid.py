@@ -2347,3 +2347,163 @@ def api_fantasia_ensure_structure():
         created["live_tokens_used"] = budget.live_used
         created["ms"] = int((time.perf_counter()-structure_wall_start)*1000)
         return jsonify(created), 500
+
+
+def _fetch_all_cores_brief(conn):
+    rows = conn.execute("""
+        SELECT
+            id,
+            title,
+            description,
+            COALESCE(vision,'') AS vision,
+            created_at
+        FROM fantasia_cores
+        ORDER BY created_at DESC, id DESC
+        LIMIT 500
+    """).fetchall()
+    return [
+        {
+            "id": int(r["id"]),
+            "title": r["title"],
+            "description": r["description"],
+            "vision": r["vision"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def _fetch_core_full(conn, core_id: int):
+    # pull core
+    core_row = conn.execute("""
+        SELECT
+            id,
+            title,
+            description,
+            rationale,
+            COALESCE(vision,'') AS vision,
+            created_at
+        FROM fantasia_cores
+        WHERE id = ?
+        LIMIT 1
+    """, (core_id,)).fetchone()
+
+    if not core_row:
+        return None
+
+    core_obj = {
+        "id": int(core_row["id"]),
+        "title": core_row["title"],
+        "description": core_row["description"],
+        "rationale": core_row["rationale"],
+        "vision": core_row["vision"],
+        "created_at": core_row["created_at"],
+        "domains": [],
+    }
+
+    # pull domains for that core
+    dom_rows = conn.execute("""
+        SELECT
+            d.id,
+            d.name,
+            d.description,
+            d.group_title,
+            d.provider,
+            d.created_at
+        FROM fantasia_domain d
+        WHERE d.core_id = ?
+        ORDER BY d.id ASC
+    """, (core_id,)).fetchall()
+
+    # for each domain, pull dimensions
+    for drow in dom_rows:
+        domain_id = int(drow["id"])
+        domain_obj = {
+            "id": domain_id,
+            "name": drow["name"],
+            "description": drow["description"],
+            "group_title": drow["group_title"],
+            "provider": drow["provider"],
+            "created_at": drow["created_at"],
+            "dimensions": [],
+        }
+
+        dim_rows = conn.execute("""
+            SELECT
+                m.id,
+                m.name,
+                m.description,
+                m.provider,
+                m.created_at
+            FROM fantasia_dimension m
+            WHERE m.domain_id = ?
+            ORDER BY m.id ASC
+        """, (domain_id,)).fetchall()
+
+        for mrow in dim_rows:
+            dim_id = int(mrow["id"])
+            dim_obj = {
+                "id": dim_id,
+                "name": mrow["name"],
+                "description": mrow["description"],
+                "provider": mrow["provider"],
+                "created_at": mrow["created_at"],
+                "theses": [],
+            }
+
+            # pull ALL theses for this dimension (force_thesis mode can create multiples)
+            thes_rows = conn.execute("""
+                SELECT
+                    t.id,
+                    t.text,
+                    t.author_email,
+                    t.provider,
+                    t.created_at
+                FROM fantasia_thesis t
+                WHERE t.dimension_id = ?
+                ORDER BY t.id ASC
+            """, (dim_id,)).fetchall()
+
+            for trow in thes_rows:
+                dim_obj["theses"].append({
+                    "id": int(trow["id"]),
+                    "text": trow["text"],
+                    "author_email": trow["author_email"],
+                    "provider": trow["provider"],
+                    "created_at": trow["created_at"],
+                })
+
+            domain_obj["dimensions"].append(dim_obj)
+
+        core_obj["domains"].append(domain_obj)
+
+    return core_obj
+
+
+@app.get("/api/fantasia/cores")
+def api_list_cores():
+    """
+    Return a brief list of fantasia cores for display/selection in core.html.
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        _apply_fantasia_structure_schema(DB_PATH)  # ensure tables exist
+        cores = _fetch_all_cores_brief(conn)
+    return jsonify({"ok": True, "cores": cores}), 200
+
+
+@app.get("/api/fantasia/core/<int:core_id>")
+def api_get_core(core_id: int):
+    """
+    Return full nested structure for one fantasia core:
+    core -> domains -> dimensions -> theses.
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        _apply_fantasia_structure_schema(DB_PATH)
+        core_obj = _fetch_core_full(conn, core_id)
+
+    if core_obj is None:
+        return jsonify({"ok": False, "error": "core_not_found"}), 404
+
+    return jsonify({"ok": True, "core": core_obj}), 200

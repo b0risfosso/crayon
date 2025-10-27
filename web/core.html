@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fantasia Cores · Structure Viewer</title>
+<style>
+  :root {
+    --bg-main: #0f0f10;
+    --bg-panel: #1a1b1e;
+    --bg-card: #232428;
+    --border-color: #2f3035;
+    --text-primary: #f8f8fa;
+    --text-dim: #9a9aa5;
+    --accent: #6b6bff;
+    --radius-lg: 16px;
+    --radius-sm: 8px;
+    --pad-lg: 16px;
+    --pad-sm: 8px;
+    --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Layout: sidebar list of cores + main detail panel */
+  .sidebar {
+    width: 320px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: var(--pad-lg);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .sidebar-header h1 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--text-primary);
+  }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .core-item {
+    padding: var(--pad-lg);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+  }
+  .core-item:hover {
+    background: rgba(255,255,255,0.03);
+  }
+  .core-item-title {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    line-height: 1.4;
+  }
+  .core-item-vision {
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--accent);
+    word-break: break-word;
+    margin-bottom: 4px;
+  }
+  .core-item-desc {
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1.4;
+    max-height: 3.6em;
+    overflow: hidden;
+  }
+  .core-item-meta {
+    color: var(--text-dim);
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .main-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .main-header {
+    padding: var(--pad-lg);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-panel);
+  }
+  .main-header .core-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    line-height: 1.4;
+  }
+  .main-header .core-vision {
+    font-size: 12px;
+    color: var(--accent);
+    line-height: 1.4;
+    margin: 0 0 8px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .main-header .core-desc {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0 0 4px 0;
+  }
+  .main-header .core-meta {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-dim);
+  }
+
+  .main-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--pad-lg);
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) 1fr;
+    grid-gap: 16px;
+  }
+
+  /* left column: Domains list */
+  .domains-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .domain-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--pad-lg);
+  }
+  .domain-header {
+    margin: 0 0 8px 0;
+  }
+  .domain-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  .domain-group {
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+  .domain-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .domain-meta {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 6px;
+  }
+
+  /* right column: Dimensions + theses for selected domain */
+  .detail-col {
+    min-width: 0;
+  }
+
+  .placeholder-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--pad-lg);
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .dimension-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--pad-lg);
+    margin-bottom: 12px;
+  }
+
+  .dimension-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    cursor: pointer;
+  }
+
+  .dimension-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+    margin: 0;
+    word-break: break-word;
+  }
+
+  .dim-provider {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-left: 8px;
+  }
+
+  .dimension-desc {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-dim);
+    margin: 6px 0 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .thesis-list {
+    border-left: 2px solid var(--accent);
+    padding-left: 10px;
+  }
+
+  .thesis-item {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .thesis-meta {
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  /* active domain highlight */
+  .domain-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(107,107,255,0.4);
+  }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR: list of cores -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <h1>Fantasia Cores</h1>
+  </div>
+  <div class="sidebar-list" id="coreList">
+    <!-- populated by JS -->
+  </div>
+</aside>
+
+<!-- MAIN AREA -->
+<main class="main-panel">
+  <section class="main-header" id="coreHeader">
+    <h2 class="core-title" id="coreTitle">Select a core</h2>
+    <div class="core-vision" id="coreVision"></div>
+    <div class="core-desc" id="coreDesc"></div>
+    <div class="core-meta" id="coreMeta"></div>
+  </section>
+
+  <section class="main-scroll">
+    <div class="domains-col" id="domainsCol">
+      <!-- domain cards inserted here -->
+    </div>
+    <div class="detail-col" id="detailCol">
+      <div class="placeholder-panel" id="detailPlaceholder">
+        <strong>No domain selected.</strong><br><br>
+        Click a domain on the left to see its dimensions and theses.
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const coreListEl = document.getElementById("coreList");
+const coreTitleEl = document.getElementById("coreTitle");
+const coreVisionEl = document.getElementById("coreVision");
+const coreDescEl = document.getElementById("coreDesc");
+const coreMetaEl = document.getElementById("coreMeta");
+
+const domainsColEl = document.getElementById("domainsCol");
+const detailColEl = document.getElementById("detailCol");
+const detailPlaceholderEl = document.getElementById("detailPlaceholder");
+
+let currentCore = null;
+let currentDomainId = null;
+
+// Fetch brief list of cores for sidebar
+async function loadCoreList() {
+  const res = await fetch("/api/fantasia/cores");
+  const data = await res.json();
+  if (!data.ok) return;
+  coreListEl.innerHTML = "";
+  data.cores.forEach(core => {
+    const div = document.createElement("div");
+    div.className = "core-item";
+    div.dataset.coreId = core.id;
+
+    const title = document.createElement("div");
+    title.className = "core-item-title";
+    title.textContent = core.title || ("Core " + core.id);
+
+    const vision = document.createElement("div");
+    vision.className = "core-item-vision";
+    vision.textContent = core.vision || "";
+
+    const desc = document.createElement("div");
+    desc.className = "core-item-desc";
+    desc.textContent = core.description || "";
+
+    const meta = document.createElement("div");
+    meta.className = "core-item-meta";
+    meta.textContent = (core.created_at || "") + " · id " + core.id;
+
+    div.appendChild(title);
+    if (core.vision) div.appendChild(vision);
+    div.appendChild(desc);
+    div.appendChild(meta);
+
+    div.addEventListener("click", () => {
+      selectCore(core.id);
+    });
+
+    coreListEl.appendChild(div);
+  });
+}
+
+// Fetch full nested core structure
+async function selectCore(coreId) {
+  currentDomainId = null;
+  const res = await fetch(`/api/fantasia/core/${coreId}`);
+  const data = await res.json();
+  if (!data.ok) return;
+
+  currentCore = data.core;
+  renderCoreHeader(currentCore);
+  renderDomains(currentCore.domains);
+  renderEmptyDetail();
+}
+
+// Render top header panel for current core
+function renderCoreHeader(core) {
+  coreTitleEl.textContent = core.title || ("Core " + core.id);
+
+  coreVisionEl.textContent = core.vision || "";
+  coreVisionEl.style.display = core.vision ? "block" : "none";
+
+  coreDescEl.textContent = core.description || "";
+  coreDescEl.style.display = core.description ? "block" : "none";
+
+  let metaBits = [];
+  if (core.created_at) metaBits.push(core.created_at);
+  if (core.rationale) metaBits.push("rationale: " + core.rationale.slice(0,160));
+  coreMetaEl.textContent = metaBits.join(" · ");
+}
+
+// Render domain list (left column of the main scroll area)
+function renderDomains(domains) {
+  domainsColEl.innerHTML = "";
+  domains.forEach(domain => {
+    const card = document.createElement("div");
+    card.className = "domain-card";
+    card.dataset.domainId = domain.id;
+
+    // header
+    const header = document.createElement("div");
+    header.className = "domain-header";
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "domain-name";
+    nameEl.textContent = domain.name || ("Domain " + domain.id);
+
+    header.appendChild(nameEl);
+
+    if (domain.group_title) {
+        const groupEl = document.createElement("div");
+        groupEl.className = "domain-group";
+        groupEl.textContent = domain.group_title;
+        header.appendChild(groupEl);
+    }
+
+    card.appendChild(header);
+
+    if (domain.description) {
+      const descEl = document.createElement("div");
+      descEl.className = "domain-desc";
+      descEl.textContent = domain.description;
+      card.appendChild(descEl);
+    }
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "domain-meta";
+    const metaBits = [];
+    if (domain.provider) metaBits.push("provider: " + domain.provider);
+    if (domain.created_at) metaBits.push(domain.created_at);
+    metaEl.textContent = metaBits.join(" · ");
+    card.appendChild(metaEl);
+
+    card.addEventListener("click", () => {
+      selectDomain(domain.id);
+    });
+
+    domainsColEl.appendChild(card);
+  });
+}
+
+// Render detail column for a selected domain
+function renderDomainDetail(domain) {
+  detailColEl.innerHTML = "";
+
+  if (!domain) {
+    renderEmptyDetail();
+    return;
+  }
+
+  // For each dimension under this domain:
+  domain.dimensions.forEach(dim => {
+    const block = document.createElement("div");
+    block.className = "dimension-block";
+
+    const head = document.createElement("div");
+    head.className = "dimension-head";
+
+    const nameWrap = document.createElement("div");
+    nameWrap.style.display = "flex";
+    nameWrap.style.flexWrap = "wrap";
+    nameWrap.style.alignItems = "baseline";
+    nameWrap.style.gap = "6px";
+
+    const dn = document.createElement("div");
+    dn.className = "dimension-name";
+    dn.textContent = dim.name || ("Dimension " + dim.id);
+
+    const prov = document.createElement("div");
+    prov.className = "dim-provider";
+    const providerBits = [];
+    if (dim.provider) providerBits.push(dim.provider);
+    if (dim.created_at) providerBits.push(dim.created_at);
+    prov.textContent = providerBits.join(" · ");
+
+    nameWrap.appendChild(dn);
+    nameWrap.appendChild(prov);
+    head.appendChild(nameWrap);
+
+    block.appendChild(head);
+
+    if (dim.description) {
+      const dd = document.createElement("div");
+      dd.className = "dimension-desc";
+      dd.textContent = dim.description;
+      block.appendChild(dd);
+    }
+
+    if (dim.theses && dim.theses.length > 0) {
+      const tlist = document.createElement("div");
+      tlist.className = "thesis-list";
+
+      dim.theses.forEach(th => {
+        const ti = document.createElement("div");
+        ti.className = "thesis-item";
+        ti.textContent = th.text || "";
+
+        const tm = document.createElement("div");
+        tm.className = "thesis-meta";
+        const tBits = [];
+        if (th.author_email) tBits.push(th.author_email);
+        if (th.provider) tBits.push(th.provider);
+        if (th.created_at) tBits.push(th.created_at);
+        tm.textContent = tBits.join(" · ");
+
+        tlist.appendChild(ti);
+        tlist.appendChild(tm);
+      });
+
+      block.appendChild(tlist);
+    }
+
+    detailColEl.appendChild(block);
+  });
+}
+
+// When nothing is selected in the right col
+function renderEmptyDetail() {
+  detailColEl.innerHTML = "";
+  detailColEl.appendChild(detailPlaceholderEl);
+}
+
+// Handle selecting a domain visually and in detail view
+function selectDomain(domainId) {
+  currentDomainId = domainId;
+
+  // highlight in domainsCol
+  Array.from(domainsColEl.children).forEach(card => {
+    if (card.classList.contains("domain-card")) {
+      if (String(card.dataset.domainId) === String(domainId)) {
+        card.classList.add("active");
+      } else {
+        card.classList.remove("active");
+      }
+    }
+  });
+
+  // lookup domain in currentCore
+  if (!currentCore) return;
+  const domain = currentCore.domains.find(d => String(d.id) === String(domainId));
+  renderDomainDetail(domain);
+}
+
+// Kick off
+loadCoreList();
+</script>
+</body>
+</html>
