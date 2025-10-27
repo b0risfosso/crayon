@@ -1110,42 +1110,55 @@ class RunLogger:
         _log_event(event, run_id=self.run_id, vision=vision, writing_id=writing_id, **fields)
 
 
-def _openai_parse_guarded(model: str, system_msg: str, user_msg: str, schema: type[BaseModel],
-                          budget: _TokenBudget, conn: sqlite3.Connection):
+def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBudget, conn):
     """
-    Wrap _client.responses.parse with budget checks and usage accounting.
+    Call model with structured parsing, enforce live+daily caps,
+    update usage tables and budget.live_used, return parsed.
     """
-    budget.check_before()
-    try:
-        resp = _client.responses.parse(  # type: ignore[attr-defined]
-            model=model,
-            input=[
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            text_format=schema,
+
+    # 1. budget gate BEFORE the call
+    budget.check_before()  # should raise if > DAILY_CAP or > LIVE_CAP projected
+
+    # 2. make request
+    resp = responses.parse(
+        model=model,
+        system=sys_msg,
+        input=user_msg,
+        text_format=OutSchema,
+    )
+
+    # 3. extract usage from the API response
+    # Here's where things commonly go wrong:
+    # Some wrappers return usage on resp.usage,
+    # some wrap the raw OpenAI response inside resp.raw or resp.response.
+    usage_obj = getattr(resp, "usage", None)
+    if usage_obj is None and hasattr(resp, "response"):
+        usage_obj = getattr(resp.response, "usage", None)
+
+    # usage_obj should look like:
+    #   {"input_tokens": int, "output_tokens": int, "total_tokens": int}
+    # or something convertible to that.
+
+    if usage_obj:
+        # 4. persist accounting
+        _record_llm_usage(conn, usage_obj)
+        _record_llm_usage_by_model(conn, model, usage_obj)
+
+        # 5. bump in-memory live usage for this endpoint invocation
+        total_used = usage_obj.get("total_tokens") or (
+            (usage_obj.get("input_tokens", 0) + usage_obj.get("output_tokens", 0))
         )
-    except Exception as e:
-        raise RuntimeError(f"OpenAI parse failed: {e}")
+        if total_used is None:
+            total_used = 0
+        budget.live_used += total_used
 
-    parsed = getattr(resp, "output_parsed", None) or getattr(resp, "parsed", None)
-    if parsed is None:
-        raise RuntimeError("OpenAI did not return parsed output")
+        # 6. re-check caps AFTER this call
+        budget.check_after_increment()
 
-    # record usage if present
-    usage = {}
-    try:
-        u = getattr(resp, "usage", None) or {}
-        # new SDK usage fields often: {"input_tokens":.., "output_tokens":.., "total_tokens":..}
-        inp = int(u.get("input_tokens") or u.get("input") or 0)
-        outp = int(u.get("output_tokens") or u.get("output") or 0)
-        tot = int(u.get("total_tokens") or (inp + outp))
-        usage = {"input": inp, "output": outp, "total": tot}
-    except Exception:
-        usage = {}
+    # 7. return the parsed content that the caller expects
+    # depending on your wrapper this might be resp.output or resp.parsed
+    return resp.parsed if hasattr(resp, "parsed") else resp
 
-    budget.add_usage(conn, usage)
-    return parsed
 
 
 # ---- DB helpers for this endpoint ----
@@ -2318,7 +2331,6 @@ def api_fantasia_ensure_structure():
                  live_tokens_used=budget.live_used)
 
             R.ev("🏁 /api/fantasia/ensure-structure.complete",
-                 run_id=run_id,
                  core_id=core_id,
                  domains_created=created["domains_created"],
                  dimensions_created=created["dimensions_created"],
@@ -2336,7 +2348,6 @@ def api_fantasia_ensure_structure():
         log.error("💥 ensure-structure.error run_id=%s core_id=%s: %s",
                   run_id, requested_core_id, e, exc_info=True)
         R.ev("💥 /api/fantasia/ensure-structure.error",
-             run_id=run_id,
              core_id=requested_core_id,
              error_type=type(e).__name__,
              error=str(e))
