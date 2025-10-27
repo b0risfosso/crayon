@@ -1112,7 +1112,7 @@ def _select_topics_for_vision(
     if not isinstance(parsed, CuratedPlan):
         parsed = CuratedPlan.model_validate(parsed)
 
-    return parsed, raw_text
+    return parsed
 
 def _commission_single_writing(topic: str, description: str, model_write: str, db_path: Path) -> tuple:
     """
