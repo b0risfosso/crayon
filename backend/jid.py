@@ -1118,6 +1118,7 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
 
     # 1. budget gate BEFORE the call
     budget.check_before()  # should raise if > DAILY_CAP or > LIVE_CAP projected
+    db_path = DB_PATH_DEFAULT
 
     # 2. make request
     resp =  _client.responses.parse(
