@@ -30,6 +30,10 @@ from crayon_prompts import (
     THESIS_SYS_MSG, THESIS_USER_TEMPLATE,
 )
 
+import threading
+import queue
+import time
+
 
 # --- Pydantic (v2 preferred; v1 shim) ---
 try:
@@ -56,6 +60,7 @@ SUPPORTED_PDF_EXT = {".pdf"}
 SUPPORTED_EPUB_EXT = {".epub"}
 DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
 DB_PATH = DB_PATH_DEFAULT
+FANTASIA_DB_PATH = "/var/www/site/data/fantasia_cores.db"
 
  
 # ---- Token budget controls (defaults; can be overridden per /run) ----
@@ -63,6 +68,12 @@ SWITCH_FROM_MODEL_DEFAULT = DEFAULT_MODEL
 FALLBACK_MODEL_DEFAULT = "gpt-5-mini-2025-08-07"
 SWITCH_MODEL_LIMIT_DEFAULT = 10_000_000   # if today's tokens for default model > this, switch model
 STOP_RUN_LIMIT_DEFAULT    = 1_000_000     # if today's TOTAL tokens > this, abort run
+
+# global work queue for ensure-structure tasks
+_fantasia_job_queue = queue.Queue()
+_fantasia_job_seen  = set()  # core_ids currently queued or processing
+_fantasia_worker_started = False
+_fantasia_worker_lock = threading.Lock()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -419,6 +430,79 @@ def _apply_fantasia_structure_schema(db_path: Path) -> None:
         for stmt in SCHEMA:
             cur.execute(stmt)
         conn.commit()
+
+
+def ensure_fantasia_db(db_path: str = FANTASIA_DB_PATH):
+    """
+    Create fantasia_cores.db and its tables if they don't exist.
+    This DB holds fantasia cores, domains, dimensions, theses only.
+    """
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+
+        # fantasia_cores table (1 row per core)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_cores (
+            id INTEGER PRIMARY KEY,
+            title TEXT,
+            description TEXT,
+            rationale TEXT,
+            vision TEXT,
+            created_at TEXT
+        )
+        """)
+
+        # domains
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_domain (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            core_id INTEGER NOT NULL,
+            name TEXT,
+            description TEXT,
+            group_title TEXT,
+            provider TEXT,
+            created_at TEXT,
+            UNIQUE(core_id, name)
+        )
+        """)
+
+        # dimensions
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_dimension (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain_id INTEGER NOT NULL,
+            name TEXT,
+            description TEXT,
+            provider TEXT,
+            created_at TEXT,
+            UNIQUE(domain_id, name)
+        )
+        """)
+
+        # theses
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_thesis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dimension_id INTEGER NOT NULL,
+            text TEXT,
+            author_email TEXT,
+            provider TEXT,
+            created_at TEXT
+        )
+        """)
+
+        # indexes to speed lookups
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_core ON fantasia_domain(core_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_dimension_domain ON fantasia_dimension(domain_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_dimension ON fantasia_thesis(dimension_id)")
+
+        conn.commit()
+    finally:
+        conn.close()
+
 
 
 
@@ -1110,18 +1194,13 @@ class RunLogger:
         _log_event(event, run_id=self.run_id, vision=vision, writing_id=writing_id, **fields)
 
 
-def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBudget, conn):
-    """
-    Call model with structured parsing, enforce live+daily caps,
-    update usage tables and budget.live_used, return parsed.
-    """
+def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema,
+                          budget: _TokenBudget,
+                          jid_conn):
+    # 1. check budget before the call
+    budget.check_before()
 
-    # 1. budget gate BEFORE the call
-    budget.check_before()  # should raise if > DAILY_CAP or > LIVE_CAP projected
-    db_path = DB_PATH_DEFAULT
-
-    # 2. make request
-    resp =  _client.responses.parse(
+    resp = _client.responses.parse(
         model=model,
         input=[
             {"role": "system", "content": sys_msg},
@@ -1134,23 +1213,19 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
     raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
 
     if parsed is None:
-        # Fallback: parse the raw text as JSON (strip code fences if present)
         m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.S)
         raw_json = m.group(1) if m else raw_text
         parsed = OutSchema.model_validate(json.loads(raw_json))
 
-    # Ensure we really have the right type (SDKs sometimes return dicts)
     if not isinstance(parsed, OutSchema):
         parsed = OutSchema.model_validate(parsed)
 
-    # --- crayon-style token accounting ---
+    # token accounting
     try:
         usage = _usage_from_resp(resp)
+        _record_llm_usage_by_model(jid_conn, model, usage)
+        _record_llm_usage(jid_conn, usage)
 
-        _record_llm_usage_by_model(conn, model, usage)
-        _record_llm_usage(conn, usage)
-
-        # bump live_used in memory
         total_used = (
             usage.get("total_tokens")
             or (usage.get("input_tokens", 0) + usage.get("output_tokens", 0))
@@ -1158,9 +1233,10 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
         )
         budget.live_used += total_used
 
-        budget.check_after_increment()
+        # re-check cap after increment (use check_before() as post-check fallback)
+        budget.check_before()
+
     except Exception as e:
-        # non-fatal; keep processing
         log.warning(f"failed to record llm usage: {e}")
 
     return parsed
@@ -2736,3 +2812,220 @@ def api_list_cores_by_vision():
         cores = _fetch_cores_for_vision(conn, vision_q if vision_q is not None else None)
 
     return jsonify({"ok": True, "cores": cores}), 200
+
+
+def _maybe_start_fantasia_worker():
+    """
+    Start the single fantasia worker thread once per process.
+    Safe to call repeatedly.
+    """
+    global _fantasia_worker_started
+    with _fantasia_worker_lock:
+        if _fantasia_worker_started:
+            return
+        t = threading.Thread(target=_fantasia_worker_loop, name="fantasia-worker", daemon=True)
+        t.start()
+        _fantasia_worker_started = True
+
+
+def _fantasia_worker_loop():
+    """
+    Runs forever in one thread.
+    Consumes jobs from _fantasia_job_queue and processes them serially.
+    """
+    log.info("🌙 fantasia worker thread started")
+
+    while True:
+        job = _fantasia_job_queue.get()  # blocking
+        core_id = job["core_id"]
+        try:
+            _process_fantasia_job(job)
+        except Exception as e:
+            log.error("💥 fantasia worker failed core_id=%s: %s", core_id, e, exc_info=True)
+        finally:
+            # allow this core_id to be enqueued again in the future
+            _fantasia_job_seen.discard(core_id)
+            _fantasia_job_queue.task_done()
+
+
+@app.post("/api/fantasia/ensure-structure")
+def api_fantasia_ensure_structure_enqueue():
+    """
+    Enqueue one or more cores for structure growth.
+    Does NOT generate immediately; that is handled by the background worker.
+    """
+    ensure_fantasia_db(FANTASIA_DB_PATH)
+
+    data = request.get_json(silent=True) or {}
+
+    # normalize input into a list of core_ids
+    core_ids = []
+    if "core_ids" in data and isinstance(data["core_ids"], list):
+        for cid in data["core_ids"]:
+            try:
+                core_ids.append(int(cid))
+            except Exception:
+                pass
+    elif "core_id" in data:
+        try:
+            core_ids.append(int(data["core_id"]))
+        except Exception:
+            pass
+
+    if not core_ids:
+        return jsonify({"ok": False, "error": "no_core_ids"}), 400
+
+    # options that will travel with each job
+    job_opts = {
+        "email": data.get("email"),
+        "model": data.get("model", "gpt-5-mini-2025-08-07"),
+        "force_domains": bool(data.get("force_domains", False)),
+        "force_dimensions": bool(data.get("force_dimensions", False)),
+        "force_theses": bool(data.get("force_theses", False)),
+        # caps
+        "live_cap": 3_000_000,
+        "daily_cap": 10_000_000,
+    }
+
+    enqueued = []
+    skipped  = []
+
+    global _fantasia_worker_started
+    _maybe_start_fantasia_worker()  # make sure worker thread exists
+
+    for cid in core_ids:
+        if cid in _fantasia_job_seen:
+            skipped.append(cid)
+            continue
+
+        job = {
+            "core_id": cid,
+            **job_opts,
+        }
+        _fantasia_job_seen.add(cid)
+        _fantasia_job_queue.put(job)
+        enqueued.append(cid)
+
+    return jsonify({
+        "ok": True,
+        "enqueued": enqueued,
+        "skipped_already_queued": skipped,
+        "queue_length": _fantasia_job_queue.qsize(),
+    }), 202
+
+
+def _process_fantasia_job(job: dict):
+    """
+    job = {
+      "core_id": int,
+      "email": str|None,
+      "model": "gpt-5-mini-2025-08-07",
+      "force_domains": bool,
+      "force_dimensions": bool,
+      "force_theses": bool,
+      "live_cap": int,
+      "daily_cap": int,
+    }
+    """
+
+    core_id         = job["core_id"]
+    model           = job["model"]
+    force_domains   = job["force_domains"]
+    force_dimensions= job["force_dimensions"]
+    force_theses    = job["force_theses"]
+    email           = job["email"]
+
+    ensure_fantasia_db(FANTASIA_DB_PATH)
+
+    # open BOTH dbs:
+    # - fantasia_cores.db for structure writes
+    # - jid.db for usage tracking, etc
+    # IMPORTANT: we still want just one writer to fantasia_cores.db,
+    # and we are that writer (this thread). jid.db can still be updated
+    # here too; usage is lightweight writes.
+    fc_conn = sqlite3.connect(FANTASIA_DB_PATH, timeout=30.0)
+    fc_conn.row_factory = sqlite3.Row
+    fc_conn.execute("PRAGMA journal_mode=WAL;")
+    fc_conn.execute("PRAGMA synchronous=NORMAL;")
+
+    jid_conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    jid_conn.row_factory = sqlite3.Row
+    jid_conn.execute("PRAGMA journal_mode=WAL;")
+    jid_conn.execute("PRAGMA synchronous=NORMAL;")
+
+    # budeting: daily cap for `model` is still global (jid.db)
+    budget = _TokenBudget(DB_PATH, model, job["live_cap"], job["daily_cap"])
+
+    run_id = short_hash(f"{core_id}|{time.time()}|{model}")
+    R = RunLogger(run_id)
+    R.ev("🟢 worker.begin", core_id=core_id, model=model,
+         force_domains=force_domains,
+         force_dimensions=force_dimensions,
+         force_theses=force_theses)
+
+    try:
+        # 1. load current state for this core (domains, dimensions, theses)
+        #    using fc_conn
+        core_info = _load_core_state(fc_conn, core_id)
+
+        # 2. if force_domains OR core has no domains:
+        #    call LLM (via _openai_parse_guarded with jid_conn for usage logging)
+        #    insert domains into fc_conn
+        if force_domains or not core_info["has_domains"]:
+            R.ev("🤖 llm.domains.begin", core_id=core_id, live_used=budget.live_used)
+            new_domains = _generate_domains_for_core(
+                fc_conn,
+                jid_conn,
+                core_id,
+                model,
+                budget,
+                core_info,
+            )
+            R.ev("✅ llm.domains.parsed", core_id=core_id,
+                 groups=len(new_domains or []),
+                 live_used=budget.live_used)
+
+        # 3. for each domain:
+        #    if force_dimensions OR domain has no dimensions:
+        #       generate dimensions with _openai_parse_guarded(...)
+        #       insert into fc_conn
+        #    then for each dimension:
+        #       if force_theses OR dimension has no thesis:
+        #           generate thesis, insert into fc_conn
+        _generate_dimensions_and_theses(
+            fc_conn,
+            jid_conn,
+            core_id,
+            model,
+            budget,
+            force_dimensions,
+            force_theses,
+            R
+        )
+
+        usage_snapshot = _read_usage_snapshot(DB_PATH)
+
+        R.ev("📊 worker.usage.end",
+             core_id=core_id,
+             live_used=budget.live_used,
+             by_model=usage_snapshot.get("by_model", {}))
+
+        fc_conn.commit()
+        jid_conn.commit()
+
+        R.ev("🏁 worker.complete",
+             core_id=core_id,
+             live_used=budget.live_used)
+
+    except Exception as e:
+        fc_conn.rollback()
+        jid_conn.rollback()
+        R.ev("💥 worker.error",
+             core_id=core_id,
+             error_type=type(e).__name__,
+             error=str(e))
+        log.error("worker error for core_id=%s: %s", core_id, e, exc_info=True)
+
+    finally:
+        fc_conn.close()
+        jid_conn.close()
