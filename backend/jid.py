@@ -1122,10 +1122,13 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
     # 2. make request
     resp =  _client.responses.parse(
         model=model,
-        system=sys_msg,
-        input=user_msg,
+        input=[
+            {"role": "system", "content": sys_msg},
+            {"role": "user", "content": user_msg},
+        ],
         text_format=OutSchema,
     )
+
 
     try:
         usage_obj = _usage_from_resp(resp)
