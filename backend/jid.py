@@ -55,6 +55,7 @@ SUPPORTED_TXT_EXT = {".txt", ".md", ".rst", ".log"}
 SUPPORTED_PDF_EXT = {".pdf"}
 SUPPORTED_EPUB_EXT = {".epub"}
 DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
+DB_PATH = DB_PATH_DEFAULT
 
  
 # ---- Token budget controls (defaults; can be overridden per /run) ----
