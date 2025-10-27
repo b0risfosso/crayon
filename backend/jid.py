@@ -1137,7 +1137,7 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
         # Fallback: parse the raw text as JSON (strip code fences if present)
         m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.S)
         raw_json = m.group(1) if m else raw_text
-        parsed = FantasiaBatch.model_validate(json.loads(raw_json))
+        parsed = OutSchema.model_validate(json.loads(raw_json))
 
     # Ensure we really have the right type (SDKs sometimes return dicts)
     if not isinstance(parsed, OutSchema):
@@ -1145,20 +1145,20 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
 
     # --- crayon-style token accounting ---
     try:
-        if db_path is not None:
-            usage = _usage_from_resp(resp)
-            with sqlite3.connect(db_path) as conn:
-                _record_llm_usage_by_model(conn, model, usage)
-                _record_llm_usage(conn, usage)
-            total_used = usage.get("total_tokens") or (
-                (usage.get("input_tokens", 0) + usage.get("output_tokens", 0))
-            )
-            if total_used is None:
-                total_used = 0
-            budget.live_used += total_used
+        usage = _usage_from_resp(resp)
 
-            # 6. re-check caps AFTER this call
-            budget.check_after_increment()
+        _record_llm_usage_by_model(conn, model, usage)
+        _record_llm_usage(conn, usage)
+
+        # bump live_used in memory
+        total_used = (
+            usage.get("total_tokens")
+            or (usage.get("input_tokens", 0) + usage.get("output_tokens", 0))
+            or 0
+        )
+        budget.live_used += total_used
+
+        budget.check_after_increment()
     except Exception as e:
         # non-fatal; keep processing
         log.warning(f"failed to record llm usage: {e}")
