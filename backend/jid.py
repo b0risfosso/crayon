@@ -1142,16 +1142,11 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
     if not isinstance(parsed, OutSchema):
         parsed = OutSchema.model_validate(parsed)
 
-    # Optional: attach a short content hash if your caller wants it
-    excerpt_hash = hashlib.sha1(doc.encode("utf-8")).hexdigest()[:12]
-    # if your downstream expects parsed.excerpt_hash, you can do:
-    setattr(parsed, "excerpt_hash", excerpt_hash)
-
     # --- crayon-style token accounting ---
     try:
         if db_path is not None:
+            usage = _usage_from_resp(resp)
             with sqlite3.connect(db_path) as conn:
-                usage = _usage_from_resp(resp)
                 _record_llm_usage_by_model(conn, model, usage)
                 _record_llm_usage(conn, usage)
             total_used = usage.get("total_tokens") or (
