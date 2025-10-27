@@ -1981,12 +1981,10 @@ def list_visions():
 @app.post("/api/fantasia/ensure-structure")
 def api_fantasia_ensure_structure():
     """
-    Select (random or specified) fantasia core and ensure/grow:
-      - domains
-      - dimensions per domain
-      - thesis per dimension
-
-    Optional force flags let you append new structure even if it already exists.
+    Grow structure under a fantasia core (domains → dimensions → thesis).
+    Optionally:
+      - choose which core via core_id
+      - force new domains/dimensions/theses even if they already exist
 
     Request JSON (all optional):
     {
@@ -2001,167 +1999,351 @@ def api_fantasia_ensure_structure():
       "force_thesis": false
     }
     """
+
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower() or None
     model = (data.get("model") or "gpt-5-mini-2025-08-07").strip()
     target_dims = max(1, int(data.get("target_dimensions_per_domain") or 3))
 
-    force_domains = bool(data.get("force_domains"))
-    force_dimensions = bool(data.get("force_dimensions"))
-    force_thesis = bool(data.get("force_thesis"))
+    force_domains     = bool(data.get("force_domains"))
+    force_dimensions  = bool(data.get("force_dimensions"))
+    force_thesis      = bool(data.get("force_thesis"))
+    requested_core_id = data.get("core_id")  # may be None
 
-    # budgets
     LIVE_CAP   = 3_000_000
     DAILY_CAP  = 10_000_000
+
+    # --- create run_id + logger (mirrors /run pattern) ---
+    job_started = datetime.utcnow().isoformat() + "Z"
+    # make a short hash string using job_started + model + (core_id or "random")
+    _tag_core = str(requested_core_id) if requested_core_id is not None else "random"
+    run_id = short_hash(job_started + "|" + model + "|" + _tag_core + "|ensure-structure")
+    R = RunLogger(run_id)
+
+    # high-level request context log
+    R.ev("🟢 /api/fantasia/ensure-structure.start",
+         model=model,
+         live_cap=LIVE_CAP,
+         daily_cap=DAILY_CAP,
+         target_dimensions_per_domain=target_dims,
+         force_domains=force_domains,
+         force_dimensions=force_dimensions,
+         force_thesis=force_thesis,
+         core_id=requested_core_id,
+         email=email)
+
     budget = _TokenBudget(DB_PATH, model, LIVE_CAP, DAILY_CAP)
 
     created = {
+        "ok": True,
+        "run_id": run_id,
         "core_id": None,
         "domains_created": 0,
         "dimensions_created": 0,
         "theses_created": 0,
         "live_tokens_used": 0,
         "model": model,
+        "stopped_early": False,
+        "stop_reason": None,
     }
 
-    with sqlite3.connect(DB_PATH) as conn, conn:
-        conn.row_factory = sqlite3.Row
+    structure_wall_start = time.perf_counter()
 
-        # make sure schema exists
-        _apply_fantasia_structure_schema(DB_PATH)
+    # open transaction
+    try:
+        with sqlite3.connect(DB_PATH) as conn, conn:
+            conn.row_factory = sqlite3.Row
 
-        # ---- choose core ----
-        core = None
-        if data.get("core_id") is not None:
-            core_row = conn.execute("""
-                SELECT id, file_name, title, description, rationale, created_at,
-                       COALESCE(vision,'') AS vision
-                FROM fantasia_cores
-                WHERE id = ?
-                LIMIT 1
-            """, (int(data["core_id"]),)).fetchone()
-            if core_row:
-                core = dict(core_row)
-        else:
-            core = _pick_random_core(conn)
+            # ensure schema exists
+            _apply_fantasia_structure_schema(DB_PATH)
+            R.ev("🧱 schema.ensure",
+                 tables=["fantasia_domain", "fantasia_dimension", "fantasia_thesis"],
+                 db_path=str(DB_PATH))
 
-        if not core:
-            return jsonify(ok=False, error="No matching fantasia_core found."), 404
+            # -------- choose core (random or specific) --------
+            if requested_core_id is not None:
+                core_row = conn.execute("""
+                    SELECT id, file_name, title, description, rationale, created_at,
+                           COALESCE(vision,'') AS vision
+                    FROM fantasia_cores
+                    WHERE id = ?
+                    LIMIT 1
+                """, (int(requested_core_id),)).fetchone()
+                core = dict(core_row) if core_row else None
+            else:
+                core = _pick_random_core(conn)
 
-        core_id = int(core["id"])
-        created["core_id"] = core_id
+            if not core:
+                created["ok"] = False
+                created["stopped_early"] = True
+                created["stop_reason"] = "no_matching_core"
+                R.ev("⛔ core.missing",
+                     requested_core_id=requested_core_id,
+                     reason="No matching fantasia_core found.")
+                return jsonify(created), 404
 
-        # ---- DOMAINS ----
-        have_domains = (_domain_count(conn, core_id) > 0)
+            core_id = int(core["id"])
+            created["core_id"] = core_id
 
-        if force_domains or (not have_domains):
-            # Build user message for domains
-            user_msg = (DOMAIN_ARCHITECT_USER_TEMPLATE
-                        .replace("{core_title}", core["title"])
-                        .replace("{core_description}", core["description"]))
+            R.ev("🎯 core.selected",
+                 core_id=core_id,
+                 core_title=core["title"],
+                 core_description=(core["description"] or "")[:200],
+                 vision=(core.get("vision") or "")[:200])
 
-            parsed = _openai_parse_guarded(
-                model, DOMAIN_ARCHITECT_SYS_MSG, user_msg,
-                PD_DomainArchitectOut, budget, conn
-            )
+            # -------- BUDGET sanity preflight --------
+            gpt_today_snapshot = _today_for_model(DB_PATH, model)
+            R.ev("🧮 budget.check.preflight",
+                 model=model,
+                 today_total=gpt_today_snapshot.get("total", 0),
+                 daily_cap=DAILY_CAP,
+                 live_used=budget.live_used,
+                 live_cap=LIVE_CAP)
 
-            for group in parsed.groups:
-                group_title = (group.title or "").strip() or None
-                for d in group.domains:
-                    name = (d.name or "").strip()
-                    desc = (d.description or "").strip()
-                    if not name:
-                        continue
-                    _insert_domain(
-                        conn,
-                        core_id,
-                        name,
-                        desc,
-                        provider="openai",
-                        group_title=group_title
-                    )
-                    created["domains_created"] += 1
+            if gpt_today_snapshot.get("total", 0) >= DAILY_CAP:
+                created["ok"] = False
+                created["stopped_early"] = True
+                created["stop_reason"] = f"daily_cap_reached ({gpt_today_snapshot.get('total')} >= {DAILY_CAP})"
+                R.ev("⛔ abort.daily_cap",
+                     model=model,
+                     today_total=gpt_today_snapshot.get("total", 0),
+                     daily_cap=DAILY_CAP)
+                return jsonify(created), 200
 
-        # fetch (now possibly larger) domain set
-        domains = conn.execute(
-            "SELECT * FROM fantasia_domain WHERE core_id=? ORDER BY id",
-            (core_id,)
-        ).fetchall()
+            # -------- DOMAINS --------
+            have_domains = (_domain_count(conn, core_id) > 0)
+            R.ev("📚 domain.inventory",
+                 core_id=core_id,
+                 have_domains=have_domains,
+                 force_domains=force_domains)
 
-        # ---- DIMENSIONS ----
-        for dom in domains:
-            dom_id = int(dom["id"])
-            dims_existing = _dimensions_for_domain(conn, dom_id)
+            if force_domains or (not have_domains):
+                # Build domain architect prompt
+                user_msg = (DOMAIN_ARCHITECT_USER_TEMPLATE
+                            .replace("{core_title}", core["title"])
+                            .replace("{core_description}", core["description"]))
 
-            if force_dimensions or (len(dims_existing) == 0):
-                # Build prompt for new dimensions
-                user_msg = (DIM_USER_TEMPLATE
-                            .replace("{core_name}", core["title"])
-                            .replace("{core_description}", core["description"])
-                            .replace("{domain_name}", dom["name"])
-                            .replace("{domain_description}", dom["description"] or "")
-                            .replace("{count}", str(target_dims)))
+                R.ev("🤖 llm.domains.begin",
+                     model=model,
+                     core_id=core_id,
+                     force=force_domains,
+                     have_domains=have_domains,
+                     live_used=budget.live_used)
 
-                parsed_dims = _openai_parse_guarded(
-                    model, DIM_SYS_MSG, user_msg,
-                    PD_DimensionOut, budget, conn
-                )
-
-                for di in parsed_dims.dimensions[:target_dims]:
-                    name = (di.name or "").strip()
-                    desc = (di.description or "").strip()
-                    if not name:
-                        continue
-                    _insert_dimension(
-                        conn,
-                        dom_id,
-                        name,
-                        desc,
-                        provider="openai"
-                    )
-                    created["dimensions_created"] += 1
-
-        # refresh dimensions after potential inserts
-        all_dims = conn.execute("""
-            SELECT d.id AS domain_id,
-                   d.name AS domain_name,
-                   m.*
-            FROM fantasia_domain d
-            JOIN fantasia_dimension m ON m.domain_id = d.id
-            WHERE d.core_id = ?
-            ORDER BY d.id, m.id
-        """, (core_id,)).fetchall()
-
-        # ---- THESES ----
-        for row in all_dims:
-            dim_id = int(row["id"])
-            has_thesis = (_thesis_for_dimension(conn, dim_id) is not None)
-
-            if force_thesis or (not has_thesis):
-                user_msg = (THESIS_USER_TEMPLATE
-                            .replace("{core_name}", core["title"])
-                            .replace("{core_description}", core["description"])
-                            .replace("{domain_name}", row["domain_name"])
-                            .replace("{domain_description}", "")  # optional
-                            .replace("{dimension_name}", row["name"])
-                            .replace("{dimension_description}", row["description"] or ""))
-
-                parsed_thesis = _openai_parse_guarded(
-                    model, THESIS_SYS_MSG, user_msg,
-                    PD_ThesisOut, budget, conn
-                )
-
-                _insert_thesis(
+                parsed_domains = _openai_parse_guarded(
+                    model,
+                    DOMAIN_ARCHITECT_SYS_MSG,
+                    user_msg,
+                    PD_DomainArchitectOut,
+                    budget,
                     conn,
-                    core_id=core_id,
-                    domain_id=int(row["domain_id"]),
-                    dimension_id=dim_id,
-                    text=(parsed_thesis.thesis or "").strip(),
-                    provider="openai",
-                    author_email=email
                 )
-                created["theses_created"] += 1
 
+                R.ev("✅ llm.domains.parsed",
+                     groups=len(parsed_domains.groups),
+                     live_used=budget.live_used)
+
+                for group in parsed_domains.groups:
+                    group_title = (group.title or "").strip() or None
+                    for d in group.domains:
+                        name = (d.name or "").strip()
+                        desc = (d.description or "").strip()
+                        if not name:
+                            continue
+                        dom_id = _insert_domain(
+                            conn,
+                            core_id,
+                            name,
+                            desc,
+                            provider="openai",
+                            group_title=group_title
+                        )
+                        created["domains_created"] += 1
+                        R.ev("💾 domain.insert",
+                             core_id=core_id,
+                             domain_id=dom_id,
+                             name=name[:120],
+                             group_title=(group_title or "")[:120])
+
+            # fetch domains fresh after possible inserts
+            domains = conn.execute(
+                "SELECT * FROM fantasia_domain WHERE core_id=? ORDER BY id",
+                (core_id,)
+            ).fetchall()
+
+            R.ev("📚 domain.postfetch",
+                 core_id=core_id,
+                 domain_count=len(domains))
+
+            # -------- DIMENSIONS --------
+            for dom in domains:
+                dom_id = int(dom["id"])
+                dims_existing = _dimensions_for_domain(conn, dom_id)
+
+                R.ev("📐 dimension.inventory",
+                     core_id=core_id,
+                     domain_id=dom_id,
+                     domain_name=dom["name"][:120],
+                     dims_existing=len(dims_existing),
+                     force_dimensions=force_dimensions)
+
+                if force_dimensions or (len(dims_existing) == 0):
+                    # Build dimension prompt
+                    user_msg = (DIM_USER_TEMPLATE
+                                .replace("{core_name}", core["title"])
+                                .replace("{core_description}", core["description"])
+                                .replace("{domain_name}", dom["name"])
+                                .replace("{domain_description}", dom["description"] or "")
+                                .replace("{count}", str(target_dims)))
+
+                    R.ev("🤖 llm.dimensions.begin",
+                         model=model,
+                         core_id=core_id,
+                         domain_id=dom_id,
+                         force=force_dimensions,
+                         live_used=budget.live_used)
+
+                    parsed_dims = _openai_parse_guarded(
+                        model,
+                        DIM_SYS_MSG,
+                        user_msg,
+                        PD_DimensionOut,
+                        budget,
+                        conn,
+                    )
+
+                    R.ev("✅ llm.dimensions.parsed",
+                         domain_id=dom_id,
+                         returned=len(parsed_dims.dimensions),
+                         live_used=budget.live_used)
+
+                    for di in parsed_dims.dimensions[:target_dims]:
+                        name = (di.name or "").strip()
+                        desc = (di.description or "").strip()
+                        if not name:
+                            continue
+                        dim_id = _insert_dimension(
+                            conn,
+                            dom_id,
+                            name,
+                            desc,
+                            provider="openai"
+                        )
+                        created["dimensions_created"] += 1
+                        R.ev("💾 dimension.insert",
+                             core_id=core_id,
+                             domain_id=dom_id,
+                             dimension_id=dim_id,
+                             name=name[:120])
+
+            # refresh all dimensions for thesis stage
+            all_dims = conn.execute("""
+                SELECT d.id AS domain_id,
+                       d.name AS domain_name,
+                       m.*
+                FROM fantasia_domain d
+                JOIN fantasia_dimension m ON m.domain_id = d.id
+                WHERE d.core_id = ?
+                ORDER BY d.id, m.id
+            """, (core_id,)).fetchall()
+
+            R.ev("📚 dimension.postfetch",
+                 core_id=core_id,
+                 dimension_count=len(all_dims))
+
+            # -------- THESES --------
+            for row in all_dims:
+                dim_id = int(row["id"])
+                has_thesis_row = (_thesis_for_dimension(conn, dim_id) is not None)
+
+                R.ev("📜 thesis.inventory",
+                     core_id=core_id,
+                     domain_id=int(row["domain_id"]),
+                     dimension_id=dim_id,
+                     has_thesis=has_thesis_row,
+                     force_thesis=force_thesis)
+
+                if force_thesis or (not has_thesis_row):
+                    user_msg = (THESIS_USER_TEMPLATE
+                                .replace("{core_name}", core["title"])
+                                .replace("{core_description}", core["description"])
+                                .replace("{domain_name}", row["domain_name"])
+                                .replace("{domain_description}", "")
+                                .replace("{dimension_name}", row["name"])
+                                .replace("{dimension_description}", row["description"] or ""))
+
+                    R.ev("🤖 llm.thesis.begin",
+                         model=model,
+                         core_id=core_id,
+                         domain_id=int(row["domain_id"]),
+                         dimension_id=dim_id,
+                         force=force_thesis,
+                         live_used=budget.live_used)
+
+                    parsed_thesis = _openai_parse_guarded(
+                        model,
+                        THESIS_SYS_MSG,
+                        user_msg,
+                        PD_ThesisOut,
+                        budget,
+                        conn,
+                    )
+
+                    thesis_text = (parsed_thesis.thesis or "").strip()
+
+                    thesis_id = _insert_thesis(
+                        conn,
+                        core_id=core_id,
+                        domain_id=int(row["domain_id"]),
+                        dimension_id=dim_id,
+                        text=thesis_text,
+                        provider="openai",
+                        author_email=email
+                    )
+                    created["theses_created"] += 1
+
+                    R.ev("💾 thesis.insert",
+                         core_id=core_id,
+                         domain_id=int(row["domain_id"]),
+                         dimension_id=dim_id,
+                         thesis_id=thesis_id,
+                         text_preview=thesis_text[:160])
+
+            # final usage snapshot and runtime
+            created["live_tokens_used"] = budget.live_used
+            usage_snapshot = _read_usage_snapshot(DB_PATH)
+
+            R.ev("📊 usage.snapshot.end",
+                 by_model=usage_snapshot.get("by_model", {}),
+                 live_tokens_used=budget.live_used)
+
+            R.ev("🏁 /api/fantasia/ensure-structure.complete",
+                 run_id=run_id,
+                 core_id=core_id,
+                 domains_created=created["domains_created"],
+                 dimensions_created=created["dimensions_created"],
+                 theses_created=created["theses_created"],
+                 live_tokens_used=created["live_tokens_used"],
+                 ms=int((time.perf_counter()-structure_wall_start)*1000))
+
+            created["usage"] = usage_snapshot
+            created["ms"] = int((time.perf_counter()-structure_wall_start)*1000)
+
+            return jsonify(created), 200
+
+    except Exception as e:
+        # catch top-level errors so they show up in logs like /run
+        log.error("💥 ensure-structure.error run_id=%s core_id=%s: %s",
+                  run_id, requested_core_id, e, exc_info=True)
+        R.ev("💥 /api/fantasia/ensure-structure.error",
+             run_id=run_id,
+             core_id=requested_core_id,
+             error_type=type(e).__name__,
+             error=str(e))
+        created["ok"] = False
+        created["stopped_early"] = True
+        created["stop_reason"] = f"exception:{type(e).__name__}"
+        created["error"] = str(e)
         created["live_tokens_used"] = budget.live_used
-
-    return jsonify(ok=True, **created), 200
+        created["ms"] = int((time.perf_counter()-structure_wall_start)*1000)
+        return jsonify(created), 500
