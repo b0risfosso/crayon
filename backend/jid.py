@@ -2349,6 +2349,67 @@ def api_fantasia_ensure_structure():
         return jsonify(created), 500
 
 
+def _core_structure_status(conn, core_id: int) -> str:
+    """
+    Returns "complete" if:
+      - the core has at least 1 domain
+      - every domain has at least 1 dimension
+      - every dimension has at least 1 thesis
+    Otherwise "incomplete".
+    """
+
+    # any domains?
+    dom_rows = conn.execute("""
+        SELECT id FROM fantasia_domain
+        WHERE core_id = ?
+    """, (core_id,)).fetchall()
+    if not dom_rows:
+        return "incomplete"
+
+    domain_ids = [int(r["id"]) for r in dom_rows]
+
+    # map domain_id -> has_dimensions
+    q_dims = conn.execute(f"""
+        SELECT domain_id, COUNT(*) AS c
+        FROM fantasia_dimension
+        WHERE domain_id IN ({",".join(["?"]*len(domain_ids))})
+        GROUP BY domain_id
+    """, domain_ids).fetchall()
+    dims_by_domain = {int(r["domain_id"]): int(r["c"]) for r in q_dims}
+
+    # if any domain has 0 dimensions -> incomplete
+    for did in domain_ids:
+        if dims_by_domain.get(did, 0) == 0:
+            return "incomplete"
+
+    # now check each dimension has ≥1 thesis
+    # we'll gather all dimensions for those domains
+    dim_rows = conn.execute(f"""
+        SELECT id
+        FROM fantasia_dimension
+        WHERE domain_id IN ({",".join(["?"]*len(domain_ids))})
+    """, domain_ids).fetchall()
+    if not dim_rows:
+        return "incomplete"
+
+    dim_ids = [int(r["id"]) for r in dim_rows]
+
+    q_th = conn.execute(f"""
+        SELECT dimension_id, COUNT(*) AS c
+        FROM fantasia_thesis
+        WHERE dimension_id IN ({",".join(["?"]*len(dim_ids))})
+        GROUP BY dimension_id
+    """, dim_ids).fetchall()
+    thesis_by_dim = {int(r["dimension_id"]): int(r["c"]) for r in q_th}
+
+    # if any dimension has 0 theses -> incomplete
+    for mid in dim_ids:
+        if thesis_by_dim.get(mid, 0) == 0:
+            return "incomplete"
+
+    return "complete"
+
+
 def _fetch_all_cores_brief(conn):
     rows = conn.execute("""
         SELECT
@@ -2361,20 +2422,23 @@ def _fetch_all_cores_brief(conn):
         ORDER BY created_at DESC, id DESC
         LIMIT 500
     """).fetchall()
-    return [
-        {
-            "id": int(r["id"]),
+
+    out = []
+    for r in rows:
+        core_id = int(r["id"])
+        status = _core_structure_status(conn, core_id)
+        out.append({
+            "id": core_id,
             "title": r["title"],
             "description": r["description"],
             "vision": r["vision"],
             "created_at": r["created_at"],
-        }
-        for r in rows
-    ]
+            "structure_status": status,
+        })
+    return out
 
 
 def _fetch_core_full(conn, core_id: int):
-    # pull core
     core_row = conn.execute("""
         SELECT
             id,
@@ -2391,6 +2455,8 @@ def _fetch_core_full(conn, core_id: int):
     if not core_row:
         return None
 
+    status = _core_structure_status(conn, core_id)
+
     core_obj = {
         "id": int(core_row["id"]),
         "title": core_row["title"],
@@ -2398,8 +2464,12 @@ def _fetch_core_full(conn, core_id: int):
         "rationale": core_row["rationale"],
         "vision": core_row["vision"],
         "created_at": core_row["created_at"],
+        "structure_status": status,
         "domains": [],
     }
+
+    # ... (domains/dimensions/theses loop stays the same)
+    # fill out core_obj["domains"] exactly like before
 
     # pull domains for that core
     dom_rows = conn.execute("""
@@ -2415,7 +2485,6 @@ def _fetch_core_full(conn, core_id: int):
         ORDER BY d.id ASC
     """, (core_id,)).fetchall()
 
-    # for each domain, pull dimensions
     for drow in dom_rows:
         domain_id = int(drow["id"])
         domain_obj = {
@@ -2451,7 +2520,6 @@ def _fetch_core_full(conn, core_id: int):
                 "theses": [],
             }
 
-            # pull ALL theses for this dimension (force_thesis mode can create multiples)
             thes_rows = conn.execute("""
                 SELECT
                     t.id,
