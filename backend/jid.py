@@ -46,9 +46,9 @@ try:
     from openai import OpenAI
     _OPENAI_STYLE = "new"
     _client = OpenAI()
-except Exception as _e:  # pragma: no cover
-    # If you need legacy fallback, wire it yourself. This app assumes new SDK.
-    raise RuntimeError("OpenAI SDK with `responses.parse` is required.") from _e
+#except Exception as _e:  # pragma: no cover
+#    # If you need legacy fallback, wire it yourself. This app assumes new SDK.
+#    raise RuntimeError("OpenAI SDK with `responses.parse` is required.") from _e
 
 # --- Config defaults ---
 DEFAULT_SOURCE = "/var/www/site/data/source"
