@@ -1120,27 +1120,19 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
     budget.check_before()  # should raise if > DAILY_CAP or > LIVE_CAP projected
 
     # 2. make request
-    resp = responses.parse(
+    resp =  _client.responses.parse(
         model=model,
         system=sys_msg,
         input=user_msg,
         text_format=OutSchema,
     )
 
-    # 3. extract usage from the API response
-    # Here's where things commonly go wrong:
-    # Some wrappers return usage on resp.usage,
-    # some wrap the raw OpenAI response inside resp.raw or resp.response.
-    usage_obj = getattr(resp, "usage", None)
-    if usage_obj is None and hasattr(resp, "response"):
-        usage_obj = getattr(resp.response, "usage", None)
-
-    # usage_obj should look like:
-    #   {"input_tokens": int, "output_tokens": int, "total_tokens": int}
-    # or something convertible to that.
-
-    if usage_obj:
-        # 4. persist accounting
+    try:
+        usage_obj = _usage_from_resp(resp)
+        with sqlite3.connect(db_path) as conn:
+            _record_llm_usage_by_model(conn, model, usage_obj)  # per-model totals
+            _record_llm_usage(conn, usage_obj)                  # global totals
+        log.debug("Curator usage recorded: %s", usage_obj)
         _record_llm_usage(conn, usage_obj)
         _record_llm_usage_by_model(conn, model, usage_obj)
 
@@ -1154,7 +1146,9 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
 
         # 6. re-check caps AFTER this call
         budget.check_after_increment()
-
+    except Exception as ue:
+        log.warning("curator usage accounting failed: %s", ue)
+        
     # 7. return the parsed content that the caller expects
     # depending on your wrapper this might be resp.output or resp.parsed
     return resp.parsed if hasattr(resp, "parsed") else resp
