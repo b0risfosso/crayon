@@ -1976,7 +1976,8 @@ def list_visions():
     return jsonify(rows)
 
 
-# ---- The endpoint ----@app.post("/api/fantasia/ensure-structure")
+# ---- The endpoint ----
+@app.post("/api/fantasia/ensure-structure")
 def api_fantasia_ensure_structure():
     """
     Select (random or specified) fantasia core and ensure/grow:
