@@ -1027,7 +1027,7 @@ def _select_topics_for_vision(
     if not isinstance(parsed, CuratedPlan):
         parsed = CuratedPlan.model_validate(parsed)
 
-    return parsed
+    return parsed, raw_text
 
 def _commission_single_writing(topic: str, description: str, model_write: str, db_path: Path) -> tuple:
     """
@@ -1162,7 +1162,7 @@ def _openai_parse_guarded(model, sys_msg, user_msg, OutSchema, budget: _TokenBud
         # non-fatal; keep processing
         log.warning(f"failed to record llm usage: {e}")
 
-    return parsed, raw_text
+    return parsed
 
 
 
