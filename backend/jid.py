@@ -21,6 +21,15 @@ import uuid
 import time
 import traceback
 
+from zoneinfo import ZoneInfo
+
+from crayon_prompts import (
+    DOMAIN_ARCHITECT_SYS_MSG,
+    DOMAIN_ARCHITECT_USER_TEMPLATE,
+    DIM_SYS_MSG, DIM_USER_TEMPLATE,
+    THESIS_SYS_MSG, THESIS_USER_TEMPLATE,
+)
+
 
 # --- Pydantic (v2 preferred; v1 shim) ---
 try:
@@ -124,6 +133,61 @@ class CuratedPlan(BaseModel):
     selected_existing: List[ExistingPick] = Field(default_factory=list)
     proposed_new: List[ProposedTopic] = Field(default_factory=list)
     rationale: Optional[str] = None
+
+# ---- Parsed output models matching your crayon endpoints ----
+class PD_DomainItem(BaseModel):
+    name: str
+    description: str
+
+class PD_DomainGroup(BaseModel):
+    title: str
+    domains: list[PD_DomainItem]
+
+class PD_DomainArchitectOut(BaseModel):
+    groups: list[PD_DomainGroup]
+
+class PD_DimensionItem(BaseModel):
+    name: str
+    description: str
+
+class PD_DimensionOut(BaseModel):
+    dimensions: list[PD_DimensionItem]
+
+class PD_ThesisOut(BaseModel):
+    thesis: str
+
+# ---- Token budget guard ----
+class _TokenBudget:
+    def __init__(self, db_path: Path, model: str, live_cap: int, daily_cap: int):
+        self.db_path = db_path
+        self.model = model
+        self.live_cap = live_cap
+        self.daily_cap = daily_cap
+        self.live_used = 0  # for this one endpoint call
+
+    def check_before(self) -> None:
+        today = _today_for_model(self.db_path, self.model)
+        # Check daily projected (we only know live_used so far; this prevents new calls when we're already near the limit)
+        projected_total = int(today.get("total") or 0) + self.live_used
+        if projected_total >= self.daily_cap:
+            raise RuntimeError(f"Daily token cap reached for {self.model}: {projected_total} >= {self.daily_cap}")
+        if self.live_used >= self.live_cap:
+            raise RuntimeError(f"Per-request live token cap reached: {self.live_used} >= {self.live_cap}")
+
+    def add_usage(self, conn: sqlite3.Connection, usage: dict) -> None:
+        # usage = {"input": int, "output": int, "total": int}
+        tot = int(usage.get("total") or (int(usage.get("input") or 0) + int(usage.get("output") or 0)))
+        self.live_used += tot
+        _record_llm_usage(conn, usage)
+        _record_llm_usage_by_model(conn, self.model, usage)
+        # Post-check to ensure we didn't overshoot live cap
+        if self.live_used > self.live_cap:
+            raise RuntimeError(f"Per-request live token cap exceeded post-call: {self.live_used} > {self.live_cap}")
+        # Post-check daily
+        today = _today_for_model(self.db_path, self.model)
+        if int(today.get("total") or 0) > self.daily_cap:
+            raise RuntimeError(f"Daily token cap exceeded post-call for {self.model}")
+
 
 # ---------- Text extraction & chunking ----------
 
@@ -278,6 +342,83 @@ def read_pdf(path: Path) -> str:
 
     # Final fallback (optional OCR)
     return ocr_pdf_if_needed(path) or ""
+
+
+def _apply_fantasia_structure_schema(db_path: Path) -> None:
+    """
+    Adds fantasia_domain, fantasia_dimension, fantasia_thesis (idempotent).
+    Mirrors the structure you use in crayon so we can store outputs locally in jid.db.
+    """
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL;")
+        cur.execute("PRAGMA synchronous=NORMAL;")
+
+        SCHEMA = [
+            # domain
+            """
+            CREATE TABLE IF NOT EXISTS fantasia_domain (
+              id INTEGER PRIMARY KEY,
+              core_id INTEGER NOT NULL,
+              name TEXT NOT NULL,
+              description TEXT,
+              provider TEXT,
+              group_title TEXT,
+              targets_json TEXT,
+              created_at TEXT NOT NULL DEFAULT (datetime('now')),
+              updated_at TEXT,
+              FOREIGN KEY (core_id) REFERENCES fantasia_cores(id) ON DELETE CASCADE
+            );
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_domain_core ON fantasia_domain(core_id);",
+            "CREATE INDEX IF NOT EXISTS idx_domain_name ON fantasia_domain(name);",
+
+            # dimension
+            """
+            CREATE TABLE IF NOT EXISTS fantasia_dimension (
+              id INTEGER PRIMARY KEY,
+              domain_id INTEGER NOT NULL,
+              name TEXT NOT NULL,
+              thesis TEXT,
+              description TEXT,
+              targets_json TEXT,
+              provider TEXT,
+              created_at TEXT NOT NULL DEFAULT (datetime('now')),
+              updated_at TEXT,
+              FOREIGN KEY (domain_id) REFERENCES fantasia_domain(id) ON DELETE CASCADE
+            );
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_dimension_domain ON fantasia_dimension(domain_id);",
+            "CREATE INDEX IF NOT EXISTS idx_dimension_name ON fantasia_dimension(name);",
+
+            # thesis
+            """
+            CREATE TABLE IF NOT EXISTS fantasia_thesis (
+              id INTEGER PRIMARY KEY,
+              core_id INTEGER NOT NULL,
+              domain_id INTEGER NOT NULL,
+              dimension_id INTEGER NOT NULL,
+              text TEXT NOT NULL,
+              author_email TEXT,
+              provider TEXT,
+              created_at TEXT NOT NULL DEFAULT (datetime('now')),
+              updated_at TEXT,
+              FOREIGN KEY (core_id)     REFERENCES fantasia_cores(id)      ON DELETE CASCADE,
+              FOREIGN KEY (domain_id)   REFERENCES fantasia_domain(id)     ON DELETE CASCADE,
+              FOREIGN KEY (dimension_id)REFERENCES fantasia_dimension(id)  ON DELETE CASCADE
+            );
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_thesis_core ON fantasia_thesis(core_id);",
+            "CREATE INDEX IF NOT EXISTS idx_thesis_domain ON fantasia_thesis(domain_id);",
+            "CREATE INDEX IF NOT EXISTS idx_thesis_dimension ON fantasia_thesis(dimension_id);",
+            "CREATE INDEX IF NOT EXISTS idx_thesis_created_at ON fantasia_thesis(created_at);",
+        ]
+
+        for stmt in SCHEMA:
+            cur.execute(stmt)
+        conn.commit()
+
 
 
 def normalize_ws(text: str) -> str:
@@ -651,6 +792,7 @@ def ensure_db(db_path: Path) -> None:
         )
         try:
             cur.execute("ALTER TABLE fantasia_cores ADD COLUMN vision TEXT")
+            _apply_fantasia_structure_schema(db_path)
         except Exception:
             pass  # column already exists
         cur.execute("CREATE INDEX IF NOT EXISTS idx_fantasia_cores_created_at ON fantasia_cores(created_at);")
@@ -965,6 +1107,85 @@ class RunLogger:
         _log_event(event, run_id=self.run_id, vision=vision, **fields)
     def ev_w(self, event: str, vision: str, writing_id: int, **fields):
         _log_event(event, run_id=self.run_id, vision=vision, writing_id=writing_id, **fields)
+
+
+def _openai_parse_guarded(model: str, system_msg: str, user_msg: str, schema: type[BaseModel],
+                          budget: _TokenBudget, conn: sqlite3.Connection):
+    """
+    Wrap _client.responses.parse with budget checks and usage accounting.
+    """
+    budget.check_before()
+    try:
+        resp = _client.responses.parse(  # type: ignore[attr-defined]
+            model=model,
+            input=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            text_format=schema,
+        )
+    except Exception as e:
+        raise RuntimeError(f"OpenAI parse failed: {e}")
+
+    parsed = getattr(resp, "output_parsed", None) or getattr(resp, "parsed", None)
+    if parsed is None:
+        raise RuntimeError("OpenAI did not return parsed output")
+
+    # record usage if present
+    usage = {}
+    try:
+        u = getattr(resp, "usage", None) or {}
+        # new SDK usage fields often: {"input_tokens":.., "output_tokens":.., "total_tokens":..}
+        inp = int(u.get("input_tokens") or u.get("input") or 0)
+        outp = int(u.get("output_tokens") or u.get("output") or 0)
+        tot = int(u.get("total_tokens") or (inp + outp))
+        usage = {"input": inp, "output": outp, "total": tot}
+    except Exception:
+        usage = {}
+
+    budget.add_usage(conn, usage)
+    return parsed
+
+
+# ---- DB helpers for this endpoint ----
+def _pick_random_core(conn: sqlite3.Connection) -> dict | None:
+    row = conn.execute("""
+        SELECT id, file_name, title, description, rationale, created_at, COALESCE(vision,'') AS vision
+        FROM fantasia_cores
+        ORDER BY RANDOM()
+        LIMIT 1
+    """).fetchone()
+    return dict(row) if row else None
+
+def _domain_count(conn, core_id: int) -> int:
+    return conn.execute("SELECT COUNT(*) FROM fantasia_domain WHERE core_id=?", (core_id,)).fetchone()[0]
+
+def _dimensions_for_domain(conn, domain_id: int) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM fantasia_dimension WHERE domain_id=?", (domain_id,)).fetchall()
+
+def _thesis_for_dimension(conn, dimension_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM fantasia_thesis WHERE dimension_id=? LIMIT 1", (dimension_id,)).fetchone()
+
+def _insert_domain(conn, core_id: int, name: str, description: str, provider: str, group_title: str | None) -> int:
+    cur = conn.execute("""
+        INSERT INTO fantasia_domain(core_id, name, description, provider, group_title)
+        VALUES (?, ?, ?, ?, ?)
+    """, (core_id, name, description, provider, group_title))
+    return int(cur.lastrowid)
+
+def _insert_dimension(conn, domain_id: int, name: str, description: str, provider: str) -> int:
+    cur = conn.execute("""
+        INSERT INTO fantasia_dimension(domain_id, name, description, provider)
+        VALUES (?, ?, ?, ?)
+    """, (domain_id, name, description, provider))
+    return int(cur.lastrowid)
+
+def _insert_thesis(conn, core_id: int, domain_id: int, dimension_id: int, text: str, provider: str, author_email: str | None) -> int:
+    cur = conn.execute("""
+        INSERT INTO fantasia_thesis(core_id, domain_id, dimension_id, text, provider, author_email)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (core_id, domain_id, dimension_id, text, provider, author_email))
+    return int(cur.lastrowid)
 
 
 # ---------- Flask app ----------
@@ -1754,3 +1975,191 @@ def list_visions():
         rows = [dict(r) for r in cur.fetchall()]
     return jsonify(rows)
 
+
+# ---- The endpoint ----@app.post("/api/fantasia/ensure-structure")
+def api_fantasia_ensure_structure():
+    """
+    Select (random or specified) fantasia core and ensure/grow:
+      - domains
+      - dimensions per domain
+      - thesis per dimension
+
+    Optional force flags let you append new structure even if it already exists.
+
+    Request JSON (all optional):
+    {
+      "email": "boris@fantasiagenesis.com",
+      "model": "gpt-5-mini-2025-08-07",
+      "target_dimensions_per_domain": 3,
+
+      "core_id": 482,
+
+      "force_domains": false,
+      "force_dimensions": false,
+      "force_thesis": false
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower() or None
+    model = (data.get("model") or "gpt-5-mini-2025-08-07").strip()
+    target_dims = max(1, int(data.get("target_dimensions_per_domain") or 3))
+
+    force_domains = bool(data.get("force_domains"))
+    force_dimensions = bool(data.get("force_dimensions"))
+    force_thesis = bool(data.get("force_thesis"))
+
+    # budgets
+    LIVE_CAP   = 3_000_000
+    DAILY_CAP  = 10_000_000
+    budget = _TokenBudget(DB_PATH, model, LIVE_CAP, DAILY_CAP)
+
+    created = {
+        "core_id": None,
+        "domains_created": 0,
+        "dimensions_created": 0,
+        "theses_created": 0,
+        "live_tokens_used": 0,
+        "model": model,
+    }
+
+    with sqlite3.connect(DB_PATH) as conn, conn:
+        conn.row_factory = sqlite3.Row
+
+        # make sure schema exists
+        _apply_fantasia_structure_schema(DB_PATH)
+
+        # ---- choose core ----
+        core = None
+        if data.get("core_id") is not None:
+            core_row = conn.execute("""
+                SELECT id, file_name, title, description, rationale, created_at,
+                       COALESCE(vision,'') AS vision
+                FROM fantasia_cores
+                WHERE id = ?
+                LIMIT 1
+            """, (int(data["core_id"]),)).fetchone()
+            if core_row:
+                core = dict(core_row)
+        else:
+            core = _pick_random_core(conn)
+
+        if not core:
+            return jsonify(ok=False, error="No matching fantasia_core found."), 404
+
+        core_id = int(core["id"])
+        created["core_id"] = core_id
+
+        # ---- DOMAINS ----
+        have_domains = (_domain_count(conn, core_id) > 0)
+
+        if force_domains or (not have_domains):
+            # Build user message for domains
+            user_msg = (DOMAIN_ARCHITECT_USER_TEMPLATE
+                        .replace("{core_title}", core["title"])
+                        .replace("{core_description}", core["description"]))
+
+            parsed = _openai_parse_guarded(
+                model, DOMAIN_ARCHITECT_SYS_MSG, user_msg,
+                PD_DomainArchitectOut, budget, conn
+            )
+
+            for group in parsed.groups:
+                group_title = (group.title or "").strip() or None
+                for d in group.domains:
+                    name = (d.name or "").strip()
+                    desc = (d.description or "").strip()
+                    if not name:
+                        continue
+                    _insert_domain(
+                        conn,
+                        core_id,
+                        name,
+                        desc,
+                        provider="openai",
+                        group_title=group_title
+                    )
+                    created["domains_created"] += 1
+
+        # fetch (now possibly larger) domain set
+        domains = conn.execute(
+            "SELECT * FROM fantasia_domain WHERE core_id=? ORDER BY id",
+            (core_id,)
+        ).fetchall()
+
+        # ---- DIMENSIONS ----
+        for dom in domains:
+            dom_id = int(dom["id"])
+            dims_existing = _dimensions_for_domain(conn, dom_id)
+
+            if force_dimensions or (len(dims_existing) == 0):
+                # Build prompt for new dimensions
+                user_msg = (DIM_USER_TEMPLATE
+                            .replace("{core_name}", core["title"])
+                            .replace("{core_description}", core["description"])
+                            .replace("{domain_name}", dom["name"])
+                            .replace("{domain_description}", dom["description"] or "")
+                            .replace("{count}", str(target_dims)))
+
+                parsed_dims = _openai_parse_guarded(
+                    model, DIM_SYS_MSG, user_msg,
+                    PD_DimensionOut, budget, conn
+                )
+
+                for di in parsed_dims.dimensions[:target_dims]:
+                    name = (di.name or "").strip()
+                    desc = (di.description or "").strip()
+                    if not name:
+                        continue
+                    _insert_dimension(
+                        conn,
+                        dom_id,
+                        name,
+                        desc,
+                        provider="openai"
+                    )
+                    created["dimensions_created"] += 1
+
+        # refresh dimensions after potential inserts
+        all_dims = conn.execute("""
+            SELECT d.id AS domain_id,
+                   d.name AS domain_name,
+                   m.*
+            FROM fantasia_domain d
+            JOIN fantasia_dimension m ON m.domain_id = d.id
+            WHERE d.core_id = ?
+            ORDER BY d.id, m.id
+        """, (core_id,)).fetchall()
+
+        # ---- THESES ----
+        for row in all_dims:
+            dim_id = int(row["id"])
+            has_thesis = (_thesis_for_dimension(conn, dim_id) is not None)
+
+            if force_thesis or (not has_thesis):
+                user_msg = (THESIS_USER_TEMPLATE
+                            .replace("{core_name}", core["title"])
+                            .replace("{core_description}", core["description"])
+                            .replace("{domain_name}", row["domain_name"])
+                            .replace("{domain_description}", "")  # optional
+                            .replace("{dimension_name}", row["name"])
+                            .replace("{dimension_description}", row["description"] or ""))
+
+                parsed_thesis = _openai_parse_guarded(
+                    model, THESIS_SYS_MSG, user_msg,
+                    PD_ThesisOut, budget, conn
+                )
+
+                _insert_thesis(
+                    conn,
+                    core_id=core_id,
+                    domain_id=int(row["domain_id"]),
+                    dimension_id=dim_id,
+                    text=(parsed_thesis.thesis or "").strip(),
+                    provider="openai",
+                    author_email=email
+                )
+                created["theses_created"] += 1
+
+        created["live_tokens_used"] = budget.live_used
+
+    return jsonify(ok=True, **created), 200
