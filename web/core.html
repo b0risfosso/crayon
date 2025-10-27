@@ -47,11 +47,50 @@
   }
 
   .sidebar-header h1 {
-    margin: 0;
+    margin: 0 0 8px 0;
     font-size: 14px;
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--text-primary);
+  }
+
+  /* NEW: vision filter box */
+  .vision-filter-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .vision-row1 {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .vision-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+
+  .vision-stats {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+
+  .vision-select {
+    width: 100%;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.4;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    padding: 6px 8px;
+    font-family: inherit;
   }
 
   .sidebar-list {
@@ -84,7 +123,6 @@
     margin: 0;
   }
 
-  /* new: status badge in sidebar and header */
   .status-badge {
     font-size: 10px;
     font-weight: 600;
@@ -305,7 +343,19 @@
 <aside class="sidebar">
   <div class="sidebar-header">
     <h1>Fantasia Cores</h1>
+
+    <!-- NEW: vision filter UI -->
+    <div class="vision-filter-block">
+      <div class="vision-row1">
+        <div class="vision-label">Vision</div>
+        <div class="vision-stats" id="visionStats">–</div>
+      </div>
+      <select class="vision-select" id="visionSelect">
+        <!-- options populated by JS -->
+      </select>
+    </div>
   </div>
+
   <div class="sidebar-list" id="coreList">
     <!-- populated by JS -->
   </div>
@@ -346,11 +396,17 @@ const domainsColEl = document.getElementById("domainsCol");
 const detailColEl = document.getElementById("detailCol");
 const detailPlaceholderEl = document.getElementById("detailPlaceholder");
 
+const visionSelectEl = document.getElementById("visionSelect");
+const visionStatsEl = document.getElementById("visionStats");
+
 let currentCore = null;
 let currentDomainId = null;
 
+// We'll also keep the vision list so we can update stats easily
+let visionsData = []; // [{vision, complete, incomplete}, ...]
+
+// utility: status badge classes
 function makeStatusBadge(status) {
-  // returns {text, classList} for COMPLETE vs INCOMPLETE
   if (status === "complete") {
     return { text: "COMPLETE", cls: "status-badge status-complete" };
   } else {
@@ -358,14 +414,101 @@ function makeStatusBadge(status) {
   }
 }
 
-// Fetch brief list of cores for sidebar
-async function loadCoreList() {
-  const res = await fetch("/api/fantasia/cores");
+// --- Vision loading / filtering ---
+
+async function loadVisions() {
+  const res = await fetch("/api/fantasia/visions");
   const data = await res.json();
   if (!data.ok) return;
 
+  visionsData = data.visions || [];
+
+  // Populate select
+  visionSelectEl.innerHTML = "";
+  visionsData.forEach(v => {
+    const opt = document.createElement("option");
+    // vision=None in API means ALL
+    // We'll store that literally as "" in value "ALL::".
+    if (v.vision === null) {
+      opt.value = "__ALL__";
+      opt.textContent = `ALL (${v.complete} complete · ${v.incomplete} incomplete)`;
+    } else if (v.vision.trim() === "") {
+      opt.value = "__EMPTY__";
+      opt.textContent = `[no vision] (${v.complete} · ${v.incomplete})`;
+    } else {
+      opt.value = v.vision;
+      opt.textContent = `${v.vision} (${v.complete} · ${v.incomplete})`;
+    }
+    visionSelectEl.appendChild(opt);
+  });
+
+  // Initialize stats text + cores using first option
+  applyVisionSelection();
+}
+
+// read currently selected <option>, update the stats label, then load cores
+function applyVisionSelection() {
+  const val = visionSelectEl.value;
+
+  // find the matching vision record for stats
+  let selectedVisionRecord = null;
+  if (val === "__ALL__") {
+    selectedVisionRecord = visionsData.find(v => v.vision === null);
+  } else if (val === "__EMPTY__") {
+    selectedVisionRecord = visionsData.find(v => v.vision === "");
+  } else {
+    selectedVisionRecord = visionsData.find(v => v.vision === val);
+  }
+
+  if (selectedVisionRecord) {
+    visionStatsEl.textContent = `${selectedVisionRecord.complete} complete · ${selectedVisionRecord.incomplete} incomplete`;
+  } else {
+    visionStatsEl.textContent = "–";
+  }
+
+  loadCoresForSelectedVision();
+}
+
+// when you change dropdown, reload core list
+visionSelectEl.addEventListener("change", () => {
+  applyVisionSelection();
+});
+
+// --- Core list loading ---
+
+async function loadCoresForSelectedVision() {
+  const val = visionSelectEl.value;
+
+  let queryVisionParam = "";
+  if (val === "__ALL__") {
+    // no query param => ALL
+    queryVisionParam = "";
+  } else if (val === "__EMPTY__") {
+    // explicit empty vision
+    queryVisionParam = "?vision=";
+  } else {
+    // regular named vision
+    // encodeURIComponent for safety
+    queryVisionParam = "?vision=" + encodeURIComponent(val);
+  }
+
+  const res = await fetch("/api/fantasia/cores/by-vision" + queryVisionParam);
+  const data = await res.json();
+  if (!data.ok) return;
+
+  renderCoreList(data.cores || []);
+}
+
+// Render the sidebar core list for the chosen vision
+function renderCoreList(cores) {
   coreListEl.innerHTML = "";
-  data.cores.forEach(core => {
+  currentCore = null;
+  currentDomainId = null;
+  renderCoreHeader(null);
+  renderDomains([]);
+  renderEmptyDetail();
+
+  cores.forEach(core => {
     const div = document.createElement("div");
     div.className = "core-item";
     div.dataset.coreId = core.id;
@@ -411,7 +554,8 @@ async function loadCoreList() {
   });
 }
 
-// Fetch full nested core structure
+// --- Selecting a core and rendering structure ---
+
 async function selectCore(coreId) {
   currentDomainId = null;
   const res = await fetch(`/api/fantasia/core/${coreId}`);
@@ -424,8 +568,18 @@ async function selectCore(coreId) {
   renderEmptyDetail();
 }
 
-// Render top header panel for current core
 function renderCoreHeader(core) {
+  if (!core) {
+    coreTitleEl.textContent = "Select a core";
+    coreStatusBadgeEl.style.display = "none";
+    coreVisionEl.textContent = "";
+    coreVisionEl.style.display = "none";
+    coreDescEl.textContent = "";
+    coreDescEl.style.display = "none";
+    coreMetaEl.textContent = "";
+    return;
+  }
+
   coreTitleEl.textContent = core.title || ("Core " + core.id);
 
   // status badge in header
@@ -446,9 +600,10 @@ function renderCoreHeader(core) {
   coreMetaEl.textContent = metaBits.join(" · ");
 }
 
-// Render domain list
+// left column domains
 function renderDomains(domains) {
   domainsColEl.innerHTML = "";
+
   domains.forEach(domain => {
     const card = document.createElement("div");
     card.className = "domain-card";
@@ -494,7 +649,7 @@ function renderDomains(domains) {
   });
 }
 
-// Right column panel
+// right column details
 function renderDomainDetail(domain) {
   detailColEl.innerHTML = "";
 
@@ -573,7 +728,6 @@ function renderEmptyDetail() {
   detailColEl.appendChild(detailPlaceholderEl);
 }
 
-// domain selection
 function selectDomain(domainId) {
   currentDomainId = domainId;
   Array.from(domainsColEl.children).forEach(card => {
@@ -591,8 +745,11 @@ function selectDomain(domainId) {
   renderDomainDetail(domain);
 }
 
-// init
-loadCoreList();
+// boot sequence:
+// 1. load visions
+// 2. populate select + stats
+// 3. load cores for the first vision automatically
+loadVisions();
 </script>
 </body>
 </html>

@@ -2575,3 +2575,147 @@ def api_get_core(core_id: int):
         return jsonify({"ok": False, "error": "core_not_found"}), 404
 
     return jsonify({"ok": True, "core": core_obj}), 200
+
+
+def _fetch_visions_with_stats(conn):
+    """
+    Return a list of all distinct non-empty visions, and for each:
+      - complete: number of cores under that vision that are fully structured
+      - incomplete: number of cores under that vision that are not fully structured
+    Also include a synthetic entry for ALL (vision=None) aggregating across everything.
+    """
+    rows = conn.execute("""
+        SELECT
+            id,
+            COALESCE(vision,'') AS vision
+        FROM fantasia_cores
+    """).fetchall()
+
+    # bucket cores by vision string
+    by_vision = {}
+    for r in rows:
+        vid = (r["vision"] or "").strip()
+        if vid not in by_vision:
+            by_vision[vid] = []
+        by_vision[vid].append(int(r["id"]))
+
+    def status_for_core_id(cid: int) -> str:
+        return _core_structure_status(conn, cid)
+
+    vision_list = []
+    total_complete = 0
+    total_incomplete = 0
+
+    for vtext, core_ids in by_vision.items():
+        c_complete = 0
+        c_incomplete = 0
+        for cid in core_ids:
+            st = status_for_core_id(cid)
+            if st == "complete":
+                c_complete += 1
+            else:
+                c_incomplete += 1
+        total_complete += c_complete
+        total_incomplete += c_incomplete
+        vision_list.append({
+            "vision": vtext,  # empty string means "no vision"/unspecified
+            "complete": c_complete,
+            "incomplete": c_incomplete,
+        })
+
+    # add synthetic "ALL"
+    vision_list.sort(key=lambda x: (x["vision"].lower() if x["vision"] else "~"))  # simple alpha, "" last-ish
+    vision_list.insert(0, {
+        "vision": None,
+        "complete": total_complete,
+        "incomplete": total_incomplete,
+    })
+
+    return vision_list
+
+
+def _fetch_cores_for_vision(conn, vision_filter: str | None):
+    """
+    Return brief cores like _fetch_all_cores_brief,
+    but filtered to a given vision (exact match).
+    If vision_filter is None: return ALL cores.
+    """
+    if vision_filter is None:
+        q = """
+            SELECT
+                id,
+                title,
+                description,
+                COALESCE(vision,'') AS vision,
+                created_at
+            FROM fantasia_cores
+            ORDER BY created_at DESC, id DESC
+            LIMIT 500
+        """
+        params = ()
+    else:
+        q = """
+            SELECT
+                id,
+                title,
+                description,
+                COALESCE(vision,'') AS vision,
+                created_at
+            FROM fantasia_cores
+            WHERE COALESCE(vision,'') = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT 500
+        """
+        params = (vision_filter.strip(),)
+
+    rows = conn.execute(q, params).fetchall()
+
+    out = []
+    for r in rows:
+        cid = int(r["id"])
+        out.append({
+            "id": cid,
+            "title": r["title"],
+            "description": r["description"],
+            "vision": r["vision"],
+            "created_at": r["created_at"],
+            "structure_status": _core_structure_status(conn, cid),
+        })
+    return out
+
+
+@app.get("/api/fantasia/visions")
+def api_list_visions():
+    """
+    Returns [{vision, complete, incomplete}, ...]
+    First element always vision=None representing ALL cores.
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        _apply_fantasia_structure_schema(DB_PATH)
+        visions = _fetch_visions_with_stats(conn)
+
+    return jsonify({"ok": True, "visions": visions}), 200
+
+
+@app.get("/api/fantasia/cores/by-vision")
+def api_list_cores_by_vision():
+    """
+    Returns cores filtered by exact vision match.
+    ?vision=...  (omit for ALL)
+    """
+    vision_q = request.args.get("vision", None)
+    # Interpret explicit "null" or "" as empty-string vision, not ALL
+    # Behavior:
+    #   vision param omitted entirely => ALL
+    #   vision=""                      => cores where vision == ""
+    #   vision=null                    => cores where vision == ""
+    if vision_q is not None and vision_q.lower() == "null":
+        vision_q = ""
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        _apply_fantasia_structure_schema(DB_PATH)
+        cores = _fetch_cores_for_vision(conn, vision_q if vision_q is not None else None)
+
+    return jsonify({"ok": True, "cores": cores}), 200
