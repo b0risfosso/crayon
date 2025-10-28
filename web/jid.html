@@ -258,17 +258,51 @@
       const rows = await fetchJSON(url);
       list.innerHTML = "";
       rows.forEach(r => {
-        const title = mk("div", {}, [
-          mk("strong", {text: r.title}),
-          r.vision ? mk("span", {class:"pill", style:"margin-left:8px;", text: r.vision}) : mk("span"),
+        // outer item
+        const item = mk("div", {class:"item"});
+        item.dataset.coreId = r.id;  // store core.id on the DOM node (future-click use)
+
+        // title row: title, [vision pill], [#id]
+        const title = mk("div", {class:"row"}, [
+            mk("strong", {text: r.title || `Core ${r.id}`}),
+            // vision pill (if any)
+            r.vision
+            
+            ? mk("span", {
+                class:"pill",
+                style:"margin-left:8px;",
+                text: r.vision
+                })
+            : mk("span"),
+            // id pill (always show)
+            mk("span", {
+            class:"pill mono",
+            style:"margin-left:8px;",
+            text: `#${r.id}`
+            })
         ]);
-        const meta = mk("div", {class:"small muted"}, []);
+
+        // meta line: file_name · created_at
+        const meta = mk("div", {class:"small muted"});
         meta.textContent = `${r.file_name || "(no file)"} · ${r.created_at}`;
-        const desc = mk("div", {class:"break small"}, []); desc.textContent = r.description || "";
-        const rat  = mk("div", {class:"break small muted"}, []); rat.textContent = r.rationale || "";
-        const item = mk("div", {class:"item"}, [title, meta, desc, rat]);
+
+        // description
+        const desc = mk("div", {class:"break small"});
+        desc.textContent = r.description || "";
+
+        // rationale
+        const rat  = mk("div", {class:"break small muted"});
+        rat.textContent = r.rationale || "";
+
+        // assemble
+        item.appendChild(title);
+        item.appendChild(meta);
+        item.appendChild(desc);
+        item.appendChild(rat);
+
         list.appendChild(item);
-      });
+        });
+
       if (!rows.length) list.innerHTML = `<div class="small muted">No fantasia cores for the current selection.</div>`;
     } catch (e) {
       list.innerHTML = `Error: ${e.message}`;
