@@ -434,7 +434,7 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
                     domain_id=domain_id,
                     name=dim.name,
                     description=dim.description,
-                    targets=dim.targets
+                    targets=dim.targets,
                     provider=dim.provider or model,
                     created_at=now,
                 )
