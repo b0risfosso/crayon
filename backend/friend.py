@@ -41,6 +41,12 @@ from crayon_prompts import (
     FANTASIA_USER_TEMPLATE,
 )
 
+# --- Pydantic (v2 preferred; v1 shim) ---
+try:
+    from pydantic import BaseModel, Field, ValidationError
+except Exception:  # pragma: no cover
+    from pydantic.v1 import BaseModel, Field, ValidationError  # type: ignore
+
 # import OpenAI client that jid already uses
 try:
     from openai import OpenAI
