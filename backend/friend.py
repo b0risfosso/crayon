@@ -178,7 +178,7 @@ def _open_jid_conn():
     return conn
 
 
-def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget, jid_conn):
+def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget):
     """
     model: "gpt-5-mini-2025-08-07"
     sys_msg: system prompt string
@@ -190,6 +190,7 @@ def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget, jid_co
 
     # check caps before call
     budget.check_before()
+
 
     resp = _client.responses.parse(
         model=model,
@@ -215,9 +216,11 @@ def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget, jid_co
 
     # token accounting
     try:
+        jid_conn = _open_jid_conn()
         usage = _usage_from_resp(resp)
         _record_llm_usage_by_model(jid_conn, model, usage)
         _record_llm_usage(jid_conn, usage)
+        jid_conn.commit()  # commit any inserts we just did into fantasia_cores
 
         total_used = (
             usage.get("total_tokens")
@@ -232,6 +235,8 @@ def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget, jid_co
     except Exception as e:
         # don't kill the job if usage logging had a hiccup
         log.warning("⚠️ usage logging failed: %s", e)
+    finally:
+        jid_conn.close()
 
     return parsed
 
@@ -287,6 +292,7 @@ def _ensure_core_present(fc_conn, jid_conn, core_id: int):
         WHERE id=?
     """, (core_id,)).fetchone()
 
+
     if not jid_row:
         raise RuntimeError(f"core {core_id} not found in fantasia_cores.db or jid.db")
 
@@ -321,8 +327,10 @@ def _ensure_core_present(fc_conn, jid_conn, core_id: int):
 
 
 
-def _load_core_state(fc_conn, core_id: int, jid_conn=None):
+def _load_core_state(fc_conn, core_id: int):
     # core
+
+    jid_conn = _open_jid_conn()
 
     if jid_conn is not None:
         core_row = _ensure_core_present(fc_conn, jid_conn, core_id)
@@ -334,6 +342,13 @@ def _load_core_state(fc_conn, core_id: int, jid_conn=None):
         """, (core_id,)).fetchone()
         if not core_row:
             raise RuntimeError(f"core {core_id} not found in fantasia_cores.db")
+
+    try:
+        jid_conn.commit()  # commit any inserts we just did into fantasia_cores
+    except:
+        pass
+    finally:
+        jid_conn.close()
 
     # domains
     dom_rows = fc_conn.execute("""
@@ -470,7 +485,7 @@ def build_thesis_prompt(core_row, domain_name, domain_desc, dimension_name, dime
     )
     return sys_msg, user_msg
 
-def _generate_domains_for_core(fc_conn, jid_conn, core_row, budget, model, force):
+def _generate_domains_for_core(fc_conn, core_row, budget, model, force):
     """
     Returns list of newly inserted domain_ids.
     """
@@ -490,7 +505,6 @@ def _generate_domains_for_core(fc_conn, jid_conn, core_row, budget, model, force
         user_msg=user_msg,
         OutSchema=PD_DomainArchitectOut,
         budget=budget,
-        jid_conn=jid_conn,
     )
     # parsed should be something like {groups:[{group_title, domains:[{name,desc,provider}, ...]}]}
 
@@ -513,7 +527,7 @@ def _generate_domains_for_core(fc_conn, jid_conn, core_row, budget, model, force
 
 
 
-def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
+def _generate_dimensions_and_theses(fc_conn, core_row, budget,
                                     model, force_dimensions, force_theses, email, R):
     core_id = int(core_row["id"])
     now = datetime.utcnow().isoformat() + "Z"
@@ -554,7 +568,6 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
                 user_msg=user_msg,
                 OutSchema=PDDimensionsResponse,
                 budget=budget,
-                jid_conn=jid_conn,
             )
             
 
@@ -612,7 +625,6 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
                 user_msg=user_msg,
                 OutSchema=PDThesis,
                 budget=budget,
-                jid_conn=jid_conn,
             )
 
             # thesis_parsed.text, thesis_parsed.provider, etc.
@@ -656,7 +668,6 @@ def _process_job(job: dict):
 
     # open DBs
     fc_conn  = _open_fc_conn()
-    jid_conn = _open_jid_conn()
 
     # build budget from jid.db (global usage tables)
     budget = _TokenBudget(JID_DB_PATH, model, live_cap, daily_cap)
@@ -674,7 +685,7 @@ def _process_job(job: dict):
 
     try:
         # load snapshot of this core
-        core_state = _load_core_state(fc_conn, core_id, jid_conn=jid_conn)
+        core_state = _load_core_state(fc_conn, core_id)
         core_row = core_state["core"]  # sqlite Row for fantasia_cores
 
         # generate domains (if missing / forced)
@@ -686,7 +697,6 @@ def _process_job(job: dict):
 
         new_domains = _generate_domains_for_core(
             fc_conn,
-            jid_conn,
             core_row,
             budget,
             model,
@@ -701,7 +711,6 @@ def _process_job(job: dict):
         # generate dimensions + theses
         _generate_dimensions_and_theses(
             fc_conn,
-            jid_conn,
             core_row,
             budget,
             model,
@@ -720,7 +729,6 @@ def _process_job(job: dict):
              by_model=usage_snapshot.get("by_model", {}))
 
         fc_conn.commit()
-        jid_conn.commit()
 
         R.ev("🏁 worker.complete",
              core_id=core_id,
@@ -728,7 +736,6 @@ def _process_job(job: dict):
 
     except Exception as e:
         fc_conn.rollback()
-        jid_conn.rollback()
         R.ev("💥 worker.error",
              core_id=core_id,
              error_type=type(e).__name__,
@@ -736,7 +743,6 @@ def _process_job(job: dict):
         log.error("worker error core_id=%s: %s", core_id, e, exc_info=True)
     finally:
         fc_conn.close()
-        jid_conn.close()
 
 
 @app.post("/enqueue-structure")
