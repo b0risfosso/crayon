@@ -619,7 +619,7 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
             t_id = _insert_thesis(
                 fc_conn,
                 dimension_id=dimension_id,
-                text=thesis_parsed.text,
+                text=thesis_parsed.thesis,
                 author_email=email,
                 provider=model,
                 created_at=now,
