@@ -159,12 +159,13 @@ class PD_DomainGroup(BaseModel):
 class PD_DomainArchitectOut(BaseModel):
     groups: list[PD_DomainGroup]
 
-class PD_DimensionItem(BaseModel):
-    name: str
-    description: str
+class PDDimension(BaseModel):
+    name: str = Field(..., description="Dimension name")
+    thesis: str = Field(..., description="1–2 sentence distilled thesis")
+    targets: List[str] = Field(..., min_length=3, max_length=6, description="Short target phrases")
 
 class PD_DimensionOut(BaseModel):
-    dimensions: list[PD_DimensionItem]
+    dimensions: list[PDDimension]
 
 class PD_ThesisOut(BaseModel):
     thesis: str
@@ -434,75 +435,79 @@ def _apply_fantasia_structure_schema(db_path: Path) -> None:
 
 
 def ensure_fantasia_db(db_path: str = FANTASIA_DB_PATH):
-    """
-    Create fantasia_cores.db and its tables if they don't exist.
-    This DB holds fantasia cores, domains, dimensions, theses only.
-    """
     conn = sqlite3.connect(db_path, timeout=30.0)
     try:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
 
-        # fantasia_cores table (1 row per core)
+        # cores table (unchanged)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS fantasia_cores (
-            id INTEGER PRIMARY KEY,
-            title TEXT,
+            id          INTEGER PRIMARY KEY,
+            title       TEXT,
             description TEXT,
-            rationale TEXT,
-            vision TEXT,
-            created_at TEXT
+            rationale   TEXT,
+            vision      TEXT,
+            created_at  TEXT
         )
         """)
 
-        # domains
+        # domain table (unchanged)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS fantasia_domain (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            core_id INTEGER NOT NULL,
-            name TEXT,
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            core_id     INTEGER NOT NULL,
+            name        TEXT,
             description TEXT,
             group_title TEXT,
-            provider TEXT,
-            created_at TEXT,
+            provider    TEXT,
+            created_at  TEXT,
             UNIQUE(core_id, name)
         )
         """)
 
-        # dimensions
+        # dimension table (original create, without targets)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS fantasia_dimension (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            domain_id INTEGER NOT NULL,
-            name TEXT,
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain_id   INTEGER NOT NULL,
+            name        TEXT,
             description TEXT,
-            provider TEXT,
-            created_at TEXT,
+            targets     TEXT,
+            provider    TEXT,
+            created_at  TEXT,
             UNIQUE(domain_id, name)
         )
         """)
 
-        # theses
+        # thesis table (unchanged)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS fantasia_thesis (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            dimension_id INTEGER NOT NULL,
-            text TEXT,
-            author_email TEXT,
-            provider TEXT,
-            created_at TEXT
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            dimension_id  INTEGER NOT NULL,
+            text          TEXT,
+            author_email  TEXT,
+            provider      TEXT,
+            created_at    TEXT
         )
         """)
 
-        # indexes to speed lookups
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_core ON fantasia_domain(core_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_dimension_domain ON fantasia_dimension(domain_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_dimension ON fantasia_thesis(dimension_id)")
+        # indexes
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_core        ON fantasia_domain(core_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_dimension_domain   ON fantasia_dimension(domain_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_dimension   ON fantasia_thesis(dimension_id)")
+
+        # ✅ NEW: ensure `targets` column exists even if table was created before we added it
+        cols = conn.execute("PRAGMA table_info(fantasia_dimension)").fetchall()
+        colnames = {c["name"] for c in cols}
+        if "targets" not in colnames:
+            conn.execute("ALTER TABLE fantasia_dimension ADD COLUMN targets TEXT")
 
         conn.commit()
     finally:
         conn.close()
+
 
 
 
@@ -2596,6 +2601,7 @@ def _fetch_core_full(conn, core_id: int):
                 m.id,
                 m.name,
                 m.description,
+                m.targets,
                 m.provider,
                 m.created_at
             FROM fantasia_dimension m
@@ -2609,6 +2615,7 @@ def _fetch_core_full(conn, core_id: int):
                 "id": dim_id,
                 "name": mrow["name"],
                 "description": mrow["description"],
+                "targets": mrow["targets"],
                 "provider": mrow["provider"],
                 "created_at": mrow["created_at"],
                 "theses": [],
