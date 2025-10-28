@@ -936,10 +936,10 @@ def ensure_db(db_path: Path) -> None:
         _init_llm_usage_table(conn)
         conn.commit()
 
-with sqlite3.connect(DB_PATH) as conn:
-    ensure_db(Path(DB_PATH))
-with sqlite3.connect(FANTASIA_DB_PATH) as conn:
-    ensure_db(Path(FANTASIA_DB_PATH))
+#with sqlite3.connect(DB_PATH) as conn:
+#    ensure_db(Path(DB_PATH))
+#with sqlite3.connect(FANTASIA_DB_PATH) as conn:
+#    ensure_db(Path(FANTASIA_DB_PATH))
 
 def insert_writings_rows(
     db_path: Path,
