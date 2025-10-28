@@ -458,7 +458,7 @@ def build_dimension_prompt(core_row, domain_name, domain_desc):
 
 def build_thesis_prompt(core_row, domain_name, domain_desc, dimension_name, dimension_desc, dimension_targets):
     sys_msg = THESIS_SYS_MSG
-    user_msg = user_msg = render_prompt(
+    user_msg = render_prompt(
         THESIS_USER_TEMPLATE,
         core_name=core_row["title"],
         core_description=core_row["description"],
@@ -466,7 +466,7 @@ def build_thesis_prompt(core_row, domain_name, domain_desc, dimension_name, dime
         domain_description=domain_desc,
         dimension_name=dimension_name,
         dimension_description=(dimension_desc or ""),
-        dimension_targets=(row["dimension_targets"] or ""),
+        dimension_targets=(dimension_targets or ""),
     )
     return sys_msg, user_msg
 
@@ -556,15 +556,17 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
                 budget=budget,
                 jid_conn=jid_conn,
             )
+            
 
             # dims_parsed.dimensions: [{name, description, provider}, ...]
             for dim in dims_parsed.dimensions:
+                targets_str = json.dumps(dim.targets)
                 dim_id = _insert_dimension(
                     fc_conn,
                     domain_id=domain_id,
                     name=dim.name,
                     description=dim.thesis,
-                    targets=dim.targets,
+                    targets=targets_str,
                     provider=model,
                     created_at=now,
                 )
