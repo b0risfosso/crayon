@@ -1163,12 +1163,11 @@ def _select_topics_for_vision(
         text_format=CuratedPlan,
     )
 
-    try:
-        usage = _usage_from_resp(resp)
+    usage = _usage_from_resp(resp)
 
-        def _usage_write_block(conn: sqlite3.Connection):
-            _record_llm_usage_by_model(conn, model, usage)
-            _record_llm_usage(conn, usage)
+    def _usage_write_block(conn: sqlite3.Connection):
+        _record_llm_usage_by_model(conn, model, usage)
+        _record_llm_usage(conn, usage)
 
     try:
         _with_retry_write(db_path, _usage_write_block)
