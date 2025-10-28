@@ -505,7 +505,7 @@ def _generate_domains_for_core(fc_conn, jid_conn, core_row, budget, model, force
                 name=d.name,
                 description=d.description,
                 group_title=gtitle,
-                provider=d.provider or model,
+                provider=model,
                 created_at=now,
             )
             created_ids.append(dom_id)
@@ -565,7 +565,7 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
                     name=dim.name,
                     description=dim.description,
                     targets=dim.targets,
-                    provider=dim.provider or model,
+                    provider=model,
                     created_at=now,
                 )
                 R.ev("💾 dimension.insert",
@@ -619,7 +619,7 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
                 dimension_id=dimension_id,
                 text=thesis_parsed.text,
                 author_email=email,
-                provider=thesis_parsed.provider or model,
+                provider=model,
                 created_at=now,
             )
             R.ev("💾 thesis.insert",
