@@ -48,6 +48,10 @@ try:
     _client = OpenAI()
 except Exception as _e:  # pragma: no cover
     pass
+
+import sqlite3, time, random, functools
+
+
 #    # If you need legacy fallback, wire it yourself. This app assumes new SDK.
 #    raise RuntimeError("OpenAI SDK with `responses.parse` is required.") from _e
 
@@ -864,7 +868,8 @@ def _today_for_model(db_path: Path, model: str) -> dict:
 # --- UPDATED: ensure_db now also creates processed_files table ---
 def ensure_db(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as conn:
+    conn = _connect_db(db_path)
+    try:
         cur = conn.cursor()
         cur.execute("PRAGMA journal_mode=WAL;")
         cur.execute("PRAGMA synchronous=NORMAL;")
@@ -935,6 +940,8 @@ def ensure_db(db_path: Path) -> None:
 
         _init_llm_usage_table(conn)
         conn.commit()
+    finally:
+        conn.close()
 
 #with sqlite3.connect(DB_PATH) as conn:
 #    ensure_db(Path(DB_PATH))
@@ -981,7 +988,8 @@ def file_already_processed(db_path: Path, path: Path) -> bool:
 # --- NEW: record that we processed this file state ---
 def mark_file_processed(db_path: Path, path: Path, run_id: str) -> None:
     size_bytes, mtime_ns = stat_fingerprint(path)
-    with sqlite3.connect(db_path) as conn:
+
+    def _block(conn: sqlite3.Connection):
         cur = conn.cursor()
         cur.execute(
             """
@@ -989,18 +997,17 @@ def mark_file_processed(db_path: Path, path: Path, run_id: str) -> None:
                 (path, size_bytes, mtime_ns, run_id, processed_at)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (str(path), size_bytes, mtime_ns, run_id, datetime.utcnow().isoformat() + "Z"),
+            (
+                str(path), size_bytes, mtime_ns, run_id,
+                datetime.utcnow().isoformat() + "Z",
+            ),
         )
-        conn.commit()
+    _with_retry_write(db_path, _block)
 
 
-def insert_fantasia_rows(db_path: Path, rows: list[tuple[str, str, str, str, str, Optional[str]]]) -> None:
-    """
-    rows: List of tuples (file_name, title, description, rationale, created_at, vision)
-    """
-    if not rows:
-        return
-    with sqlite3.connect(db_path) as conn:
+
+def insert_fantasia_rows(db_path: Path, rows: list[tuple]):
+    def _block(conn: sqlite3.Connection):
         cur = conn.cursor()
         cur.executemany(
             """
@@ -1009,16 +1016,69 @@ def insert_fantasia_rows(db_path: Path, rows: list[tuple[str, str, str, str, str
             """,
             rows,
         )
-        conn.commit()
+    _with_retry_write(db_path, _block)
+
+
+
+def _connect_db(db_path: Path) -> sqlite3.Connection:
+    """
+    Open a sqlite3 connection with WAL mode and a sane busy timeout.
+    Every place that writes to the DB should use this instead of
+    bare sqlite3.connect.
+    """
+    # timeout here is how long sqlite3 will wait on a locked db
+    conn = sqlite3.connect(db_path, timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    # WAL improves concurrent readers/writers
+    cur.execute("PRAGMA journal_mode=WAL;")
+    cur.execute("PRAGMA synchronous=NORMAL;")
+    # busy_timeout is per-connection in SQLite itself (ms). belt + suspenders.
+    cur.execute("PRAGMA busy_timeout=5000;")
+    return conn
+
+
+def _with_retry_write(db_path: Path, fn, max_attempts: int = 8):
+    """
+    Run a block that does write(s) in a single connection/transaction.
+    Retries if we hit `database is locked`.
+    `fn` receives the live sqlite3.Connection.
+    """
+    attempt = 0
+    while True:
+        try:
+            conn = _connect_db(db_path)
+            try:
+                result = fn(conn)
+                conn.commit()
+                return result
+            finally:
+                conn.close()
+        except sqlite3.OperationalError as e:
+            msg = str(e).lower()
+            if "database is locked" in msg or "database is busy" in msg:
+                attempt += 1
+                if attempt >= max_attempts:
+                    # give up, surface the error
+                    raise
+                # exponential backoff + jitter to desynchronize workers
+                sleep_s = (0.05 * (2 ** attempt)) + random.random() * 0.05
+                time.sleep(sleep_s)
+                continue
+            else:
+                # unrelated sqlite error -> raise
+                raise
+
 
 
 def mark_writing_vision_done(db_path: Path, writing_id: int, vision: str) -> None:
-    with sqlite3.connect(db_path) as conn:
+    def _block(conn: sqlite3.Connection):
         conn.execute(
             "INSERT OR IGNORE INTO writing_vision_done (writing_id, vision, done_at) VALUES (?, ?, ?)",
             (writing_id, vision, datetime.utcnow().isoformat() + "Z"),
         )
-        conn.commit()
+    _with_retry_write(db_path, _block)
+
 
 def writing_vision_already_done(db_path: Path, writing_id: int, vision: str) -> bool:
     with sqlite3.connect(db_path) as conn:
@@ -1105,9 +1165,13 @@ def _select_topics_for_vision(
 
     try:
         usage = _usage_from_resp(resp)
-        with sqlite3.connect(db_path) as conn:
-            _record_llm_usage_by_model(conn, model, usage)  # per-model totals
-            _record_llm_usage(conn, usage)                  # global totals
+
+        def _usage_write_block(conn: sqlite3.Connection):
+        _record_llm_usage_by_model(conn, model, usage)
+        _record_llm_usage(conn, usage)
+
+    try:
+        _with_retry_write(db_path, _usage_write_block)
         log.debug("Curator usage recorded: %s", usage)
     except Exception as ue:
         log.warning("curator usage accounting failed: %s", ue)
@@ -1158,7 +1222,7 @@ def _commission_single_writing(topic: str, description: str, model_write: str, d
     writing = getattr(resp, "output_text", None) or getattr(resp, "text", None) or "[No content returned]"
     created_at = datetime.utcnow().isoformat() + "Z"
 
-    with sqlite3.connect(db_path) as conn:
+    def _commit_block(conn: sqlite3.Connection):
         cur = conn.cursor()
         cur.execute(
             """
@@ -1169,7 +1233,7 @@ def _commission_single_writing(topic: str, description: str, model_write: str, d
         )
         wid = cur.lastrowid
 
-        # usage accounting (best-effort)
+        # usage accounting inside same transaction
         try:
             usage = _usage_from_resp(resp)
             _record_llm_usage_by_model(conn, model_write, usage)
@@ -1177,9 +1241,11 @@ def _commission_single_writing(topic: str, description: str, model_write: str, d
         except Exception as ue:
             log.warning(f"usage accounting failed: {ue}")
 
-        conn.commit()
-
+        # return data for outer scope
         return (wid, topic, description, writing)
+
+    row = _with_retry_write(db_path, _commit_block)
+    return row
 
 # --- Structured logging helper (keeps your emoji style) ---
 def _log_event(event: str, **fields):

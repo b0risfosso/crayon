@@ -88,14 +88,21 @@ try:
 except Exception as _e:  # pragma: no cover
     pass
 
+from time import sleep
+
+TOKEN_CHECK_INTERVAL = 60  # seconds between token-limit rechecks
+
+
 log = logging.getLogger("jid_friend")
 logging.basicConfig(level=logging.INFO)
 
 app = Flask("jid-friend")
 
+_WORKER_COUNT = 4 
+
 _fantasia_job_queue = queue.Queue()
 _fantasia_job_seen  = set()          # core_ids currently queued or in progress
-_fantasia_worker_started = False
+_fantasia_workers_started = 0
 _fantasia_worker_lock = threading.Lock()
 
 
@@ -123,34 +130,57 @@ class PDThesis(BaseModel):
     thesis: str = Field(..., description="Precise thesis. 2-3 sentences")
 
 
-def _maybe_start_worker():
-    global _fantasia_worker_started
-    with _fantasia_worker_lock:
-        if _fantasia_worker_started:
-            return
-        t = threading.Thread(
-            target=_fantasia_worker_loop,
-            name="fantasia-worker-loop",
-            daemon=True,
-        )
-        t.start()
-        _fantasia_worker_started = True
-        log.info("🌙 fantasia-worker loop started")
-
-
-def _fantasia_worker_loop():
+def _worker_thread_loop():
     while True:
-        job = _fantasia_job_queue.get()  # blocking call
-        core_id = job["core_id"]
+        job = _fantasia_job_queue.get()  # blocking wait for next job
+        core_id = job.get("core_id")
+        model = job.get("model", "gpt-5-mini-2025-08-07")
+        daily_cap = int(job.get("daily_cap", 10_000_000))
+
         try:
+            # --- Token Guard ---
+            # Check current token usage for this model in jid.db
+            usage_today = _today_for_model(JID_DB_PATH, model)
+            used_total = usage_today.get("total", 0)
+
+            if used_total >= daily_cap:
+                log.warning(
+                    f"⏸️ Token guard: {model} used {used_total}/{daily_cap} tokens today. "
+                    "Pausing queue."
+                )
+                # Put job back into queue head
+                _fantasia_job_queue.put(job)
+                _fantasia_job_queue.task_done()
+                # Sleep before retrying
+                sleep(TOKEN_CHECK_INTERVAL)
+                continue
+
+            # --- Safe to process ---
             _process_job(job)
+
         except Exception as e:
             log.error("💥 worker error core_id=%s: %s", core_id, e, exc_info=True)
         finally:
-            # allow this core to be scheduled again in future
+            # free this core for future enqueueing regardless of result
             _fantasia_job_seen.discard(core_id)
             _fantasia_job_queue.task_done()
 
+
+def _maybe_start_worker_pool():
+    global _fantasia_workers_started
+    with _fantasia_worker_lock:
+        if _fantasia_workers_started >= _WORKER_COUNT:
+            return
+        # spin up remaining workers
+        while _fantasia_workers_started < _WORKER_COUNT:
+            t = threading.Thread(
+                target=_worker_thread_loop,
+                name=f"fantasia-worker-{_fantasia_workers_started}",
+                daemon=True,
+            )
+            t.start()
+            _fantasia_workers_started += 1
+        log.info("🌙 started %d fantasia workers", _fantasia_workers_started)
 
 def _open_fc_conn():
     """
@@ -215,8 +245,8 @@ def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget):
         parsed = OutSchema.model_validate(parsed)
 
     # token accounting
+    jid_conn = _open_jid_conn()
     try:
-        jid_conn = _open_jid_conn()
         usage = _usage_from_resp(resp)
         _record_llm_usage_by_model(jid_conn, model, usage)
         _record_llm_usage(jid_conn, usage)
@@ -239,6 +269,47 @@ def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget):
         jid_conn.close()
 
     return parsed
+
+
+def _openai_text(*, model, sys_msg, user_msg, budget, jid_conn):
+    """
+    Light wrapper for text-only generations (no Pydantic parse).
+    Still logs usage and enforces budget.
+    Returns raw text string.
+    """
+    # budget check before call
+    budget.check_before()
+
+    resp = _client.responses.create(
+        model=model,
+        input=[
+            {"role": "system", "content": sys_msg},
+            {"role": "user",  "content": user_msg},
+        ],
+    )
+
+    # extract text
+    raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
+
+    # token accounting + commit
+    try:
+        usage = _usage_from_resp(resp)
+        _record_llm_usage_by_model(jid_conn, model, usage)
+        _record_llm_usage(jid_conn, usage)
+
+        total_used = (
+            usage.get("total_tokens")
+            or (usage.get("input_tokens", 0) + usage.get("output_tokens", 0))
+            or 0
+        )
+        budget.live_used += total_used
+
+        budget.check_before()
+    except Exception as e:
+        log.warning("⚠️ usage logging failed (sim world): %s", e)
+
+    return raw_text
+
 
 def upsert_core_into_fantasia_db(core_id, title, description, rationale, vision, created_at=None):
     from pathlib import Path
@@ -326,96 +397,82 @@ def _ensure_core_present(fc_conn, jid_conn, core_id: int):
     """, (core_id,)).fetchone()
 
 
-
-def _load_core_state(fc_conn, core_id: int):
-    # core
-
-    jid_conn = _open_jid_conn()
-
-    if jid_conn is not None:
-        core_row = _ensure_core_present(fc_conn, jid_conn, core_id)
-    else:
-        core_row = fc_conn.execute("""
-            SELECT id, title, description, rationale, vision, created_at
-            FROM fantasia_cores
-            WHERE id=?
-        """, (core_id,)).fetchone()
-        if not core_row:
-            raise RuntimeError(f"core {core_id} not found in fantasia_cores.db")
-
+def load_core_state(core_id: int):
+    """
+    Return (core_row, domain_states) just like _load_core_state used to,
+    but open/close fc_conn and jid_conn inside.
+    """
+    fc_conn = _open_fc_conn()
     try:
-        jid_conn.commit()  # commit any inserts we just did into fantasia_cores
-    except:
-        pass
+        # short-lived jid_conn just to ensure hydration
+        jid_conn = _open_jid_conn()
+        try:
+            core_row = _ensure_core_present(fc_conn, jid_conn, core_id)
+            jid_conn.commit()
+        finally:
+            jid_conn.close()
+
+        # pull domains, dims, theses (same logic you already have)
+        dom_rows = fc_conn.execute("""
+            SELECT id, name, description, group_title, provider, created_at
+            FROM fantasia_domain
+            WHERE core_id=?
+            ORDER BY id ASC
+        """, (core_id,)).fetchall()
+
+        dom_ids = [int(r["id"]) for r in dom_rows]
+        if dom_ids:
+            qmarks = ",".join("?" for _ in dom_ids)
+            dim_rows = fc_conn.execute(f"""
+                SELECT id, domain_id, name, description, provider, created_at
+                FROM fantasia_dimension
+                WHERE domain_id IN ({qmarks})
+                ORDER BY id ASC
+            """, dom_ids).fetchall()
+        else:
+            dim_rows = []
+
+        dim_ids = [int(r["id"]) for r in dim_rows]
+        if dim_ids:
+            qmarks = ",".join("?" for _ in dim_ids)
+            th_rows = fc_conn.execute(f"""
+                SELECT id, dimension_id, text, author_email, provider, created_at
+                FROM fantasia_thesis
+                WHERE dimension_id IN ({qmarks})
+                ORDER BY id ASC
+            """, dim_ids).fetchall()
+        else:
+            th_rows = []
+
+        # organize
+        dims_by_domain = {}
+        for d in dim_rows:
+            dims_by_domain.setdefault(int(d["domain_id"]), []).append(d)
+
+        thesis_by_dim = {}
+        for t in th_rows:
+            thesis_by_dim.setdefault(int(t["dimension_id"]), []).append(t)
+
+        domain_states = []
+        for dom in dom_rows:
+            d_id = int(dom["id"])
+            dims = dims_by_domain.get(d_id, [])
+            dom_state = {
+                "domain_row": dom,
+                "dimensions": [],
+            }
+            for dim in dims:
+                dim_id = int(dim["id"])
+                theses = thesis_by_dim.get(dim_id, [])
+                dom_state["dimensions"].append({
+                    "dimension_row": dim,
+                    "theses": theses,
+                })
+            domain_states.append(dom_state)
+
+        return core_row, domain_states
     finally:
-        jid_conn.close()
-
-    # domains
-    dom_rows = fc_conn.execute("""
-        SELECT id, name, description, group_title, provider, created_at
-        FROM fantasia_domain
-        WHERE core_id=?
-        ORDER BY id ASC
-    """, (core_id,)).fetchall()
-
-    # dimensions (for all domain ids)
-    dom_ids = [int(r["id"]) for r in dom_rows]
-    dim_rows = []
-    if dom_ids:
-        qmarks = ",".join("?" for _ in dom_ids)
-        dim_rows = fc_conn.execute(f"""
-            SELECT id, domain_id, name, description, provider, created_at
-            FROM fantasia_dimension
-            WHERE domain_id IN ({qmarks})
-            ORDER BY id ASC
-        """, dom_ids).fetchall()
-
-    # theses (for all dimension ids)
-    dim_ids = [int(r["id"]) for r in dim_rows]
-    th_rows = []
-    if dim_ids:
-        qmarks = ",".join("?" for _ in dim_ids)
-        th_rows = fc_conn.execute(f"""
-            SELECT id, dimension_id, text, author_email, provider, created_at
-            FROM fantasia_thesis
-            WHERE dimension_id IN ({qmarks})
-            ORDER BY id ASC
-        """, dim_ids).fetchall()
-
-    # Organize for convenience:
-    dims_by_domain = {}
-    for d in dim_rows:
-        dims_by_domain.setdefault(int(d["domain_id"]), []).append(d)
-
-    thesis_by_dim = {}
-    for t in th_rows:
-        thesis_by_dim.setdefault(int(t["dimension_id"]), []).append(t)
-
-    # Boolean summary
-    has_domains = len(dom_rows) > 0
-
-    domain_states = []
-    for dom in dom_rows:
-        d_id = int(dom["id"])
-        dims = dims_by_domain.get(d_id, [])
-        dom_state = {
-            "domain_row": dom,
-            "dimensions": [],
-        }
-        for dim in dims:
-            dim_id = int(dim["id"])
-            theses = thesis_by_dim.get(dim_id, [])
-            dom_state["dimensions"].append({
-                "dimension_row": dim,
-                "theses": theses,
-            })
-        domain_states.append(dom_state)
-
-    return {
-        "core": core_row,
-        "domains": domain_states,
-        "has_domains": has_domains,
-    }
+        fc_conn.close()
 
 
 def _insert_domain(fc_conn, core_id, name, description, group_title, provider, created_at):
@@ -438,6 +495,101 @@ def _insert_thesis(fc_conn, dimension_id, text, author_email, provider, created_
         VALUES (?, ?, ?, ?, ?)
     """, (dimension_id, text, author_email, provider, created_at))
     return cur.lastrowid
+
+def insert_domains_for_core(core_id: int, domains_to_insert, provider_model: str, run_logger):
+    """
+    domains_to_insert = [
+      {"group_title": gtitle, "name": dname, "description": ddesc},
+      ...
+    ]
+    """
+    now = datetime.utcnow().isoformat() + "Z"
+    fc_conn = _open_fc_conn()
+    try:
+        created_ids = []
+        for dom in domains_to_insert:
+            cur_id = _insert_domain(
+                fc_conn,
+                core_id=core_id,
+                name=dom["name"],
+                description=dom["description"],
+                group_title=dom["group_title"],
+                provider=provider_model,
+                created_at=now,
+            )
+            created_ids.append(cur_id)
+            run_logger.ev("💾 domain.insert",
+                          core_id=core_id,
+                          domain_id=cur_id,
+                          name_preview=dom["name"][:80])
+        fc_conn.commit()
+        return created_ids
+    except Exception:
+        fc_conn.rollback()
+        raise
+    finally:
+        fc_conn.close()
+
+
+def insert_dimensions_for_domain(domain_id: int, dims_to_insert, provider_model: str, run_logger, core_id: int):
+    """
+    dims_to_insert = [
+      {"name": ..., "thesis": ..., "targets": [...]},
+      ...
+    ]
+    """
+    now = datetime.utcnow().isoformat() + "Z"
+    fc_conn = _open_fc_conn()
+    try:
+        for dim in dims_to_insert:
+            targets_str = json.dumps(dim["targets"])
+            dim_id = _insert_dimension(
+                fc_conn,
+                domain_id=domain_id,
+                name=dim["name"],
+                description=dim["thesis"],
+                targets=targets_str,
+                provider=provider_model,
+                created_at=now,
+            )
+            run_logger.ev("💾 dimension.insert",
+                          core_id=core_id,
+                          domain_id=domain_id,
+                          dimension_id=dim_id,
+                          name_preview=dim["name"][:80])
+        fc_conn.commit()
+    except Exception:
+        fc_conn.rollback()
+        raise
+    finally:
+        fc_conn.close()
+
+
+def insert_thesis_for_dimension(dimension_id: int, thesis_text: str, provider_model: str, author_email: str|None, run_logger, core_id: int, domain_id: int):
+    now = datetime.utcnow().isoformat() + "Z"
+    fc_conn = _open_fc_conn()
+    try:
+        t_id = _insert_thesis(
+            fc_conn,
+            dimension_id=dimension_id,
+            text=thesis_text,
+            author_email=author_email,
+            provider=provider_model,
+            created_at=now,
+        )
+        run_logger.ev("💾 thesis.insert",
+                      core_id=core_id,
+                      domain_id=domain_id,
+                      dimension_id=dimension_id,
+                      thesis_id=t_id,
+                      text_preview=thesis_text[:120])
+        fc_conn.commit()
+    except Exception:
+        fc_conn.rollback()
+        raise
+    finally:
+        fc_conn.close()
+
 
 def render_prompt(template: str, **vars) -> str:
     """
@@ -644,19 +796,69 @@ def _generate_dimensions_and_theses(fc_conn, core_row, budget,
                  text_preview=thesis_parsed.thesis[:120])
 
 
-def _process_job(job: dict):
+def _get_random_core_ids_for_visions(
+    visions: list[str],
+    n: int,
+) -> list[int]:
     """
-    job fields:
-      core_id: int
-      email: str|None
-      model: str
-      force_domains: bool
-      force_dimensions: bool
-      force_theses: bool
-      live_cap: int
-      daily_cap: int
-    """
+    visions: list of vision TEXT values (strings, exactly as stored in fantasia_cores.vision in jid.db)
+    n: number to randomly sample per vision
 
+    Returns a flat list of unique core_ids (ints).
+    """
+    jid_conn = _open_jid_conn()
+    try:
+        jid_conn.row_factory = sqlite3.Row
+        chosen_core_ids = set()
+
+        for v_text in visions:
+            if v_text is None:
+                continue
+            v_text_clean = v_text.strip()
+            if v_text_clean == "":
+                # we should still support "" because you DO allow empty vision in dashboard
+                pass
+
+            rows = jid_conn.execute(
+                """
+                SELECT id
+                FROM fantasia_cores
+                WHERE vision = ?
+            """,
+                (v_text_clean,),
+            ).fetchall()
+
+            all_ids = [int(r["id"]) for r in rows]
+            if not all_ids:
+                continue
+
+            # sample up to n
+            if len(all_ids) <= n:
+                sample_ids = all_ids
+            else:
+                sample_ids = random.sample(all_ids, n)
+
+            for cid in sample_ids:
+                chosen_core_ids.add(cid)
+
+        return list(chosen_core_ids)
+    finally:
+        jid_conn.close()
+
+
+def _core_needs_structure(fc_conn, core_id: int) -> bool:
+    """
+    Return True if this core_id looks unstructured (no domains yet).
+    Return False if at least one domain already exists.
+    """
+    row = fc_conn.execute(
+        "SELECT id FROM fantasia_domain WHERE core_id=? LIMIT 1",
+        (core_id,)
+    ).fetchone()
+    return (row is None)
+
+
+def _process_job(job: dict):
     core_id         = int(job["core_id"])
     email           = job.get("email")
     model           = job.get("model", "gpt-5-mini-2025-08-07")
@@ -666,145 +868,297 @@ def _process_job(job: dict):
     live_cap        = int(job.get("live_cap", 3_000_000))
     daily_cap       = int(job.get("daily_cap", 10_000_000))
 
-    # open DBs
-    fc_conn  = _open_fc_conn()
-
-    # build budget from jid.db (global usage tables)
+    # jid_conn is only needed for token accounting, and we'll commit/close quickly after each LLM call
+    # So: open it when calling LLM, not for the whole job.
+    # Budget still needs to read jid.db snapshot first:
     budget = _TokenBudget(JID_DB_PATH, model, live_cap, daily_cap)
 
     run_id = short_hash(f"{core_id}|{time.time()}|{model}")
     R = RunLogger(run_id)
-    R.ev("🟢 worker.begin",
+    R.ev("🟢 worker.begin", core_id=core_id, model=model, force_domains=force_domains,
+         force_dimensions=force_dimensions, force_theses=force_theses,
+         live_cap=live_cap, daily_cap=daily_cap)
+
+    # 1. Snapshot current state
+    core_row, domain_states = load_core_state(core_id)
+    has_domains = len(domain_states) > 0
+
+    R.ev("📜 domain.inventory",
          core_id=core_id,
-         model=model,
+         has_domains=has_domains,
          force_domains=force_domains,
-         force_dimensions=force_dimensions,
-         force_theses=force_theses,
-         live_cap=live_cap,
-         daily_cap=daily_cap)
+         live_used=budget.live_used)
 
-    try:
-        # load snapshot of this core
-        core_state = _load_core_state(fc_conn, core_id)
-        core_row = core_state["core"]  # sqlite Row for fantasia_cores
+    # 2. Maybe generate domains (LLM, no DB hold)
+    new_domain_defs = []  # list of {"group_title", "name", "description"}
+    if force_domains or not has_domains:
+        sys_msg, user_msg = build_domain_prompt(core_row)
 
-        # generate domains (if missing / forced)
-        R.ev("📜 domain.inventory",
-             core_id=core_id,
-             has_domains=core_state["has_domains"],
-             force_domains=force_domains,
-             live_used=budget.live_used)
+        try:
+            parsed = _openai_parse_guarded(
+                model=model,
+                sys_msg=sys_msg,
+                user_msg=user_msg,
+                OutSchema=PD_DomainArchitectOut,
+                budget=budget,
+            )
 
-        new_domains = _generate_domains_for_core(
-            fc_conn,
-            core_row,
-            budget,
-            model,
-            force_domains
-        )
+        # flatten parsed.groups into new_domain_defs
+        for group in parsed.groups:
+            gtitle = group.title
+            for d in group.domains:
+                new_domain_defs.append({
+                    "group_title": gtitle,
+                    "name": d.name,
+                    "description": d.description,
+                })
 
-        R.ev("✅ llm.domains.parsed",
-             core_id=core_id,
-             groups=len(new_domains or []),
-             live_used=budget.live_used)
+        # write them
+        if new_domain_defs:
+            created_ids = insert_domains_for_core(core_id, new_domain_defs, model, R)
+            R.ev("✅ llm.domains.parsed",
+                 core_id=core_id,
+                 groups=len(created_ids),
+                 live_used=budget.live_used)
 
-        # generate dimensions + theses
-        _generate_dimensions_and_theses(
-            fc_conn,
-            core_row,
-            budget,
-            model,
-            force_dimensions,
-            force_theses,
-            email,
-            R
-        )
+        # refresh snapshot after insert so we know real domain IDs
+        core_row, domain_states = load_core_state(core_id)
 
-        # snapshot usage
-        usage_snapshot = _read_usage_snapshot(JID_DB_PATH)
+    # 3. For each domain, maybe generate dimensions and theses
+    for dom_state in domain_states:
+        dom_row = dom_state["domain_row"]
+        domain_id = int(dom_row["id"])
+        domain_name = dom_row["name"] or ""
+        domain_desc = dom_row["description"] or ""
 
-        R.ev("📊 worker.usage.end",
-             core_id=core_id,
-             live_used=budget.live_used,
-             by_model=usage_snapshot.get("by_model", {}))
+        dims_existing = dom_state["dimensions"]  # from snapshot
 
-        fc_conn.commit()
+        # generate dimensions?
+        need_dims = force_dimensions or (len(dims_existing) == 0)
+        if need_dims:
+            R.ev("🤖 llm.dimensions.begin",
+                 core_id=core_id,
+                 domain_id=domain_id,
+                 live_used=budget.live_used)
 
-        R.ev("🏁 worker.complete",
-             core_id=core_id,
-             live_used=budget.live_used)
+            sys_msg, user_msg = build_dimension_prompt(core_row, domain_name, domain_desc)
 
-    except Exception as e:
-        fc_conn.rollback()
-        R.ev("💥 worker.error",
-             core_id=core_id,
-             error_type=type(e).__name__,
-             error=str(e))
-        log.error("worker error core_id=%s: %s", core_id, e, exc_info=True)
-    finally:
-        fc_conn.close()
+            try:
+                dims_parsed = _openai_parse_guarded(
+                    model=model,
+                    sys_msg=sys_msg,
+                    user_msg=user_msg,
+                    OutSchema=PDDimensionsResponse,
+                    budget=budget,
+                )
+
+            # insert dimensions
+            dims_to_insert = []
+            for dim in dims_parsed.dimensions:
+                dims_to_insert.append({
+                    "name": dim.name,
+                    "thesis": dim.thesis,
+                    "targets": dim.targets,
+                })
+
+            if dims_to_insert:
+                insert_dimensions_for_domain(domain_id, dims_to_insert, model, R, core_id)
+
+            # refresh snapshot for this domain (so we know dim ids for thesis gen)
+            core_row2, domain_states2 = load_core_state(core_id)
+            # find this same domain again
+            dom_state = next(d for d in domain_states2
+                             if int(d["domain_row"]["id"]) == domain_id)
+            dims_existing = dom_state["dimensions"]
+
+        # now handle theses per dimension
+        for dim_state in dims_existing:
+            dim_row = dim_state["dimension_row"]
+            dimension_id = int(dim_row["id"])
+            dim_name = dim_row["name"] or ""
+            dim_desc = dim_row["description"] or ""
+            dim_targets = dim_row.get("targets", "") if hasattr(dim_row, "keys") else ""
+
+            has_thesis = len(dim_state["theses"]) > 0
+            if has_thesis and not force_theses:
+                continue
+
+            R.ev("🤖 llm.thesis.begin",
+                 core_id=core_id,
+                 domain_id=domain_id,
+                 dimension_id=dimension_id,
+                 model=model,
+                 live_used=budget.live_used)
+
+            sys_msg, user_msg = build_thesis_prompt(
+                core_row,
+                domain_name,
+                domain_desc,
+                dim_name,
+                dim_desc,
+                dim_targets,
+            )
+
+            try:
+                thesis_parsed = _openai_parse_guarded(
+                    model=model,
+                    sys_msg=sys_msg,
+                    user_msg=user_msg,
+                    OutSchema=PDThesis,
+                    budget=budget,
+                )
+
+            insert_thesis_for_dimension(
+                dimension_id,
+                thesis_parsed.thesis,
+                model,
+                email,
+                R,
+                core_id,
+                domain_id,
+            )
+
+    # usage snapshot (still needs jid.db, but read-only)
+    usage_snapshot = _read_usage_snapshot(JID_DB_PATH)
+
+    R.ev("📊 worker.usage.end",
+         core_id=core_id,
+         live_used=budget.live_used,
+         by_model=usage_snapshot.get("by_model", {}))
+
+    R.ev("🏁 worker.complete",
+         core_id=core_id,
+         live_used=budget.live_used)
 
 
 @app.post("/enqueue-structure")
 def enqueue_structure():
     """
-    Accepts:
-    {
-      "core_id": 123,
-      "email": "boris@fantasiagenesis.com",
-      "model": "gpt-5-mini-2025-08-07",
-      "force_domains": false,
-      "force_dimensions": false,
-      "force_theses": false
-    }
-    OR
+    Accepts either:
+    OLD STYLE:
     {
       "core_ids": [123,124,125],
       "email": "...",
-      ...
+      "model": "gpt-5-mini-2025-08-07",
+      "force_domains": false,
+      "force_dimensions": false,
+      "force_theses": false,
+      "force_core": false,
+      "live_cap": 3000000,
+      "daily_cap": 10000000
     }
 
-    Adds each core_id to the job queue (if not already queued).
-    Starts the worker thread if not running.
-    Returns list of enqueued vs skipped.
+    NEW STYLE:
+    {
+      "visions": ["acquiring a billion dollars", "learning to see love as resonant recognition"],
+      "n": 5,
+      "email": "...",
+      "model": "gpt-5-mini-2025-08-07",
+      "force_domains": false,
+      "force_dimensions": false,
+      "force_theses": false,
+      "force_core": false,
+      "live_cap": 3000000,
+      "daily_cap": 10000000
+    }
+
+    Behavior:
+    - For each vision string, randomly sample up to n fantasia_cores from jid.db (DB_PATH_DEFAULT).
+    - If force_core==False, skip cores that already have at least one domain in fantasia_cores.db.
+    - Enqueue the rest unless they're already queued.
     """
+
     data = request.get_json(silent=True) or {}
 
-    # normalize list of core_ids
-    core_ids = []
+    force_core        = bool(data.get("force_core", False))
+    force_domains     = bool(data.get("force_domains", False))
+    force_dimensions  = bool(data.get("force_dimensions", False))
+    force_theses      = bool(data.get("force_theses", False))
+    email             = data.get("email")
+    model             = data.get("model", "gpt-5-mini-2025-08-07")
+    live_cap          = int(data.get("live_cap", 3_000_000))
+    daily_cap         = int(data.get("daily_cap", 10_000_000))
+
+    # ---- 1. Resolve which core_ids we want ----
+
+    final_core_ids = set()
+
+    # A) explicit core_ids (backward compatible)
     if isinstance(data.get("core_ids"), list):
         for cid in data["core_ids"]:
             try:
-                core_ids.append(int(cid))
+                final_core_ids.add(int(cid))
             except Exception:
                 pass
-    elif "core_id" in data:
-        try:
-            core_ids.append(int(data["core_id"]))
-        except Exception:
-            pass
 
-    if not core_ids:
+    # B) visions + n
+    if isinstance(data.get("visions"), list) and data["visions"]:
+        # n must be >=1
+        try:
+            n = int(data.get("n", 0))
+        except Exception:
+            n = 0
+        if n < 1:
+            n = 1
+
+        # Clean/normalize visions to strings
+        vision_strings = []
+        for v in data["visions"]:
+            if v is None:
+                continue
+            vs = str(v).strip()
+            # Important: your data model absolutely includes empty-string vision ("")
+            # and may include None. We will include "" but skip None.
+            vision_strings.append(vs)
+
+        sampled_ids = _get_random_core_ids_for_visions(vision_strings, n)
+        for cid in sampled_ids:
+            final_core_ids.add(int(cid))
+
+    final_core_ids = list(final_core_ids)
+
+    if not final_core_ids:
         return jsonify({"ok": False, "error": "no_core_ids"}), 400
 
-    job_opts = {
-        "email": data.get("email"),
-        "model": data.get("model", "gpt-5-mini-2025-08-07"),
-        "force_domains": bool(data.get("force_domains", False)),
-        "force_dimensions": bool(data.get("force_dimensions", False)),
-        "force_theses": bool(data.get("force_theses", False)),
-        "live_cap": 3_000_000,
-        "daily_cap": 10_000_000,
-    }
+    # ---- 2. Filter by "already structured" unless force_core is True ----
+
+    fc_conn = _open_fc_conn()
+    try:
+        core_ids_to_enqueue = []
+        skipped_already_structured = []
+
+        for cid in final_core_ids:
+            if force_core:
+                core_ids_to_enqueue.append(cid)
+                continue
+
+            if _core_needs_structure(fc_conn, cid):
+                core_ids_to_enqueue.append(cid)
+            else:
+                skipped_already_structured.append(cid)
+    finally:
+        fc_conn.close()
+
+    # ---- 3. Enqueue jobs the same way as before ----
+
+    _maybe_start_worker_pool()
 
     enqueued = []
-    skipped  = []
+    skipped_already_queued = []
 
-    _maybe_start_worker()
+    job_opts = {
+        "email": email,
+        "model": model,
+        "force_domains": force_domains,
+        "force_dimensions": force_dimensions,
+        "force_theses": force_theses,
+        "live_cap": live_cap,
+        "daily_cap": daily_cap,
+    }
 
-    for cid in core_ids:
+    for cid in core_ids_to_enqueue:
         if cid in _fantasia_job_seen:
-            skipped.append(cid)
+            skipped_already_queued.append(cid)
             continue
 
         job = {
@@ -818,6 +1172,7 @@ def enqueue_structure():
     return jsonify({
         "ok": True,
         "enqueued": enqueued,
-        "skipped_already_queued": skipped,
+        "skipped_already_structured": skipped_already_structured,
+        "skipped_already_queued": skipped_already_queued,
         "queue_length": _fantasia_job_queue.qsize(),
     }), 202
