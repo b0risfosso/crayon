@@ -42,7 +42,12 @@ from crayon_prompts import (
 )
 
 # import OpenAI client that jid already uses
-from jid import _client  # your configured OpenAI client
+try:
+    from openai import OpenAI
+    _OPENAI_STYLE = "new"
+    _client = OpenAI()
+except Exception as _e:  # pragma: no cover
+    pass
 
 log = logging.getLogger("jid_friend")
 logging.basicConfig(level=logging.INFO)
