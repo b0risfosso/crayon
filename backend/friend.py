@@ -235,19 +235,105 @@ def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget, jid_co
 
     return parsed
 
+def upsert_core_into_fantasia_db(core_id, title, description, rationale, vision, created_at=None):
+    from pathlib import Path
+    import sqlite3
+    from datetime import datetime
 
-def _load_core_state(fc_conn, core_id: int):
-    # core
-    core_row = fc_conn.execute("""
+    if created_at is None:
+        created_at = datetime.utcnow().isoformat() + "Z"
+
+    # open fantasia_cores.db
+    conn = sqlite3.connect(FANTASIA_DB_PATH, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+
+    try:
+        # ensure DB/tables exist and any migrations are applied
+        ensure_fantasia_db(FANTASIA_DB_PATH)
+
+        # insert OR replace the core row
+        conn.execute("""
+            INSERT INTO fantasia_cores (id, title, description, rationale, vision, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title=excluded.title,
+                description=excluded.description,
+                rationale=excluded.rationale,
+                vision=excluded.vision
+        """, (core_id, title, description, rationale, vision, created_at))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _ensure_core_present(fc_conn, jid_conn, core_id: int):
+    # first try fantasia_cores.db
+    row = fc_conn.execute("""
         SELECT id, title, description, rationale, vision, created_at
         FROM fantasia_cores
         WHERE id=?
     """, (core_id,)).fetchone()
 
-    if not core_row:
-        # You could choose to create a stub core row here if missing,
-        # but for now let's treat "no such core" as an error.
-        raise RuntimeError(f"core {core_id} not found in fantasia_cores.db")
+    if row:
+        return row  # done
+
+    # not found in fantasia_cores.db → try to pull from jid.db
+    jid_row = jid_conn.execute("""
+        SELECT id, title, description, rationale, vision, created_at
+        FROM fantasia_cores
+        WHERE id=?
+    """, (core_id,)).fetchone()
+
+    if not jid_row:
+        raise RuntimeError(f"core {core_id} not found in fantasia_cores.db or jid.db")
+
+    now = jid_row["created_at"]
+    if not now:
+        from datetime import datetime
+        now = datetime.utcnow().isoformat() + "Z"
+
+    # insert into fantasia_cores.db
+    fc_conn.execute("""
+        INSERT INTO fantasia_cores (id, title, description, rationale, vision, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            title=excluded.title,
+            description=excluded.description,
+            rationale=excluded.rationale,
+            vision=excluded.vision
+    """, (
+        jid_row["id"],
+        jid_row["title"],
+        jid_row["description"],
+        jid_row["rationale"],
+        jid_row["vision"],
+        now,
+    ))
+
+    return fc_conn.execute("""
+        SELECT id, title, description, rationale, vision, created_at
+        FROM fantasia_cores
+        WHERE id=?
+    """, (core_id,)).fetchone()
+
+
+
+def _load_core_state(fc_conn, core_id: int, jid_conn=None):
+    # core
+
+    if jid_conn is not None:
+        core_row = _ensure_core_present(fc_conn, jid_conn, core_id)
+    else:
+        core_row = fc_conn.execute("""
+            SELECT id, title, description, rationale, vision, created_at
+            FROM fantasia_cores
+            WHERE id=?
+        """, (core_id,)).fetchone()
+        if not core_row:
+            raise RuntimeError(f"core {core_id} not found in fantasia_cores.db")
 
     # domains
     dom_rows = fc_conn.execute("""
@@ -586,7 +672,7 @@ def _process_job(job: dict):
 
     try:
         # load snapshot of this core
-        core_state = _load_core_state(fc_conn, core_id)
+        core_state = _load_core_state(fc_conn, core_id, jid_conn=jid_conn)
         core_row = core_state["core"]  # sqlite Row for fantasia_cores
 
         # generate domains (if missing / forced)

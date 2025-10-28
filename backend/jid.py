@@ -1311,6 +1311,7 @@ def run_pipeline():
 
     # --- Inputs / defaults ---
     db_path          = Path(data.get("db_path", DB_PATH_DEFAULT))
+    fc_db_path       = Path("/var/www/site/data/fantasia_core.db")
     out_dir          = Path(data.get("out", DEFAULT_OUT))
     model            = str(data.get("model", DEFAULT_MODEL))  # curator model (mini)
     dry_run          = bool(data.get("dry_run", False))
@@ -1602,6 +1603,7 @@ def run_pipeline():
                 R.ev_w("🌱 fantasia.parsed", vision=vision, writing_id=wid, items=items_count, ms=int(dt*1000))
 
                 if rows_for_db:
+                    insert_fantasia_rows(db_path, rows_for_db)
                     insert_fantasia_rows(db_path, rows_for_db)
                     mark_writing_vision_done(db_path, wid, vision)
                     R.ev_w("💾 fantasia.persisted", vision=vision, writing_id=wid, items=items_count)
