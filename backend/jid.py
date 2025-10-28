@@ -1695,32 +1695,50 @@ def list_files():
 @app.get("/fantasias")
 def list_fantasias():
     db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
+
     q = (request.args.get("q") or "").strip()
     file_name = (request.args.get("file_name") or "").strip()
     vision = (request.args.get("vision") or "").strip()
     limit = int(request.args.get("limit") or 500)
     limit = max(1, min(limit, 5000))
 
-    sql = "SELECT file_name, title, description, rationale, vision, created_at FROM fantasia_cores"
+    # include id in the select so the frontend can display #id and store dataset.coreId
+    sql = (
+        "SELECT id, file_name, title, description, rationale, vision, created_at "
+        "FROM fantasia_cores"
+    )
+
     where, params = [], []
+
     if file_name:
-        where.append("file_name = ?"); params.append(file_name)
+        where.append("file_name = ?")
+        params.append(file_name)
+
     if vision:
-        where.append("vision = ?"); params.append(vision)
+        where.append("vision = ?")
+        params.append(vision)
+
     if q:
         like = f"%{q}%"
-        where.append("(title LIKE ? OR description LIKE ? OR rationale LIKE ? OR IFNULL(vision,'') LIKE ?)")
+        where.append(
+            "(title LIKE ? OR description LIKE ? OR rationale LIKE ? OR IFNULL(vision,'') LIKE ?)"
+        )
         params += [like, like, like, like]
+
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY datetime(created_at) DESC LIMIT ?"; params.append(limit)
+
+    sql += " ORDER BY datetime(created_at) DESC LIMIT ?"
+    params.append(limit)
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(sql, params)
         data = [dict(r) for r in cur.fetchall()]
+
     return jsonify(data)
+
 
 
 @app.get("/usage")
