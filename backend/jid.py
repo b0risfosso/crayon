@@ -1311,7 +1311,6 @@ def run_pipeline():
 
     # --- Inputs / defaults ---
     db_path          = Path(data.get("db_path", DB_PATH_DEFAULT))
-    fc_db_path       = Path("/var/www/site/data/fantasia_core.db")
     out_dir          = Path(data.get("out", DEFAULT_OUT))
     model            = str(data.get("model", DEFAULT_MODEL))  # curator model (mini)
     dry_run          = bool(data.get("dry_run", False))
@@ -1603,7 +1602,6 @@ def run_pipeline():
                 R.ev_w("🌱 fantasia.parsed", vision=vision, writing_id=wid, items=items_count, ms=int(dt*1000))
 
                 if rows_for_db:
-                    insert_fantasia_rows(db_path, rows_for_db)
                     insert_fantasia_rows(db_path, rows_for_db)
                     mark_writing_vision_done(db_path, wid, vision)
                     R.ev_w("💾 fantasia.persisted", vision=vision, writing_id=wid, items=items_count)
@@ -2656,7 +2654,7 @@ def api_list_cores():
     """
     Return a brief list of fantasia cores for display/selection in core.html.
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(FANTASIA_DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         _apply_fantasia_structure_schema(DB_PATH)  # ensure tables exist
         cores = _fetch_all_cores_brief(conn)
@@ -2669,7 +2667,7 @@ def api_get_core(core_id: int):
     Return full nested structure for one fantasia core:
     core -> domains -> dimensions -> theses.
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(FANTASIA_DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         _apply_fantasia_structure_schema(DB_PATH)
         core_obj = _fetch_core_full(conn, core_id)
@@ -2793,7 +2791,7 @@ def api_list_visions():
     Returns [{vision, complete, incomplete}, ...]
     First element always vision=None representing ALL cores.
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(FANTASIA_DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         _apply_fantasia_structure_schema(DB_PATH)
         visions = _fetch_visions_with_stats(conn)
@@ -2816,7 +2814,7 @@ def api_list_cores_by_vision():
     if vision_q is not None and vision_q.lower() == "null":
         vision_q = ""
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(FANTASIA_DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         _apply_fantasia_structure_schema(DB_PATH)
         cores = _fetch_cores_for_vision(conn, vision_q if vision_q is not None else None)
