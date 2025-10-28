@@ -649,3 +649,81 @@ def _process_job(job: dict):
     finally:
         fc_conn.close()
         jid_conn.close()
+
+
+@app.post("/enqueue-structure")
+def enqueue_structure():
+    """
+    Accepts:
+    {
+      "core_id": 123,
+      "email": "boris@fantasiagenesis.com",
+      "model": "gpt-5-mini-2025-08-07",
+      "force_domains": false,
+      "force_dimensions": false,
+      "force_theses": false
+    }
+    OR
+    {
+      "core_ids": [123,124,125],
+      "email": "...",
+      ...
+    }
+
+    Adds each core_id to the job queue (if not already queued).
+    Starts the worker thread if not running.
+    Returns list of enqueued vs skipped.
+    """
+    data = request.get_json(silent=True) or {}
+
+    # normalize list of core_ids
+    core_ids = []
+    if isinstance(data.get("core_ids"), list):
+        for cid in data["core_ids"]:
+            try:
+                core_ids.append(int(cid))
+            except Exception:
+                pass
+    elif "core_id" in data:
+        try:
+            core_ids.append(int(data["core_id"]))
+        except Exception:
+            pass
+
+    if not core_ids:
+        return jsonify({"ok": False, "error": "no_core_ids"}), 400
+
+    job_opts = {
+        "email": data.get("email"),
+        "model": data.get("model", "gpt-5-mini-2025-08-07"),
+        "force_domains": bool(data.get("force_domains", False)),
+        "force_dimensions": bool(data.get("force_dimensions", False)),
+        "force_theses": bool(data.get("force_theses", False)),
+        "live_cap": 3_000_000,
+        "daily_cap": 10_000_000,
+    }
+
+    enqueued = []
+    skipped  = []
+
+    _maybe_start_worker()
+
+    for cid in core_ids:
+        if cid in _fantasia_job_seen:
+            skipped.append(cid)
+            continue
+
+        job = {
+            "core_id": cid,
+            **job_opts,
+        }
+        _fantasia_job_seen.add(cid)
+        _fantasia_job_queue.put(job)
+        enqueued.append(cid)
+
+    return jsonify({
+        "ok": True,
+        "enqueued": enqueued,
+        "skipped_already_queued": skipped,
+        "queue_length": _fantasia_job_queue.qsize(),
+    }), 202
