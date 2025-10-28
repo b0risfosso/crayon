@@ -497,7 +497,7 @@ def _generate_domains_for_core(fc_conn, jid_conn, core_row, budget, model, force
     created_ids = []
     now = datetime.utcnow().isoformat() + "Z"
     for group in parsed.groups:
-        gtitle = group.group_title
+        gtitle = group.title
         for d in group.domains:
             dom_id = _insert_domain(
                 fc_conn,
