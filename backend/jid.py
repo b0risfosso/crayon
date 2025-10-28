@@ -63,11 +63,6 @@ DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
 DB_PATH = DB_PATH_DEFAULT
 FANTASIA_DB_PATH = "/var/www/site/data/fantasia_cores.db"
 
-with sqlite3.connect(DB_PATH) as conn:
-    ensure_db(DB_PATH)
-with sqlite3.connect(FANTASIA_DB_PATH) as conn:
-    ensure_db(FANTASIA_DB_PATH)
-
  
 # ---- Token budget controls (defaults; can be overridden per /run) ----
 SWITCH_FROM_MODEL_DEFAULT = DEFAULT_MODEL
@@ -940,6 +935,11 @@ def ensure_db(db_path: Path) -> None:
 
         _init_llm_usage_table(conn)
         conn.commit()
+
+with sqlite3.connect(DB_PATH) as conn:
+    ensure_db(DB_PATH)
+with sqlite3.connect(FANTASIA_DB_PATH) as conn:
+    ensure_db(FANTASIA_DB_PATH)
 
 def insert_writings_rows(
     db_path: Path,
