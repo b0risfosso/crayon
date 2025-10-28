@@ -488,7 +488,7 @@ def _generate_domains_for_core(fc_conn, jid_conn, core_row, budget, model, force
         model=model,
         sys_msg=sys_msg,
         user_msg=user_msg,
-        OutSchema=PD_DomainGroup,
+        OutSchema=PD_DomainArchitectOut,
         budget=budget,
         jid_conn=jid_conn,
     )
