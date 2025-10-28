@@ -63,6 +63,11 @@ DB_PATH_DEFAULT = "/var/www/site/data/jid.db"
 DB_PATH = DB_PATH_DEFAULT
 FANTASIA_DB_PATH = "/var/www/site/data/fantasia_cores.db"
 
+with sqlite3.connect(DB_PATH) as conn:
+    ensure_db(DB_PATH)
+with sqlite3.connect(FANTASIA_DB_PATH) as conn:
+    ensure_db(FANTASIA_DB_PATH)
+
  
 # ---- Token budget controls (defaults; can be overridden per /run) ----
 SWITCH_FROM_MODEL_DEFAULT = DEFAULT_MODEL
@@ -1364,7 +1369,6 @@ def run_pipeline():
     R.ev("🟢 /run.start", **_run_ctx, visions=visions, db_path=str(db_path), out_dir=str(out_dir))
 
 
-    ensure_db(db_path)
     ensure_dir(out_dir)
 
     job_started = datetime.utcnow().isoformat() + "Z"
@@ -1764,7 +1768,6 @@ def write_by_gpt():
     log.info(f"🟢 /write called — model_write={model_write}, model_topics={model_topics}, max_token_count={max_token_count}")
 
     db_path = Path(DB_PATH_DEFAULT)
-    ensure_db(db_path)
     job_started = datetime.utcnow().isoformat() + "Z"
     run_id = f"write-{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
     run_out_dir = out_dir / f"writings_{run_id}"
@@ -2012,7 +2015,6 @@ def list_writings():
     sql += " ORDER BY datetime(created_at) DESC LIMIT ?"
     params.append(limit)
 
-    ensure_db(db_path)
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
@@ -2027,7 +2029,6 @@ def get_writing(writing_id: int):
     Fetch a single writing including the full document text.
     """
     db_path = Path(request.args.get("db_path") or DB_PATH_DEFAULT)
-    ensure_db(db_path)
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
