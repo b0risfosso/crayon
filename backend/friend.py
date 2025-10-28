@@ -629,7 +629,7 @@ def _generate_dimensions_and_theses(fc_conn, jid_conn, core_row, budget,
                  domain_id=domain_id,
                  dimension_id=dimension_id,
                  thesis_id=t_id,
-                 text_preview=thesis_parsed.text[:120])
+                 text_preview=thesis_parsed.thesis[:120])
 
 
 def _process_job(job: dict):
