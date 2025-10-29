@@ -36,6 +36,7 @@ from crayon_prompts import (
     DOMAIN_ARCHITECT_USER_TEMPLATE,
     DIM_SYS_MSG, DIM_USER_TEMPLATE,
     THESIS_SYS_MSG, THESIS_USER_TEMPLATE,
+    SIM_SYS_MSG,
 )
 
 import threading
@@ -46,7 +47,7 @@ import time
 from jid import (
     FANTASIA_DB_PATH,
     DB_PATH_DEFAULT as JID_DB_PATH,
-    ensure_fantasia_db,
+    #ensure_fantasia_db,
     _usage_from_resp,
     _record_llm_usage,
     _record_llm_usage_by_model,
@@ -166,6 +167,102 @@ def _worker_thread_loop():
             _fantasia_job_queue.task_done()
 
 
+def ensure_fantasia_db(db_path: str = FANTASIA_DB_PATH):
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+
+        # cores table (unchanged)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_cores (
+            id          INTEGER PRIMARY KEY,
+            title       TEXT,
+            description TEXT,
+            rationale   TEXT,
+            vision      TEXT,
+            created_at  TEXT
+        )
+        """)
+
+        # domain table (unchanged)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_domain (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            core_id     INTEGER NOT NULL,
+            name        TEXT,
+            description TEXT,
+            group_title TEXT,
+            provider    TEXT,
+            created_at  TEXT,
+            UNIQUE(core_id, name)
+        )
+        """)
+
+        # dimension table (original create, without targets)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_dimension (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain_id   INTEGER NOT NULL,
+            name        TEXT,
+            description TEXT,
+            targets     TEXT,
+            provider    TEXT,
+            created_at  TEXT,
+            UNIQUE(domain_id, name)
+        )
+        """)
+
+        # thesis table (unchanged)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_thesis (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            dimension_id  INTEGER NOT NULL,
+            text          TEXT,
+            author_email  TEXT,
+            provider      TEXT,
+            created_at    TEXT
+        )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_world (
+            id INTEGER PRIMARY KEY,
+            core_id INTEGER,
+            domain_id INTEGER,
+            dimension_id INTEGER,
+            thesis_id INTEGER,
+            model TEXT,
+            created_at TEXT,
+            world_spec TEXT
+        )
+        """)
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_world_core ON fantasia_world(core_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_world_dim ON fantasia_world(dimension_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_world_thesis ON fantasia_world(thesis_id)")
+
+
+        # indexes
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_core        ON fantasia_domain(core_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_dimension_domain   ON fantasia_dimension(domain_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_thesis_dimension   ON fantasia_thesis(dimension_id)")
+
+        # ✅ NEW: ensure `targets` column exists even if table was created before we added it
+        cols = conn.execute("PRAGMA table_info(fantasia_dimension)").fetchall()
+        colnames = {c["name"] for c in cols}
+        if "targets" not in colnames:
+            conn.execute("ALTER TABLE fantasia_dimension ADD COLUMN targets TEXT")
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+
+ensure_fantasia_db(Path(FANTASIA_DB_PATH))
+
 def _maybe_start_worker_pool():
     global _fantasia_workers_started
     with _fantasia_worker_lock:
@@ -188,7 +285,7 @@ def _open_fc_conn():
     This is the only process that writes to this DB, so we don't expect writer collisions.
     We still set WAL + timeout to be safe for any read concurrency.
     """
-    ensure_fantasia_db(FANTASIA_DB_PATH)
+    #ensure_fantasia_db(FANTASIA_DB_PATH)
     conn = sqlite3.connect(FANTASIA_DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
@@ -326,8 +423,6 @@ def upsert_core_into_fantasia_db(core_id, title, description, rationale, vision,
     conn.execute("PRAGMA synchronous=NORMAL;")
 
     try:
-        # ensure DB/tables exist and any migrations are applied
-        ensure_fantasia_db(FANTASIA_DB_PATH)
 
         # insert OR replace the core row
         conn.execute("""
@@ -637,6 +732,42 @@ def build_thesis_prompt(core_row, domain_name, domain_desc, dimension_name, dime
     )
     return sys_msg, user_msg
 
+def build_sim_user_msg(core_row, domain_name, domain_desc, dimension_name, dimension_desc, dimension_targets, thesis):
+    """
+    Produce the user message according to your spec:
+    Fantasia Core, Domain, Dimension, Thesis, Task...
+    We'll pull data from the rows we already have in memory.
+    """
+    core_title = core_row["title"] or ""
+    core_desc  = core_row["description"] or ""
+
+    return f"""Fantasia Core:
+{core_title}
+{core_description}
+
+Domain:
+{domain_name}
+{domain_desc}
+
+Dimension:
+{dimension_name}
+{dimension_desc}
+{dimension_targets}
+
+Thesis:
+{thesis}
+
+Task:
+Construct a structured simulation outline of a living world that embodies this thesis.
+Populate all sections defined in the System Message above.
+Design the world so its behavior can be observed, tuned, and verified by an external participant (the observer).
+"""
+
+def build_sim_prompt(core_row, domain_name, domain_desc, dimension_name, dimension_desc, dimension_targets, thesis):
+    sys_msg = THESIS_SYS_MSG
+    user_msg = build_sim_user_msg(core_row, domain_name, domain_desc, dimension_name, dimension_desc, dimension_targets, thesis)
+    return sys_msg, user_msg
+
 def _generate_domains_for_core(fc_conn, core_row, budget, model, force):
     """
     Returns list of newly inserted domain_ids.
@@ -677,6 +808,36 @@ def _generate_domains_for_core(fc_conn, core_row, budget, model, force):
             created_ids.append(dom_id)
     return created_ids
 
+def _save_world_spec(core_id, domain_id, dimension_id, thesis_id, model, world_spec, run_logger):
+    now = datetime.utcnow().isoformat() + "Z"
+    fc_conn = _open_fc_conn()
+    try:
+        fc_conn.execute("""
+            INSERT INTO fantasia_world
+            (core_id, domain_id, dimension_id, thesis_id, model, created_at, world_spec)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            core_id,
+            domain_id,
+            dimension_id,
+            thesis_id,
+            model,
+            now,
+            world_spec,
+        ))
+        fc_conn.commit()
+    except Exception:
+        fc_conn.rollback()
+        raise
+    finally:
+        fc_conn.close()
+
+    run_logger.ev("🌍 sim.world.stored",
+                  core_id=core_id,
+                  domain_id=domain_id,
+                  dimension_id=dimension_id,
+                  thesis_id=thesis_id,
+                  bytes=len(world_spec))
 
 
 def _generate_dimensions_and_theses(fc_conn, core_row, budget,
@@ -795,6 +956,51 @@ def _generate_dimensions_and_theses(fc_conn, core_row, budget,
                  thesis_id=t_id,
                  text_preview=thesis_parsed.thesis[:120])
 
+            # --- NEW: simulation world model generation ---
+            sim_sys_msg, sim_user_msg = build_sim_prompt(core_row, domain_name, domain_desc, dim_name, dim_desc, dim_targets, thesis_parsed.thesis)
+            
+            # run second LLM call for the simulation spec
+            sim_text = _openai_text(
+                model=model,
+                sys_msg=sim_sys_msg,
+                user_msg=sim_user_msg,
+                budget=budget,
+            )
+
+            # You now have sim_text (a long structured world spec).
+            # Option A: just log it for now
+            R.ev("🌍 sim.world.generated",
+                core_id=core_id,
+                domain_id=domain_id,
+                dimension_id=dimension_id,
+                thesis_id=t_id,
+                bytes=len(sim_text))
+
+            # Option B (recommended): persist it in DB
+            # You'd first create a table once:
+            #   CREATE TABLE IF NOT EXISTS fantasia_world (
+            #       id INTEGER PRIMARY KEY,
+            #       thesis_id INTEGER,
+            #       core_id INTEGER,
+            #       domain_id INTEGER,
+            #       dimension_id INTEGER,
+            #       model TEXT,
+            #       created_at TEXT,
+            #       world_spec TEXT
+            #   );
+            #
+            # Then here:
+            _save_world_spec(
+                core_id=core_id,
+                domain_id=domain_id,
+                dimension_id=dimension_id,
+                thesis_id=t_id,
+                model=model,
+                world_spec=sim_text,
+                run_logger=R,
+            )
+
+
 
 def _get_random_core_ids_for_visions(
     visions: list[str],
@@ -894,14 +1100,13 @@ def _process_job(job: dict):
     if force_domains or not has_domains:
         sys_msg, user_msg = build_domain_prompt(core_row)
 
-        try:
-            parsed = _openai_parse_guarded(
-                model=model,
-                sys_msg=sys_msg,
-                user_msg=user_msg,
-                OutSchema=PD_DomainArchitectOut,
-                budget=budget,
-            )
+        parsed = _openai_parse_guarded(
+            model=model,
+            sys_msg=sys_msg,
+            user_msg=user_msg,
+            OutSchema=PD_DomainArchitectOut,
+            budget=budget,
+        )
 
         # flatten parsed.groups into new_domain_defs
         for group in parsed.groups:

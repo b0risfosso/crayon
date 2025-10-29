@@ -497,6 +497,24 @@ def ensure_fantasia_db(db_path: str = FANTASIA_DB_PATH):
         )
         """)
 
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS fantasia_world (
+            id INTEGER PRIMARY KEY,
+            core_id INTEGER,
+            domain_id INTEGER,
+            dimension_id INTEGER,
+            thesis_id INTEGER,
+            model TEXT,
+            created_at TEXT,
+            world_spec TEXT
+        )
+        """)
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_world_core ON fantasia_world(core_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_world_dim ON fantasia_world(dimension_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_world_thesis ON fantasia_world(thesis_id)")
+
+
         # indexes
         conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_core        ON fantasia_domain(core_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_dimension_domain   ON fantasia_dimension(domain_id)")
