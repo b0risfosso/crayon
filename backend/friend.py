@@ -1424,6 +1424,66 @@ def enqueue_structure():
     }), 202
 
 
+def _core_structure_status(conn, core_id: int) -> str:
+    """
+    Returns "complete" if:
+      - the core has at least 1 domain
+      - every domain has at least 1 dimension
+      - every dimension has at least 1 thesis
+    Otherwise "incomplete".
+    """
+
+    # any domains?
+    dom_rows = conn.execute("""
+        SELECT id FROM fantasia_domain
+        WHERE core_id = ?
+    """, (core_id,)).fetchall()
+    if not dom_rows:
+        return "incomplete"
+
+    domain_ids = [int(r["id"]) for r in dom_rows]
+
+    # map domain_id -> has_dimensions
+    q_dims = conn.execute(f"""
+        SELECT domain_id, COUNT(*) AS c
+        FROM fantasia_dimension
+        WHERE domain_id IN ({",".join(["?"]*len(domain_ids))})
+        GROUP BY domain_id
+    """, domain_ids).fetchall()
+    dims_by_domain = {int(r["domain_id"]): int(r["c"]) for r in q_dims}
+
+    # if any domain has 0 dimensions -> incomplete
+    for did in domain_ids:
+        if dims_by_domain.get(did, 0) == 0:
+            return "incomplete"
+
+    # now check each dimension has ≥1 thesis
+    # we'll gather all dimensions for those domains
+    dim_rows = conn.execute(f"""
+        SELECT id
+        FROM fantasia_dimension
+        WHERE domain_id IN ({",".join(["?"]*len(domain_ids))})
+    """, domain_ids).fetchall()
+    if not dim_rows:
+        return "incomplete"
+
+    dim_ids = [int(r["id"]) for r in dim_rows]
+
+    q_th = conn.execute(f"""
+        SELECT dimension_id, COUNT(*) AS c
+        FROM fantasia_thesis
+        WHERE dimension_id IN ({",".join(["?"]*len(dim_ids))})
+        GROUP BY dimension_id
+    """, dim_ids).fetchall()
+    thesis_by_dim = {int(r["dimension_id"]): int(r["c"]) for r in q_th}
+
+    # if any dimension has 0 theses -> incomplete
+    for mid in dim_ids:
+        if thesis_by_dim.get(mid, 0) == 0:
+            return "incomplete"
+
+    return "complete"
+
 
 def delete_incomplete_cores(db_path):
     """
