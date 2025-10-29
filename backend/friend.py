@@ -1148,14 +1148,13 @@ def _process_job(job: dict):
 
             sys_msg, user_msg = build_dimension_prompt(core_row, domain_name, domain_desc)
 
-            try:
-                dims_parsed = _openai_parse_guarded(
-                    model=model,
-                    sys_msg=sys_msg,
-                    user_msg=user_msg,
-                    OutSchema=PDDimensionsResponse,
-                    budget=budget,
-                )
+            dims_parsed = _openai_parse_guarded(
+                model=model,
+                sys_msg=sys_msg,
+                user_msg=user_msg,
+                OutSchema=PDDimensionsResponse,
+                budget=budget,
+            )
 
             # insert dimensions
             dims_to_insert = []
@@ -1204,14 +1203,13 @@ def _process_job(job: dict):
                 dim_targets,
             )
 
-            try:
-                thesis_parsed = _openai_parse_guarded(
-                    model=model,
-                    sys_msg=sys_msg,
-                    user_msg=user_msg,
-                    OutSchema=PDThesis,
-                    budget=budget,
-                )
+            thesis_parsed = _openai_parse_guarded(
+                model=model,
+                sys_msg=sys_msg,
+                user_msg=user_msg,
+                OutSchema=PDThesis,
+                budget=budget,
+            )
 
             insert_thesis_for_dimension(
                 dimension_id,
@@ -1221,6 +1219,49 @@ def _process_job(job: dict):
                 R,
                 core_id,
                 domain_id,
+            )
+
+            sim_sys_msg, sim_user_msg = build_sim_prompt(core_row, domain_name, domain_desc, dim_name, dim_desc, dim_targets, thesis_parsed.thesis)
+            
+            # run second LLM call for the simulation spec
+            sim_text = _openai_text(
+                model=model,
+                sys_msg=sim_sys_msg,
+                user_msg=sim_user_msg,
+                budget=budget,
+            )
+
+            # You now have sim_text (a long structured world spec).
+            # Option A: just log it for now
+            R.ev("🌍 sim.world.generated",
+                core_id=core_id,
+                domain_id=domain_id,
+                dimension_id=dimension_id,
+                thesis_id=t_id,
+                bytes=len(sim_text))
+
+            # Option B (recommended): persist it in DB
+            # You'd first create a table once:
+            #   CREATE TABLE IF NOT EXISTS fantasia_world (
+            #       id INTEGER PRIMARY KEY,
+            #       thesis_id INTEGER,
+            #       core_id INTEGER,
+            #       domain_id INTEGER,
+            #       dimension_id INTEGER,
+            #       model TEXT,
+            #       created_at TEXT,
+            #       world_spec TEXT
+            #   );
+            #
+            # Then here:
+            _save_world_spec(
+                core_id=core_id,
+                domain_id=domain_id,
+                dimension_id=dimension_id,
+                thesis_id=t_id,
+                model=model,
+                world_spec=sim_text,
+                run_logger=R,
             )
 
     # usage snapshot (still needs jid.db, but read-only)
