@@ -743,7 +743,7 @@ def build_sim_user_msg(core_row, domain_name, domain_desc, dimension_name, dimen
 
     return f"""Fantasia Core:
 {core_title}
-{core_description}
+{core_desc}
 
 Domain:
 {domain_name}
