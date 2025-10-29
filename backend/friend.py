@@ -1784,3 +1784,17 @@ def api_core_worlds(core_id: int):
         return jsonify({"ok": True, "core": core_meta})
     finally:
         conn.close()
+
+
+@app.get("/api/fantasia/visions")
+def api_list_visions():
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT vision
+            FROM fantasia_cores
+            WHERE vision IS NOT NULL AND TRIM(vision) <> ''
+            ORDER BY vision COLLATE NOCASE;
+        """).fetchall()
+    visions = [r[0] for r in rows]
+    return jsonify({"ok": True, "visions": visions}), 200
+
