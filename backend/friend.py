@@ -519,7 +519,7 @@ def load_core_state(core_id: int):
         if dom_ids:
             qmarks = ",".join("?" for _ in dom_ids)
             dim_rows = fc_conn.execute(f"""
-                SELECT id, domain_id, name, description, provider, created_at
+                SELECT id, domain_id, name, description, targets, provider, created_at
                 FROM fantasia_dimension
                 WHERE domain_id IN ({qmarks})
                 ORDER BY id ASC
