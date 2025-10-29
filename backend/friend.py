@@ -1562,4 +1562,4 @@ def delete_incomplete_cores(db_path):
     finally:
         conn.close()
 
-delete_incomplete_cores("/var/www/site/data/fantasia_cores.db")
+#delete_incomplete_cores("/var/www/site/data/fantasia_cores.db")
