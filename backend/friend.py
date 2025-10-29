@@ -773,7 +773,7 @@ Design the world so its behavior can be observed, tuned, and verified by an exte
 """
 
 def build_sim_prompt(core_row, domain_name, domain_desc, dimension_name, dimension_desc, dimension_targets, thesis):
-    sys_msg = THESIS_SYS_MSG
+    sys_msg = SIM_SYS_MSG
     user_msg = build_sim_user_msg(core_row, domain_name, domain_desc, dimension_name, dimension_desc, dimension_targets, thesis)
     return sys_msg, user_msg
 
@@ -965,8 +965,10 @@ def _generate_dimensions_and_theses(fc_conn, core_row, budget,
                  thesis_id=t_id,
                  text_preview=thesis_parsed.thesis[:120])
 
+            thesis_text = thesis_parsed.thesis
+
             # --- NEW: simulation world model generation ---
-            sim_sys_msg, sim_user_msg = build_sim_prompt(core_row, domain_name, domain_desc, dim_name, dim_desc, dim_targets, thesis_parsed.thesis)
+            sim_sys_msg, sim_user_msg = build_sim_prompt(core_row, domain_name, domain_desc, dim_name, dim_desc, dim_targets, thesis_text)
             
             # run second LLM call for the simulation spec
             sim_text = _openai_text(
@@ -1230,7 +1232,9 @@ def _process_job(job: dict):
                 domain_id,
             )
 
-            sim_sys_msg, sim_user_msg = build_sim_prompt(core_row, domain_name, domain_desc, dim_name, dim_desc, dim_targets, thesis_parsed.thesis)
+            thesis_text = thesis_parsed.thesis
+
+            sim_sys_msg, sim_user_msg = build_sim_prompt(core_row, domain_name, domain_desc, dim_name, dim_desc, dim_targets, thesis_text)
             
             # run second LLM call for the simulation spec
             sim_text = _openai_text(
