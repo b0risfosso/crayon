@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fantasia Worlds · Simulation Viewer</title>
+<style>
+  :root {
+    --bg-main: #0f0f10;
+    --bg-panel: #1a1b1e;
+    --bg-card: #232428;
+    --border-color: #2f3035;
+    --text-primary: #f8f8fa;
+    --text-dim: #9a9aa5;
+    --accent: #6b6bff;
+    --status-complete-bg: #1f3b28;
+    --status-complete-fg: #6bff92;
+    --status-incomplete-bg: #3b2a1f;
+    --status-incomplete-fg: #ffbf6b;
+    --radius-lg: 16px;
+    --radius-sm: 8px;
+    --pad-lg: 16px;
+    --pad-sm: 8px;
+    --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    width: 320px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: var(--pad-lg);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .sidebar-header h1 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--text-primary);
+  }
+
+  .vision-filter-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .vision-row1 {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .vision-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+  .vision-stats {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+  .vision-select {
+    width: 100%;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.4;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    padding: 6px 8px;
+    font-family: inherit;
+  }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .core-item {
+    padding: var(--pad-lg);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+  }
+  .core-item:hover {
+    background: rgba(255,255,255,0.03);
+  }
+
+  .core-item-row1 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .core-item-title {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .status-complete {
+    background: var(--status-complete-bg);
+    color: var(--status-complete-fg);
+  }
+  .status-incomplete {
+    background: var(--status-incomplete-bg);
+    color: var(--status-incomplete-fg);
+  }
+
+  .core-item-vision {
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--accent);
+    word-break: break-word;
+    margin-top: 4px;
+  }
+  .core-item-desc {
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1.4;
+    max-height: 3.6em;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .core-item-meta {
+    color: var(--text-dim);
+    font-size: 10px;
+    margin-top: 6px;
+  }
+
+  .main-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .main-header {
+    padding: var(--pad-lg);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-panel);
+  }
+
+  .core-header-row1 {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .core-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .core-vision {
+    font-size: 12px;
+    color: var(--accent);
+    line-height: 1.4;
+    margin: 8px 0 8px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .core-desc {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0 0 8px 0;
+  }
+  .core-meta {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-dim);
+  }
+
+  .main-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--pad-lg);
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) 1fr;
+    grid-gap: 16px;
+  }
+
+  .domains-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .domain-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--pad-lg);
+  }
+  .domain-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(107,107,255,0.4);
+  }
+
+  .domain-header {
+    margin: 0 0 8px 0;
+  }
+  .domain-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  .domain-group {
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+  .domain-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .domain-meta {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 6px;
+  }
+
+  .detail-col {
+    min-width: 0;
+  }
+
+  .placeholder-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--pad-lg);
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .dimension-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--pad-lg);
+    margin-bottom: 12px;
+  }
+  .dimension-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .dimension-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+    margin: 0;
+    word-break: break-word;
+  }
+  .dim-provider {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-left: 8px;
+  }
+
+  .thesis-block {
+    border-left: 2px solid var(--accent);
+    padding-left: 10px;
+    margin-top: 8px;
+    margin-bottom: 16px;
+  }
+  .thesis-text {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .thesis-meta {
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--text-dim);
+    margin-top: 4px;
+    margin-bottom: 8px;
+  }
+
+  .world-spec-block {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--pad-sm);
+    margin-top: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .world-spec-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .world-spec-text {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <h1>Fantasia Worlds</h1>
+
+    <div class="vision-filter-block">
+      <div class="vision-row1">
+        <div class="vision-label">Vision</div>
+        <div class="vision-stats" id="visionStats">–</div>
+      </div>
+      <select class="vision-select" id="visionSelect">
+        <!-- populated by JS -->
+      </select>
+    </div>
+  </div>
+
+  <div class="sidebar-list" id="coreList">
+    <!-- populated by JS -->
+  </div>
+</aside>
+
+<main class="main-panel">
+  <section class="main-header" id="coreHeader">
+    <div class="core-header-row1">
+      <h2 class="core-title" id="coreTitle">Select a core</h2>
+      <div class="status-badge" id="coreStatusBadge" style="display:none;"></div>
+    </div>
+
+    <div class="core-vision" id="coreVision"></div>
+    <div class="core-desc" id="coreDesc"></div>
+    <div class="core-meta" id="coreMeta"></div>
+  </section>
+
+  <section class="main-scroll">
+    <div class="domains-col" id="domainsCol"></div>
+    <div class="detail-col" id="detailCol">
+      <div class="placeholder-panel" id="detailPlaceholder">
+        <strong>No world selected.</strong><br><br>
+        Click a domain on the left to explore its dimensions, theses, and generated worlds.
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const coreListEl = document.getElementById("coreList");
+const coreTitleEl = document.getElementById("coreTitle");
+const coreVisionEl = document.getElementById("coreVision");
+const coreDescEl = document.getElementById("coreDesc");
+const coreMetaEl = document.getElementById("coreMeta");
+const coreStatusBadgeEl = document.getElementById("coreStatusBadge");
+
+const domainsColEl = document.getElementById("domainsCol");
+const detailColEl = document.getElementById("detailCol");
+const detailPlaceholderEl = document.getElementById("detailPlaceholder");
+
+const visionSelectEl = document.getElementById("visionSelect");
+const visionStatsEl = document.getElementById("visionStats");
+
+let currentCore = null;
+let currentDomainId = null;
+let visionsData = []; // [{vision, complete, incomplete}, ...]
+
+// status badge logic (reuse core.html style)
+function makeStatusBadge(status) {
+  if (status === "complete") {
+    return { text: "COMPLETE", cls: "status-badge status-complete" };
+  } else {
+    return { text: "INCOMPLETE", cls: "status-badge status-incomplete" };
+  }
+}
+
+// ---------- Vision loading ----------
+
+async function loadVisions() {
+  const res = await fetch("/api/fantasia/visions");
+  const data = await res.json();
+  if (!data.ok) return;
+
+  visionsData = data.visions || [];
+
+  visionSelectEl.innerHTML = "";
+  visionsData.forEach(v => {
+    const opt = document.createElement("option");
+    if (v.vision === null) {
+      opt.value = "__ALL__";
+      opt.textContent = `ALL (${v.complete} complete · ${v.incomplete} incomplete)`;
+    } else if ((v.vision || "").trim() === "") {
+      opt.value = "__EMPTY__";
+      opt.textContent = `[no vision] (${v.complete} · ${v.incomplete})`;
+    } else {
+      opt.value = v.vision;
+      opt.textContent = `${v.vision} (${v.complete} · ${v.incomplete})`;
+    }
+    visionSelectEl.appendChild(opt);
+  });
+
+  applyVisionSelection();
+}
+
+function applyVisionSelection() {
+  const val = visionSelectEl.value;
+
+  let selectedVisionRecord = null;
+  if (val === "__ALL__") {
+    selectedVisionRecord = visionsData.find(v => v.vision === null);
+  } else if (val === "__EMPTY__") {
+    selectedVisionRecord = visionsData.find(v => v.vision === "");
+  } else {
+    selectedVisionRecord = visionsData.find(v => v.vision === val);
+  }
+
+  if (selectedVisionRecord) {
+    visionStatsEl.textContent =
+      `${selectedVisionRecord.complete} complete · ${selectedVisionRecord.incomplete} incomplete`;
+  } else {
+    visionStatsEl.textContent = "–";
+  }
+
+  loadCoresForSelectedVision();
+}
+
+visionSelectEl.addEventListener("change", () => {
+  applyVisionSelection();
+});
+
+// ---------- Core list for vision ----------
+
+async function loadCoresForSelectedVision() {
+  const val = visionSelectEl.value;
+
+  let queryVisionParam = "";
+  if (val === "__ALL__") {
+    queryVisionParam = "";
+  } else if (val === "__EMPTY__") {
+    queryVisionParam = "?vision=";
+  } else {
+    queryVisionParam = "?vision=" + encodeURIComponent(val);
+  }
+
+  const res = await fetch("/api/fantasia/worlds/by-vision" + queryVisionParam);
+  const data = await res.json();
+  if (!data.ok) return;
+
+  renderCoreList(data.cores || []);
+}
+
+function renderCoreList(cores) {
+  coreListEl.innerHTML = "";
+  currentCore = null;
+  currentDomainId = null;
+  renderCoreHeader(null);
+  renderDomainColumn([]);
+  renderEmptyDetail();
+
+  cores.forEach(core => {
+    const div = document.createElement("div");
+    div.className = "core-item";
+    div.dataset.coreId = core.id;
+
+    const row1 = document.createElement("div");
+    row1.className = "core-item-row1";
+
+    const title = document.createElement("div");
+    title.className = "core-item-title";
+    title.textContent = core.title || ("Core " + core.id);
+
+    const badgeInfo = makeStatusBadge(core.structure_status || "incomplete");
+    const badge = document.createElement("div");
+    badge.className = badgeInfo.cls;
+    badge.textContent = badgeInfo.text;
+
+    row1.appendChild(title);
+    row1.appendChild(badge);
+
+    const vision = document.createElement("div");
+    vision.className = "core-item-vision";
+    vision.textContent = core.vision || "";
+
+    const desc = document.createElement("div");
+    desc.className = "core-item-desc";
+    desc.textContent = core.description || "";
+
+    const meta = document.createElement("div");
+    meta.className = "core-item-meta";
+    meta.textContent = (core.created_at || "") + " · id " + core.id;
+
+    div.appendChild(row1);
+    if (core.vision) div.appendChild(vision);
+    div.appendChild(desc);
+    div.appendChild(meta);
+
+    div.addEventListener("click", () => {
+      selectCore(core.id);
+    });
+
+    coreListEl.appendChild(div);
+  });
+}
+
+// ---------- Loading a core's worlds ----------
+
+async function selectCore(coreId) {
+  currentDomainId = null;
+  const res = await fetch(`/api/fantasia/core/${coreId}/worlds`);
+  const data = await res.json();
+  if (!data.ok) return;
+
+  currentCore = data.core;
+  renderCoreHeader(currentCore);
+  renderDomainColumn(currentCore.domains_with_worlds || []);
+  renderEmptyDetail();
+}
+
+function renderCoreHeader(core) {
+  if (!core) {
+    coreTitleEl.textContent = "Select a core";
+    coreStatusBadgeEl.style.display = "none";
+    coreVisionEl.textContent = "";
+    coreVisionEl.style.display = "none";
+    coreDescEl.textContent = "";
+    coreDescEl.style.display = "none";
+    coreMetaEl.textContent = "";
+    return;
+  }
+
+  coreTitleEl.textContent = core.title || ("Core " + core.id);
+
+  const badgeInfo = makeStatusBadge(core.structure_status || "incomplete");
+  coreStatusBadgeEl.className = badgeInfo.cls;
+  coreStatusBadgeEl.textContent = badgeInfo.text;
+  coreStatusBadgeEl.style.display = "inline-block";
+
+  coreVisionEl.textContent = core.vision || "";
+  coreVisionEl.style.display = core.vision ? "block" : "none";
+
+  coreDescEl.textContent = core.description || "";
+  coreDescEl.style.display = core.description ? "block" : "none";
+
+  let metaBits = [];
+  if (core.created_at) metaBits.push(core.created_at);
+  if (core.rationale) metaBits.push("rationale: " + core.rationale.slice(0,160));
+  coreMetaEl.textContent = metaBits.join(" · ");
+}
+
+// left column: domains + dimensions summary
+function renderDomainColumn(domainsWithWorlds) {
+  domainsColEl.innerHTML = "";
+
+  domainsWithWorlds.forEach(domain => {
+    const card = document.createElement("div");
+    card.className = "domain-card";
+    card.dataset.domainId = domain.id;
+
+    const header = document.createElement("div");
+    header.className = "domain-header";
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "domain-name";
+    nameEl.textContent = domain.name || ("Domain " + domain.id);
+    header.appendChild(nameEl);
+
+    if (domain.group_title) {
+      const groupEl = document.createElement("div");
+      groupEl.className = "domain-group";
+      groupEl.textContent = domain.group_title;
+      header.appendChild(groupEl);
+    }
+
+    card.appendChild(header);
+
+    if (domain.description) {
+      const descEl = document.createElement("div");
+      descEl.className = "domain-desc";
+      descEl.textContent = domain.description;
+      card.appendChild(descEl);
+    }
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "domain-meta";
+    const metaBits = [];
+    if (domain.provider) metaBits.push("provider: " + domain.provider);
+    if (domain.created_at) metaBits.push(domain.created_at);
+    metaEl.textContent = metaBits.join(" · ");
+    card.appendChild(metaEl);
+
+    card.addEventListener("click", () => {
+      selectDomain(domain.id);
+    });
+
+    domainsColEl.appendChild(card);
+  });
+}
+
+function renderDomainDetail(domain) {
+  detailColEl.innerHTML = "";
+
+  if (!domain) {
+    renderEmptyDetail();
+    return;
+  }
+
+  // domain.dimensions_with_worlds: each dimension has its theses, and each thesis has world specs
+  domain.dimensions_with_worlds.forEach(dim => {
+    const block = document.createElement("div");
+    block.className = "dimension-block";
+
+    // header row: dimension name + provider/time
+    const head = document.createElement("div");
+    head.className = "dimension-head";
+
+    const nameWrap = document.createElement("div");
+    nameWrap.style.display = "flex";
+    nameWrap.style.flexWrap = "wrap";
+    nameWrap.style.alignItems = "baseline";
+    nameWrap.style.gap = "6px";
+
+    const dn = document.createElement("div");
+    dn.className = "dimension-name";
+    dn.textContent = dim.name || ("Dimension " + dim.id);
+
+    const prov = document.createElement("div");
+    prov.className = "dim-provider";
+    const providerBits = [];
+    if (dim.provider) providerBits.push(dim.provider);
+    if (dim.created_at) providerBits.push(dim.created_at);
+    prov.textContent = providerBits.join(" · ");
+
+    nameWrap.appendChild(dn);
+    nameWrap.appendChild(prov);
+    head.appendChild(nameWrap);
+    block.appendChild(head);
+
+    // each thesis under this dimension
+    dim.theses_with_worlds.forEach(th => {
+      const tWrap = document.createElement("div");
+      tWrap.className = "thesis-block";
+
+      const tText = document.createElement("div");
+      tText.className = "thesis-text";
+      tText.textContent = th.text || "";
+      tWrap.appendChild(tText);
+
+      const tMeta = document.createElement("div");
+      tMeta.className = "thesis-meta";
+      const tBits = [];
+      if (th.author_email) tBits.push(th.author_email);
+      if (th.provider) tBits.push(th.provider);
+      if (th.created_at) tBits.push(th.created_at);
+      tMeta.textContent = tBits.join(" · ");
+      tWrap.appendChild(tMeta);
+
+      // Now world specs for this thesis
+      (th.worlds || []).forEach(w => {
+        const wsBlock = document.createElement("div");
+        wsBlock.className = "world-spec-block";
+
+        const wsTitle = document.createElement("div");
+        wsTitle.className = "world-spec-title";
+        wsTitle.textContent = `World Spec (${w.model || "?"} · ${w.created_at || ""})`;
+        wsBlock.appendChild(wsTitle);
+
+        const wsText = document.createElement("div");
+        wsText.className = "world-spec-text";
+        wsText.textContent = w.world_spec || "";
+        wsBlock.appendChild(wsText);
+
+        tWrap.appendChild(wsBlock);
+      });
+
+      block.appendChild(tWrap);
+    });
+
+    detailColEl.appendChild(block);
+  });
+}
+
+function renderEmptyDetail() {
+  detailColEl.innerHTML = "";
+  detailColEl.appendChild(detailPlaceholderEl);
+}
+
+function selectDomain(domainId) {
+  currentDomainId = domainId;
+
+  Array.from(domainsColEl.children).forEach(card => {
+    if (card.classList.contains("domain-card")) {
+      if (String(card.dataset.domainId) === String(domainId)) {
+        card.classList.add("active");
+      } else {
+        card.classList.remove("active");
+      }
+    }
+  });
+
+  if (!currentCore) return;
+  const domain = currentCore.domains_with_worlds.find(
+    d => String(d.id) === String(domainId)
+  );
+  renderDomainDetail(domain);
+}
+
+// boot
+loadVisions();
+</script>
+</body>
+</html>
