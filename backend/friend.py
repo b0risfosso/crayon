@@ -691,6 +691,8 @@ def insert_thesis_for_dimension(dimension_id: int, thesis_text: str, provider_mo
     finally:
         fc_conn.close()
 
+    return t_id
+
 
 def render_prompt(template: str, **vars) -> str:
     """
@@ -1217,7 +1219,7 @@ def _process_job(job: dict):
                 budget=budget,
             )
 
-            insert_thesis_for_dimension(
+            t_id = insert_thesis_for_dimension(
                 dimension_id,
                 thesis_parsed.thesis,
                 model,
