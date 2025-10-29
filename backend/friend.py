@@ -509,6 +509,7 @@ def load_core_state(core_id: int):
         jid_conn = _open_jid_conn()
         try:
             core_row = _ensure_core_present(fc_conn, jid_conn, core_id)
+            fc_conn.commit() 
             jid_conn.commit()
         finally:
             jid_conn.close()
@@ -1584,7 +1585,6 @@ def api_worlds_by_vision():
     """
     vision = (request.args.get("vision") or None)
     # open fantasia_cores.db
-    ensure_fantasia_db(FANTASIA_DB_PATH)
     conn = sqlite3.connect(FANTASIA_DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     try:
