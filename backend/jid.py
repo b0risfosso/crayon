@@ -963,8 +963,6 @@ def ensure_db(db_path: Path) -> None:
 
 #with sqlite3.connect(DB_PATH) as conn:
 #    ensure_db(Path(DB_PATH))
-#with sqlite3.connect(FANTASIA_DB_PATH) as conn:
-#    ensure_db(Path(FANTASIA_DB_PATH))
 
 def insert_writings_rows(
     db_path: Path,
@@ -3139,3 +3137,82 @@ def _process_fantasia_job(job: dict):
     finally:
         fc_conn.close()
         jid_conn.close()
+
+
+def delete_incomplete_cores(db_path):
+    """
+    Deletes all cores from fantasia_cores.db that do not have a complete structure
+    (no domains, missing dimensions, or missing theses).
+    Cleans up related entries in fantasia_domain, fantasia_dimension, fantasia_thesis,
+    and fantasia_world if present.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = OFF;")  # ensure manual control
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+
+    try:
+        # Get all core IDs
+        core_rows = conn.execute("SELECT id FROM fantasia_cores").fetchall()
+        if not core_rows:
+            print("No cores found.")
+            return
+
+        incomplete_ids = []
+
+        for row in core_rows:
+            cid = int(row["id"])
+            status = _core_structure_status(conn, cid)
+            if status != "complete":
+                incomplete_ids.append(cid)
+
+        if not incomplete_ids:
+            print("All cores are complete. Nothing to delete.")
+            return
+
+        print(f"Deleting {len(incomplete_ids)} incomplete cores...")
+
+        for cid in incomplete_ids:
+            print(f"  - Deleting core {cid}")
+            # Delete theses linked to this core
+            conn.execute("""
+                DELETE FROM fantasia_thesis
+                WHERE dimension_id IN (
+                    SELECT id FROM fantasia_dimension
+                    WHERE domain_id IN (
+                        SELECT id FROM fantasia_domain
+                        WHERE core_id = ?
+                    )
+                )
+            """, (cid,))
+            # Delete dimensions
+            conn.execute("""
+                DELETE FROM fantasia_dimension
+                WHERE domain_id IN (
+                    SELECT id FROM fantasia_domain
+                    WHERE core_id = ?
+                )
+            """, (cid,))
+            # Delete domains
+            conn.execute("DELETE FROM fantasia_domain WHERE core_id = ?", (cid,))
+            # Delete world models (optional)
+            try:
+                conn.execute("DELETE FROM fantasia_world WHERE core_id = ?", (cid,))
+            except sqlite3.OperationalError:
+                pass  # Table may not exist
+            # Finally delete the core
+            conn.execute("DELETE FROM fantasia_cores WHERE id = ?", (cid,))
+
+        conn.commit()
+        print("✅ Incomplete cores deleted successfully.")
+
+    except Exception as e:
+        conn.rollback()
+        print("❌ Error deleting incomplete cores:", e)
+        raise
+    finally:
+        conn.close()
+
