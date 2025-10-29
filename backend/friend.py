@@ -1563,3 +1563,216 @@ def delete_incomplete_cores(db_path):
         conn.close()
 
 #delete_incomplete_cores("/var/www/site/data/fantasia_cores.db")
+
+
+@app.get("/api/fantasia/worlds/by-vision")
+def api_worlds_by_vision():
+    """
+    Returns cores for a given vision, plus structure_status, BUT
+    restricted to cores that have at least one world model recorded.
+
+    Query params:
+      ?vision=<string>   (optional; if omitted treat as ALL)
+    """
+    vision = (request.args.get("vision") or None)
+    # open fantasia_cores.db
+    ensure_fantasia_db(FANTASIA_DB_PATH)
+    conn = sqlite3.connect(FANTASIA_DB_PATH, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        # build base query
+        params = []
+        where_clauses = []
+
+        # join fantasia_world so we only include cores that actually have worlds
+        sql = """
+        SELECT fc.id,
+               fc.title,
+               fc.description,
+               fc.rationale,
+               fc.vision,
+               fc.created_at
+        FROM fantasia_cores fc
+        JOIN fantasia_world fw
+          ON fw.core_id = fc.id
+        """
+
+        if vision is not None:
+            where_clauses.append(" (fc.vision = ?) ")
+            params.append(vision)
+
+        if where_clauses:
+            sql += " WHERE " + " AND ".join(where_clauses)
+
+        sql += """
+        GROUP BY fc.id
+        ORDER BY datetime(fc.created_at) DESC
+        LIMIT 500
+        """
+
+        cores = []
+        for row in conn.execute(sql, params).fetchall():
+            cid = int(row["id"])
+            status = _core_structure_status(conn, cid)
+            cores.append({
+                "id": cid,
+                "title": row["title"],
+                "description": row["description"],
+                "rationale": row["rationale"],
+                "vision": row["vision"],
+                "created_at": row["created_at"],
+                "structure_status": status,
+            })
+
+        return jsonify({"ok": True, "cores": cores})
+    finally:
+        conn.close()
+
+
+@app.get("/api/fantasia/core/<int:core_id>/worlds")
+def api_core_worlds(core_id: int):
+    """
+    Return full nested structure for a single core_id, including the generated
+    world specs associated with theses.
+    {
+      ok: true,
+      core: {
+        id, title, description, rationale, vision, created_at, structure_status,
+        domains_with_worlds: [
+          {
+            id, name, description, group_title, provider, created_at,
+            dimensions_with_worlds: [
+              {
+                id, name, description, provider, created_at,
+                theses_with_worlds: [
+                  {
+                    id, text, author_email, provider, created_at,
+                    worlds: [
+                      { id, model, created_at, world_spec }
+                    ]
+                  },
+                  ...
+                ]
+              },
+              ...
+            ]
+          },
+          ...
+        ]
+      }
+    }
+    """
+
+    ensure_fantasia_db(FANTASIA_DB_PATH)
+    conn = sqlite3.connect(FANTASIA_DB_PATH, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        # core row
+        c = conn.execute("""
+            SELECT id, title, description, rationale, vision, created_at
+            FROM fantasia_cores
+            WHERE id = ?
+        """, (core_id,)).fetchone()
+        if not c:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+
+        core_meta = {
+            "id": int(c["id"]),
+            "title": c["title"],
+            "description": c["description"],
+            "rationale": c["rationale"],
+            "vision": c["vision"],
+            "created_at": c["created_at"],
+            "structure_status": _core_structure_status(conn, int(c["id"])),
+        }
+
+        # domains for this core
+        dom_rows = conn.execute("""
+            SELECT id, name, description, group_title, provider, created_at
+            FROM fantasia_domain
+            WHERE core_id=?
+            ORDER BY id ASC
+        """, (core_id,)).fetchall()
+
+        domains_payload = []
+        for dom in dom_rows:
+            domain_id = int(dom["id"])
+
+            # dimensions for this domain
+            dim_rows = conn.execute("""
+                SELECT id, name, description, provider, created_at
+                FROM fantasia_dimension
+                WHERE domain_id=?
+                ORDER BY id ASC
+            """, (domain_id,)).fetchall()
+
+            dim_payload = []
+            for dim in dim_rows:
+                dimension_id = int(dim["id"])
+
+                # theses for this dimension
+                th_rows = conn.execute("""
+                    SELECT id, text, author_email, provider, created_at
+                    FROM fantasia_thesis
+                    WHERE dimension_id=?
+                    ORDER BY id ASC
+                """, (dimension_id,)).fetchall()
+
+                th_payload = []
+                for th in th_rows:
+                    thesis_id = int(th["id"])
+
+                    # world specs attached to this thesis
+                    world_rows = []
+                    try:
+                        world_rows = conn.execute("""
+                            SELECT id, model, created_at, world_spec
+                            FROM fantasia_world
+                            WHERE thesis_id=?
+                            ORDER BY id ASC
+                        """, (thesis_id,)).fetchall()
+                    except sqlite3.OperationalError:
+                        # fantasia_world may not exist yet on older DBs
+                        world_rows = []
+
+                    th_payload.append({
+                        "id": thesis_id,
+                        "text": th["text"],
+                        "author_email": th["author_email"],
+                        "provider": th["provider"],
+                        "created_at": th["created_at"],
+                        "worlds": [
+                            {
+                                "id": int(w["id"]),
+                                "model": w["model"],
+                                "created_at": w["created_at"],
+                                "world_spec": w["world_spec"],
+                            }
+                            for w in world_rows
+                        ]
+                    })
+
+                dim_payload.append({
+                    "id": dimension_id,
+                    "name": dim["name"],
+                    "description": dim["description"],
+                    "provider": dim["provider"],
+                    "created_at": dim["created_at"],
+                    "theses_with_worlds": th_payload,
+                })
+
+            domains_payload.append({
+                "id": domain_id,
+                "name": dom["name"],
+                "description": dom["description"],
+                "group_title": dom["group_title"],
+                "provider": dom["provider"],
+                "created_at": dom["created_at"],
+                "dimensions_with_worlds": dim_payload,
+            })
+
+        core_meta["domains_with_worlds"] = domains_payload
+
+        return jsonify({"ok": True, "core": core_meta})
+    finally:
+        conn.close()
