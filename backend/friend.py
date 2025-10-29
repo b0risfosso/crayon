@@ -368,7 +368,7 @@ def _openai_parse_guarded(*, model, sys_msg, user_msg, OutSchema, budget):
     return parsed
 
 
-def _openai_text(*, model, sys_msg, user_msg, budget, jid_conn):
+def _openai_text(*, model, sys_msg, user_msg, budget):
     """
     Light wrapper for text-only generations (no Pydantic parse).
     Still logs usage and enforces budget.
@@ -388,11 +388,12 @@ def _openai_text(*, model, sys_msg, user_msg, budget, jid_conn):
     # extract text
     raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
 
-    # token accounting + commit
+    jid_conn = _open_jid_conn()
     try:
         usage = _usage_from_resp(resp)
         _record_llm_usage_by_model(jid_conn, model, usage)
         _record_llm_usage(jid_conn, usage)
+        jid_conn.commit()  # commit any inserts we just did into fantasia_cores
 
         total_used = (
             usage.get("total_tokens")
@@ -401,9 +402,14 @@ def _openai_text(*, model, sys_msg, user_msg, budget, jid_conn):
         )
         budget.live_used += total_used
 
+        # after increment, enforce caps again
         budget.check_before()
+
     except Exception as e:
-        log.warning("⚠️ usage logging failed (sim world): %s", e)
+        # don't kill the job if usage logging had a hiccup
+        log.warning("⚠️ usage logging failed: %s", e)
+    finally:
+        jid_conn.close()
 
     return raw_text
 
