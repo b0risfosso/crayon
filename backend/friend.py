@@ -1181,7 +1181,7 @@ def _process_job(job: dict):
             dimension_id = int(dim_row["id"])
             dim_name = dim_row["name"] or ""
             dim_desc = dim_row["description"] or ""
-            dim_targets = dim_row.get("targets", "") if hasattr(dim_row, "keys") else ""
+            dim_targets = dim_row["targets"] or ""
 
             has_thesis = len(dim_state["theses"]) > 0
             if has_thesis and not force_theses:
