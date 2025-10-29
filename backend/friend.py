@@ -1788,7 +1788,7 @@ def api_core_worlds(core_id: int):
 
 @app.get("/api/fantasia/visions")
 def api_list_visions():
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(FANTASIA_DB_PATH) as conn:
         rows = conn.execute("""
             SELECT DISTINCT vision
             FROM fantasia_cores
