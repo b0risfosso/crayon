@@ -133,7 +133,7 @@ const edges = [
 ];
 
 async function fetchSnapshot() {
-  const res = await fetch("/api/snapshot");
+  const res = await fetch("/api/worlds/snapshot");
   const data = await res.json();
   renderAll(data);
 }
@@ -316,7 +316,7 @@ function renderSegmentCards(segments) {
 
 // buttons: inject stress to watch reflex
 document.getElementById("surgeHospitalBtn").addEventListener("click", async ()=>{
-  await fetch("/api/event/demand_surge", {
+  await fetch("/api/worlds/event/demand_surge", {
     method:"POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({node_id:"hospital_south", frac:0.25})
@@ -324,7 +324,7 @@ document.getElementById("surgeHospitalBtn").addEventListener("click", async ()=>
 });
 
 document.getElementById("faultSegABtn").addEventListener("click", async ()=>{
-  await fetch("/api/event/fault", {
+  await fetch("/api/worlds/event/fault", {
     method:"POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({seg_id:"segA"})
