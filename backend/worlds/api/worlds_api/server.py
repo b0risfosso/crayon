@@ -30,11 +30,11 @@ def loop():
 threading.Thread(target=loop, daemon=True).start()
 
 # ----------- endpoints the HTML calls -----------
-@app.get("/api/world/snapshot")
+@app.get("/api/worlds/snapshot")
 def snapshot():
     return jsonify(world.get_snapshot())
 
-@app.post("/api/world/event/demand_surge")
+@app.post("/api/worlds/event/demand_surge")
 def demand_surge():
     data = request.get_json(force=True) or {}
     node_id = data.get("node_id", "hospital_south")
@@ -42,7 +42,7 @@ def demand_surge():
     world.inject_demand_surge(node_id, frac)
     return jsonify({"ok": True})
 
-@app.post("/api/world/event/fault")
+@app.post("/api/worlds/event/fault")
 def fault():
     data = request.get_json(force=True) or {}
     seg_id = data.get("seg_id", "segA")
