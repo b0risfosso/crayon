@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Ambient Mesh — Mnemonic Field</title>
+  <style>
+    :root{
+      --bg:#f7f9fc;         /* light background */
+      --panel:#ffffff;      /* white panels */
+      --ink:#1f2d3d;        /* dark text */
+      --muted:#6b7a90;      /* muted text */
+      --accent:#2d7ef7;     /* controls accent */
+      --good:#2ab673;       /* resonance hit */
+      --warn:#ffb020;       /* warnings */
+      --bad:#e55353;        /* errors */
+      --filament:#8aa8ff;   /* field lines base */
+      --node:#9dd7ff;       /* node glow */
+      --echo:#caa8ff;       /* holographic echo */
+    }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--ink); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    .wrap { display:grid; grid-template-columns: 320px 1fr; grid-template-rows: auto 1fr; gap: 12px; height:100%; padding: 12px; box-sizing:border-box; }
+    header { grid-column: 1 / -1; background:var(--panel); border-radius:14px; padding: 12px 16px; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    header h1 { font-size: 18px; margin:0; letter-spacing:.2px; }
+    header .sub { color:var(--muted); font-size:12px; }
+
+    aside { background:var(--panel); border-radius:14px; padding: 14px; display:flex; flex-direction:column; gap:12px; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+    .section { border:1px solid #eef2f7; border-radius:12px; padding:12px; }
+    .section h2 { font-size:13px; margin:0 0 8px 0; color:#3b4a5d; text-transform:uppercase; letter-spacing:.6px; }
+    .row { display:flex; align-items:center; gap:8px; margin:6px 0; }
+    .row label { flex: 1 1 auto; color:var(--muted); font-size:12px; }
+    .row input[type="range"]{ width: 100%; }
+    .row input[type="number"]{ width:72px; }
+    .buttons { display:flex; flex-wrap:wrap; gap:8px; }
+    button { appearance:none; border:1px solid #dfe7f3; background:#fff; color:#1f2d3d; padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:600; }
+    button.primary { background: var(--accent); color:#fff; border-color:transparent; }
+    button.good { background: var(--good); color:#fff; border-color:transparent; }
+    button.warn { background: var(--warn); color:#fff; border-color:transparent; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+
+    .status { display:flex; gap:10px; align-items:center; font-size:12px; color:var(--muted); }
+    .dot { width:10px; height:10px; border-radius:50%; background:#d0d8e6; box-shadow:0 0 0 2px #eef2f7 inset; }
+    .dot.on { background: var(--good); box-shadow:0 0 12px var(--good); }
+    .dot.warn { background: var(--warn); box-shadow:0 0 12px var(--warn); }
+
+    main { position:relative; background:var(--panel); border-radius:14px; overflow:hidden; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+    #view { width:100%; height:100%; display:block; background: radial-gradient(1200px 800px at 60% 40%, #f7fbff 0%, #edf5ff 40%, #ebf1ff 45%, #e9f0ff 50%, #e4ecff 60%, #e2ebff 70%, #e0e9ff 80%, #dfe7ff 100%); }
+    .overlay { position:absolute; left:0; top:0; right:0; padding:10px; display:flex; justify-content:flex-end; pointer-events:none; }
+    .pill { pointer-events:auto; background:rgba(255,255,255,.85); border:1px solid #dfe7f3; padding:6px 10px; border-radius:999px; font-size:12px; color:var(--muted); }
+    .legend { position:absolute; left:8px; bottom:8px; background:rgba(255,255,255,.85); border:1px solid #dfe7f3; padding:8px 10px; border-radius:10px; font-size:12px; color:#3b4a5d; }
+    .legend .swatch { display:inline-block; vertical-align:middle; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+    .note { font-size:12px; color:var(--muted); margin-top:6px; }
+    a.small { color:var(--accent); font-size:12px; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>The Ambient Mesh</h1>
+        <div class="sub">Memory as interference in a standing-wave room. Gesture and tone to recall holographic echoes.</div>
+      </div>
+      <div class="status" id="statusbar">
+        <div class="dot" id="engineDot" title="Field Engine"></div><span>Field</span>
+        <div class="dot" id="audioDot" title="Audio Engine"></div><span>Audio</span>
+        <div class="dot" id="micDot" title="Microphone"></div><span>Mic</span>
+      </div>
+    </header>
+
+    <aside>
+      <div class="section">
+        <h2>Field Controls</h2>
+        <div class="row"><label for="nodes">Node count</label><input id="nodes" type="range" min="64" max="800" value="280" step="8"><span id="nodesVal">280</span></div>
+        <div class="row"><label for="persistence">Persistence (decay)</label><input id="persistence" type="range" min="0.88" max="0.999" value="0.975" step="0.001"><span id="persistenceVal">0.975</span></div>
+        <div class="row"><label for="coherence">Coherence</label><input id="coherence" type="range" min="0.0" max="1.0" value="0.6" step="0.01"><span id="coherenceVal">0.60</span></div>
+        <div class="row"><label for="gain">Visual gain</label><input id="gain" type="range" min="0.5" max="3.0" value="1.2" step="0.1"><span id="gainVal">1.2</span></div>
+        <div class="buttons">
+          <button id="startBtn" class="primary">Start Field</button>
+          <button id="clearBtn">Clear Memory</button>
+          <button id="saveBtn">Save Memory</button>
+          <button id="loadBtn">Load Memory</button>
+        </div>
+        <div class="note">Move your mouse or finger to write into the mesh. Hold <strong>Shift</strong> while dragging to lay a strong trace.</div>
+      </div>
+
+      <div class="section">
+        <h2>Resonance</h2>
+        <div class="row"><label for="tone">Tone (Hz)</label><input id="tone" type="range" min="120" max="1200" value="432" step="1"><input id="toneNum" type="number" min="120" max="1200" value="432"></div>
+        <div class="row"><label for="resThresh">Recall threshold</label><input id="resThresh" type="range" min="0.60" max="0.98" value="0.86" step="0.01"><span id="resThreshVal">0.86</span></div>
+        <div class="buttons">
+          <button id="toneBtn" class="primary">Play Tone</button>
+          <button id="micBtn">Enable Mic</button>
+          <button id="demoBtn" class="good">Demo: Seed Echoes</button>
+        </div>
+        <div class="note">Hum near the selected frequency or replay a gesture arc to call echoes into view.</div>
+      </div>
+
+      <div class="section">
+        <h2>About</h2>
+        <p class="note">This room hosts a lattice of simulated field nodes. Your motions and tones perturb the standing wave. The system stores sparse <em>interference traces</em> and tries to reconstitute them when current input resonates.</p>
+        <p class="note">Memories live locally in your browser (no network). Use <em>Save</em>/<em>Load</em> to persist.</p>
+        <div class="buttons">
+          <a class="small" href="#" id="exportPNG">Export Snapshot</a>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <canvas id="view" aria-label="Ambient Mesh Field" role="img"></canvas>
+      <div class="overlay"><div class="pill" id="hint">Drag to write. Shift+Drag for strong imprint. Tone or Mic to recall.</div></div>
+      <div class="legend">
+        <div><span class="swatch" style="background:var(--filament)"></span>Filaments</div>
+        <div><span class="swatch" style="background:var(--node)"></span>Field nodes</div>
+        <div><span class="swatch" style="background:var(--echo)"></span>Holographic echoes</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+  ;(() => {
+    const $ = sel => document.querySelector(sel);
+    const view = $('#view');
+    const ctx = view.getContext('2d');
+
+    // UI elements
+    const nodesSlider = $('#nodes');
+    const nodesVal = $('#nodesVal');
+    const persistenceSlider = $('#persistence');
+    const persistenceVal = $('#persistenceVal');
+    const coherenceSlider = $('#coherence');
+    const coherenceVal = $('#coherenceVal');
+    const gainSlider = $('#gain');
+    const gainVal = $('#gainVal');
+    const resThresh = $('#resThresh');
+    const resThreshVal = $('#resThreshVal');
+
+    const toneRange = $('#tone');
+    const toneNum = $('#toneNum');
+
+    const startBtn = $('#startBtn');
+    const clearBtn = $('#clearBtn');
+    const saveBtn = $('#saveBtn');
+    const loadBtn = $('#loadBtn');
+    const toneBtn = $('#toneBtn');
+    const micBtn = $('#micBtn');
+    const demoBtn = $('#demoBtn');
+    const exportPNG = $('#exportPNG');
+
+    const engineDot = $('#engineDot');
+    const audioDot = $('#audioDot');
+    const micDot = $('#micDot');
+
+    // State
+    let running = false;
+    let W = 0, H = 0, DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+    const params = {
+      nodes: parseInt(nodesSlider.value, 10),
+      persistence: parseFloat(persistenceSlider.value),
+      coherence: parseFloat(coherenceSlider.value),
+      visualGain: parseFloat(gainSlider.value),
+      recallThresh: parseFloat(resThresh.value),
+      toneHz: parseInt(toneRange.value, 10),
+    };
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a,b,t)=>a+(b-a)*t;
+    const now = () => performance.now();
+
+    // Field nodes and filaments
+    let nodes = [];
+    let filaments = []; // pairs of node indices
+
+    // Gesture writing
+    let drawing = false;
+    let strong = false; // shift key for strong imprint
+    let lastX = 0, lastY = 0;
+    let gestureBuffer = []; // recent points for similarity detection
+
+    // Memory traces
+    const MAX_TRACES = 256;
+    let traces = [];
+
+    // Audio
+    let audioCtx = null, masterGain = null, toneOsc = null, micStream = null, micAnalyser = null, micData = null;
+
+    // Resize canvas
+    function resize() {
+      const rect = view.getBoundingClientRect();
+      W = Math.floor(rect.width * DPR);
+      H = Math.floor(rect.height * DPR);
+      view.width = W;
+      view.height = H;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Initialize nodes with Poisson-ish jitter grid
+    function initNodes(n) {
+      nodes = [];
+      const cols = Math.ceil(Math.sqrt(n * (W/H)));
+      const rows = Math.ceil(n / cols);
+      for (let r=0; r<rows; r++){
+        for (let c=0; c<cols; c++){
+          if (nodes.length >= n) break;
+          const x = (c + 0.5 + (Math.random()-0.5)*0.6) * (W/cols);
+          const y = (r + 0.5 + (Math.random()-0.5)*0.6) * (H/rows);
+          nodes.push({x, y, phase: Math.random()*Math.PI*2, amp: 0});
+        }
+      }
+      // connect filaments by Delaunay-ish nearest neighbors (simple k-NN)
+      filaments = [];
+      const k = 3;
+      for (let i=0;i<nodes.length;i++){
+        // find k nearest
+        const base = nodes[i];
+        const dists = nodes.map((p,j)=> j===i? [Infinity,j]: [ (p.x-base.x)**2 + (p.y-base.y)**2, j ] ).sort((a,b)=>a[0]-b[0]);
+        for (let t=1;t<=k;t++){
+          const j = dists[t]?.[1];
+          if (j!=null) filaments.push([i,j]);
+        }
+      }
+    }
+
+    // Field update
+    let t0 = now();
+    function step(){
+      if (!running) return;
+      const t = now()*0.001;
+      const dt = (t - t0);
+      t0 = t;
+
+      // fade canvas for persistence of light
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(255,255,255,${1-params.persistence})`;
+      ctx.fillRect(0,0,view.width/DPR,view.height/DPR);
+
+      // update node phases (standing wave modulated by coherence and stored traces)
+      for (let i=0;i<nodes.length;i++){
+        const p = nodes[i];
+        // base standing wave
+        const base = Math.sin( (p.x*0.004) + (p.y*0.006) + t*1.6 + p.phase );
+
+        // influence from active gesture
+        let gAmp = 0;
+        if (gestureBuffer.length>1){
+          const g = gestureBuffer[gestureBuffer.length-1];
+          const dx = p.x - g.x*DPR;
+          const dy = p.y - g.y*DPR;
+          const d = Math.hypot(dx,dy);
+          gAmp += strong? 1.8 : 0.9;
+          gAmp *= Math.exp(-d*0.004);
+        }
+
+        // influence from traces re-playing (sum of near echoes)
+        let eAmp = 0;
+        for (let tr of traces){
+          if (!tr.active) continue;
+          const dx = p.x - tr.lastX*DPR;
+          const dy = p.y - tr.lastY*DPR;
+          const d = Math.hypot(dx,dy);
+          eAmp += tr.strength * Math.exp(-d*0.003);
+        }
+
+        // combine
+        const amp = (0.6*base + 0.25*gAmp + 0.35*eAmp) * (0.6 + 0.6*params.coherence);
+        p.amp = lerp(p.amp, amp, 0.35);
+      }
+
+      // draw filaments
+      ctx.lineWidth = 1.2;
+      for (let [i,j] of filaments){
+        const a = nodes[i], b = nodes[j];
+        const lum = clamp((Math.abs(a.amp) + Math.abs(b.amp))*0.5*params.visualGain, 0, 1.6);
+        ctx.strokeStyle = `rgba(138,168,255,${0.20 + lum*0.45})`;
+        ctx.beginPath(); ctx.moveTo(a.x/DPR, a.y/DPR); ctx.lineTo(b.x/DPR, b.y/DPR); ctx.stroke();
+      }
+
+      // draw nodes
+      for (let p of nodes){
+        const lum = clamp(Math.abs(p.amp)*params.visualGain, 0, 1.8);
+        ctx.fillStyle = `rgba(157,215,255,${0.15 + lum*0.35})`;
+        ctx.beginPath(); ctx.arc(p.x/DPR, p.y/DPR, 1.6 + lum*1.8, 0, Math.PI*2); ctx.fill();
+      }
+
+      // draw active traces (holographic echoes)
+      for (let tr of traces){
+        tr.update(dt);
+        tr.draw(ctx);
+      }
+
+      // attempt resonance recall when enough gesture or tone energy present
+      if (gestureBuffer.length > 8 || micEnergy()>0.25 || toneOsc){
+        tryRecall();
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    // Memory Trace class
+    class Trace{
+      constructor(points, freq, strength=1){
+        this.points = points.slice();
+        this.freq = freq|0; // Hz snapshot
+        this.strength = strength; // echo brightness
+        this.alpha = 0.0;
+        this.active = false;
+        this.t = 0;
+        this.lastX = points[points.length-1]?.x || 0;
+        this.lastY = points[points.length-1]?.y || 0;
+      }
+      similarity(currPoints, freq){
+        if (this.points.length<4 || currPoints.length<4) return 0;
+        // use simplified shape context: compare last 24 samples resampled to 12 points
+        const A = resample(this.points, 12);
+        const B = resample(currPoints, 12);
+        // compute normalized dot of direction vectors + frequency closeness
+        let s=0, n=0;
+        for (let i=1;i<12;i++){
+          const ax=A[i].x-A[i-1].x, ay=A[i].y-A[i-1].y;
+          const bx=B[i].x-B[i-1].x, by=B[i].y-B[i-1].y;
+          const da = Math.hypot(ax,ay)||1; const db = Math.hypot(bx,by)||1;
+          s += ( (ax/da)*(bx/db) + (ay/da)*(by/db) ) * 0.5 + 0.5; // map [-1,1]→[0,1]
+          n++;
+        }
+        const dirSim = s/n; // 0..1
+        const fSim = Math.exp(-Math.abs((freq|0)-this.freq)/180);
+        return 0.6*dirSim + 0.4*fSim;
+      }
+      activate(){
+        this.active = true; this.t = 0; this.alpha = 0.0;
+      }
+      update(dt){
+        if (!this.active) return;
+        this.t += dt;
+        // fade-in then slow fade-out governed by persistence
+        this.alpha = Math.min(1, this.alpha + dt*1.6);
+        this.strength *= params.persistence;
+        if (this.strength < 0.05) { this.active = false; this.alpha = 0; }
+        const last = this.points[this.points.length-1];
+        if (last) { this.lastX = last.x; this.lastY = last.y; }
+      }
+      draw(ctx){
+        if (!this.active) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(202,168,255,${0.08 + this.alpha*0.35})`;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        for (let i=0;i<this.points.length;i++){
+          const p = this.points[i];
+          if (i===0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+      toJSON(){ return {points:this.points, freq:this.freq, strength:this.strength}; }
+      static from(o){ const tr = new Trace(o.points, o.freq, o.strength); return tr; }
+    }
+
+    function resample(points, n){
+      if (points.length===0) return Array.from({length:n},()=>({x:0,y:0}));
+      const total = points.reduce((acc,p,i)=> i? acc + Math.hypot(p.x-points[i-1].x, p.y-points[i-1].y) : 0, 0) || 1;
+      const step = total/(n-1);
+      const out=[points[0]]; let d=0; let i=1;
+      for (let s=1; s<n-1; s++){
+        const target = s*step; while (i<points.length){
+          const a = points[i-1], b = points[i];
+          const seg = Math.hypot(b.x-a.x, b.y-a.y);
+          if (d+seg >= target){
+            const t = (target - d) / seg; out.push({x: lerp(a.x,b.x,t), y: lerp(a.y,b.y,t)}); break;
+          } else { d += seg; i++; }
+        }
+      }
+      out.push(points[points.length-1]);
+      return out;
+    }
+
+    // Gesture capture
+    function toLocal(e){
+      const rect = view.getBoundingClientRect();
+      const x = ( (e.touches? e.touches[0].clientX : e.clientX) - rect.left );
+      const y = ( (e.touches? e.touches[0].clientY : e.clientY) - rect.top );
+      return {x, y};
+    }
+
+    function beginDraw(e){ drawing = true; strong = e.shiftKey===true; gestureBuffer = []; const p = toLocal(e); lastX=p.x; lastY=p.y; gestureBuffer.push(p); e.preventDefault(); }
+    function moveDraw(e){ if (!drawing) { // still write a faint perturbation
+        const p = toLocal(e); gestureBuffer.push(p); if (gestureBuffer.length>64) gestureBuffer.shift(); return; }
+      const p = toLocal(e);
+      const dx = p.x - lastX, dy = p.y - lastY; const d = Math.hypot(dx,dy);
+      if (d > 1){
+        lastX = p.x; lastY = p.y; gestureBuffer.push({x:p.x, y:p.y});
+      }
+      e.preventDefault();
+    }
+    function endDraw(e){ if (!drawing) return; drawing = false; e.preventDefault();
+      if (gestureBuffer.length>8){
+        const freq = currentFreq();
+        const str = strong? 1.4 : 0.8;
+        const tr = new Trace(gestureBuffer.slice(-220), freq, str);
+        traces.unshift(tr); if (traces.length>MAX_TRACES) traces.length = MAX_TRACES;
+      }
+    }
+
+    view.addEventListener('mousedown', beginDraw);
+    window.addEventListener('mousemove', moveDraw);
+    window.addEventListener('mouseup', endDraw);
+    view.addEventListener('touchstart', beginDraw, {passive:false});
+    view.addEventListener('touchmove', moveDraw, {passive:false});
+    view.addEventListener('touchend', endDraw, {passive:false});
+
+    // Resonance detection
+    function tryRecall(){
+      const freq = currentFreq();
+      const pts = gestureBuffer.slice(-220);
+      let best = null, bestS = 0;
+      for (let tr of traces){
+        const s = tr.similarity(pts, freq);
+        if (s > bestS){ bestS = s; best = tr; }
+      }
+      if (best && bestS >= params.recallThresh){
+        best.strength = Math.min(1.6, best.strength + 0.6*(bestS-params.recallThresh+0.1));
+        best.activate();
+        pingAudio(best.freq);
+        flash(engineDot, 'on');
+      }
+    }
+
+    function flash(el, cls){ el.classList.add(cls); setTimeout(()=>el.classList.remove(cls), 300); }
+
+    // UI bindings
+    nodesSlider.addEventListener('input', ()=>{ params.nodes = parseInt(nodesSlider.value,10); nodesVal.textContent = params.nodes; initNodes(params.nodes); });
+    persistenceSlider.addEventListener('input', ()=>{ params.persistence = parseFloat(persistenceSlider.value); persistenceVal.textContent = params.persistence.toFixed(3); });
+    coherenceSlider.addEventListener('input', ()=>{ params.coherence = parseFloat(coherenceSlider.value); coherenceVal.textContent = params.coherence.toFixed(2); });
+    gainSlider.addEventListener('input', ()=>{ params.visualGain = parseFloat(gainSlider.value); gainVal.textContent = params.visualGain.toFixed(1); });
+    resThresh.addEventListener('input', ()=>{ params.recallThresh = parseFloat(resThresh.value); resThreshVal.textContent = params.recallThresh.toFixed(2); });
+
+    toneRange.addEventListener('input', ()=>{ toneNum.value = toneRange.value; params.toneHz = parseInt(toneRange.value,10); if (toneOsc) toneOsc.frequency.value = params.toneHz; });
+    toneNum.addEventListener('input', ()=>{ const v = clamp(parseInt(toneNum.value,10)||432, 120, 1200); toneNum.value = v; toneRange.value = v; params.toneHz = v; if (toneOsc) toneOsc.frequency.value = v; });
+
+    startBtn.addEventListener('click', startEngine);
+    clearBtn.addEventListener('click', ()=>{ traces = []; localStorage.removeItem('ambient_mesh_traces'); });
+    saveBtn.addEventListener('click', ()=>{ const payload = JSON.stringify(traces.map(t=>t.toJSON())); localStorage.setItem('ambient_mesh_traces', payload); flash(engineDot,'on'); });
+    loadBtn.addEventListener('click', ()=>{ const payload = localStorage.getItem('ambient_mesh_traces'); if (payload){ try{ const arr = JSON.parse(payload); traces = arr.map(o=>Trace.from(o)); flash(engineDot,'on'); }catch(e){ console.warn(e); } } });
+
+    toneBtn.addEventListener('click', ()=>{ if (!audioCtx) initAudio(); if (!toneOsc) startTone(); else stopTone(); });
+    micBtn.addEventListener('click', ()=>{ if (!audioCtx) initAudio(); if (!micStream) enableMic(); else disableMic(); });
+    demoBtn.addEventListener('click', seedDemo);
+
+    exportPNG.addEventListener('click', (e)=>{ e.preventDefault(); const url = view.toDataURL('image/png'); const a = document.createElement('a'); a.href=url; a.download='ambient-mesh.png'; a.click(); });
+
+    function startEngine(){
+      if (running) return; running = true; initNodes(params.nodes); engineDot.classList.add('on'); step();
+    }
+
+    // Audio helpers
+    function initAudio(){
+      if (audioCtx) return;
+      const AC = window.AudioContext || window.webkitAudioContext; audioCtx = new AC();
+      masterGain = audioCtx.createGain(); masterGain.gain.value = 0.2; masterGain.connect(audioCtx.destination);
+      audioDot.classList.add('on');
+    }
+    function startTone(){ if (!audioCtx) return; if (toneOsc) return; toneOsc = audioCtx.createOscillator(); toneOsc.type = 'sine'; toneOsc.frequency.value = params.toneHz; const g = audioCtx.createGain(); g.gain.value = 0.12; toneOsc.connect(g).connect(masterGain); toneOsc.start(); toneBtn.textContent='Stop Tone'; flash(audioDot,'on'); }
+    function stopTone(){ if (!toneOsc) return; toneOsc.stop(); toneOsc.disconnect(); toneOsc=null; toneBtn.textContent='Play Tone'; }
+
+    async function enableMic(){
+      try{
+        micStream = await navigator.mediaDevices.getUserMedia({audio: { echoCancellation:true, noiseSuppression:true }});
+        const src = audioCtx.createMediaStreamSource(micStream);
+        micAnalyser = audioCtx.createAnalyser(); micAnalyser.fftSize = 2048; micData = new Float32Array(micAnalyser.fftSize);
+        src.connect(micAnalyser);
+        micBtn.textContent='Disable Mic'; micDot.classList.add('on');
+      }catch(err){ console.warn(err); micDot.classList.add('warn'); }
+    }
+    function disableMic(){ if (!micStream) return; micStream.getTracks().forEach(t=>t.stop()); micStream=null; micAnalyser=null; micData=null; micBtn.textContent='Enable Mic'; micDot.classList.remove('on'); }
+
+    function micEnergy(){
+      if (!micAnalyser || !micData) return 0;
+      micAnalyser.getFloatTimeDomainData(micData);
+      // simple RMS
+      let sum=0; for (let i=0;i<micData.length;i++){ const v = micData[i]; sum += v*v; }
+      const rms = Math.sqrt(sum/micData.length);
+      return clamp((rms-0.02)*10, 0, 1); // normalize
+    }
+
+    function pingAudio(freq){
+      if (!audioCtx) return;
+      const o = audioCtx.createOscillator(); o.type='sine'; o.frequency.value = freq||params.toneHz;
+      const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+0.45);
+      o.connect(g).connect(masterGain); o.start(); o.stop(audioCtx.currentTime+0.48);
+    }
+
+    function currentFreq(){ return toneOsc? toneOsc.frequency.value|0 : params.toneHz; }
+
+    // Demo seeding: draw a few characteristic traces and frequencies
+    function seedDemo(){
+      const w = view.width/DPR, h = view.height/DPR;
+      const seeds = [
+        { pts: [ {x:w*0.2,y:h*0.7},{x:w*0.28,y:h*0.55},{x:w*0.38,y:h*0.46},{x:w*0.54,y:h*0.44},{x:w*0.66,y:h*0.5},{x:w*0.78,y:h*0.63} ], f: 432 },
+        { pts: [ {x:w*0.7,y:h*0.2},{x:w*0.62,y:h*0.32},{x:w*0.55,y:h*0.38},{x:w*0.48,y:h*0.42},{x:w*0.36,y:h*0.46},{x:w*0.25,y:h*0.5} ], f: 528 },
+        { pts: [ {x:w*0.35,y:h*0.25},{x:w*0.42,y:h*0.28},{x:w*0.51,y:h*0.31},{x:w*0.62,y:h*0.35},{x:w*0.74,y:h*0.38} ], f: 639 }
+      ];
+      for (let s of seeds){ const tr = new Trace(s.pts, s.f, 1.1); traces.unshift(tr); }
+      if (!running) startEngine();
+      flash(engineDot,'on');
+    }
+
+    // Initial text values
+    nodesVal.textContent = params.nodes;
+    persistenceVal.textContent = params.persistence.toFixed(3);
+    coherenceVal.textContent = params.coherence.toFixed(2);
+    gainVal.textContent = params.visualGain.toFixed(1);
+    resThreshVal.textContent = params.recallThresh.toFixed(2);
+
+    // Auto-start for convenience
+    startEngine();
+  })();
+  </script>
+</body>
+</html>
