@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 import threading, time
 
 # import your engine
-from backend.worlds.created_worlds.subterranean_spinal_grid import SpinalGridWorld
+from worlds.created_worlds.subterranean_spinal_grid import SpinalGridWorld
 
 app = Flask(__name__)
 
