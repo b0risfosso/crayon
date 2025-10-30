@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Minting Organism — Living World</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#121922; --ink:#d2e3f5; --muted:#7a8aa0; --accent:#56d7ff;
+      --good:#3bd16f; --warn:#ffbe3b; --bad:#ff5c7a; --gene:#9aa7ff; --leaf:#2bdc7b; --vine:#1b8f50;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071018 0%,#0b0f14 100%);color:var(--ink);font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial}
+    .wrap{display:grid;grid-template-columns:1.2fr 0.8fr;grid-template-rows:auto 1fr auto;gap:12px;min-height:100vh;padding:12px}
+    header{grid-column:1/-1;background:rgba(255,255,255,0.03);backdrop-filter: blur(6px);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+    header h1{font-size:18px;margin:0;letter-spacing:0.4px}
+    header .badges{display:flex;gap:8px;align-items:center}
+    .badge{padding:4px 8px;border-radius:999px;background:#0f1621;border:1px solid rgba(255,255,255,0.07);color:var(--muted)}
+
+    #viewport{position:relative;background:radial-gradient(60% 40% at 50% 70%, rgba(86,215,255,0.1), rgba(86,215,255,0) 60%), radial-gradient(50% 50% at 20% 20%, rgba(59,209,111,0.12), rgba(59,209,111,0) 60%);border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden}
+    #garden{width:100%;height:100%}
+
+    aside{display:flex;flex-direction:column;gap:12px}
+    .panel{background:var(--panel);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:12px}
+    .panel h2{margin:0 0 8px 0;font-size:14px;color:var(--muted);letter-spacing:0.3px}
+    .control{display:grid;grid-template-columns:120px 1fr 48px;gap:8px;align-items:center;margin:8px 0}
+    .control input[type="range"]{width:100%}
+    .kv{display:flex;gap:8px;flex-wrap:wrap}
+    .kv .pill{background:#0f1621;border:1px solid rgba(255,255,255,0.07);border-radius:999px;padding:6px 10px;color:var(--muted)}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    button{cursor:pointer;border:1px solid rgba(255,255,255,0.08);background:#0f1621;color:var(--ink);padding:8px 12px;border-radius:12px}
+    button.primary{background:linear-gradient(180deg,#1b2a3a,#0f1621);border-color:#1e2c3f}
+    button:active{transform:translateY(1px)}
+
+    footer{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .ledger{background:var(--panel);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:12px;min-height:120px;}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:6px 8px;border-bottom:1px dashed rgba(255,255,255,0.06);color:#c9d7e8}
+    th{text-align:left;color:var(--muted);font-weight:600}
+
+    .metric{display:flex;align-items:center;gap:8px}
+    .metric strong{font-size:18px}
+    .meter{height:8px;border-radius:999px;background:#0f1621;border:1px solid rgba(255,255,255,0.07);overflow:hidden}
+    .meter>i{display:block;height:100%;background:linear-gradient(90deg,var(--good),var(--accent));width:0%}
+
+    /* SVG styles */
+    .leaf{filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));cursor:pointer}
+    .leaf .vein{stroke:rgba(0,0,0,0.25);stroke-width:0.8}
+    .leaf .fill{fill:url(#leafFill)}
+    .leaf .note{font-weight:600;fill:#0b1a10}
+    .vine{stroke:var(--vine);stroke-width:3;fill:none;stroke-linecap:round;stroke-opacity:0.9}
+    .sun{filter: drop-shadow(0 0 18px rgba(255, 223, 128, 0.5))}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🌿 The Minting Organism — Sheets of Currency Growing on Vines</h1>
+      <div class="badges">
+        <div class="badge">Money = Growth × Time × Sunlight</div>
+        <div class="badge">Click mature leaves to mint</div>
+      </div>
+    </header>
+
+    <section id="viewport">
+      <svg id="garden" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice" aria-label="Minting organism garden">
+        <defs>
+          <radialGradient id="leafFill" cx="50%" cy="40%" r="70%">
+            <stop offset="0%" stop-color="#98ffd2" stop-opacity="0.95"/>
+            <stop offset="55%" stop-color="#55e29b" stop-opacity="0.95"/>
+            <stop offset="100%" stop-color="#25c06f" stop-opacity="0.98"/>
+          </radialGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge>
+              <feMergeNode in="b"/><feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <!-- Sun indicator -->
+        <g id="sun" class="sun">
+          <circle cx="1050" cy="80" r="26" fill="#ffd86b" stroke="#ffe9a9" stroke-width="2"/>
+          <text x="1050" y="85" text-anchor="middle" font-size="12" fill="#1b1200">☀</text>
+        </g>
+        <!-- Vines & leaves injected here -->
+        <g id="vines"></g>
+      </svg>
+    </section>
+
+    <aside>
+      <div class="panel">
+        <h2>Metabolism Controls</h2>
+        <div class="control"><label>Sunlight</label><input type="range" id="sunlight" min="0" max="100" value="70"><span id="sunlightVal">70</span></div>
+        <div class="control"><label>Effort</label><input type="range" id="effort" min="0" max="100" value="60"><span id="effortVal">60</span></div>
+        <div class="control"><label>Ideas</label><input type="range" id="ideas" min="0" max="100" value="65"><span id="ideasVal">65</span></div>
+        <div class="control"><label>Trade</label><input type="range" id="trade" min="0" max="100" value="55"><span id="tradeVal">55</span></div>
+        <div class="control"><label>Water</label><input type="range" id="water" min="0" max="100" value="50"><span id="waterVal">50</span></div>
+        <div class="row">
+          <button id="toggle">⏸️ Pause</button>
+          <button id="newVine">🌱 New Vine</button>
+          <button id="storm">⚡ Stress Test</button>
+          <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="autoHarvest"> Auto‑harvest</label>
+        </div>
+        <div class="kv" style="margin-top:8px">
+          <span class="pill">Maturity threshold: <strong id="maturityLabel">1.00</strong></span>
+          <span class="pill">Growth rate: <strong id="growthLabel">–</strong></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Health & Yield</h2>
+        <div class="control" style="grid-template-columns:140px 1fr 70px">
+          <label>Resilience</label>
+          <div class="meter"><i id="resMeter"></i></div>
+          <span id="resilienceVal">0%</span>
+        </div>
+        <div class="control" style="grid-template-columns:140px 1fr 70px">
+          <label>Photosynthesis</label>
+          <div class="meter"><i id="photoMeter"></i></div>
+          <span id="photoVal">0%</span>
+        </div>
+        <div class="control" style="grid-template-columns:140px 1fr 70px">
+          <label>Diversity</label>
+          <div class="meter"><i id="divMeter"></i></div>
+          <span id="divVal">0%</span>
+        </div>
+        <div class="row">
+          <div class="metric">Minted Value: <strong id="minted">0.00</strong> ¤</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Principle</h2>
+        <p style="color:var(--muted);margin:0">Value emerges from cycles of input → transformation → harvest. Tune nutrients to explore regimes: exploitative (fast growth, fragile) vs regenerative (balanced, resilient).</p>
+      </div>
+    </aside>
+
+    <div class="ledger">
+      <h2 style="margin:0 0 8px 0;color:var(--muted)">Mint Ledger (recent)</h2>
+      <table id="ledger">
+        <thead><tr><th>Time</th><th>Leaf</th><th>Age (s)</th><th>Quality</th><th>Denom (¤)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="ledger">
+      <h2 style="margin:0 0 8px 0;color:var(--muted)">World Notes</h2>
+      <ul id="notes" style="margin:0;padding-left:18px;color:#c9d7e8">
+        <li>Click mature leaves to harvest currency. Auto‑harvest can be toggled.</li>
+        <li>Stress Test applies pests & drought. High resilience mitigates losses.</li>
+        <li>Ideas amplify quality and denomination; Trade improves market multiplier & stability; Effort accelerates growth; Water buffers stress; Sunlight drives photosynthesis.</li>
+      </ul>
+    </div>
+  </footer>
+  </div>
+
+  <script>
+    // -------------------------- Utilities --------------------------
+    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+    const rng = (seed=>(){
+      // Mulberry32
+      let s = seed>>>0; return ()=>{ s += 0x6D2B79F5; let t = Math.imul(s ^ s>>>15,1|s); t ^= t + Math.imul(t ^ t>>>7, 61|t); return ((t ^ t>>>14) >>> 0) / 4294967296; };
+    })(Math.floor(Math.random()*1e9));
+
+    // -------------------------- World State --------------------------
+    const world = {
+      running: true,
+      time: 0,
+      minted: 0,
+      leaves: new Map(), // id -> leaf
+      vines: [],
+      controls: {
+        sunlight: 70, effort: 60, ideas: 65, trade: 55, water: 50
+      },
+      stress: 0,
+    };
+
+    const svg = document.getElementById('garden');
+    const vinesG = document.getElementById('vines');
+    const ledgerBody = document.querySelector('#ledger tbody');
+
+    // UI elements
+    const el = id => document.getElementById(id);
+    const controls = ['sunlight','effort','ideas','trade','water'];
+    controls.forEach(k=>{
+      const input = el(k); const out = el(k+"Val");
+      input.addEventListener('input',()=>{ world.controls[k] = +input.value; out.textContent = input.value; updateDerived(); });
+      out.textContent = input.value;
+    });
+
+    el('toggle').onclick = ()=>{ world.running = !world.running; el('toggle').textContent = world.running ? '⏸️ Pause' : '▶️ Play'; };
+    el('newVine').onclick = ()=> spawnVine();
+    el('storm').onclick = ()=> applyStress();
+
+    // -------------------------- Metabolism Model --------------------------
+    function derived(){
+      const c = world.controls;
+      const light = c.sunlight/100; // 0..1
+      const effort = c.effort/100;
+      const ideas = c.ideas/100;
+      const trade = c.trade/100;
+      const water = c.water/100;
+
+      const photosynthesis = clamp(light * (0.6 + 0.4*water), 0, 1);
+      const growthRate = 0.015 + photosynthesis * (0.05 + 0.06*effort); // size/sec
+      const quality = 0.5 + 0.6*ideas + 0.2*photosynthesis; // affects denomination
+      const marketMult = 0.8 + 0.6*trade + 0.2*ideas; // value boost
+      const diversity = (1 - Math.abs(ideas - trade)) * (0.5 + 0.5*water); // balance metric
+      const resilience = clamp(0.25*water + 0.35*diversity + 0.25*trade + 0.15*ideas, 0, 1);
+      const maturityThreshold = 1.0; // normalized size
+
+      return {photosynthesis, growthRate, quality, marketMult, diversity, resilience, maturityThreshold};
+    }
+
+    function updateDerived(){
+      const d = derived();
+      el('growthLabel').textContent = d.growthRate.toFixed(3) + ' size/s';
+      el('maturityLabel').textContent = d.maturityThreshold.toFixed(2);
+      el('resilienceVal').textContent = Math.round(d.resilience*100)+'%';
+      el('photoVal').textContent = Math.round(d.photosynthesis*100)+'%';
+      el('divVal').textContent = Math.round(d.diversity*100)+'%';
+      el('resMeter').style.width = (d.resilience*100)+'%';
+      el('photoMeter').style.width = (d.photosynthesis*100)+'%';
+      el('divMeter').style.width = (d.diversity*100)+'%';
+      // Sun position feedback
+      const sun = document.getElementById('sun');
+      sun.setAttribute('transform',`translate(${(d.photosynthesis*140)} ${0})`);
+    }
+
+    // -------------------------- Entities --------------------------
+    let nextLeafId = 1;
+    function spawnVine(){
+      const id = 'vine_'+Math.floor(rng()*1e6);
+      const x0 = 80 + rng()*200; const y0 = 680 - rng()*80;
+      const len = 700 + rng()*300;
+      const angle = -Math.PI/2 + (rng()-0.5)*0.4; // generally upward
+      const segments = 8 + Math.floor(rng()*6);
+      const pts = [];
+      for(let i=0;i<=segments;i++){
+        const t = i/segments; const x = x0 + Math.cos(angle + (rng()-0.5)*0.2)*len*t*0.12 + t*80; const y = y0 + Math.sin(angle + (rng()-0.5)*0.2)*len*t*(-0.12) - t*40;
+        pts.push([x,y]);
+      }
+      const path = `M ${pts.map(p=>p.join(',')).join(' L ')}`;
+      const pathEl = document.createElementNS('http://www.w3.org/2000/svg','path');
+      pathEl.setAttribute('d',path); pathEl.setAttribute('class','vine'); pathEl.setAttribute('stroke-dasharray','4 6');
+      vinesG.appendChild(pathEl);
+
+      // spawn initial leaves along the vine
+      const leavesCount = 6 + Math.floor(rng()*7);
+      for(let i=0;i<leavesCount;i++){
+        const t = (i+1)/(leavesCount+2);
+        const px = pts[Math.floor(t*segments)][0] + (rng()-0.5)*30;
+        const py = pts[Math.floor(t*segments)][1] + (rng()-0.5)*20;
+        spawnLeaf(px, py, -20 + (rng()-0.5)*60);
+      }
+      world.vines.push({id, pathEl});
+    }
+
+    function spawnLeaf(x,y,rot){
+      const id = nextLeafId++;
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class','leaf');
+      g.setAttribute('transform',`translate(${x} ${y}) rotate(${rot}) scale(0.01)`);
+      g.dataset.id = id;
+
+      // leaf shape (simple bezier heart-like leaf)
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d','M 0 -22 C 18 -28, 26 -6, 0 22 C -26 -6, -18 -28, 0 -22 z');
+      path.setAttribute('class','fill');
+      path.setAttribute('filter','url(#glow)');
+
+      const vein = document.createElementNS('http://www.w3.org/2000/svg','path');
+      vein.setAttribute('d','M 0 -18 L 0 18 M 0 -8 C 6 -6, 8 -4, 10 0 M 0 0 C -6 2, -8 6, -10 10');
+      vein.setAttribute('class','vein');
+
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('y','4'); txt.setAttribute('text-anchor','middle'); txt.setAttribute('class','note'); txt.setAttribute('font-size','10');
+      txt.textContent = '¤';
+
+      g.appendChild(path); g.appendChild(vein); g.appendChild(txt);
+      vinesG.appendChild(g);
+
+      const leaf = { id, x, y, rot, size: 0.05 + rng()*0.05, age: 0, quality: 0.5, denom: 0, g, harvested:false };
+      world.leaves.set(id, leaf);
+
+      g.addEventListener('click',()=> tryHarvest(leaf));
+      return leaf;
+    }
+
+    // -------------------------- Simulation Loop --------------------------
+    function step(dt){
+      world.time += dt;
+      const d = derived();
+      // chance to spawn new buds
+      if(rng() < 0.02 * d.photosynthesis){
+        const x = 120 + rng()*900; const y = 420 + (1-rng())*240; const r = -20 + (rng()-0.5)*80;
+        spawnLeaf(x,y,r);
+      }
+      // grow leaves
+      world.leaves.forEach(leaf=>{
+        if(leaf.harvested) return;
+        // stress impact
+        const stressFactor = (1 - world.stress*0.5) * (0.8 + 0.4*d.resilience);
+        leaf.size += d.growthRate * dt * clamp(stressFactor, 0, 1);
+        leaf.size = Math.min(leaf.size, 1.6); // cap size to avoid runaway
+        leaf.age += dt;
+        leaf.quality = clamp(0.5 + 0.6*d.quality + 0.1*Math.sin(leaf.age*0.3), 0, 2.2);
+        // denomination increases with size and quality
+        leaf.denom = clamp( (leaf.size/d.maturityThreshold) * (0.4 + 0.6*leaf.quality) * d.marketMult, 0, 10);
+        // animate
+        const scale = Math.max(0.05, Math.min(leaf.size, 1.6));
+        leaf.g.setAttribute('transform',`translate(${leaf.x} ${leaf.y}) rotate(${leaf.rot}) scale(${scale})`);
+        // maturity glow
+        if(leaf.size >= d.maturityThreshold){
+          leaf.g.querySelector('.fill').setAttribute('stroke','#eafff3');
+          leaf.g.querySelector('.fill').setAttribute('stroke-width','0.8');
+        } else {
+          leaf.g.querySelector('.fill').setAttribute('stroke','none');
+        }
+        // auto harvest
+        if(el('autoHarvest').checked && leaf.size >= d.maturityThreshold){ tryHarvest(leaf); }
+      });
+      // light decay of stress
+      world.stress = Math.max(0, world.stress - dt*0.03);
+      updateDerived();
+      el('minted').textContent = world.minted.toFixed(2);
+    }
+
+    function tryHarvest(leaf){
+      const d = derived();
+      if(leaf.harvested) return;
+      if(leaf.size < d.maturityThreshold) return; // not ready
+      const base = 1.0 * d.marketMult; // base denomination unit
+      const denom = base * (0.6 + 0.4*leaf.quality) * (0.6 + 0.4*(leaf.size/d.maturityThreshold));
+      const value = Math.max(0.05, denom);
+      world.minted += value;
+      // ledger
+      const row = document.createElement('tr');
+      const t = new Date().toLocaleTimeString();
+      row.innerHTML = `<td>${t}</td><td>#${leaf.id}</td><td>${leaf.age.toFixed(1)}</td><td>${leaf.quality.toFixed(2)}</td><td>${value.toFixed(2)}</td>`;
+      ledgerBody.prepend(row);
+      // visual: pop + fade
+      leaf.harvested = true;
+      leaf.g.style.transition = 'transform 300ms ease, opacity 400ms ease';
+      leaf.g.style.opacity = '0.0';
+      const [x,y]=[leaf.x,leaf.y];
+      leaf.g.setAttribute('transform',`translate(${x} ${y-20}) rotate(${leaf.rot}) scale(${leaf.size*1.15})`);
+      setTimeout(()=>{ leaf.g.remove(); world.leaves.delete(leaf.id); }, 420);
+      // spawn a new bud nearby to represent regenerative growth
+      if(rng()<0.8){ spawnLeaf(x + (rng()-0.5)*40, y + (rng()-0.5)*20, leaf.rot + (rng()-0.5)*40); }
+    }
+
+    function applyStress(){
+      const d = derived();
+      world.stress = 1.0; // apply a shock
+      // probabilistic leaf loss inversely proportional to resilience
+      const killProb = clamp(0.5 - 0.45*d.resilience, 0.05, 0.6);
+      const toCull = [];
+      world.leaves.forEach(l=>{ if(!l.harvested && rng()<killProb*0.3){ toCull.push(l); }});
+      toCull.slice(0, Math.floor(toCull.length*0.7)).forEach(l=>{
+        l.harvested = true; l.g.style.transition='opacity 300ms ease'; l.g.style.opacity='0'; setTimeout(()=>{ l.g.remove(); world.leaves.delete(l.id); }, 320);
+      });
+      // note
+      const li = document.createElement('li');
+      li.textContent = `Stress event: ${Math.round(killProb*100)}% severity; culled ${toCull.length} leaves.`;
+      document.getElementById('notes').prepend(li);
+    }
+
+    // -------------------------- Loop --------------------------
+    let last = performance.now();
+    function loop(now){
+      const dt = Math.min(0.05, (now-last)/1000); last = now;
+      if(world.running) step(dt);
+      requestAnimationFrame(loop);
+    }
+
+    // -------------------------- Init --------------------------
+    function init(){
+      updateDerived();
+      for(let i=0;i<3;i++) spawnVine();
+      requestAnimationFrame(loop);
+    }
+
+    init();
+  </script>
+</body>
+</html>
