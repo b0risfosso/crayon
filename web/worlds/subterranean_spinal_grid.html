@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Subterranean Spinal Grid</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    background: #0e0e10;
+    color: #eee;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  #leftPane {
+    position: relative;
+    background: #1a1a1f;
+    border-radius: 16px;
+    padding: 1rem;
+  }
+  #rightPane {
+    background: #1a1a1f;
+    border-radius: 16px;
+    padding: 1rem;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .metricBlock {
+    margin-bottom: 1rem;
+    background: #111114;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    border: 1px solid #2a2a35;
+  }
+  .metricBlock h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #9ca3ff;
+  }
+  .metricValue {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .nodeCard {
+    border: 1px solid #2a2a35;
+    background: #141418;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .danger {
+    color: #ff6b6b;
+    font-weight: 600;
+  }
+  .warn {
+    color: #ffc857;
+    font-weight: 600;
+  }
+  canvas {
+    background: #0f0f12;
+    border: 1px solid #2a2a35;
+    border-radius: 12px;
+  }
+</style>
+</head>
+<body>
+  <section id="leftPane">
+    <h1 style="color:#fff; font-size:1rem; font-weight:600; margin-top:0;">
+      Subterranean Spinal Grid — Live City Spine
+    </h1>
+    <canvas id="topology" width="800" height="600"></canvas>
+    <small style="color:#666;">Edges = trunk segments (color = congestion). Nodes = microgrids (ring fill = SOC, ring border = priority).</small>
+  </section>
+
+  <section id="rightPane">
+    <div class="metricBlock">
+      <h2>System Stress</h2>
+      <div class="metricValue">
+        <span id="cityUnmet">--</span> kW unmet
+      </div>
+      <div style="font-size:0.8rem; color:#999;">
+        Max congestion: <span id="maxCong">--</span>
+      </div>
+      <div style="font-size:0.8rem; color:#999;">
+        Avg LV: <span id="avgLV">--</span>
+      </div>
+    </div>
+
+    <div class="metricBlock">
+      <h2>Trigger Actions</h2>
+      <button id="surgeHospitalBtn"
+              style="background:#2a2a35;color:#eee;border-radius:8px;border:1px solid #444;padding:0.4rem 0.6rem;font-size:0.8rem;cursor:pointer;">
+        Inject Hospital Surge
+      </button>
+      <button id="faultSegABtn"
+              style="background:#2a2a35;color:#eee;border-radius:8px;border:1px solid #444;padding:0.4rem 0.6rem;font-size:0.8rem;cursor:pointer;">
+        Fault segA
+      </button>
+    </div>
+
+    <div class="metricBlock">
+      <h2>Node States</h2>
+      <div id="nodesContainer"></div>
+    </div>
+
+    <div class="metricBlock">
+      <h2>Segment States</h2>
+      <div id="segmentsContainer"></div>
+    </div>
+  </section>
+
+<script>
+const topologyCanvas = document.getElementById("topology");
+const ctx = topologyCanvas.getContext("2d");
+
+const nodesPos = {
+  // fixed layout coordinates for now (px)
+  "hospital_south": {x: 400, y: 500},
+  "transit_hub":   {x: 500, y: 300},
+  "shelter_west":  {x: 300, y: 200},
+  "mall_lowpri":   {x: 150, y: 400}
+};
+
+// Graph edges (must mirror server graph)
+const edges = [
+  ["hospital_south","transit_hub","segA"],
+  ["transit_hub","shelter_west","segB"],
+  ["shelter_west","mall_lowpri","segC"],
+  ["mall_lowpri","hospital_south","segD"]
+];
+
+async function fetchSnapshot() {
+  const res = await fetch("/api/snapshot");
+  const data = await res.json();
+  renderAll(data);
+}
+
+function renderAll(snap) {
+  // Update metrics
+  document.getElementById("cityUnmet").textContent = snap.city_unmet_kw?.toFixed(1);
+  document.getElementById("maxCong").textContent = snap.max_congestion?.toFixed(2);
+  document.getElementById("avgLV").textContent = snap.avg_lv?.toFixed(2);
+
+  renderTopology(snap);
+  renderNodeCards(snap.nodes || {});
+  renderSegmentCards(snap.segments || {});
+}
+
+function renderTopology(snap) {
+  ctx.clearRect(0,0,topologyCanvas.width,topologyCanvas.height);
+
+  // Draw edges with congestion color
+  edges.forEach(([a,b,segId])=>{
+    const A = nodesPos[a];
+    const B = nodesPos[b];
+    if(!A || !B) return;
+
+    const seg = snap.segments[segId];
+    const C_e = seg ? seg.C_e : 0.0;
+    // congestion color: green -> yellow -> red
+    const col = congestionColor(C_e || 0.0);
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(B.x, B.y);
+    ctx.stroke();
+
+    // mark failed segment
+    if (seg && seg.failed) {
+      ctx.strokeStyle = "#ff6b6b";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6,4]);
+      ctx.beginPath();
+      ctx.moveTo(A.x, A.y);
+      ctx.lineTo(B.x, B.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+
+  // Draw nodes (SOC fill, PRI border)
+  Object.entries(nodesPos).forEach(([nodeId,pos])=>{
+    const n = snap.nodes[nodeId];
+    if(!n) return;
+    const socFrac = n.soc_frac || 0.0;
+    const pri = n.pri || 0.0;
+
+    const r = 22;
+
+    // fill = SOC (low SOC => redder, high SOC => greener)
+    ctx.fillStyle = socColor(socFrac);
+    ctx.beginPath();
+    ctx.arc(pos.x,pos.y,r,0,Math.PI*2);
+    ctx.fill();
+
+    // border = PRI (thicker / brighter if critical)
+    const borderW = 2 + (pri*4);
+    ctx.lineWidth = borderW;
+    ctx.strokeStyle = priColor(pri);
+    ctx.beginPath();
+    ctx.arc(pos.x,pos.y,r,0,Math.PI*2);
+    ctx.stroke();
+
+    // draw label text
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(nodeId, pos.x, pos.y - r - 8);
+
+    // unmet load badge
+    if (n.unmet_kw > 1.0) {
+      ctx.fillStyle = "#ff6b6b";
+      ctx.font = "10px system-ui";
+      ctx.fillText("UNMET " + n.unmet_kw.toFixed(0)+" kW", pos.x, pos.y + r + 12);
+    }
+  });
+}
+
+// helper color maps
+function congestionColor(c) {
+  // 0 -> greenish, 0.6 -> yellow, 1 -> red
+  // simple linear blend zones
+  if (c < 0.6) {
+    // green to yellow
+    const t = c/0.6;
+    const r = Math.round(50 + t*205);
+    const g = Math.round(200);
+    const b = 80;
+    return `rgb(${r},${g},${b})`;
+  } else {
+    // yellow to red
+    const t = (c-0.6)/0.4;
+    const r = 255;
+    const g = Math.round(200 - t*200);
+    const b = Math.round(80 - t*80);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+function socColor(frac) {
+  // SOC 0 -> red, 1 -> green
+  const r = Math.round(255*(1-frac));
+  const g = Math.round(255*(frac));
+  const b = 80;
+  return `rgb(${r},${g},${b})`;
+}
+
+function priColor(pri) {
+  // PRI 0 -> gray, 1 -> electric purple
+  const r = Math.round(120 + pri*80);
+  const g = Math.round(80  + pri*20);
+  const b = Math.round(200 + pri*30);
+  return `rgb(${r},${g},${b})`;
+}
+
+function renderNodeCards(nodes) {
+  const container = document.getElementById("nodesContainer");
+  container.innerHTML = "";
+  Object.entries(nodes).forEach(([id, n])=>{
+    const unmetClass = n.unmet_kw > 0 ? "danger" : "";
+    const commWarn = (n.comm_latency_ms > 5000) ? "warn" : "";
+    const islandWarn = (n.is_state !== "grid-connected") ? "warn" : "";
+
+    const div = document.createElement("div");
+    div.className = "nodeCard";
+    div.innerHTML = `
+      <div style="font-weight:600;color:#fff;font-size:0.9rem;margin-bottom:0.25rem;">
+        ${id}
+      </div>
+      <div style="font-size:0.75rem;color:#aaa;">
+        PRI ${n.pri.toFixed(2)} | LV ${n.lv.toFixed(2)} | SOC ${(n.soc_frac*100).toFixed(0)}%
+      </div>
+      <div style="font-size:0.75rem;color:#aaa;">
+        Gen ${n.p_gen_kw.toFixed(1)} kW · Load ${n.p_load_kw.toFixed(1)} kW
+      </div>
+      <div style="font-size:0.75rem;">
+        <span class="${unmetClass}">Unmet ${n.unmet_kw.toFixed(1)} kW</span>
+        &nbsp; <span class="${islandWarn}">${n.is_state}</span>
+      </div>
+      <div style="font-size:0.7rem;color:#666;">
+        Comm ${n.comm_latency_ms.toFixed(1)} ms
+        ${commWarn ? "<span class='warn'>(degraded)</span>" : ""}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function renderSegmentCards(segments) {
+  const container = document.getElementById("segmentsContainer");
+  container.innerHTML = "";
+  Object.entries(segments).forEach(([id, s])=>{
+    const fail = s.failed ? "danger" : "";
+    const div = document.createElement("div");
+    div.className = "nodeCard";
+    div.innerHTML = `
+      <div style="font-weight:600;color:#fff;font-size:0.9rem;margin-bottom:0.25rem;">
+        ${id}
+      </div>
+      <div style="font-size:0.75rem;color:#aaa;">
+        I ${s.I_A.toFixed(0)} A · T ${s.T_C.toFixed(1)} °C
+      </div>
+      <div style="font-size:0.75rem;">
+        Congestion <span class="${s.C_e>0.6?"warn":""}">${s.C_e.toFixed(2)}</span>
+        &nbsp; Failed: <span class="${fail}">${s.failed}</span>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// buttons: inject stress to watch reflex
+document.getElementById("surgeHospitalBtn").addEventListener("click", async ()=>{
+  await fetch("/api/event/demand_surge", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({node_id:"hospital_south", frac:0.25})
+  });
+});
+
+document.getElementById("faultSegABtn").addEventListener("click", async ()=>{
+  await fetch("/api/event/fault", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({seg_id:"segA"})
+  });
+});
+
+setInterval(fetchSnapshot, 1000);
+fetchSnapshot();
+</script>
+</body>
+</html>
