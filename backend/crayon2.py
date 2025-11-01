@@ -6,3 +6,4 @@ from db_shared import (
 # On startup
 init_picture_db()
 init_usage_db()
+
