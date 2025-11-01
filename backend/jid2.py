@@ -196,19 +196,34 @@ def run_vision_to_pictures_llm(
 
 @app.route("/jid/create_pictures", methods=["POST"])
 def jid_create_pictures():
+    x = 1
+    print(x)
+    x = x + 1
     payload = request.get_json(force=True) or {}
+    print(x)
+    x = x + 1
     vision_text = (payload.get("vision") or "").strip()
+    print(x)
+    x = x + 1
     if not vision_text:
         return jsonify({"error": "Missing 'vision'"}), 400
 
+    print(x)
+    x = x + 1
     email = payload.get("email")
+    print(x)
+    x = x + 1
     try:
+        print(x)
+        x = x + 1
         result = run_vision_to_pictures_llm(
             vision_text=vision_text,
             email=email,
             model=DEFAULT_MODEL,
             endpoint_name=DEFAULT_ENDPOINT_NAME,
         )
+        print(x)
+        x = x + 1
         return jsonify(result.dict()), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
