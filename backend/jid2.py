@@ -206,14 +206,25 @@ def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = No
 
 @app.route("/jid/create_pictures", methods=["POST"])
 def jid_create_pictures():
-    print("1")
+    x = 1
+    print(x)
+    x = x + 1
     payload = request.get_json(force=True) or {}
+    print(x)
+    x = x + 1
     vision_text = (payload.get("vision") or "").strip()
+    print(x)
+    x = x + 1
     if not vision_text:
         return jsonify({"error": "Missing 'vision'"}), 400
-
+    print(x)
+    x = x + 1
     email = payload.get("email")
+    print(x)
+    x = x + 1
     try:
+        print(x)
+        x = x + 1
         result = run_vision_to_pictures_llm(
             vision_text=vision_text,
             email=email,
