@@ -134,8 +134,8 @@ def run_vision_to_pictures_llm(
 
     request_id = None
 
-    usage_in = usage["input"]
-    usage_out = usage["output"]
+    usage_in = 0
+    usage_out = 0
 
     try:
         # If your SDK supports "responses.create" with json response_format, you can switch to that.
