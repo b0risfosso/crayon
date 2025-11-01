@@ -112,7 +112,6 @@ def run_vision_to_pictures_llm(
     email: Optional[str] = None,
     model: str = DEFAULT_MODEL,
     endpoint_name: str = DEFAULT_ENDPOINT_NAME,
-    max_output_tokens: int = 2200,
 ) -> PicturesResponse:
     """
     Inserts `vision_text` into the structured prompt and calls the LLM.
@@ -128,9 +127,7 @@ def run_vision_to_pictures_llm(
         )
 
     # 2) Build prompt
-    print("pre")
     prompt_text = build_create_pictures_prompt(vision_text)
-    print("pass")
 
     # 4) Call LLM
     client = _ensure_openai_client()
@@ -145,12 +142,14 @@ def run_vision_to_pictures_llm(
 
     request_id = None
 
+    usage_in = usage["input"]
+    usage_out = usage["output"]
+
     try:
         # If your SDK supports "responses.create" with json response_format, you can switch to that.
         # Using chat.completions for broad compatibility:
         resp = client.responses.parse(
             model=model,
-            temperature=0.8,
             input=[
                 {"role": "system", "content": SYSTEM_MSG},
                 {"role": "user", "content": user_msg},
@@ -208,25 +207,12 @@ def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = No
 
 @app.route("/jid/create_pictures", methods=["POST"])
 def jid_create_pictures():
-    x = 1
-    print(x)
-    x = x + 1
     payload = request.get_json(force=True) or {}
-    print(x)
-    x = x + 1
     vision_text = (payload.get("vision") or "").strip()
-    print(x)
-    x = x + 1
     if not vision_text:
         return jsonify({"error": "Missing 'vision'"}), 400
-    print(x)
-    x = x + 1
     email = payload.get("email")
-    print(x)
-    x = x + 1
     try:
-        print(x)
-        x = x + 1
         result = run_vision_to_pictures_llm(
             vision_text=vision_text,
             email=email,
