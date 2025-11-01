@@ -24,6 +24,10 @@ from db_shared import (
     init_picture_db, init_usage_db, log_usage, connect, USAGE_DB
 )
 
+import re
+from pydantic import ValidationError
+
+
 # ------------------------------------------------------------------------------
 # Config
 DEFAULT_MODEL = os.getenv("JID_LLM_MODEL", "gpt-5-mini-2025-08-07")
@@ -76,6 +80,31 @@ def get_today_model_tokens(model: str) -> int:
 def build_create_pictures_prompt(vision_text: str) -> str:
     return create_pictures_prompt.format(vision=vision_text.strip())
 
+JSON_OBJECT_RE = re.compile(r"\{(?:[^{}]|(?R))*\}", re.S)  # recursive-ish best-effort
+
+def _strip_code_fences(s: str) -> str:
+    # Remove ```json ... ``` fences if present
+    s = s.strip()
+    if s.startswith("```"):
+        s = re.sub(r"^```(?:json)?\s*", "", s, flags=re.I)
+        s = re.sub(r"\s*```$", "", s)
+    return s.strip()
+
+def _best_effort_json_parse(text: str) -> dict:
+    """
+    Be liberal in what we accept: strip fences, try full loads, or extract first JSON object.
+    """
+    s = _strip_code_fences(text)
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        # Try to find the first JSON object in the string
+        m = JSON_OBJECT_RE.search(s)
+        if not m:
+            raise
+        return json.loads(m.group(0))
+
+
 # ------------------------------------------------------------------------------
 # Core LLM logic
 
@@ -113,13 +142,11 @@ def run_vision_to_pictures_llm(
 
     resp = client.chat.completions.create(
         model=model,
-        temperature=0.8,
-        max_tokens=max_output_tokens,
         messages=[
             {"role": "system", "content": SYSTEM_MSG},
             {"role": "user", "content": prompt_text},
         ],
-        response_format={"type": "json_object"},  # ensure strict JSON if the model supports it
+        response_format={"type": "json_object"},  # ensure strict JSON if supported
     )
 
     content = resp.choices[0].message.content
@@ -132,11 +159,17 @@ def run_vision_to_pictures_llm(
 
     # Parse + validate with Pydantic
     try:
-        data = json.loads(content)
+        data = _best_effort_json_parse(content)
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"Model returned invalid JSON: {e}")
+        # Surface a helpful snippet
+        snippet = content[:300].replace("\n", "\\n")
+        raise RuntimeError(f"Model returned invalid JSON: {e}. Snippet: {snippet}")
 
-    parsed = PicturesResponse(**data)
+    try:
+        parsed = PicturesResponse(**data)
+    except ValidationError as ve:
+        # Show structured validation details
+        raise RuntimeError(f"Pydantic validation failed: {ve.errors()}")
 
     # Log usage
     try:
