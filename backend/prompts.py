@@ -1,7 +1,8 @@
 # prompts.py
 
-# Base authoring prompt (verbatim style), with an added JSON-only instruction
-# so we can parse/validate against Pydantic on the receiving side.
+# NOTE: All literal braces in the JSON schema are doubled {{ }} so that
+# Python .format(...) does not treat them as placeholders. Only {vision} remains.
+
 create_pictures_prompt = r"""
 You are the Vision Architect.
 
@@ -18,16 +19,16 @@ VISION: "{vision}"
 ### OUTPUT FORMAT (STRICT JSON ONLY):
 Return **ONLY** valid JSON (no Markdown, no commentary) matching this schema:
 
-{
-  "vision": string,
+{{
+  "vision": "string",
   "pictures": [
-    {
-      "title": string,
-      "picture": string,      // visual description (geometry, materials, colors, forces/flows)
-      "function": string      // real-world role; how it operates; how it realizes the vision
-    }
+    {{
+      "title": "string",
+      "picture": "string",      // visual description (geometry, materials, colors, forces/flows)
+      "function": "string"      // real-world role; how it operates; how it realizes the vision
+    }}
   ]
-}
+}}
 
 Rules for the JSON:
 - Do not include trailing commas.
