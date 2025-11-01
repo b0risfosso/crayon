@@ -128,7 +128,9 @@ def run_vision_to_pictures_llm(
         )
 
     # 2) Build prompt
+    print("pre")
     prompt_text = build_create_pictures_prompt(vision_text)
+    print("pass")
 
     # 4) Call LLM
     client = _ensure_openai_client()
