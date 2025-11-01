@@ -206,6 +206,7 @@ def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = No
 
 @app.route("/jid/create_pictures", methods=["POST"])
 def jid_create_pictures():
+    print("1")
     payload = request.get_json(force=True) or {}
     vision_text = (payload.get("vision") or "").strip()
     if not vision_text:
