@@ -99,11 +99,6 @@ def build_create_pictures_prompt(vision_text: str) -> str:
 # ------------------------------------------------------------------------------
 # LLM call
 
-def _ensure_openai_client() -> OpenAI:
-    if not _HAS_OPENAI:
-        raise RuntimeError("OpenAI client not installed. `pip install openai`")
-    return OpenAI()
-
 
 
 def run_vision_to_pictures_llm(
@@ -128,9 +123,6 @@ def run_vision_to_pictures_llm(
 
     # 2) Build prompt
     prompt_text = build_create_pictures_prompt(vision_text)
-
-    # 4) Call LLM
-    client = _ensure_openai_client()
 
     # Prefer JSON output for reliable parsing. If your SDK supports `response_format={"type":"json_object"}`
     # or JSON schema, use that. Here we ask for JSON via system+user messages.
