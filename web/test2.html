@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Wax Worldwright — Microbial Power Field</title>
+<style>
+  :root{--bg:#fbfbfc;--panel:#ffffff;--muted:#6b7280;--accent:#0f172a;--good:#059669;--bad:#dc2626;--warn:#f59e0b; --glass: rgba(15,23,42,0.04)}
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#f7f8fa);color:var(--accent)}
+  .app{display:flex;flex-direction:column;height:100vh}
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--panel);box-shadow:0 1px 0 rgba(15,23,42,0.04);z-index:2}
+  header .title{font-weight:600}
+  header .subtitle{font-size:12px;color:var(--muted)}
+  main{flex:1;display:grid;grid-template-columns:260px 1fr 340px;gap:12px;padding:12px}
+  .panel{background:var(--panel);border-radius:8px;padding:12px;box-shadow:0 1px 2px rgba(15,23,42,0.04);overflow:auto}
+  .left{min-width:220px}
+  .center{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+  .canvasWrap{flex:1;position:relative;min-height:360px}
+  #worldCanvas{width:100%;height:100%;background:linear-gradient(180deg,#f7fafc,#ffffff);border-radius:6px}
+  .right{min-width:300px}
+  footer{display:flex;gap:8px;align-items:center;padding:8px 12px;background:transparent}
+  .controls{display:flex;gap:8px;align-items:center;margin-left:auto}
+  select,input,button{padding:6px 8px;border-radius:6px;border:1px solid rgba(15,23,42,0.06);background:transparent;font-size:13px}
+  button.primary{background:#0f172a;color:#fff;border:none}
+  .statusRow{display:flex;justify-content:space-between;padding:8px 6px;border-bottom:1px dashed rgba(15,23,42,0.04);align-items:center}
+  .muted{color:var(--muted);font-size:13px}
+  .log{font-family:monospace;max-height:180px;overflow:auto;background:var(--glass);padding:8px;border-radius:6px;font-size:12px}
+  .kpi{display:flex;gap:8px;flex-direction:column}
+  .kpiItem{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(15,23,42,0.03)}
+  .chip{padding:4px 8px;border-radius:999px;background:rgba(15,23,42,0.06);font-size:12px}
+  .checklist{display:flex;gap:8px;flex-wrap:wrap}
+  .check{padding:8px;border-radius:6px;background:linear-gradient(180deg,#fff,#fbfbfd);border:1px solid rgba(15,23,42,0.04);min-width:160px;display:flex;justify-content:space-between;align-items:center}
+  canvas.node{border-radius:6px}
+  .small{font-size:12px;color:var(--muted)}
+  .safety.good{color:var(--good)} .safety.bad{color:var(--bad)} .safety.warn{color:var(--warn)}
+  @media (max-width:980px){main{grid-template-columns:1fr;grid-auto-rows:auto} .right{order:3} .left{order:1}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div style="display:flex;flex-direction:column">
+      <div class="title">Harnessing energy using dirt</div>
+      <div class="subtitle">The Microbial Power Field — Campus garden plot — Budget $2k; student lab</div>
+    </div>
+    <div class="muted" style="margin-left:12px">Vision: Soil electrodes harvest microbial metabolism as electrical current</div>
+    <div class="controls">
+      <label class="small muted">Scenario</label>
+      <select id="scenarioSelect" title="Pick a simulated disturbance">
+        <option>Normal</option>
+        <option>Supply Delay</option>
+        <option>Cold Snap</option>
+        <option>Peak Demand</option>
+        <option>Sensor Drift</option>
+      </select>
+      <button id="resetBtn">Reset</button>
+      <div style="width:8px"></div>
+      <div class="chip" id="seedChip">seed=?</div>
+    </div>
+  </header>
+
+  <main>
+    <aside class="panel left" id="leftPanel">
+      <h3 style="margin:0 0 8px 0">World Status</h3>
+      <div class="statusRow"><div>Sim Time</div><div id="simTime">0s</div></div>
+      <div class="statusRow"><div>Tick dt</div><div id="tickDt">0.1s</div></div>
+      <div class="statusRow"><div>Seed</div><div id="seedDisplay" class="chip">-</div></div>
+      <div class="statusRow"><div>Scenario</div><div id="scenarioDisplay" class="small">-</div></div>
+      <div style="height:8px"></div>
+      <h4 style="margin:6px 0">Environment</h4>
+      <div class="statusRow"><div>Air Temp</div><div id="envTemp">--°C</div></div>
+      <div class="statusRow"><div>Soil Moist</div><div id="envMoist">--%</div></div>
+      <div class="statusRow"><div>Microbial Activity</div><div id="envBio">--</div></div>
+      <div style="height:8px"></div>
+      <h4 style="margin:6px 0">Logs (rolling)</h4>
+      <div id="logView" class="log"></div>
+    </aside>
+
+    <section class="panel center">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;flex-direction:column">
+          <strong>Agent Field</strong>
+          <span class="small muted">Interactive visualization of agents, flows and states</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="small muted">Nodes: <span id="nodeCount">0</span></div>
+          <div class="small muted">Events: <span id="eventCount">0</span></div>
+        </div>
+      </div>
+      <div class="canvasWrap">
+        <canvas id="worldCanvas"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <div style="flex:1">
+          <div class="small muted">Inspector</div>
+          <div id="inspector" style="padding:8px;border-radius:6px;background:var(--glass);font-family:monospace;font-size:13px;min-height:56px"></div>
+        </div>
+        <div style="width:240px">
+          <div class="small muted">Rolling KPIs (5m window)</div>
+          <div id="miniChart" style="height:56px"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel right">
+      <h3 style="margin:0 0 8px 0">KPIs & Resources</h3>
+      <div class="kpi">
+        <div class="kpiItem"><div>Average Power (mW)</div><div id="kpiPower">--</div></div>
+        <div class="kpiItem"><div>Uptime</div><div id="kpiUptime">--</div></div>
+        <div class="kpiItem"><div>Data Completeness</div><div id="kpiData">--</div></div>
+        <div class="kpiItem"><div>TRL Progress</div><div id="kpiTRL">--</div></div>
+      </div>
+
+      <div style="height:12px"></div>
+      <h4 style="margin:6px 0">Resources</h4>
+      <div class="statusRow"><div>Budget</div><div id="resBudget">$2,000</div></div>
+      <div class="statusRow"><div>Battery</div><div id="resBattery">--%</div></div>
+      <div class="statusRow"><div>Bus Voltage</div><div id="resVoltage">--V</div></div>
+
+      <div style="height:12px"></div>
+      <h4 style="margin:6px 0">Events</h4>
+      <div id="eventLog" class="log"></div>
+
+      <div style="height:12px"></div>
+      <h4 style="margin:6px 0">Safety</h4>
+      <div class="statusRow"><div>Soil Contact SOP</div><div id="safetySOP" class="small">OK</div></div>
+      <div class="statusRow"><div>Voltage Safe</div><div id="safetyVoltage" class="safety good">Good</div></div>
+
+    </aside>
+  </main>
+
+  <footer>
+    <div style="display:flex;gap:8px;align-items:center">
+      <strong>Readiness Evidence</strong>
+      <div class="small muted">Checklist auto-completes as system demonstrates TRL milestones</div>
+    </div>
+    <div style="width:12px"></div>
+    <div class="checklist" id="checklist">
+      <div class="check" data-key="frame"><div>Mechanical frame assembled</div><div id="e-frame">⌳</div></div>
+      <div class="check" data-key="electrodes"><div>Electrode array operational</div><div id="e-electrodes">⌳</div></div>
+      <div class="check" data-key="power"><div>DC-DC regulated output</div><div id="e-power">⌳</div></div>
+      <div class="check" data-key="data"><div>Logging & ADC validated</div><div id="e-data">⌳</div></div>
+      <div class="check" data-key="safety"><div>Soil SOP & safety checks</div><div id="e-safety">⌳</div></div>
+      <div class="check" data-key="demo"><div>Integrated demo (TRL4)</div><div id="e-demo">⌳</div></div>
+    </div>
+  </footer>
+</div>
+
+<!-- Embed exact input payload -->
+<script type="application/json" id="worldSpec">{"vision":"Harnessing energy using dirt","picture_short":"The Microbial Power Field","picture_description":"Soil electrodes harvest microbial metabolism as electrical current; arrayed rods connect to power conditioning and logging.","constraints":"Budget $2k; student lab; no hazardous materials.","deployment_context":"Campus garden plot","readiness_target":"TRL 4 in 90 days","wax_stack":"Mechanical Wax: frame, probe array; Electrical Wax: anode/cathode, wiring, ADC, DC-DC; Data Wax: logging schema; Safety Wax: soil contact SOP."}</script>
+
+<script>
+/*
+ Wax Worldwright — self-contained simulation
+ - Deterministic clock with seed
+ - Agents created from wax_stack
+ - Environment (temp, moisture, microbial_activity)
+ - Agents: frame, probe array, anode, cathode, wiring, ADC, DC-DC, logger, safety
+ - Event bus, logging, persistence, UI updates
+*/
+
+// Utilities
+function parseJSONSpec() {
+  const el = document.getElementById('worldSpec');
+  try { return JSON.parse(el.textContent); }
+  catch(e){ return {error:'invalid spec'} }
+}
+function rngMulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a>>>15, 1 | a);
+    t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t;
+    return ((t ^ t>>>14) >>> 0) / 4294967296;
+  }
+}
+function seeded(seed){
+  // create number from string
+  let h = 2166136261 >>> 0;
+  for(let i=0;i<seed.length;i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)>>>0;
+  return rngMulberry32(h);
+}
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function fmt(v,prec=2){ return Number.isFinite(v)?v.toFixed(prec):'--'; }
+function nowISO(){ return (new Date()).toISOString(); }
+
+// Parse URL seed
+const urlParams = new URLSearchParams(location.search);
+const seedParam = urlParams.get('seed') || 'wax-default-seed';
+const rng = seeded(seedParam);
+const scenarioParam = urlParams.get('scenario') || 'Normal';
+document.getElementById('seedDisplay').textContent = seedParam;
+document.getElementById('seedChip').textContent = 'seed='+seedParam;
+document.getElementById('scenarioSelect').value = scenarioParam;
+
+// Load spec and validate
+const rawSpec = parseJSONSpec();
+const spec = Object.assign({
+  vision:'(untitled)',
+  picture_short:'(photo)',
+  picture_description:'',
+  constraints:'',
+  deployment_context:'',
+  readiness_target:'TRL 1 in 365 days',
+  wax_stack:''
+}, rawSpec);
+
+function synthDefaults() {
+  // ensure essential fields exist
+  if(!spec.wax_stack) spec.wax_stack = "Mechanical Wax: frame; Electrical Wax: anode/cathode; Data Wax: logger; Safety Wax: soil SOP";
+  // parse wax stack into components lines
+  const parts = spec.wax_stack.split(';').map(s=>s.trim()).filter(Boolean);
+  const components = [];
+  for(const p of parts){
+    const [group,items] = p.split(':').map(s=>s.trim());
+    if(!items) continue;
+    for(const it of items.split(',').map(s=>s.trim()).filter(Boolean)){
+      components.push({group, name:it});
+    }
+  }
+  return components;
+}
+const waxComponents = synthDefaults();
+
+// Event Bus
+class EventBus {
+  constructor(){ this.subs = {}; this.count=0; }
+  on(topic,fn){ (this.subs[topic]||(this.subs[topic]=[])).push(fn); }
+  emit(topic,data){ this.count++; const list = this.subs[topic]||[]; for(const f of list) try{ f(data); }catch(e){console.error(e);} }
+}
+const bus = new EventBus();
+
+// Rolling logs & persistence
+const logBuffer = [];
+const MAX_LOG = 500;
+function appendLog(msg,tag='info'){
+  const entry = {t:sim.t, ts:nowISO(), tag, msg};
+  logBuffer.push(entry);
+  if(logBuffer.length>MAX_LOG) logBuffer.shift();
+  // UI append
+  const view = document.getElementById('logView');
+  view.textContent = logBuffer.slice(-80).map(e=>`[${e.ts}] ${e.tag.toUpperCase()}: ${e.msg}`).join('\n');
+  // also event log
+  const ev = document.getElementById('eventLog');
+  ev.textContent = logBuffer.slice(-80).map(e=>`[${fmt(e.t,1)}s] ${e.tag}: ${e.msg}`).reverse().join('\n');
+}
+function persist() {
+  try{
+    localStorage.setItem('wax_world_logs', JSON.stringify({seed:seedParam,simTime:sim.t,logs:logBuffer.slice(-200)}));
+  }catch(e){}
+}
+setInterval(persist,5000);
+
+// Simulation clock
+const sim = {t:0,dt:0.1,step:0,seed:seedParam,scenario:scenarioParam, running:true};
+
+// Scenario control UI
+const scenarioSelect = document.getElementById('scenarioSelect');
+scenarioSelect.addEventListener('change', ()=>{
+  sim.scenario = scenarioSelect.value;
+  appendLog('Scenario changed to '+sim.scenario,'scenario');
+  applyScenario(sim.scenario);
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>resetSimulation());
+
+// Environment model
+const env = {
+  temp: 18, // °C
+  moist: 40, // %
+  bio: 0.6, // microbial activity 0..1
+  conductivity: 0.3, // soil conductivity relative 0..1
+  disturbance:{}
+};
+
+// Apply scenario modifications
+function applyScenario(name){
+  env.disturbance = {};
+  if(name==='Cold Snap') {
+    env.disturbance.tempDrop = {duration:600, delta:-8, start:sim.t+2};
+    appendLog('Cold Snap scheduled','scenario');
+  } else if(name==='Supply Delay') {
+    env.disturbance.supplyLag = {duration:300, start:sim.t+1};
+    appendLog('Supply delay scheduled','scenario');
+  } else if(name==='Peak Demand') {
+    env.disturbance.peakDemand = {duration:180, start:sim.t+5};
+    appendLog('Peak demand scheduled','scenario');
+  } else if(name==='Sensor Drift') {
+    env.disturbance.sensorDrift = {start:sim.t+1,duration:120};
+    appendLog('Sensor drift scheduled','scenario');
+  } else {
+    appendLog('Normal scenario','scenario');
+  }
+}
+applyScenario(sim.scenario);
+
+// Agent base class
+class Agent {
+  constructor(id,kind,attrs){
+    this.id = id; this.kind = kind;
+    this.resources = attrs.resources || {};
+    this.sensors = attrs.sensors || [];
+    this.actuators = attrs.actuators || [];
+    this.state = attrs.state || {};
+    this.goals = attrs.goals || [];
+    this.interfaces = {};
+    this.failed = {sensor:false,actuator:false,dead:false};
+    this.metrics = {};
+    this.lastUpdate = 0;
+    // planner queue
+    this.planPriority = 0;
+  }
+  sense(world){ /* populate state from world */ }
+  decide(){ /* set intentions */ }
+  act(world){ /* apply to world */ }
+  update(dt,world){
+    if(this.failed.dead) return;
+    this.sense(world);
+    this.decide();
+    this.act(world);
+    this.lastUpdate = world.t;
+  }
+  fail(kind,dur){
+    this.failed[kind]=true;
+    appendLog(`${this.id} ${kind} failed for ${fmt(dur,0)}s`,'fault');
+    setTimeout(()=>{
+      this.failed[kind]=false;
+      appendLog(`${this.id} ${kind} recovered`,'fault');
+    }, dur*1000 * (1 + Math.floor(rng()*2)));
+  }
+}
+
+// Instantiate agents from wax components
+const agents = [];
+function buildAgents(){
+  agents.length=0;
+  // basic: frame, probe array, anode, cathode, wiring, ADC, DC-DC, logger, safety
+  const make = (id,kind,attrs)=>{ const a=new Agent(id,kind,attrs); agents.push(a); return a; };
+
+  const frame = make('frame','mechanical',{resources:{mass:2}, sensors:['structuralIntegrity'], actuators:['mountProbe'], state:{assembled:true,integrity:1.0}, goals:['support']});
+  frame.sense = function(w){ /* monitors integrity */ this.state.integrity -= 0.00001 * w.dt; };
+  frame.decide = function(){ if(this.state.integrity<0.85) this.goals.push('inspect'); }
+  frame.act = function(w){ /* minor self-heal maintenance budget */ if(this.goals.includes('inspect')){ this.state.integrity = Math.min(1.0,this.state.integrity+0.0005); } };
+
+  const probeArray = make('probeArray','mechanical',{resources:{rods:8}, sensors:['contact','depth'], actuators:['adjustDepth'], state:{deployed:true,depth:5,contactQuality:1.0}, goals:['reachGoodContact']});
+  probeArray.sense = function(w){
+    // contactQuality affected by soil moisture and conductivity
+    const qual = 0.5 + 0.5 * (w.env.moist/60) * (w.env.conductivity);
+    this.state.contactQuality = clamp(qual + (rng()-0.5)*0.05,0,1);
+  };
+  probeArray.act = function(w){
+    if(this.state.contactQuality<0.6) this.state.depth = clamp(this.state.depth+0.5,1,12);
+  };
+
+  const anode = make('anode','electrode',{resources:{material:'carbon'}, sensors:['potential','current'], actuators:[], state:{openCircuitVolt:0.09, internalR:1000,productionRate:0.5}, goals:['produceCurrent']});
+  anode.sense = function(w){
+    // production depends on microbial activity, temp, moist
+    const Tfactor = Math.exp(-(Math.abs(w.env.temp-25)/20));
+    const Mfactor = clamp(w.env.moist/50,0,1);
+    this.state.productionRate = clamp(0.1 + w.env.bio * 1.2 * Tfactor * Mfactor + (rng()-0.5)*0.05, 0, 2);
+  };
+  anode.act = function(w){
+    // provide current to wiring via bus
+    const openV = this.state.openCircuitVolt * this.state.productionRate;
+    // modeled current through internal resistance and circuit voltage (calculated later)
+    this.interfaces.voltage = openV;
+    this.interfaces.current = this.state.productionRate * 0.001; // small baseline
+  };
+
+  const cathode = make('cathode','electrode',{resources:{material:'stainless'}, sensors:['potential'], actuators:[], state:{acceptance:0.8}, goals:['completeCircuit']});
+  cathode.sense = function(w){ this.state.acceptance = clamp(0.7 + (rng()-0.5)*0.1,0.5,1); };
+  cathode.act = function(w){
+    this.interfaces.voltage = -0.02 * this.state.acceptance;
+    this.interfaces.current = this.state.acceptance * 0.0008;
+  };
+
+  const wiring = make('wiring','electrical',{resources:{length:1}, sensors:[], actuators:[], state:{resistance:5}, goals:['connect']});
+  wiring.sense = function(w){
+    // resistance slowly increases with corrosion (depends on moist)
+    this.state.resistance *= 1 + 0.00001 * (w.env.moist/50);
+    if(w.env.disturbance.sensorDrift) this.state.resistance *= 1 + (rng()-0.5)*0.0002;
+  };
+  wiring.act = function(w){
+    // aggregate currents
+    const iA = anode.interfaces.current || 0;
+    const iC = cathode.interfaces.current || 0;
+    this.interfaces.current = clamp((iA + iC)/2, 0, 0.01);
+    // convert to bus voltage available before DC-DC
+    const vA = anode.interfaces.voltage || 0;
+    const vC = cathode.interfaces.voltage || 0;
+    this.interfaces.voltage = vA - vC - this.state.resistance*0.001*this.interfaces.current;
+  };
+
+  const adc = make('ADC','data',{resources:{bits:12}, sensors:['voltage','current'], actuators:[], state:{samples:0}, goals:['logData']});
+  adc.sense = function(w){
+    // read wiring voltage/current with optional sensor drift
+    let v = wiring.interfaces.voltage || 0;
+    let i = wiring.interfaces.current || 0;
+    if(w.env.disturbance.sensorDrift && rng()<0.3) { v *= 1 + 0.1*(rng()-0.5); i *= 1 + 0.1*(rng()-0.5); }
+    this.state.lastSample = {v,i,t:w.t};
+  };
+  adc.act = function(w){
+    this.state.samples += 1;
+    bus.emit('sample', {agent:this.id,sample:this.state.lastSample});
+  };
+
+  const dc = make('DC-DC','power',{resources:{eff:0.7}, sensors:['inV','inI'], actuators:['regulate'], state:{outV:3.3,outI:0}, goals:['supplyBus']});
+  dc.sense = function(w){
+    this.state.inV = wiring.interfaces.voltage || 0;
+    this.state.inI = wiring.interfaces.current || 0;
+  };
+  dc.decide = function(){
+    // simple greed: if inV sufficient, produce outV scaled by efficiency
+    if(this.state.inV>0.05 && !this.failed.actuator){
+      this.state.outV = 3.3;
+      this.state.outI = Math.max(0, this.state.inV * this.state.inI * this.resources.eff || (this.state.inI*0.5));
+    } else {
+      this.state.outV = 0;
+      this.state.outI = 0;
+    }
+  };
+  dc.act = function(w){
+    // place power on bus
+    w.bus.voltage = this.state.outV;
+    w.bus.current = this.state.outI;
+    w.bus.power = this.state.outV * this.state.outI;
+  };
+
+  const logger = make('logger','data',{resources:{schema:spec.readiness_target||'default'}, sensors:[], actuators:[], state:{entries:0}, goals:['persist']});
+  logger.sense = function(w){};
+  logger.act = function(w){
+    // subscribe via event bus; this agent will receive samples via event subscription
+  };
+  // logger subscribes
+  bus.on('sample',(d)=>{
+    logger.state.entries += 1;
+    appendLog(`Sample from ${d.agent}: V=${fmt(d.sample.v,3)} V I=${fmt(d.sample.i,6)} A`,'data');
+  });
+
+  const safety = make('safety','procedure',{resources:{manual:true}, sensors:['touch'], actuators:['isolate'], state:{sop:true,voltageSafe:true}, goals:['ensureSafety']});
+  safety.sense = function(w){
+    // voltage safe if bus voltage <= 5V
+    this.state.voltageSafe = (w.bus.voltage <= 5);
+    this.state.sop = true;
+  };
+  safety.decide = function(){ if(!this.state.voltageSafe) this.goals.push('isolate'); };
+  safety.act = function(w){
+    if(this.goals.includes('isolate')){ w.bus.current = 0; w.bus.voltage = 0; appendLog('Safety isolation executed','safety'); this.goals = this.goals.filter(g=>g!=='isolate'); }
+  };
+
+  // attach agents to bus for visual list
+  return agents;
+}
+
+// Build first time
+buildAgents();
+document.getElementById('nodeCount').textContent = agents.length;
+
+// World state includes bus and environment
+const world = {t:0,dt:sim.dt,env,agents, bus:{voltage:0,current:0,power:0}, eventBus:bus};
+
+// Fault injection and degradation scheduler
+function stepFaults(dt){
+  // small chance per agent per minute to have sensor/actuator glitch
+  for(const a of agents){
+    const p = 1e-4 * dt * 10 * (1 + rng());
+    if(rng() < p){
+      const kind = rng()<0.5?'sensor':'actuator';
+      const dur = 5 + Math.floor(rng()*30);
+      a.fail(kind,dur);
+    }
+    // rare hard death
+    if(rng() < 1e-6 * dt * 1000){ a.failed.dead = true; appendLog(`${a.id} permanently failed (simulated)`, 'fault'); }
+  }
+}
+
+// Planner/Goal evaluation for readiness KPIs
+const kpi = {powerWindow:[],uptime:0,dataCompleteness:0,TRL:0};
+function updateKPIs(dt){
+  // rolling average power (last 60s)
+  kpi.powerWindow.push(world.bus.power || 0);
+  if(kpi.powerWindow.length>600) kpi.powerWindow.shift();
+  const avgPower = kpi.powerWindow.reduce((s,v)=>s+v,0)/Math.max(1,kpi.powerWindow.length);
+  kpi.avgPower = avgPower*1000; // to mW
+  // uptime: fraction agents not dead
+  kpi.uptime = agents.filter(a=>!a.failed.dead).length / agents.length;
+  // dataCompleteness: fraction of ADC samples vs expected rate (we model expected 1 sample per second)
+  const expected = Math.max(1, Math.floor(world.t));
+  kpi.dataCompleteness = clamp(logger.state.entries / Math.max(1, expected),0,1);
+  // TRL progress simple heuristic: progress with number of completed evidence checklist items
+  let evidence = 0;
+  if(frame.state.assembled) evidence++;
+  if(probeArray.state.contactQuality>0.6) evidence++;
+  if(dc.state.outV>0) evidence++;
+  if(logger.state.entries>5) evidence++;
+  if(safety.state.sop && safety.state.voltageSafe) evidence++;
+  kpi.TRL = clamp(evidence/6,0,1);
+  // update UI fields
+  document.getElementById('kpiPower').textContent = fmt(kpi.avgPower,2)+' mW';
+  document.getElementById('kpiUptime').textContent = fmt(kpi.uptime*100,1)+'%';
+  document.getElementById('kpiData').textContent = fmt(kpi.dataCompleteness*100,1)+'%';
+  document.getElementById('kpiTRL').textContent = fmt(kpi.TRL*100,1)+'%';
+  document.getElementById('resBattery').textContent = fmt( clamp(100 - (world.t/3600*2), 10, 100),1)+'%';
+  document.getElementById('resVoltage').textContent = fmt(world.bus.voltage,2)+' V';
+}
+
+// Expose some agents as globals for KPI access
+let frame, probeArray, anode, cathode, wiringAgent, adc, dc, logger, safety;
+function wireAgentRefs(){
+  frame = agents.find(a=>a.id==='frame');
+  probeArray = agents.find(a=>a.id==='probeArray');
+  anode = agents.find(a=>a.id==='anode');
+  cathode = agents.find(a=>a.id==='cathode');
+  wiringAgent = agents.find(a=>a.id==='wiring');
+  adc = agents.find(a=>a.id==='ADC'.toLowerCase()) || agents.find(a=>a.id==='ADC') || agents.find(a=>a.id==='adc') || agents.find(a=>a.id==='ADC');
+  // above attempt: the id might have been 'ADC' or 'adc' as created; we created 'ADC' as id 'ADC'? We made 'ADC' id 'ADC' (lowercase earlier?). Let's find by kind
+  adc = agents.find(a=>a.kind==='data' && a.id.toLowerCase().includes('adc')) || agents.find(a=>a.kind==='data' && a.id.toLowerCase().includes('logger')) || agents.find(a=>a.id==='ADC') || agents.find(a=>a.id==='adc') || agents.find(a=>a.id==='ADC');
+  dc = agents.find(a=>a.id==='DC-DC'.toLowerCase()) || agents.find(a=>a.id==='DC-DC') || agents.find(a=>a.id==='dc') || agents.find(a=>a.kind==='power');
+  logger = agents.find(a=>a.kind==='data' && a.id==='logger') || agents.find(a=>a.id==='logger');
+  safety = agents.find(a=>a.kind==='procedure') || agents.find(a=>a.id==='safety');
+}
+wireAgentRefs();
+
+// Build canvas visualization
+const canvas = document.getElementById('worldCanvas');
+const ctx = canvas.getContext('2d');
+function resizeCanvas(){
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Simple layout nodes positions
+function layoutNodes(){
+  const w = canvas.width/devicePixelRatio, h = canvas.height/devicePixelRatio;
+  const centerX = w/2, centerY = h/2;
+  const nodes = [
+    {id:'frame',x:centerX-240,y:centerY-60},
+    {id:'probeArray',x:centerX-120,y:centerY-20},
+    {id:'anode',x:centerX,y:centerY-80},
+    {id:'cathode',x:centerX,y:centerY+40},
+    {id:'wiring',x:centerX+120,y:centerY-10},
+    {id:'DC-DC',x:centerX+240,y:centerY-10},
+    {id:'ADC',x:centerX+120,y:centerY+90},
+    {id:'logger',x:centerX+240,y:centerY+90},
+    {id:'safety',x:centerX-240,y:centerY+90}
+  ];
+  return nodes;
+}
+const nodes = layoutNodes();
+
+// Draw loop
+function drawWorld(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  // background grid
+  const w = canvas.width/devicePixelRatio, h = canvas.height/devicePixelRatio;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+  // draw flows as lines colored by power
+  ctx.lineWidth = 3;
+  // find positions map
+  const pos = {}; for(const n of nodes) pos[n.id.toLowerCase()]=n;
+  // helper draw node
+  function drawNode(n, label, color, value){
+    ctx.beginPath();
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = 'rgba(15,23,42,0.06)';
+    ctx.rect(n.x-60,n.y-20,120,40);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color || '#0f172a';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(label, n.x, n.y-4);
+    if(value !== undefined){
+      ctx.font='11px monospace';
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText(value, n.x, n.y+12);
+    }
+  }
+  // draw sample flows
+  const flowColor = world.bus.power>0.001 ? 'rgba(5,150,105,0.9)' : 'rgba(99,102,241,0.25)';
+  // line from anode->wiring->DC-DC->logger
+  const a = pos['anode'], wR = pos['wiring'], d = pos['dc-dc']||pos['dc-dc']||pos['dc-dc']||pos['dc-dc']||pos['dc'];
+  const c = pos['cathode'];
+  if(a && wR){ ctx.beginPath(); ctx.moveTo(a.x+40,a.y); ctx.lineTo(wR.x-40,wR.y); ctx.strokeStyle = flowColor; ctx.stroke(); }
+  if(wR && d){ ctx.beginPath(); ctx.moveTo(wR.x+40,wR.y); ctx.lineTo(d.x-40,d.y); ctx.strokeStyle = flowColor; ctx.stroke(); }
+  // annotate bus power near DC-DC
+  ctx.font='12px sans-serif'; ctx.fillStyle='#374151';
+  ctx.textAlign='left';
+  ctx.fillText(`Bus: ${fmt(world.bus.voltage,2)} V • ${fmt((world.bus.power||0)*1000,3)} mW`, (d?d.x+50: wR.x+50), (d?d.y-10:wR.y-10));
+
+  // draw nodes with values
+  drawNode(pos['frame'],'Frame', '#111', `int ${fmt(frame.state.integrity,2)}`);
+  drawNode(pos['probearray'],'ProbeArray','#111', `contact ${fmt(probeArray.state.contactQuality,2)}`);
+  drawNode(pos['anode'],'Anode','#065f46', `prod ${fmt(anode.state.productionRate,2)}`);
+  drawNode(pos['cathode'],'Cathode','#0ea5a4',`acc ${fmt(cathode.state.acceptance,2)}`);
+  drawNode(pos['wiring'],'Wiring','#0f172a',`R ${fmt(wiringAgent.state.resistance,1)}Ω`);
+  drawNode(pos['dc-dc']||pos['dc'],'DC-DC','#7c3aed',`out ${fmt(dc.state.outV,2)}V`);
+  drawNode(pos['adc']||pos['ADC'],'ADC','#b45309',`samp ${adc.state.samples||0}`);
+  drawNode(pos['logger'],'Logger','#064e3b',`entries ${logger.state.entries||0}`);
+  drawNode(pos['safety'],'Safety','#b91c1c',`voltageSafe ${safety.state.voltageSafe? 'Y':'N'}`);
+
+  ctx.restore();
+}
+
+// UI inspector selection
+let selectedAgent = null;
+canvas.addEventListener('click', (ev)=>{
+  // map click to nearest node
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left), y = (ev.clientY - rect.top);
+  let best=null,bd=1e9;
+  for(const n of nodes){
+    const dx = x - n.x; const dy = y - n.y; const d = Math.hypot(dx,dy);
+    if(d<bd){ bd=d; best=n; }
+  }
+  if(best && bd<80){
+    selectedAgent = agents.find(a=>a.id.toLowerCase()===best.id.toLowerCase() || a.id.toLowerCase().includes(best.id.toLowerCase()));
+    updateInspector();
+  }
+});
+
+// Update inspector pane
+function updateInspector(){
+  const el = document.getElementById('inspector');
+  if(!selectedAgent){ el.textContent='Click a node to inspect agent state'; return; }
+  const a = selectedAgent;
+  el.textContent = `id: ${a.id}\nkind: ${a.kind}\nstate: ${JSON.stringify(a.state)}\nfailed: ${JSON.stringify(a.failed)}\nmetrics: ${JSON.stringify(a.metrics)}`;
+}
+
+// Simulation update loop
+let lastFrame = performance.now();
+let frames=0;
+
+function simStep(dt){
+  // deterministic drift in env
+  // base slow diurnal: temp oscillates slightly
+  env.temp += (Math.sin(sim.t/86400*2*Math.PI)+ (rng()-0.5)*0.01) * 0.01;
+  // moisture slow evaporation influenced by temp
+  env.moist = clamp(env.moist - 0.001*(env.temp-18)/5 + (rng()-0.5)*0.02, 10, 80);
+  // microbial activity depends on temp/moist
+  env.bio = clamp(0.5 + 0.02*(env.temp-20) + 0.005*(env.moist-40) + (rng()-0.5)*0.02, 0.05, 1.0);
+  // conductivity proportional to moist and bio
+  env.conductivity = clamp(0.2 + env.moist/100 * env.bio, 0.05,1);
+
+  // apply scenario disturbances
+  const d = env.disturbance;
+  if(d.tempDrop && sim.t>=d.tempDrop.start && sim.t<=d.tempDrop.start + d.tempDrop.duration){
+    env.temp =  env.temp + d.tempDrop.delta * 0.01; // gradual
+  }
+  if(d.supplyLag && sim.t>=d.supplyLag.start && sim.t<=d.supplyLag.start + d.supplyLag.duration){
+    // DC-DC efficiency drops
+    dc.resources.eff = 0.3;
+  } else {
+    dc.resources.eff = 0.7;
+  }
+  if(d.peakDemand && sim.t>=d.peakDemand.start && sim.t<=d.peakDemand.start + d.peakDemand.duration){
+    // simulate extra load drawing bus current
+    world.bus.current = Math.max(0, world.bus.current + 0.0005);
+  }
+  if(d.sensorDrift && sim.t>=d.sensorDrift.start && sim.t<=d.sensorDrift.start + d.sensorDrift.duration){
+    // handled in ADC sensing
+  }
+
+  // agent updates
+  for(const a of agents){
+    try{ a.update(dt,world); } catch(e){ console.error(e); }
+  }
+
+  // scheduled faults
+  stepFaults(dt);
+
+  // small bus leakage / decay
+  world.bus.voltage = clamp(world.bus.voltage * (1 - 0.01*dt) , 0, 12);
+  world.t = sim.t;
+
+  // KPIs and UI
+  updateKPIs(dt);
+
+  // readiness checklist
+  updateChecklist();
+
+  // event count display
+  document.getElementById('eventCount').textContent = bus.count;
+
+  // update inspector text
+  updateInspector();
+}
+
+// update checklist UI
+function updateChecklist(){
+  const checks = {
+    frame: frame && frame.state.assembled && frame.state.integrity>0.9,
+    electrodes: probeArray && probeArray.state.contactQuality>0.7,
+    power: dc && dc.state.outV>0,
+    data: logger && logger.state.entries>10,
+    safety: safety && safety.state.sop && safety.state.voltageSafe,
+    demo: kpi.TRL>0.6
+  };
+  for(const k in checks){
+    const el = document.getElementById('e-'+k);
+    if(!el) continue;
+    el.textContent = checks[k] ? '✔️' : '⌳';
+  }
+}
+
+// UI update tick (batch DOM)
+function uiTick(){
+  document.getElementById('simTime').textContent = fmt(world.t,1)+'s';
+  document.getElementById('tickDt').textContent = fmt(sim.dt,2)+'s';
+  document.getElementById('scenarioDisplay').textContent = sim.scenario;
+  // env
+  document.getElementById('envTemp').textContent = fmt(env.temp,1)+'°C';
+  document.getElementById('envMoist').textContent = fmt(env.moist,1)+'%';
+  document.getElementById('envBio').textContent = fmt(env.bio,2);
+  // safety
+  document.getElementById('safetyVoltage').className = 'safety ' + (safety.state.voltageSafe? 'good' : 'bad');
+  document.getElementById('safetyVoltage').textContent = safety.state.voltageSafe? 'Good' : 'Unsafe';
+  // node count
+  document.getElementById('nodeCount').textContent = agents.length;
+  // mini chart draw
+  drawMiniChart();
+  // canvas
+  drawWorld();
+  requestAnimationFrame(uiTick);
+}
+
+// mini chart for last power window
+function drawMiniChart(){
+  const el = document.getElementById('miniChart');
+  // create simple sparkline using inline canvas
+  el.innerHTML = '';
+  const c = document.createElement('canvas');
+  c.width = el.clientWidth*devicePixelRatio; c.height = 56*devicePixelRatio;
+  c.style.width = el.clientWidth+'px'; c.style.height = '56px';
+  el.appendChild(c);
+  const gc = c.getContext('2d');
+  gc.scale(devicePixelRatio,devicePixelRatio);
+  const w = c.width/devicePixelRatio, h = c.height/devicePixelRatio;
+  gc.clearRect(0,0,w,h);
+  const arr = kpi.powerWindow.slice(-60).map(v=>v*1000);
+  if(arr.length===0) return;
+  const max = Math.max(...arr), min = Math.min(...arr);
+  gc.beginPath();
+  for(let i=0;i<arr.length;i++){
+    const x = i/(arr.length-1||1)*w;
+    const y = h - ((arr[i]-min)/(max-min||1))*h;
+    if(i===0) gc.moveTo(x,y); else gc.lineTo(x,y);
+  }
+  gc.strokeStyle = '#0f172a'; gc.lineWidth = 1.5; gc.stroke();
+}
+
+// deterministic simulation clock loop
+let accum=0;
+function loopStep(){
+  const dt = sim.dt;
+  // run deterministic pseudo-random events by stepping rng in a predictable way
+  // update sim state
+  sim.step++;
+  sim.t += dt;
+  world.dt = dt;
+  simStep(dt);
+}
+
+// use setInterval for deterministic fixed dt
+const TICK_MS = Math.round(sim.dt*1000);
+const ticker = setInterval(loopStep, TICK_MS);
+
+// Start UI frame
+requestAnimationFrame(uiTick);
+
+// expose testing hooks: scenario selection and reset
+function resetSimulation(seedOverride){
+  clearInterval(ticker);
+  // reload by reinitializing RNG if seed override provided
+  const newSeed = seedOverride || prompt('Enter seed (leave blank to reuse):', seedParam) || seedParam;
+  // update URL
+  const u = new URL(location);
+  u.searchParams.set('seed', newSeed);
+  // preserve scenario
+  u.searchParams.set('scenario', document.getElementById('scenarioSelect').value || 'Normal');
+  history.replaceState({},'',u);
+  location.reload();
+}
+document.getElementById('resetBtn').addEventListener('click', ()=>resetSimulation());
+
+// wire button scenario already handled; ensure initial UI values
+document.getElementById('seedDisplay').textContent = seedParam;
+document.getElementById('scenarioSelect').value = sim.scenario;
+appendLog(`Simulation started — seed=${seedParam} scenario=${sim.scenario}`,'system');
+
+// After build, ensure we have references
+wireAgentRefs();
+
+// ensure graceful sampling by ADC periodically (simulate 1Hz)
+setInterval(()=>{ bus.emit('tick',{t:world.t}); }, 1000);
+
+// small scheduler to call adc sampling every second
+setInterval(()=>{ try{ adc && adc.update && adc.update(sim.dt, world); }catch(e){} }, 1000);
+
+// Persist small state to localStorage for persistence
+setInterval(()=>{ try{ localStorage.setItem('wax_world_state', JSON.stringify({t:sim.t,TRL:kpi.TRL,entries:logger.state.entries||0})); }catch(e){} }, 7000);
+
+// Final: expose some internals for console inspection
+window.waxWorld = {spec,agents,world,kpi,appendLog,resetSimulation, rngSeed:seedParam};
+
+</script>
+</body>
+</html>
