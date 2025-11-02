@@ -353,7 +353,6 @@ def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = No
         endpoint_name=DEFAULT_ENDPOINT_NAME,
     )
     return result.dict()
-    )
 
 
 @app.route("/jid/create_pictures", methods=["POST"])
