@@ -34,7 +34,6 @@ class PicturesResponse(BaseModel):
 class FocusItem(BaseModel):
     dimension: str = Field(..., min_length=2, max_length=64)
     focus: str = Field(..., min_length=6)
-    goal: str = Field(..., min_length=6)
 
 
 class FocusesResponse(BaseModel):
