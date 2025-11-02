@@ -111,18 +111,11 @@ def build_create_pictures_prompt(vision_text: str, focus: str = "") -> str:
         )
 
 # --- Focuses: prompt assembly --------------------------------------------------
-def build_create_focuses_prompt(vision_text: str,
-                                count: str = "",
-                                must_include: str = "",
-                                exclude: str = "") -> str:
-    # Ensure empty fields stay empty (prompt instructs model to ignore empties)
-    return create_focuses_prompt.format(
-        vision=vision_text.strip(),
-        count=(count or ""),
-        must_include=(must_include or ""),
-        exclude=(exclude or "")
 
-# --- Picture Explanation Prompt Builder ----------------------------------------
+def build_create_focuses_prompt(vision_text: str, count: str = "", must_include: str = "", exclude: str = "") -> str:
+    return create_focuses_prompt.format(vision=vision_text.strip(), count=(count or ""), must_include=(must_include or ""), exclude=(exclude or ""))
+
+
 def build_explain_picture_prompt(vision_text: str, picture_text: str, focus: str = "") -> str:
     try:
         return explain_picture_prompt.format(
