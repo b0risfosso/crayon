@@ -19,6 +19,8 @@ class PictureItem(BaseModel):
 
 class PicturesResponse(BaseModel):
     vision: str = Field(..., min_length=1)
+    # NEW: optional focus string; model may return null or omit it entirely
+    focus: Optional[str] = Field(default=None)
     pictures: List[PictureItem]
 
     @_validator("pictures")
