@@ -27,7 +27,7 @@ from prompts import wax_architect_prompt
 
 # On startup
 
-DEFAULT_MODEL = os.getenv("CRAYON_LLM_MODEL", "gpt-5-mini-2025-08-07")
+DEFAULT_MODEL = os.getenv("LLM_MODEL", "gpt-5-mini-2025-08-07")
 DAILY_MAX_TOKENS_LIMIT = int(os.getenv("DAILY_MAX_TOKENS_LIMIT", "10000000"))  # 10M
 DEFAULT_ENDPOINT_NAME = "/crayon/create_wax"
 
@@ -123,7 +123,7 @@ def run_wax_stack(
     readiness_target: str = "",
     *,
     email: str | None = None,
-    model: str = CRAYON_DEFAULT_MODEL,
+    model: str = DEFAULT_MODEL,
     endpoint_name: str = "/crayon/wax_stack"
 ) -> str:
 
