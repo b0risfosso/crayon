@@ -228,7 +228,7 @@ def run_vision_to_focuses_llm(
             model=model,
             input=[
                 {"role": "system", "content": SYSTEM_MSG},
-                {"role": "user", "content": user_msg},
+                {"role": "user", "content": prompt_text},
             ],
             text_format=FocusesResponse,
         )
