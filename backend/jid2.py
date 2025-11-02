@@ -474,7 +474,7 @@ def jid_create_pictures():
         return jsonify({"error": "Missing 'vision'"}), 400
 
     email = payload.get("email")
-    focus = (payload.get("focus") or "").strip()  # NEW
+    focus = (payload.get("focus") or "").strip()
 
     try:
         result = run_vision_to_pictures_llm(
@@ -482,10 +482,15 @@ def jid_create_pictures():
             email=email,
             model=DEFAULT_MODEL,
             endpoint_name=DEFAULT_ENDPOINT_NAME,
-            focus=focus,  # NEW
+            focus=focus,
         )
-        # If you persist to DB after LLM, keep your current logic here unchanged.
-        return jsonify(result.dict()), 200
+
+        # Persist to DB (non-fatal if it fails)
+        ids = persist_pictures_to_db(result, email=email, source="jid")
+        payload_out = result.dict()
+        payload_out.update(ids)  # adds vision_id and picture_ids if saved
+
+        return jsonify(payload_out), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     except Exception as e:
@@ -515,11 +520,18 @@ def jid_create_focuses():
             model=DEFAULT_MODEL,
             endpoint_name="/jid/create_focuses",
         )
-        return jsonify(result.dict()), 200
+
+        # Persist focuses inside a single vision row (metadata.focuses = [...])
+        ids = persist_focuses_to_db(result, email=email, source="jid")
+        payload_out = result.dict()
+        payload_out.update(ids)  # adds vision_id if saved
+
+        return jsonify(payload_out), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
+
 
 @app.route("/jid/explain_picture", methods=["POST"])
 def jid_explain_picture():
@@ -540,11 +552,29 @@ def jid_explain_picture():
             model=DEFAULT_MODEL,
             endpoint_name="/jid/explain_picture",
         )
-        return jsonify({"vision": vision_text, "focus": focus, "picture": picture_text, "explanation": result_text}), 200
+
+        # Persist to DB (vision + single picture with explanation in metadata)
+        ids = persist_explanation_to_db(
+            vision_text=vision_text,
+            picture_text=picture_text,
+            explanation_text=result_text,
+            focus=(focus or None),
+            email=email,
+            source="jid",
+        )
+
+        return jsonify({
+            "vision": vision_text,
+            "focus": focus,
+            "picture": picture_text,
+            "explanation": result_text,
+            **ids  # includes vision_id, picture_id if saved
+        }), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
+
 
 
 
