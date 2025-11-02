@@ -268,6 +268,8 @@ def run_vision_to_focuses_llm(
     usage_in = usage["input"]
     usage_out = usage["output"]
 
+    request_id = None
+
     # Log usage (non-fatal if it fails)
     try:
         log_usage(
