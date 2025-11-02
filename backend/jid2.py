@@ -21,7 +21,8 @@ except Exception:
 from models import PicturesResponse
 from prompts import create_pictures_prompt
 from db_shared import (
-    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB
+    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB,
+    create_vision, create_picture, upsert_vision_by_text_email
 )
 
 from models import FocusesResponse
@@ -353,6 +354,116 @@ def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = No
         endpoint_name=DEFAULT_ENDPOINT_NAME,
     )
     return result.dict()
+
+
+# -------------------- Redundancy-aware Persistence Helpers --------------------
+import json
+
+def persist_pictures_to_db(result, *, email: str | None, source: str = "jid") -> dict:
+    """
+    Upsert a vision by (text,email). Then append N picture rows.
+    - visions.focuses: if result.focus present (string), merge/set on vision.
+    """
+    try:
+        focuses_value = getattr(result, "focus", None) or None  # optional string (single focus lens)
+        vision_id = upsert_vision_by_text_email(
+            text=result.vision,
+            email=email,
+            focuses=focuses_value,  # store string or JSON string if you pass arrays later
+            explanation=None,
+            source=source,
+            metadata={"origin": "jid", "pictures_count": len(result.pictures)},
+        )
+
+        picture_ids = []
+        for idx, item in enumerate(result.pictures):
+            pid = create_picture(
+                vision_id=vision_id,
+                focus=focuses_value,           # propagate request focus to each picture if desired
+                title=item.title,
+                description=item.picture,
+                function=item.function,
+                explanation=None,
+                email=email,
+                order_index=idx,
+                status="draft",
+                source=source,
+                metadata={},
+                assets={},
+            )
+            picture_ids.append(pid)
+        return {"vision_id": vision_id, "picture_ids": picture_ids}
+    except Exception as e:
+        print(f"[WARN] persist_pictures_to_db failed: {e}")
+        return {}
+
+def persist_focuses_to_db(result, *, email: str | None, source: str = "jid") -> dict:
+    """
+    Upsert vision by (text,email). Merge focuses JSON array onto visions.focuses.
+    """
+    try:
+        focuses_payload = [
+            {"dimension": f.dimension, "focus": f.focus, "goal": f.goal}
+            for f in result.focuses
+        ]
+        vision_id = upsert_vision_by_text_email(
+            text=result.vision,
+            email=email,
+            focuses=json.dumps(focuses_payload, ensure_ascii=False),
+            explanation=None,
+            source=source,
+            metadata={"origin": "jid", "focuses_count": len(focuses_payload)},
+        )
+        return {"vision_id": vision_id}
+    except Exception as e:
+        print(f"[WARN] persist_focuses_to_db failed: {e}")
+        return {}
+
+def persist_explanation_to_db(
+    *, vision_text: str, picture_text: str, explanation_text: str, focus: str | None, email: str | None, source: str = "jid"
+) -> dict:
+    """
+    Upsert vision by (text,email). Then add/append a picture row with explanation.
+    """
+    try:
+        vision_id = upsert_vision_by_text_email(
+            text=vision_text,
+            email=email,
+            focuses=None,
+            explanation=None,  # leave vision.explanation empty here unless you want to copy explanation there as well
+            source=source,
+            metadata={"origin": "jid", "has_explanation": True},
+        )
+
+        # Title heuristic from picture_text
+        raw = picture_text.strip()
+        title = None
+        for sep in [" — ", " - ", " —", ":", "–", "—", "|"]:
+            if sep in raw:
+                title = raw.split(sep, 1)[0].strip()
+                break
+        if not title:
+            title = (raw[:64] + ("…" if len(raw) > 64 else "")).strip()
+
+        picture_id = create_picture(
+            vision_id=vision_id,
+            focus=(focus or None),
+            title=title,
+            description=picture_text,
+            function=None,
+            explanation=explanation_text,     # store explanation on picture row
+            email=email,
+            order_index=0,
+            status="draft",
+            source=source,
+            metadata={},
+            assets={},
+        )
+        return {"vision_id": vision_id, "picture_id": picture_id}
+    except Exception as e:
+        print(f"[WARN] persist_explanation_to_db failed: {e}")
+        return {}
+
 
 
 @app.route("/jid/create_pictures", methods=["POST"])

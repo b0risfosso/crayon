@@ -19,12 +19,17 @@ except Exception:
     _HAS_TIKTOKEN = False
 
 from db_shared import (
-    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB
+    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB,
+    upsert_vision_by_text_email,   # reuse your redundancy-aware vision upsert
+    upsert_wax_by_content,
+    upsert_world_by_html,
 )
 
 from prompts import wax_architect_prompt
 
 from prompts import wax_worldwright_prompt
+
+
 
 
 # On startup
@@ -314,14 +319,42 @@ def crayon_wax_stack():
             model=DEFAULT_MODEL,
             endpoint_name="/crayon/wax_stack",
         )
+
+        # --- Persist: upsert vision, then upsert wax by content hash -----------
+        vision_id = upsert_vision_by_text_email(
+            text=vision,
+            email=email,
+            source="crayon",
+            metadata={
+                "origin": "crayon",
+                "picture_short": picture_short,
+                "deployment_context": deployment_context,
+                "readiness_target": readiness_target,
+            },
+        )
+        wax_title = f"Wax Stack for: {picture_short or vision}"
+        wax_id = upsert_wax_by_content(
+            vision_id=vision_id,
+            title=wax_title,
+            content=output,
+            email=email,
+            source="crayon",
+            metadata={
+                "constraints": constraints,
+                "picture_description": picture_description,
+            },
+        )
+
         return jsonify({
             "vision": vision,
+            "vision_id": vision_id,
             "picture_short": picture_short,
             "picture_description": picture_description,
             "constraints": constraints,
             "deployment_context": deployment_context,
             "readiness_target": readiness_target,
-            "wax_stack": output
+            "wax_stack": output,
+            "wax_id": wax_id
         }), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
@@ -360,18 +393,91 @@ def crayon_wax_worldwright():
             model=DEFAULT_MODEL,
             endpoint_name="/crayon/wax_worldwright",
         )
+
+        # --- Persist: upsert vision, upsert wax (from provided wax_stack), then upsert world by html hash
+        vision_id = upsert_vision_by_text_email(
+            text=vision,
+            email=email,
+            source="crayon",
+            metadata={
+                "origin": "crayon",
+                "picture_short": picture_short,
+                "deployment_context": deployment_context,
+                "readiness_target": readiness_target,
+            },
+        )
+        wax_title = f"Wax Stack for: {picture_short or vision}"
+        wax_id = upsert_wax_by_content(
+            vision_id=vision_id,
+            title=wax_title,
+            content=wax_stack,   # NOTE: this is the provided wax stack (input), not the HTML
+            email=email,
+            source="crayon",
+            metadata={
+                "constraints": constraints,
+                "picture_description": picture_description,
+                "source_for_world": "wax_worldwright_input"
+            },
+        )
+        world_title = f"World: {picture_short or vision}"
+        world_id = upsert_world_by_html(
+            vision_id=vision_id,
+            wax_id=wax_id,
+            title=world_title,
+            html=html,
+            email=email,
+            source="crayon",
+            metadata={
+                "constraints": constraints,
+                "deployment_context": deployment_context,
+                "readiness_target": readiness_target,
+            },
+        )
+
         # Return as JSON so clients can save to disk; alternatively set mimetype='text/html'
         return jsonify({
             "vision": vision,
+            "vision_id": vision_id,
             "picture_short": picture_short,
             "deployment_context": deployment_context,
             "readiness_target": readiness_target,
+            "wax_id": wax_id,
+            "world_id": world_id,
             "html": html
         }), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
+
+
+
+# ------------------------------------------------------------------------------
+# Health check and startup
+
+@app.route("/healthz")
+def healthz():
+    return jsonify({"status": "ok", "time": _iso_now()}), 200
+
+
+@app.route("/usage/today", methods=["GET"])
+def usage_today():
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    model = request.args.get("model", DEFAULT_MODEL)
+    conn = connect(USAGE_DB)
+    try:
+        row = conn.execute(
+            "SELECT tokens_in, tokens_out, total_tokens, calls FROM totals_daily WHERE day=? AND model=?",
+            (day, model),
+        ).fetchone()
+        data = {"day": day, "model": model}
+        if row:
+            data.update({"tokens_in": row[0], "tokens_out": row[1], "total_tokens": row[2], "calls": row[3]})
+        else:
+            data.update({"tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "calls": 0})
+        return jsonify(data), 200
+    finally:
+        conn.close()
 
 # -------------------------- If-main (local testing) ---------------------------
 if __name__ == "__main__":

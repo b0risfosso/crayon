@@ -334,7 +334,7 @@ Declare units and keep simple dimensional consistency checks. Align variables to
 Start automatically; build agents; loop; agents sense/decide/act; story emerges from function.
 
 ## Testing Hooks
-Provide Scenario dropdown (e.g., Supply Delay, Cold Snap, Peak Demand, Sensor Drift) and Reset button to reseed/rebuild deterministically.
+Provide Scenario dropdown (test various scenarios relevant to world) and Reset button to reseed/rebuild deterministically.
 
 ## Style & Performance
 Clean, understated, responsive. Keep JS reasonably small (no external libs). Batch DOM updates on animation frames.

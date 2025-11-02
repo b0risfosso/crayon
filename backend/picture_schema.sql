@@ -5,41 +5,85 @@ CREATE TABLE IF NOT EXISTS visions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     title           TEXT,
     text            TEXT NOT NULL,
+    focuses         TEXT,                         -- JSON string or CSV (list of focuses or focus objects)
+    explanation     TEXT,                         -- optional, vision-level explanation
     email           TEXT,
-    status          TEXT DEFAULT 'draft',            -- draft|active|archived|error
-    priority        INTEGER DEFAULT 0,               -- sort/usefulness
-    tags            TEXT,                            -- comma-separated or JSON in metadata
-    source          TEXT,                            -- 'jid' | 'crayon' | other
+    status          TEXT DEFAULT 'draft',         -- draft|active|archived|error
+    priority        INTEGER DEFAULT 0,            -- sort/usefulness
+    tags            TEXT,                         -- comma-separated or JSON in metadata
+    source          TEXT,                         -- 'jid' | 'crayon' | other
     slug            TEXT UNIQUE,
-    metadata        TEXT,                            -- JSON string (key/values)
-    created_at      TEXT NOT NULL,                   -- ISO 8601
+    metadata        TEXT,                         -- JSON string (key/values)
+    created_at      TEXT NOT NULL,                -- ISO 8601
     updated_at      TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_visions_email ON visions(email);
-CREATE INDEX IF NOT EXISTS idx_visions_status ON visions(status);
+CREATE INDEX IF NOT EXISTS idx_visions_email   ON visions(email);
+CREATE INDEX IF NOT EXISTS idx_visions_status  ON visions(status);
 CREATE INDEX IF NOT EXISTS idx_visions_created ON visions(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_visions_text_email ON visions(text, email);
 
 CREATE TABLE IF NOT EXISTS pictures (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     vision_id       INTEGER NOT NULL,
-    subtext         TEXT,
+    focus           TEXT,                         -- optional, picture-specific focus
     title           TEXT,
     description     TEXT,
     function        TEXT,
+    explanation     TEXT,                         -- NEW: explanation tied to this picture (optional)
     email           TEXT,
     order_index     INTEGER DEFAULT 0,
-    status          TEXT DEFAULT 'draft',            -- draft|ready|published|archived|error
-    source          TEXT,                            -- 'jid' | 'crayon' | other
+    status          TEXT DEFAULT 'draft',         -- draft|ready|published|archived|error
+    source          TEXT,                         -- 'jid' | 'crayon' | other
     slug            TEXT,
-    metadata        TEXT,                            -- JSON string (params, knobs, etc.)
-    assets          TEXT,                            -- JSON string (image paths, urls)
+    metadata        TEXT,                         -- JSON string (params, knobs, etc.)
+    assets          TEXT,                         -- JSON string (image paths, urls)
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL,
     FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_pictures_vision ON pictures(vision_id);
-CREATE INDEX IF NOT EXISTS idx_pictures_email ON pictures(email);
+CREATE INDEX IF NOT EXISTS idx_pictures_email  ON pictures(email);
 CREATE INDEX IF NOT EXISTS idx_pictures_status ON pictures(status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pictures_slug ON pictures(slug);
+
+CREATE TABLE IF NOT EXISTS waxes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    vision_id     INTEGER NOT NULL,
+    title         TEXT,
+    content       TEXT NOT NULL,              -- full Wax Stack text
+    content_hash  TEXT,                       -- sha256(content) for idempotency
+    email         TEXT,
+    source        TEXT,                       -- 'crayon' | other
+    metadata      TEXT,                       -- JSON
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_waxes_vision ON waxes(vision_id);
+CREATE INDEX IF NOT EXISTS idx_waxes_email ON waxes(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_waxes_content_hash ON waxes(content_hash);
+
+
+CREATE TABLE IF NOT EXISTS worlds (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    vision_id     INTEGER NOT NULL,
+    wax_id        INTEGER,                    -- optional link to waxes.id
+    title         TEXT,
+    html          TEXT NOT NULL,              -- full HTML document
+    html_hash     TEXT,                       -- sha256(html) for idempotency
+    email         TEXT,
+    source        TEXT,                       -- 'crayon' | other
+    metadata      TEXT,                       -- JSON
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE CASCADE,
+    FOREIGN KEY (wax_id)    REFERENCES waxes(id)   ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_worlds_vision ON worlds(vision_id);
+CREATE INDEX IF NOT EXISTS idx_worlds_email  ON worlds(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_worlds_html_hash ON worlds(html_hash);
+
