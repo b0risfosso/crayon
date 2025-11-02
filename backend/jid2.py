@@ -298,19 +298,25 @@ def jid_create_pictures():
     vision_text = (payload.get("vision") or "").strip()
     if not vision_text:
         return jsonify({"error": "Missing 'vision'"}), 400
+
     email = payload.get("email")
+    focus = (payload.get("focus") or "").strip()  # NEW
+
     try:
         result = run_vision_to_pictures_llm(
             vision_text=vision_text,
             email=email,
             model=DEFAULT_MODEL,
             endpoint_name=DEFAULT_ENDPOINT_NAME,
+            focus=focus,  # NEW
         )
+        # If you persist to DB after LLM, keep your current logic here unchanged.
         return jsonify(result.dict()), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
+
 
 
 @app.route("/jid/create_focuses", methods=["POST"])
