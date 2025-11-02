@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import json
 from datetime import datetime, timezone
 from typing import Optional
@@ -361,17 +362,55 @@ def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = No
 # -------------------- Redundancy-aware Persistence Helpers --------------------
 import json
 
+def _focus_string_to_json_array(focus_text: str) -> str:
+    """
+    Convert a single focus string (e.g., 'Biological Dimension — Microbial metabolism and electron flow.')
+    into the same JSON-array-of-objects format used by /jid/create_focuses:
+      [
+        {"dimension": "Biological", "focus": "Microbial metabolism and electron flow.", "goal": null}
+      ]
+    Robust to separators: '—', '-', ':'. Falls back to {"dimension":"General","focus":<text>}.
+    """
+    s = (focus_text or "").strip()
+    if not s:
+        return json.dumps([], ensure_ascii=False)
+
+    # Split on first occurrence of em/en dash, hyphen, or colon
+    m = re.split(r"\s*[—–-:]\s*", s, maxsplit=1)
+    left = (m[0] or "").strip()
+    right = (m[1] if len(m) > 1 else "").strip()
+
+    # Extract 'X Dimension' → X
+    dim = left
+    dim = re.sub(r"\b[Dd]imension\b$", "", dim).strip() or left
+
+    if not right:
+        right = s  # no separator found; store whole string as 'focus', dimension 'General'
+
+    if not dim or dim.lower() == "dimension":
+        dim = "General"
+
+    return json.dumps([{"dimension": dim, "focus": right, "goal": None}], ensure_ascii=False)
+
+
+
 def persist_pictures_to_db(result, *, email: str | None, source: str = "jid") -> dict:
     """
     Upsert a vision by (text,email). Then append N picture rows.
-    - visions.focuses: if result.focus present (string), merge/set on vision.
+    - visions.focuses: store as JSON array-of-objects (same format as /jid/create_focuses).
+    - pictures.focus: keep the original single-line focus string for convenience.
     """
     try:
-        focuses_value = getattr(result, "focus", None) or None  # optional string (single focus lens)
+        # original single-line focus string from the request/model (may be None)
+        focus_line = getattr(result, "focus", None) or None
+
+        # JSON array-of-objects for the vision row (match /jid/create_focuses)
+        focuses_json = _focus_string_to_json_array(focus_line) if focus_line else json.dumps([], ensure_ascii=False)
+
         vision_id = upsert_vision_by_text_email(
             text=result.vision,
             email=email,
-            focuses=focuses_value,  # store string or JSON string if you pass arrays later
+            focuses=focuses_json if focus_line else None,   # only set/merge if we got a focus
             explanation=None,
             source=source,
             metadata={"origin": "jid", "pictures_count": len(result.pictures)},
@@ -381,7 +420,7 @@ def persist_pictures_to_db(result, *, email: str | None, source: str = "jid") ->
         for idx, item in enumerate(result.pictures):
             pid = create_picture(
                 vision_id=vision_id,
-                focus=focuses_value,           # propagate request focus to each picture if desired
+                focus=focus_line,                # store the readable single-line focus on each picture (TEXT)
                 title=item.title,
                 description=item.picture,
                 function=item.function,
@@ -525,7 +564,7 @@ def jid_create_focuses():
 
         # Persist focuses inside a single vision row (metadata.focuses = [...])
         ids = persist_focuses_to_db(result, email=email, source="jid")
-        payload_out = result.dict()
+        payload_out = result.model_dump()
         payload_out.update(ids)  # adds vision_id if saved
 
         return jsonify(payload_out), 200

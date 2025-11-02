@@ -227,6 +227,45 @@ def find_existing_vision_id_by_text_email(text: str, email: Optional[str]) -> Op
     finally:
         conn.close()
 
+def _ensure_focuses_json_array(s: Optional[str]) -> list:
+    """
+    Normalize a focuses value to a list of objects.
+    Accepts:
+      - None/empty → []
+      - JSON array string → parsed list
+      - Any other string → parse into [{"dimension": <derived>, "focus": <text>, "goal": None}]
+    """
+    import re, json
+    if not s or not str(s).strip():
+        return []
+    try:
+        val = json.loads(s)
+        if isinstance(val, list):
+            return val
+    except Exception:
+        pass
+    # Fallback: convert a single line into one object
+    line = str(s).strip()
+    parts = re.split(r"\s*[—–-:]\s*", line, maxsplit=1)
+    left = (parts[0] or "").strip()
+    right = (parts[1] if len(parts) > 1 else "").strip() or line
+    dim = re.sub(r"\b[Dd]imension\b$", "", left).strip() or "General"
+    return [{"dimension": dim, "focus": right, "goal": None}]
+
+def _merge_focus_arrays(a: list, b: list) -> list:
+    """
+    Merge two focus arrays, de-duplicating by JSON signature of items.
+    """
+    import json
+    seen = set()
+    out = []
+    for x in (a or []) + (b or []):
+        sig = json.dumps(x, sort_keys=True, ensure_ascii=False)
+        if sig not in seen:
+            seen.add(sig)
+            out.append(x)
+    return out
+
 def update_vision_fields(
     vision_id: int,
     *,
@@ -239,11 +278,7 @@ def update_vision_fields(
     title: Optional[str] = None,
 ) -> None:
     """
-    Non-destructive update:
-      - focuses: if target empty/NULL -> set; else if both look like JSON arrays, merge unique; else replace only if different.
-      - explanation: set only if target empty/NULL, else keep existing.
-      - metadata: shallow-merge (new keys overwrite).
-      - title/status/tags/source: set if provided (overwrite).
+    Non-destructive update with focuses normalization/merge.
     """
     conn = connect(PICTURE_DB)
     try:
@@ -255,42 +290,25 @@ def update_vision_fields(
             return
         cur_focuses, cur_expl, cur_meta = existing
 
-        # focuses handling
-        new_focuses = cur_focuses
+        # Normalize to arrays and merge
         if focuses is not None:
-            if not cur_focuses or cur_focuses.strip() == "":
-                new_focuses = focuses
-            else:
-                # Try to merge JSON arrays
-                try:
-                    a = json.loads(cur_focuses)
-                    b = json.loads(focuses)
-                    if isinstance(a, list) and isinstance(b, list):
-                        # de-dup by JSON string
-                        seen = set()
-                        merged = []
-                        for x in a + b:
-                            sig = json.dumps(x, sort_keys=True)
-                            if sig not in seen:
-                                seen.add(sig)
-                                merged.append(x)
-                        new_focuses = json.dumps(merged, ensure_ascii=False)
-                except Exception:
-                    # fallback: keep existing
-                    new_focuses = cur_focuses
+            cur_arr = _ensure_focuses_json_array(cur_focuses)
+            new_arr = _ensure_focuses_json_array(focuses)
+            merged_arr = _merge_focus_arrays(cur_arr, new_arr)
+            new_focuses = json.dumps(merged_arr, ensure_ascii=False)
+        else:
+            new_focuses = cur_focuses
 
-        # explanation handling: only set if empty
+        # explanation: set only if empty
         new_expl = cur_expl
-        if explanation is not None:
-            if not cur_expl or cur_expl.strip() == "":
-                new_expl = explanation
+        if explanation is not None and (not cur_expl or not str(cur_expl).strip()):
+            new_expl = explanation
 
-        # metadata shallow merge
+        # metadata shallow-merge
         new_meta = _json_merge(cur_meta, json.dumps(metadata or {}, ensure_ascii=False))
 
-        # columns to update
         sets = ["updated_at = ?"]
-        vals = [ _iso_now() ]
+        vals = [_iso_now()]
 
         if title is not None:
             sets.append("title = ?"); vals.append(title)
@@ -304,17 +322,13 @@ def update_vision_fields(
             sets.append("tags = ?"); vals.append(tags)
         if source is not None:
             sets.append("source = ?"); vals.append(source)
-        # metadata always writes merged string
         sets.append("metadata = ?"); vals.append(new_meta)
 
-        if len(sets) > 1:  # something to update besides updated_at
-            conn.execute(
-                f"UPDATE visions SET {', '.join(sets)} WHERE id = ?",
-                (*vals, vision_id)
-            )
-            conn.commit()
+        conn.execute(f"UPDATE visions SET {', '.join(sets)} WHERE id = ?", (*vals, vision_id))
+        conn.commit()
     finally:
         conn.close()
+
 
 def upsert_vision_by_text_email(
     *,
