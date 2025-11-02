@@ -261,7 +261,7 @@ def run_wax_worldwright(
     usage_in = usage["input"]
     usage_out = usage["output"]
 
-    content = resp.output_text
+    html = resp.output_text
 
     # Basic sanity: ensure it looks like HTML; if not, wrap minimal boilerplate
     if "<html" not in html.lower():
