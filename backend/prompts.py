@@ -86,7 +86,7 @@ create_focuses_prompt = r"""
 You are the Focus Cartographer.
 
 Your task is to take a VISION and enumerate the key DIMENSIONS it can be pursued through.
-For each dimension, define a concise FOCUS (what to concentrate on) and a concrete GOAL (what success looks like within that focus).
+For each dimension, define a concise FOCUS (what to concentrate on).
 
 Keep the outputs actionable and non-generic: each item should be a lever someone could actually pull.
 
@@ -113,7 +113,6 @@ Return ONLY valid JSON (no Markdown, no commentary) matching this schema:
     {{
       "dimension": "string",   // e.g., Legal, Economic, Mechanical, Electrical, Computational, Biological, Architectural, Social, Sensory, Temporal, Mythic, Cognitive, Ecological, Energetic, Governance, Financial, Logistics, Safety, Ethical
       "focus": "string",       // what to concentrate on (clear, specific)
-      "goal": "string"         // the concrete outcome to achieve via this focus
     }}
   ]
 }}
@@ -130,7 +129,6 @@ JSON RULES:
 ### GUIDELINES:
 - Cover multiple scales where applicable (micro → macro) and multiple modalities (physical, informational, social, symbolic).
 - Prefer dimensions that meaningfully change decisions (ownership, safety, reliability, capital, regulation, maintenance, human ritual, etc.).
-- Each GOAL must be testable/observable in the real world.
 - Avoid repeating the same concept across different dimensions; make them orthogonal.
 - If 'must_include' is provided, include those dimensions if relevant; if 'exclude' is provided, avoid those.
 

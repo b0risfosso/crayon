@@ -403,7 +403,7 @@ def persist_focuses_to_db(result, *, email: str | None, source: str = "jid") -> 
     """
     try:
         focuses_payload = [
-            {"dimension": f.dimension, "focus": f.focus, "goal": f.goal}
+            {"dimension": f.dimension, "focus": f.focus}
             for f in result.focuses
         ]
         vision_id = upsert_vision_by_text_email(
