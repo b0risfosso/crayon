@@ -27,6 +27,8 @@ from db_shared import (
 from models import FocusesResponse
 from prompts import create_focuses_prompt
 
+from prompts import explain_picture_prompt
+
 
 
 # ------------------------------------------------------------------------------
@@ -106,6 +108,32 @@ def build_create_pictures_prompt(vision_text: str, focus: str = "") -> str:
         raise RuntimeError(
             f"Prompt formatting failed on placeholder {ke!r}. "
             "Ensure all literal braces in prompts.py are doubled {{ like this }}."
+        )
+
+# --- Focuses: prompt assembly --------------------------------------------------
+def build_create_focuses_prompt(vision_text: str,
+                                count: str = "",
+                                must_include: str = "",
+                                exclude: str = "") -> str:
+    # Ensure empty fields stay empty (prompt instructs model to ignore empties)
+    return create_focuses_prompt.format(
+        vision=vision_text.strip(),
+        count=(count or ""),
+        must_include=(must_include or ""),
+        exclude=(exclude or "")
+
+# --- Picture Explanation Prompt Builder ----------------------------------------
+def build_explain_picture_prompt(vision_text: str, picture_text: str, focus: str = "") -> str:
+    try:
+        return explain_picture_prompt.format(
+            vision=vision_text.strip(),
+            picture=picture_text.strip(),
+            focus=(focus or "")
+        )
+    except KeyError as ke:
+        raise RuntimeError(
+            f"Prompt formatting failed on placeholder {ke!r}. "
+            "Ensure braces in prompts.py are doubled {{ like this }}."
         )
 
 
@@ -265,6 +293,61 @@ def run_vision_to_focuses_llm(
 
     return parsed
 
+def run_explain_picture_llm(
+    vision_text: str,
+    picture_text: str,
+    *,
+    focus: str = "",
+    email: Optional[str] = None,
+    model: str = DEFAULT_MODEL,
+    endpoint_name: str = "/jid/explain_picture",
+) -> str:
+    """Generate structured text explanation (not JSON)."""
+    today_tokens = get_today_model_tokens(model)
+    if today_tokens >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model}: {today_tokens}/{DAILY_MAX_TOKENS_LIMIT}"
+        )
+
+    prompt_text = build_explain_picture_prompt(vision_text, picture_text, focus)
+
+    usage_in = 0
+    usage_out = 0
+    request_id = None
+
+    resp = client.responses.create(
+        model=model,
+        input=prompt_text
+    )
+
+    usage = _usage_from_resp(resp)
+    usage_in = usage["input"]
+    usage_out = usage["output"]
+
+    content = resp.output_text
+
+    
+
+    # Log usage
+    try:
+        log_usage(
+            app="jid",
+            model=model,
+            tokens_in=usage_in,
+            tokens_out=usage_out,
+            endpoint=endpoint_name,
+            email=email,
+            request_id=request_id,
+            duration_ms=0,
+            cost_usd=0.0,
+            meta={"purpose": "explain_picture"},
+        )
+    except Exception as e:
+        print(f"[WARN] usage logging failed (explain_picture): {e}")
+
+    return content.strip()
+
+
 
 def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = None) -> dict:
     """
@@ -277,18 +360,6 @@ def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = No
         endpoint_name=DEFAULT_ENDPOINT_NAME,
     )
     return result.dict()
-
-# --- Focuses: prompt assembly --------------------------------------------------
-def build_create_focuses_prompt(vision_text: str,
-                                count: str = "",
-                                must_include: str = "",
-                                exclude: str = "") -> str:
-    # Ensure empty fields stay empty (prompt instructs model to ignore empties)
-    return create_focuses_prompt.format(
-        vision=vision_text.strip(),
-        count=(count or ""),
-        must_include=(must_include or ""),
-        exclude=(exclude or "")
     )
 
 
