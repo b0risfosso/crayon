@@ -418,6 +418,32 @@ def jid_create_focuses():
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
 
+@app.route("/jid/explain_picture", methods=["POST"])
+def jid_explain_picture():
+    payload = request.get_json(force=True) or {}
+    vision_text = (payload.get("vision") or "").strip()
+    picture_text = (payload.get("picture") or "").strip()
+    focus = (payload.get("focus") or "").strip()
+    if not vision_text or not picture_text:
+        return jsonify({"error": "Missing 'vision' or 'picture'"}), 400
+
+    email = payload.get("email")
+    try:
+        result_text = run_explain_picture_llm(
+            vision_text=vision_text,
+            picture_text=picture_text,
+            focus=focus,
+            email=email,
+            model=DEFAULT_MODEL,
+            endpoint_name="/jid/explain_picture",
+        )
+        return jsonify({"vision": vision_text, "focus": focus, "picture": picture_text, "explanation": result_text}), 200
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 429
+    except Exception as e:
+        return jsonify({"error": f"Unhandled error: {e}"}), 500
+
+
 
 # ------------------------------------------------------------------------------
 # Health check and startup
