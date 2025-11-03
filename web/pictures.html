@@ -104,7 +104,7 @@ let CURRENT_VISION = null;
 let LAST_JSON = {};
 
 function api(path, params) {
-  const base = 'http://127.0.0.1:9013';
+  const base = '';
   const url = new URL(base + path);
   if (params) Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
   return fetch(url).then(async res => {
