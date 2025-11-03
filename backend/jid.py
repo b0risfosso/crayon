@@ -640,7 +640,7 @@ def jid_explain_picture():
 
 @app.route("/healthz")
 def healthz():
-    return jsonify({"status": "ok", "time": _iso_now()}), 200
+    return jsonify({"status": "ok", "time": _iso_today()}), 200
 
 
 @app.route("/usage/today", methods=["GET"])
