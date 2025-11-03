@@ -625,22 +625,172 @@ def find_wax_id_by_hash(content_hash: str) -> Optional[int]:
     finally:
         conn.close()
 
+
 def upsert_wax_by_content(
     *,
     vision_id: int,
-    title: Optional[str],
     content: str,
-    email: Optional[str],
-    source: Optional[str] = "crayon",
-    metadata: Optional[Dict[str, Any]] = None,
+    title: str | None = None,
+    email: str | None = None,
+    picture_id: int | None = None,            # Link wax to a specific picture when provided
+    source: str | None = "crayon",
+    metadata: dict | None = None,
+    policy: str = "append",                    # "append" (default) or "overwrite" for same (picture_id, email)
+    separator: str = "\n\n---\n\n"            # Used when appending
 ) -> int:
-    h = _sha256(content)
-    existing = find_wax_id_by_hash(h)
-    if existing:
-        return existing
-    return create_wax(
-        vision_id=vision_id, title=title, content=content, email=email, source=source, metadata=metadata
-    )
+    """
+    Idempotent + picture-aware upsert for WAX rows.
+
+    Behavior:
+      1) If an identical content_hash exists anywhere in 'waxes', return that row.
+         - If caller supplies picture_id and stored row has NULL picture_id, attach it.
+         - Shallow-merge metadata, and set email/source if provided (COALESCE-style).
+      2) Else if (picture_id, email) already has a wax row:
+         - If policy == "append": append new content (with separator) and update content_hash.
+         - If policy == "overwrite": replace content and content_hash.
+         - In both cases, shallow-merge metadata and update timestamps.
+      3) Else: insert a fresh row.
+
+    Notes:
+      - This aligns with your "by picture" strategy while still deduping exact content globally.
+      - Requires: connect(PICTURE_DB), _iso_now(), and _json_merge(...) already defined in your module.
+    """
+    import json, hashlib
+
+    def _sha256(txt: str) -> str:
+        return hashlib.sha256(txt.encode("utf-8")).hexdigest()
+
+    if policy not in ("append", "overwrite"):
+        raise ValueError("policy must be 'append' or 'overwrite'")
+
+    now = _iso_now()
+    meta_s_new = json.dumps(metadata or {}, ensure_ascii=False)
+    new_hash = _sha256(content)
+
+    conn = connect(PICTURE_DB)
+    try:
+        # ------------------------------------------------------------------ #
+        # (1) Global exact-content de-dup (fast path)
+        row = conn.execute(
+            "SELECT id, picture_id, email, source, metadata FROM waxes WHERE content_hash = ? LIMIT 1",
+            (new_hash,)
+        ).fetchone()
+        if row:
+            wax_id, cur_pic, cur_email, cur_source, cur_meta = row
+
+            # attach picture_id if empty and we have one
+            set_picture = (picture_id is not None) and (cur_pic is None)
+
+            # merge metadata shallowly
+            merged_meta = _json_merge(cur_meta, meta_s_new) if (metadata is not None) else (cur_meta or meta_s_new)
+
+            # update link/metadata if anything new was provided
+            if set_picture or metadata is not None or email is not None or source is not None:
+                conn.execute(
+                    """
+                    UPDATE waxes
+                    SET picture_id = COALESCE(?, picture_id),
+                        email      = COALESCE(?, email),
+                        source     = COALESCE(?, source),
+                        metadata   = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (picture_id if set_picture else None, email, source, merged_meta, now, wax_id)
+                )
+                conn.commit()
+            return wax_id
+
+        # ------------------------------------------------------------------ #
+        # Helper: find existing wax row by (picture_id, email)
+        def _find_wax_id_by_picture_email(p_id: int, em: str | None):
+            if p_id is None:
+                return None
+            if em is None:
+                r = conn.execute(
+                    "SELECT id FROM waxes WHERE picture_id = ? AND email IS NULL LIMIT 1",
+                    (p_id,)
+                ).fetchone()
+            else:
+                r = conn.execute(
+                    "SELECT id FROM waxes WHERE picture_id = ? AND email = ? LIMIT 1",
+                    (p_id, em)
+                ).fetchone()
+            return int(r[0]) if r else None
+
+        # (2) If we have a picture, respect the (picture_id, email) policy
+        existing_wax_id = _find_wax_id_by_picture_email(picture_id, email)
+        if existing_wax_id is not None:
+            # fetch current content + metadata
+            row2 = conn.execute(
+                "SELECT content, metadata FROM waxes WHERE id = ?",
+                (existing_wax_id,)
+            ).fetchone()
+            cur_content, cur_meta = row2 if row2 else ("", None)
+
+            if policy == "append":
+                new_content = (cur_content or "")
+                if content:
+                    new_content = (new_content + (separator if new_content else "")) + content
+            else:  # overwrite
+                new_content = content
+
+            merged_meta = _json_merge(cur_meta, meta_s_new)
+
+            conn.execute(
+                """
+                UPDATE waxes
+                SET title       = COALESCE(?, title),
+                    content     = ?,
+                    content_hash= ?,
+                    email       = COALESCE(?, email),
+                    source      = COALESCE(?, source),
+                    metadata    = ?,
+                    updated_at  = ?
+                WHERE id = ?
+                """,
+                (
+                    title,
+                    new_content,
+                    _sha256(new_content),
+                    email,
+                    source,
+                    merged_meta,
+                    now,
+                    existing_wax_id
+                )
+            )
+            conn.commit()
+            return existing_wax_id
+
+        # ------------------------------------------------------------------ #
+        # (3) Fresh insert (no identical content, no existing (picture,email))
+        cur = conn.execute(
+            """
+            INSERT INTO waxes
+                (vision_id, picture_id, title, content, content_hash, email, source, metadata, created_at, updated_at)
+            VALUES (?,         ?,          ?,     ?,       ?,            ?,     ?,      ?,        ?,          ?)
+            """,
+            (
+                vision_id,
+                picture_id,
+                title,
+                content,
+                new_hash,
+                email,
+                source,
+                meta_s_new,
+                now,
+                now
+            )
+        )
+        conn.commit()
+        return cur.lastrowid
+
+    finally:
+        conn.close()
+
+
 
 def create_world(
     *,

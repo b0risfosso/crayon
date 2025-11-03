@@ -23,6 +23,7 @@ from db_shared import (
     upsert_vision_by_text_email,   # reuse your redundancy-aware vision upsert
     upsert_wax_by_content,
     upsert_world_by_html, find_or_create_picture_by_signature, upsert_wax_by_picture_append,
+    upsert_world_by_picture_overwrite, update_world_overwrite, find_world_id_by_picture_email
 
 )
 
@@ -451,6 +452,7 @@ def crayon_wax_worldwright():
                 "source_for_world": "wax_worldwright_input"
             },
         )
+        
         world_title = f"World: {picture_short or vision}"
         world_id = upsert_world_by_picture_overwrite(
             vision_id=vision_id,
