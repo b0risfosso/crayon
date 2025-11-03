@@ -31,6 +31,8 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .sep { height:1px; background:#eee; margin:.6rem 0; }
     .empty { padding:.4rem 0; color:#6b7280; }
+    button.view { background: #059669; }       /* green */
+    button.create { background: #0b5cff; }     /* blue */
   </style>
 </head>
 <body>
@@ -98,6 +100,21 @@ async function postJSON(url, body, timeoutMs=600000){
     throw new Error(msg);
   }
   return data;
+}
+
+// Batch check which pictures already have worlds
+async function lookupExistingWorldsByPictureIds(ids){
+  if (!Array.isArray(ids) || !ids.length) return {};
+  const res = await postJSON('/crayon/worlds/lookup', { picture_ids: ids }, 60000);
+  // returns { worlds: { "<picId>": { id, picture_id, updated_at }, ... } }
+  return res?.worlds || {};
+}
+
+async function fetchWorldHtml(worldId){
+  const r = await fetch(`/crayon/world/html?id=${encodeURIComponent(worldId)}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const j = await r.json();
+  return j?.html || '';
 }
 
 
@@ -246,41 +263,87 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
         box.append(sep);
 
         // pictures grid
-        const pics = Array.isArray(v.pictures) ? v.pictures : [];
-        if (!pics.length){
-          const empty = document.createElement('div'); empty.className = 'empty';
-          empty.textContent = 'No pictures for this vision yet.';
-          box.append(empty);
-        } else {
-          const grid = document.createElement('div'); grid.className = 'pics';
-          for (const p of pics){
-            const card = document.createElement('div'); card.className = 'pic';
-            const h3 = document.createElement('h3'); h3.textContent = p?.title || 'Untitled picture';
-            const d  = document.createElement('div'); d.className = 'muted'; d.textContent = p?.description || '';
-            const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
-            if (p?.function) fn.innerHTML = `<strong>Function:</strong> ${escapeHtml(p.function)}`;
-            const pm = document.createElement('div'); pm.className = 'meta mono';
-            pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
+        // pictures grid
+const pics = Array.isArray(v.pictures) ? v.pictures : [];
+if (!pics.length){
+  const empty = document.createElement('div'); empty.className = 'empty';
+  empty.textContent = 'No pictures for this vision yet.';
+  box.append(empty);
+} else {
+  const grid = document.createElement('div'); grid.className = 'pics';
 
-            // --- NEW: create picture (wax + world) — this time we can use the actual vision text `v.text`
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = 'create picture';
-            btn.style.marginTop = '.5rem';
-            btn.addEventListener('click', async () => {
-                const visionText = v?.text || '';
-                if (!visionText) { alert('This vision has no text.'); return; }
-                await createWorldForPictureCard(card, visionText, p);
-            });
+  // --- NEW: batch-lookup worlds for these pic ids
+  const picIds = pics.map(p => p?.id).filter(x => x != null);
+  let worldMap = {};
+  try {
+    worldMap = await lookupExistingWorldsByPictureIds(picIds);
+  } catch(e) {
+    // non-fatal; just leave as empty map
+    console.warn('world lookup failed', e);
+  }
 
-            card.append(h3, d);
-            if (p?.function) card.append(fn);
-            card.append(pm, btn);
-            grid.append(card);
-            }
+  for (const p of pics){
+    const card = document.createElement('div'); card.className = 'pic';
+    const h3 = document.createElement('h3'); h3.textContent = p?.title || 'Untitled picture';
+    const d  = document.createElement('div'); d.className = 'muted'; d.textContent = p?.description || '';
+    const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
+    if (p?.function) fn.innerHTML = `<strong>Function:</strong> ${escapeHtml(p.function)}`;
+    const pm = document.createElement('div'); pm.className = 'meta mono';
+    pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
 
-          box.append(grid);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.style.marginTop = '.5rem';
+
+    const existing = p?.id != null ? worldMap[String(p.id)] : null;
+    if (existing?.id) {
+      // ---- VIEW MODE (green)
+      btn.textContent = 'view picture';
+      btn.className = 'view';
+      btn.addEventListener('click', async () => {
+        try {
+          const html = await fetchWorldHtml(existing.id);
+          openHtmlInNewTab(html);
+        } catch(e) {
+          alert(`Failed to load world: ${e.message || e}`);
         }
+      });
+    } else {
+      // ---- CREATE MODE (blue)
+      btn.textContent = 'create picture';
+      btn.className = 'create';
+      btn.addEventListener('click', async () => {
+        const visionText = v?.text || '';
+        if (!visionText) { alert('This vision has no text.'); return; }
+        await createWorldForPictureCard(card, visionText, p);
+        // Optional: after creating, try upgrading the button to "view"
+        try {
+          const m = await lookupExistingWorldsByPictureIds([p.id]);
+          const w = m && m[String(p.id)];
+          if (w?.id) {
+            btn.textContent = 'view picture';
+            btn.className = 'view';
+            btn.replaceWith(btn.cloneNode(true)); // remove old handler
+            const newBtn = card.querySelector('button.view');
+            newBtn?.addEventListener('click', async () => {
+              try {
+                const html = await fetchWorldHtml(w.id);
+                openHtmlInNewTab(html);
+              } catch(e) { alert(`Failed to load world: ${e.message || e}`); }
+            });
+          }
+        } catch(_) {}
+      });
+    }
+
+    card.append(h3, d);
+    if (p?.function) card.append(fn);
+    card.append(pm, btn);
+    grid.append(card);
+  }
+  box.append(grid);
+}
+
 
         mount.append(box);
       }
