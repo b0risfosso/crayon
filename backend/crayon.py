@@ -19,7 +19,7 @@ except Exception:
     _HAS_TIKTOKEN = False
 
 from db_shared import (
-    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB,
+    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB, PICTURE_DB, 
     upsert_vision_by_text_email,   # reuse your redundancy-aware vision upsert
     upsert_wax_by_content,
     upsert_world_by_html, find_or_create_picture_by_signature, upsert_wax_by_picture_append,
@@ -542,7 +542,7 @@ def crayon_worlds_lookup():
     if not pic_ids:
         return jsonify({"worlds": {}})
 
-    conn = connect()
+    conn = connect(PICTURE_DB)
     cur = conn.cursor()
     placeholders = ",".join("?" for _ in pic_ids)
 
@@ -584,7 +584,7 @@ def crayon_world_html():
     if not wid.isdigit():
         return jsonify({"error": "id is required (integer)"}), 400
 
-    conn = connect()
+    conn = connect(PICTURE_DB)
     cur = conn.cursor()
     cur.execute("SELECT id, html FROM worlds WHERE id = ?", (int(wid),))
     row = cur.fetchone()
