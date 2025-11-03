@@ -36,6 +36,77 @@ def init_usage_db(conn: Optional[sqlite3.Connection]=None) -> None:
         if close:
             conn.close()
 
+
+# ---------------------- Picture lookup/update helpers -------------------------
+from typing import Optional, Dict, Any, Tuple
+
+def _email_match_clause(email: Optional[str]) -> Tuple[str, Tuple]:
+    if email is None:
+        return "email IS NULL", tuple()
+    else:
+        return "email = ?", (email,)
+
+def find_picture_id_by_signature(
+    *,
+    vision_id: int,
+    title: str,
+    description: str,
+    email: Optional[str],
+) -> Optional[int]:
+    """
+    Return picture.id if a row under this vision matches title, description, and email (or NULL).
+    """
+    conn = connect(PICTURE_DB)
+    try:
+        email_clause, email_args = _email_match_clause(email)
+        row = conn.execute(
+            f"""
+            SELECT id FROM pictures
+            WHERE vision_id = ? AND title = ? AND description = ? AND {email_clause}
+            ORDER BY created_at ASC LIMIT 1
+            """,
+            (vision_id, title, description, *email_args),
+        ).fetchone()
+        return int(row[0]) if row else None
+    finally:
+        conn.close()
+
+def update_picture_fields(
+    picture_id: int,
+    *,
+    explanation: Optional[str] = None,   # overwrite if provided
+    focus: Optional[str] = None,         # overwrite if provided
+    status: Optional[str] = None,
+    metadata_merge: Optional[Dict[str, Any]] = None,
+) -> None:
+    """
+    Overwrite simple fields if provided. Shallow-merge metadata if provided.
+    """
+    conn = connect(PICTURE_DB)
+    try:
+        sets = ["updated_at = ?"]
+        vals = [_iso_now()]
+
+        if explanation is not None:
+            sets.append("explanation = ?"); vals.append(explanation)
+        if focus is not None:
+            sets.append("focus = ?"); vals.append(focus)
+        if status is not None:
+            sets.append("status = ?"); vals.append(status)
+
+        if metadata_merge is not None:
+            # fetch current metadata and shallow-merge
+            row = conn.execute("SELECT metadata FROM pictures WHERE id = ?", (picture_id,)).fetchone()
+            cur_meta = row[0] if row else None
+            merged_meta = _json_merge(cur_meta, json.dumps(metadata_merge, ensure_ascii=False))
+            sets.append("metadata = ?"); vals.append(merged_meta)
+
+        conn.execute(f"UPDATE pictures SET {', '.join(sets)} WHERE id = ?", (*vals, picture_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 # --- CRUD: picture.db ---
 
 # db_shared.py (only the two functions shown need replacing)

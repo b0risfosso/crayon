@@ -23,7 +23,7 @@ from models import PicturesResponse
 from prompts import create_pictures_prompt
 from db_shared import (
     init_picture_db, init_usage_db, log_usage, connect, USAGE_DB,
-    create_vision, create_picture, upsert_vision_by_text_email
+    create_vision, create_picture, upsert_vision_by_text_email, find_picture_id_by_signature, update_picture_fields
 )
 
 from models import FocusesResponse
@@ -131,6 +131,13 @@ def build_explain_picture_prompt(vision_text: str, picture_text: str, focus: str
             "Ensure braces in prompts.py are doubled {{ like this }}."
         )
 
+
+def _extract_title_from_picture_text(picture_text: str) -> str:
+    raw = (picture_text or "").strip()
+    for sep in [" — ", " - ", " —", ":", "–", "—", "|"]:
+        if sep in raw:
+            return raw.split(sep, 1)[0].strip()
+    return (raw[:64] + ("…" if len(raw) > 64 else "")).strip()
 
 
 # ------------------------------------------------------------------------------
@@ -445,50 +452,75 @@ def persist_focuses_to_db(result, *, email: str | None, source: str = "jid") -> 
         return {}
 
 def persist_explanation_to_db(
-    *, vision_text: str, picture_text: str, explanation_text: str, focus: str | None, email: str | None, source: str = "jid"
+    *,
+    vision_text: str,
+    picture_text: str,
+    explanation_text: str,
+    focus: str | None,
+    email: str | None,
+    source: str = "jid",
 ) -> dict:
     """
-    Upsert vision by (text,email). Then add/append a picture row with explanation.
+    Policy:
+      - Vision: upsert by (text,email). If 'focus' provided as string, normalize to JSON-array and MERGE into visions.focuses.
+      - Picture: match by (vision_id, title, description, email). If exists, OVERWRITE explanation; else INSERT new row.
     """
     try:
+        # 1) Ensure we have a vision row, then (optionally) merge focus into focuses array.
         vision_id = upsert_vision_by_text_email(
             text=vision_text,
             email=email,
-            focuses=None,
-            explanation=None,  # leave vision.explanation empty here unless you want to copy explanation there as well
             source=source,
             metadata={"origin": "jid", "has_explanation": True},
         )
 
-        # Title heuristic from picture_text
-        raw = picture_text.strip()
-        title = None
-        for sep in [" — ", " - ", " —", ":", "–", "—", "|"]:
-            if sep in raw:
-                title = raw.split(sep, 1)[0].strip()
-                break
-        if not title:
-            title = (raw[:64] + ("…" if len(raw) > 64 else "")).strip()
+        if (focus or "").strip():
+            focuses_json = _focus_string_to_json_array(focus)  # JSON array string
+            update_vision_fields(
+                vision_id,
+                focuses=focuses_json,  # will be normalized+merged inside update_vision_fields
+                # explanation: leave None so we don't touch vision.explanation here
+                metadata={},            # no-op merge
+            )
 
+        # 2) Title + picture dedup / update
+        title = _extract_title_from_picture_text(picture_text)
+        existing_pid = find_picture_id_by_signature(
+            vision_id=vision_id,
+            title=title,
+            description=picture_text.strip(),
+            email=email,
+        )
+        if existing_pid:
+            # overwrite explanation; optionally update focus if provided
+            update_picture_fields(
+                existing_pid,
+                explanation=explanation_text,
+                focus=((focus or "").strip() or None),
+                metadata_merge={"source_last": source},
+                status=None,
+            )
+            return {"vision_id": vision_id, "picture_id": existing_pid}
+
+        # 3) Insert new picture with explanation
         picture_id = create_picture(
             vision_id=vision_id,
             focus=(focus or None),
             title=title,
             description=picture_text,
             function=None,
-            explanation=explanation_text,     # store explanation on picture row
+            explanation=explanation_text,
             email=email,
             order_index=0,
             status="draft",
             source=source,
-            metadata={},
+            metadata={"source_created": source},
             assets={},
         )
         return {"vision_id": vision_id, "picture_id": picture_id}
     except Exception as e:
         print(f"[WARN] persist_explanation_to_db failed: {e}")
         return {}
-
 
 
 @app.route("/jid/create_pictures", methods=["POST"])
