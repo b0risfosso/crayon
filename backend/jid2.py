@@ -23,7 +23,7 @@ from models import PicturesResponse
 from prompts import create_pictures_prompt
 from db_shared import (
     init_picture_db, init_usage_db, log_usage, connect, USAGE_DB,
-    create_vision, create_picture, upsert_vision_by_text_email, find_picture_id_by_signature, update_picture_fields
+    create_vision, create_picture, upsert_vision_by_text_email, find_picture_id_by_signature, update_picture_fields, update_vision_fields
 )
 
 from models import FocusesResponse
