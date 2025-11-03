@@ -124,6 +124,13 @@
     }
 
     async function createWorldForPictureCard(cardNode, visionText, pic){
+        console.log('Creating world with data:', {
+            visionText,
+            picTitle: pic?.title,
+            picDescription: pic?.description,
+            pic
+        });
+
         const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
         const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
         const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
