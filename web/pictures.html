@@ -69,6 +69,39 @@ const EP_CRAYON = {
   world: '/crayon/wax_worldwright'
 };
 
+// ---------- Shared JSON helpers ----------
+async function fetchWithTimeout(url, options={}, timeoutMs=300000){
+  const controller = new AbortController();
+  const timer = setTimeout(()=> controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function postJSON(url, body, timeoutMs=600000){
+  const resp = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }, timeoutMs);
+  let data;
+  try {
+    data = await resp.json();
+  } catch {
+    throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
+  }
+  if (!resp.ok || data?.ok === false) {
+    const msg = (data && (data.error || data.detail)) ?
+      `${data.error || ''} ${data.detail || ''}`.trim() :
+      `HTTP ${resp.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+
 // Normalize various possible response shapes
 function pickWaxStack(res){
   if (!res) return '';
@@ -87,13 +120,6 @@ function openHtmlInNewTab(html){
   w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
   w.document.close();
 }
-
-function postJSON(url, body, timeoutMs) {
-    return fetchJSON(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body || {})
-    }, timeoutMs);
 
 async function createWorldForPictureCard(cardNode, visionText, pic){
   const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
