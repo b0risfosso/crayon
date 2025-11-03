@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Vision • Focus • Picture — Visualization</title>
+<style>
+  :root{--bg:#f9fafb;--panel:#ffffff;--ink:#0f172a;--mut:#6b7280;--line:#e5e7eb;--pill:#eef2ff}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+  .wrap{max-width:1200px;margin:20px auto;padding:0 16px}
+  header{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+  h1{font-size:20px;margin:0}
+  input,select,button,textarea{border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;color:var(--ink)}
+  button{cursor:pointer}
+  .grid{display:grid;gap:16px;grid-template-columns: 320px 1fr}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .card h2{font-size:15px;margin:0 0 8px}
+  .mut{color:var(--mut);font-size:12px}
+  .list{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow:auto}
+  .vision-item{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
+  .vision-item h3{margin:0 0 6px;font-size:14px}
+  .counts{display:flex;gap:10px;font-size:12px;color:var(--mut)}
+  .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;background:var(--pill);border-radius:999px;margin:4px 6px 0 0}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .grid2{display:grid;gap:12px;grid-template-columns: repeat(auto-fill,minmax(260px,1fr))}
+  .pic{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
+  .pic h4{margin:0 0 6px;font-size:14px}
+  .small{font-size:12px}
+  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#f3f4f6;border:1px solid var(--line);padding:2px 6px;border-radius:6px}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-top:6px}
+  .json{white-space:pre-wrap;background:#0b1020;color:#e5e7eb;border-radius:10px;padding:10px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Vision • Focus • Picture</h1>
+    <span class="mut">Explore visions, see generated focuses, and browse pictures.</span>
+  </header>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="row">
+      <div style="flex:1">
+        <label class="mut">API Base</label>
+        <input id="apiBase" value="http://127.0.0.1:5001" style="width:100%"/>
+      </div>
+      <div style="width:300px">
+        <label class="mut">Search visions</label>
+        <input id="search" placeholder="keywords…" style="width:100%"/>
+      </div>
+      <div style="width:140px">
+        <label class="mut">Page size</label>
+        <select id="limit" style="width:100%">
+          <option>10</option><option selected>25</option><option>50</option><option>100</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button id="btnLoad">Load</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: Visions -->
+    <section class="card">
+      <h2>Visions</h2>
+      <div id="visions" class="list"></div>
+    </section>
+
+    <!-- RIGHT: Details -->
+    <section class="card">
+      <h2 id="detailTitle">Details</h2>
+
+      <div id="visionBlock" style="margin-bottom:10px"></div>
+
+      <div class="row" id="focusBar"></div>
+
+      <div class="toolbar">
+        <span class="mut">Filter pictures by focus:</span>
+        <input id="focusFilter" placeholder="type to filter…" style="flex:1"/>
+        <button id="btnRefresh">Refresh</button>
+        <button id="btnShowJSON">Toggle JSON</button>
+      </div>
+
+      <div id="jsonPane" class="json" style="display:none;margin-top:10px"></div>
+
+      <div id="pictures" class="grid2" style="margin-top:12px"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = {
+  apiBase: $('#apiBase'),
+  search:  $('#search'),
+  limit:   $('#limit'),
+  btnLoad: $('#btnLoad'),
+  visions: $('#visions'),
+  detailTitle: $('#detailTitle'),
+  visionBlock: $('#visionBlock'),
+  focusBar: $('#focusBar'),
+  focusFilter: $('#focusFilter'),
+  btnRefresh: $('#btnRefresh'),
+  pictures: $('#pictures'),
+  btnShowJSON: $('#btnShowJSON'),
+  jsonPane: $('#jsonPane'),
+};
+
+let CURRENT_VISION = null;
+let LAST_JSON = {};
+
+function api(path, params) {
+  const base = el.apiBase.value.replace(/\/+$/,'');
+  const url = new URL(base + path);
+  if (params) Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  return fetch(url).then(async res => {
+    const text = await res.text();
+    try { return JSON.parse(text) } catch { return {raw:text, status:res.status} }
+  });
+}
+
+function renderVisions(items) {
+  el.visions.innerHTML = '';
+  items.forEach(v => {
+    const div = document.createElement('div');
+    div.className = 'vision-item';
+    div.innerHTML = `
+      <h3 class="vision-title">#${v.id} — ${escapeHtml(v.vision_text || '(no text)')}</h3>
+      <div class="counts">
+        <span>pictures: <span class="kbd">${v.picture_count ?? 0}</span></span>
+        <span>focuses: <span class="kbd">${v.focus_count ?? 0}</span></span>
+        <span>${v.created_at ? new Date(v.created_at).toLocaleString() : ''}</span>
+      </div>
+      <div class="toolbar" style="margin-top:6px">
+        <button data-id="${v.id}" class="btn-open">Open</button>
+      </div>
+    `;
+    div.querySelector('.btn-open').addEventListener('click', () => openVision(v.id));
+    el.visions.appendChild(div);
+  });
+}
+
+async function loadVisions() {
+  const data = await api('/api/visions', {
+    search: el.search.value.trim(),
+    limit:  el.limit.value
+  });
+  LAST_JSON.list_visions = data;
+  renderVisions(data.items || []);
+}
+
+async function openVision(id) {
+  const data = await api(`/api/visions/${id}`);
+  LAST_JSON.vision_detail = data;
+  CURRENT_VISION = id;
+
+  const v = data.vision || {};
+  el.detailTitle.textContent = `Vision #${v.id ?? id}`;
+  el.visionBlock.innerHTML = `
+    <div style="border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff">
+      <div class="mut">Vision text</div>
+      <div>${escapeHtml(v.vision_text || '')}</div>
+    </div>
+  `;
+
+  // focuses bar
+  el.focusBar.innerHTML = '';
+  (data.focuses || []).forEach(f => {
+    const pill = document.createElement('div');
+    pill.className = 'pill';
+    pill.textContent = f.focus_text || '';
+    pill.addEventListener('click', () => {
+      el.focusFilter.value = f.focus_text || '';
+      refreshPictures();
+    });
+    el.focusBar.appendChild(pill);
+  });
+
+  renderPictures(data.pictures || []);
+}
+
+function renderPictures(items) {
+  el.pictures.innerHTML = '';
+  const needle = el.focusFilter.value.trim().toLowerCase();
+  items
+    .filter(p => !needle || ((p.focus || '').toLowerCase().includes(needle)))
+    .forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'pic';
+      card.innerHTML = `
+        <h4>${escapeHtml(p.title || '(untitled)')}</h4>
+        ${p.focus ? `<div class="small mut">Focus: ${escapeHtml(p.focus)}</div>` : ''}
+        ${p.description ? `<div class="small" style="margin-top:6px">${escapeHtml(p.description)}</div>` : ''}
+        ${p.function ? `<div class="small" style="margin-top:6px"><b>Function:</b> ${escapeHtml(p.function)}</div>` : ''}
+        ${p.explanation ? `<div class="small" style="margin-top:6px"><b>Explanation:</b> ${escapeHtml(p.explanation)}</div>` : ''}
+        <div class="small mut" style="margin-top:6px">${p.created_at ? new Date(p.created_at).toLocaleString() : ''}</div>
+        <div class="toolbar">
+          <button class="btn-json" data-id="${p.id}">JSON</button>
+        </div>
+      `;
+      card.querySelector('.btn-json').addEventListener('click', async () => {
+        const one = await api(`/api/pictures/${p.id}`);
+        LAST_JSON[`picture_${p.id}`] = one;
+        toggleJSON(JSON.stringify(one, null, 2));
+      });
+      el.pictures.appendChild(card);
+    });
+}
+
+async function refreshPictures() {
+  if (!CURRENT_VISION) return;
+  const focus = el.focusFilter.value.trim();
+  const data = await api(`/api/visions/${CURRENT_VISION}/pictures`, { focus });
+  LAST_JSON.refresh_pictures = data;
+  renderPictures(data.items || []);
+}
+
+function toggleJSON(textMaybe) {
+  if (textMaybe) {
+    el.jsonPane.textContent = textMaybe;
+    el.jsonPane.style.display = 'block';
+    return;
+  }
+  el.jsonPane.style.display = (el.jsonPane.style.display === 'none' ? 'block' : 'none');
+  if (el.jsonPane.style.display === 'block') {
+    el.jsonPane.textContent = JSON.stringify(LAST_JSON, null, 2);
+  }
+}
+
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+
+el.btnLoad.addEventListener('click', loadVisions);
+el.btnRefresh.addEventListener('click', refreshPictures);
+el.btnShowJSON.addEventListener('click', () => toggleJSON());
+document.addEventListener('DOMContentLoaded', loadVisions);
+</script>
+</body>
+</html>
