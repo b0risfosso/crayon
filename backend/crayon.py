@@ -515,3 +515,81 @@ def usage_today():
     finally:
         conn.close()
 
+# --- Worlds lookup + HTML fetch ------------------------------------------------
+from flask import request, jsonify
+
+def _dictify(cur, row):
+    return { d[0]: row[i] for i, d in enumerate(cur.description) }
+
+@app.route("/crayon/worlds/lookup", methods=["POST"])
+def crayon_worlds_lookup():
+    """
+    Batch lookup: given picture_ids, return the most recent world (if any) for each.
+    Body: { "picture_ids": [1,2,3] }
+    Resp: { "worlds": { "1": {"id": 10, "picture_id":1, "updated_at":"..."}, ... } }
+    """
+    payload = request.get_json(force=True) or {}
+    ids = payload.get("picture_ids") or []
+    if not isinstance(ids, list) or not ids:
+        return jsonify({"worlds": {}})
+
+    # sanitize to ints
+    try:
+        pic_ids = [int(x) for x in ids if str(x).strip() != ""]
+    except Exception:
+        return jsonify({"error": "picture_ids must be integers"}), 400
+
+    if not pic_ids:
+        return jsonify({"worlds": {}})
+
+    conn = connect()
+    cur = conn.cursor()
+    placeholders = ",".join("?" for _ in pic_ids)
+
+    # get latest world per picture_id
+    cur.execute(f"""
+        SELECT w1.id, w1.picture_id, w1.updated_at
+        FROM worlds w1
+        JOIN (
+          SELECT picture_id, MAX(COALESCE(updated_at, created_at)) AS mx
+          FROM worlds
+          WHERE picture_id IN ({placeholders})
+          GROUP BY picture_id
+        ) w2
+        ON w1.picture_id = w2.picture_id
+        AND COALESCE(w1.updated_at, w1.created_at) = w2.mx
+    """, tuple(pic_ids))
+    rows = cur.fetchall()
+
+    out = {}
+    for r in rows:
+        d = _dictify(cur, r)
+        out[str(d["picture_id"])] = {
+            "id": d["id"],
+            "picture_id": d["picture_id"],
+            "updated_at": d.get("updated_at"),
+        }
+
+    return jsonify({"worlds": out})
+
+
+@app.route("/crayon/world/html", methods=["GET"])
+def crayon_world_html():
+    """
+    Fetch HTML for a specific world id.
+    Query: ?id=<world_id>
+    Resp: { "id": 10, "html": "<!doctype html>..." }
+    """
+    wid = (request.args.get("id") or "").strip()
+    if not wid.isdigit():
+        return jsonify({"error": "id is required (integer)"}), 400
+
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT id, html FROM worlds WHERE id = ?", (int(wid),))
+    row = cur.fetchone()
+    if not row:
+        return jsonify({"error": "world not found"}), 404
+
+    d = _dictify(cur, row)
+    return jsonify({"id": d["id"], "html": d["html"]})
