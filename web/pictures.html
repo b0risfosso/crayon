@@ -88,6 +88,13 @@ function openHtmlInNewTab(html){
   w.document.close();
 }
 
+function postJSON(url, body, timeoutMs) {
+    return fetchJSON(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    }, timeoutMs);
+
 async function createWorldForPictureCard(cardNode, visionText, pic){
   const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
   const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
