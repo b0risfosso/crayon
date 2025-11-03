@@ -100,100 +100,187 @@
       createPictures: '/jid/create_pictures',
       createFocuses: '/jid/create_focuses'
     };
+    // ---- Crayon endpoints
+    const EP_CRAYON = {
+    waxStack: '/crayon/wax_stack',
+    world: '/crayon/wax_worldwright'
+    };
 
-    // ------------ Helpers ------------
-    const $ = (id) => document.getElementById(id);
-    function setText(el, msg, cls = '') {
-      if (!el) return;
-      el.className = 'status ' + (cls || '');
-      el.textContent = msg || '';
-    }
-    function escapeHtml(s) {
-      return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
-    }
-    async function fetchJSON(url, options = {}, timeoutMs = 300000) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const resp = await fetch(url, { ...options, signal: controller.signal });
-        const ct = resp.headers.get('content-type') || '';
-        const isJSON = ct.includes('application/json');
-        const data = isJSON ? await resp.json() : await resp.text();
-        if (!resp.ok) {
-          const detail = isJSON ? (data?.error || data?.detail || JSON.stringify(data)) : data;
-          throw new Error(detail || `HTTP ${resp.status}`);
-        }
-        return data;
-      } finally { clearTimeout(timer); }
-    }
-    function postJSON(url, body, timeoutMs) {
-      return fetchJSON(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body || {})
-      }, timeoutMs);
+    // Normalize various possible response shapes
+    function pickWaxStack(res){
+        if (!res) return '';
+        if (typeof res.wax_stack === 'string') return res.wax_stack;
+        if (res.data && typeof res.data.wax_stack === 'string') return res.data.wax_stack;
+        if (res.result && typeof res.result.wax_stack === 'string') return res.result.wax_stack;
+        // Sometimes the LLM returns a big text field
+        if (typeof res.wax === 'string') return res.wax;
+        return '';
     }
 
-    // ------------ Email memory ------------
-    function loadEmail() { const v = (localStorage.getItem(LS_EMAIL) || '').trim().toLowerCase(); if (v) $('email').value = v; }
-    function saveEmail() { const v = ($('email').value || '').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); else localStorage.removeItem(LS_EMAIL); }
-
-    // ------------ Renderers ------------
-    function renderPictures(block) {
-      const mount = $('picturesOut'); mount.innerHTML = '';
-      const pics = Array.isArray(block?.pictures) ? block.pictures : [];
-      if (!pics.length) { mount.innerHTML = '<div class="muted">No pictures returned.</div>'; return; }
-      for (const p of pics) {
-        const card = document.createElement('div'); card.className = 'card';
-        const h = document.createElement('h3'); h.textContent = p.title || 'Untitled picture';
-        const d = document.createElement('div'); d.className = 'muted'; d.textContent = p.description || '';
-        const fn = document.createElement('div'); fn.style.marginTop = '.35rem'; fn.innerHTML = p.function ? `<strong>Function:</strong> ${escapeHtml(p.function)}` : '';
-        const meta = document.createElement('div'); meta.style.marginTop = '.25rem';
-        meta.innerHTML = [
-          p.id ? `<span class="mono">id:${escapeHtml(String(p.id))}</span>` : '',
-          p.status ? `<span class="mono">status:${escapeHtml(p.status)}</span>` : ''
-        ].filter(Boolean).join(' · ');
-        card.append(h, d);
-        if (fn.innerHTML) card.append(fn);
-        if (meta.innerHTML) card.append(meta);
-        mount.append(card);
-      }
+    function openHtmlInNewTab(html){
+        const w = window.open('', '_blank');
+        if (!w) { alert('Popup blocked: allow popups to see the world.'); return; }
+        w.document.open();
+        w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
+        w.document.close();
     }
 
-    function renderFocuses(block) {
-        const mount = $('focusesOut');
-        mount.innerHTML = '';
+    async function createWorldForPictureCard(cardNode, visionText, pic){
+        const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
+        const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
+        const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
+        const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
 
-        // Accept either { focuses: [...] } or a raw array
-        const items = Array.isArray(block?.focuses) ? block.focuses
-                    : Array.isArray(block)           ? block
-                    : [];
+        const status = document.createElement('div');
+        status.className = 'status';
+        status.textContent = 'Building wax…';
+        cardNode.append(status);
 
-        if (!items.length) {
-            mount.innerHTML = '<div class="muted">No focuses returned.</div>';
-            return;
-        }
+        try {
+            // 1) Wax stack
+            const wsPayload = {
+            vision: visionText,
+            picture_short: pic.title || '',
+            picture_description: pic.description || '',
+            constraints, deployment_context, readiness_target
+            };
+            const wsRes = await postJSON(EP_CRAYON.waxStack, wsPayload, 600000);
+            const wax_stack = pickWaxStack(wsRes);
+            if (!wax_stack) throw new Error('No wax_stack returned.');
 
-        for (let i = 0; i < items.length; i++) {
-            const f = items[i] ?? {};
-            // Normalize multiple possible shapes
-            const dimension = f.dimension || f.title || f.name || `Focus ${i + 1}`;
-            const text      = (typeof f === 'string') ? f
-                            : f.focus || f.description || '';
+            status.textContent = 'Wax ready. Building world…';
 
-            const card = document.createElement('div');
-            card.className = 'card';
-            const head = document.createElement('div');
-            head.innerHTML = `<strong>${escapeHtml(dimension)}</strong>`;
-            const body = document.createElement('div');
-            body.className = 'muted';
-            body.textContent = text;
+            // 2) Worldwright
+            const wwPayload = {
+            vision: visionText,
+            picture_short: pic.title || '',
+            picture_description: pic.description || '',
+            wax_stack,
+            email: email || undefined, // let server accept None if not provided
+            constraints, deployment_context, readiness_target
+            };
+            const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
+            const html = worldRes?.html || worldRes?.data?.html || worldRes?.result?.html;
+            if (!html) throw new Error('No world HTML returned.');
 
-            card.append(head);
-            if (text) card.append(body);
-            mount.append(card);
+            status.className = 'status ok';
+            status.textContent = 'World built. Opening…';
+            openHtmlInNewTab(html);
+        } catch (e) {
+            status.className = 'status error';
+            status.textContent = `Failed: ${e.message || e}`;
         }
     }
+
+
+        // ------------ Helpers ------------
+        const $ = (id) => document.getElementById(id);
+        function setText(el, msg, cls = '') {
+            if (!el) return;
+            el.className = 'status ' + (cls || '');
+            el.textContent = msg || '';
+            }
+            function escapeHtml(s) {
+            return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+            }
+            async function fetchJSON(url, options = {}, timeoutMs = 300000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const resp = await fetch(url, { ...options, signal: controller.signal });
+                const ct = resp.headers.get('content-type') || '';
+                const isJSON = ct.includes('application/json');
+                const data = isJSON ? await resp.json() : await resp.text();
+                if (!resp.ok) {
+                const detail = isJSON ? (data?.error || data?.detail || JSON.stringify(data)) : data;
+                throw new Error(detail || `HTTP ${resp.status}`);
+                }
+                return data;
+            } finally { clearTimeout(timer); }
+            }
+            function postJSON(url, body, timeoutMs) {
+            return fetchJSON(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body || {})
+            }, timeoutMs);
+        }
+
+        // ------------ Email memory ------------
+        function loadEmail() { const v = (localStorage.getItem(LS_EMAIL) || '').trim().toLowerCase(); if (v) $('email').value = v; }
+        function saveEmail() { const v = ($('email').value || '').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); else localStorage.removeItem(LS_EMAIL); }
+
+        // ------------ Renderers ------------
+        function renderPictures(block) {
+            const mount = $('picturesOut'); mount.innerHTML = '';
+            const pics = Array.isArray(block?.pictures) ? block.pictures : [];
+            if (!pics.length) { mount.innerHTML = '<div class="muted">No pictures returned.</div>'; return; }
+            for (const p of pics) {
+                const card = document.createElement('div'); card.className = 'card';
+                const h = document.createElement('h3'); h.textContent = p.title || 'Untitled picture';
+                const d = document.createElement('div'); d.className = 'muted'; d.textContent = p.description || '';
+                const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
+                fn.innerHTML = p.function ? `<strong>Function:</strong> ${escapeHtml(p.function)}` : '';
+                const meta = document.createElement('div'); meta.style.marginTop = '.25rem';
+                meta.innerHTML = [
+                    p.id ? `<span class="mono">id:${escapeHtml(String(p.id))}</span>` : '',
+                    p.status ? `<span class="mono">status:${escapeHtml(p.status)}</span>` : ''
+                ].filter(Boolean).join(' · ');
+
+                // --- NEW: create picture -> wax + world
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = 'create picture';
+                btn.style.marginTop = '.5rem';
+                btn.addEventListener('click', async () => {
+                    // Find the active vision text (for draw.html we used the one in the "Create Pictures" textarea)
+                    const visionText = (document.getElementById('visionForPictures')?.value || '').trim();
+                    if (!visionText) { alert('Enter a vision (Create Pictures section) first.'); return; }
+                    await createWorldForPictureCard(card, visionText, p);
+                });
+
+                card.append(h, d);
+                if (fn.innerHTML) card.append(fn);
+                if (meta.innerHTML) card.append(meta);
+                card.append(btn);
+                mount.append(card);
+            }
+        }
+
+        function renderFocuses(block) {
+            const mount = $('focusesOut');
+            mount.innerHTML = '';
+
+            // Accept either { focuses: [...] } or a raw array
+            const items = Array.isArray(block?.focuses) ? block.focuses
+                        : Array.isArray(block)           ? block
+                        : [];
+
+            if (!items.length) {
+                mount.innerHTML = '<div class="muted">No focuses returned.</div>';
+                return;
+            }
+
+            for (let i = 0; i < items.length; i++) {
+                const f = items[i] ?? {};
+                // Normalize multiple possible shapes
+                const dimension = f.dimension || f.title || f.name || `Focus ${i + 1}`;
+                const text      = (typeof f === 'string') ? f
+                                : f.focus || f.description || '';
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                const head = document.createElement('div');
+                head.innerHTML = `<strong>${escapeHtml(dimension)}</strong>`;
+                const body = document.createElement('div');
+                body.className = 'muted';
+                body.textContent = text;
+
+                card.append(head);
+                if (text) card.append(body);
+                mount.append(card);
+            }
+        }
 
 
     // ------------ Actions ------------
