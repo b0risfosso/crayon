@@ -1,284 +1,256 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Picture & Focus Console</title>
-<style>
-  :root{
-    --bg:#f9fafb; --panel:#ffffff; --text:#0f172a; --muted:#6b7280; --line:#e5e7eb;
-    --btn:#111827; --btnText:#fff; --ok:#16a34a; --err:#dc2626;
-  }
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif}
-  .wrap{max-width:980px;margin:24px auto;padding:0 16px}
-  h1{font-size:20px;margin:0 0 16px}
-  .grid{display:grid;grid-template-columns:1fr;gap:16px}
-  @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
-  .card h2{font-size:16px;margin:0 0 10px}
-  label{display:block;font-weight:600;margin:10px 0 6px}
-  textarea,input,select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;color:var(--text)}
-  textarea{min-height:110px;resize:vertical}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  .row > *{flex:1}
-  button{appearance:none;border:1px solid #0000;background:var(--btn);color:var(--btnText);padding:9px 12px;border-radius:9px;cursor:pointer}
-  button[disabled]{opacity:.6;cursor:progress}
-  .muted{color:var(--muted);font-size:12px}
-  .hr{height:1px;background:var(--line);margin:12px 0}
-  .list{display:flex;flex-direction:column;gap:8px}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff}
-  .pill button{background:#fff;color:var(--text);border:1px solid var(--line);padding:4px 8px;border-radius:999px}
-  pre{background:#0b1020;color:#e5e7eb;padding:12px;border-radius:10px;overflow:auto;max-height:260px}
-  .status{margin-top:8px;font-weight:600}
-  .ok{color:var(--ok)} .err{color:var(--err)}
-  .small{font-size:12px}
-</style>
+  <meta charset="utf-8" />
+  <title>Fantasiagenesis · Draw (JID)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 20px; }
+    header h1 { margin: 0 0 .25rem 0; font-size: clamp(1.2rem, 2.4vw, 1.6rem); }
+    .muted { opacity: .85; }
+    .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .panel { border: 1px solid #e3e3e6; border-radius: .6rem; padding: .9rem 1rem; background: #fafafb; }
+    .panel + .panel { margin-top: .9rem; }
+    input[type="text"], input[type="email"], textarea {
+      width: min(92vw, 820px); padding: .6rem .7rem; border: 1px solid #cdd0d5; border-radius: .55rem; background: #fff;
+    }
+    input[type="text"], input[type="email"] { height: 2.4rem; }
+    textarea { min-height: 7rem; }
+    button { padding: .6rem .9rem; border: 0; border-radius: .55rem; cursor: pointer; background: #0b5cff; color: #fff; }
+    button.secondary { background: #4b5563; }
+    button.ghost { background: #eef2ff; color: #1f2937; border: 1px solid #c7d2fe; }
+    .status { font-size: .92rem; margin-top: .4rem; min-height: 1.2em; }
+    .status.error { color: #b00020; white-space: pre-wrap; }
+    .status.ok { color: #065f46; }
+    .grid { display: grid; gap: .65rem; }
+    .cols { display: grid; gap: .65rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card { border: 1px solid #e5e7eb; border-radius: .6rem; background: #fff; padding: .6rem .7rem; }
+    .card h3 { margin: 0 0 .25rem 0; font-size: 1rem; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .inline { display: inline-flex; align-items: center; gap: .5rem; }
+    code { background: #f6f7f9; padding: .12rem .3rem; border-radius: .3rem; }
+  </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Picture & Focus Console</h1>
-    <p class="muted">Create focuses from a vision, then turn a selected focus into a picture. Or, create a picture directly from a vision.</p>
+  <header class="row" style="justify-content: space-between;">
+    <div>
+      <h1>Fantasiagenesis · Draw</h1>
+      <div class="muted">Create <strong>pictures</strong> and <strong>focuses</strong> from a vision via JID.</div>
+    </div>
+    <nav class="row">
+      <a class="inline" href="/jid" title="JID UI">🧩 <span class="muted">JID</span></a>
+      <a class="inline" href="/paper" title="Paper">📄 <span class="muted">Paper</span></a>
+    </nav>
+  </header>
 
+  <!-- Email -->
+  <section class="panel">
+    <div class="row">
+      <input type="email" id="email" placeholder="Email (optional but recommended for persistence)" />
+      <button id="saveEmail" class="secondary" type="button">Save email</button>
+      <button id="checkHealth" class="ghost" type="button">Check JID</button>
+    </div>
+    <div id="svcStatus" class="status"></div>
+  </section>
+
+  <!-- Create Pictures -->
+  <section class="panel">
+    <h2 style="margin:.1rem 0 .6rem 0;">Create Pictures</h2>
     <div class="grid">
-      <!-- FOCUSES -->
-      <section class="card" id="focusesCard">
-        <h2>Create Focuses</h2>
-        <label for="visionFocus">Vision</label>
-        <textarea id="visionFocus" placeholder="Describe your vision…"></textarea>
-
-        <div class="row">
-          <div>
-            <label for="count">Count <span class="muted">(optional)</span></label>
-            <input id="count" type="number" min="1" max="20" placeholder="e.g., 6">
-          </div>
-          <div>
-            <label for="mustInclude">Must include <span class="muted">(optional)</span></label>
-            <input id="mustInclude" type="text" placeholder="comma-separated phrases">
-          </div>
-          <div>
-            <label for="exclude">Exclude <span class="muted">(optional)</span></label>
-            <input id="exclude" type="text" placeholder="comma-separated phrases">
-          </div>
-        </div>
-
-        <div class="row">
-          <div>
-            <label for="emailFocus">Email <span class="muted">(optional)</span></label>
-            <input id="emailFocus" type="email" placeholder="you@example.com">
-          </div>
-        </div>
-
-        <div class="row">
-          <button id="btnFocus">Generate Focuses</button>
-          <button id="btnClearFocuses" type="button">Clear</button>
-        </div>
-
-        <div class="status" id="statusFocus"></div>
-        <div class="hr"></div>
-
-        <div>
-          <div class="muted small">Returned focuses</div>
-          <div class="list" id="focusList"></div>
-          <div class="muted small">Raw response</div>
-          <pre id="focusRaw"></pre>
-        </div>
-      </section>
-
-      <!-- PICTURES -->
-      <section class="card" id="picturesCard">
-        <h2>Create Pictures</h2>
-
-        <label for="visionPic">Vision</label>
-        <textarea id="visionPic" placeholder="Describe your vision…"></textarea>
-
-        <label for="focusPic">Focus <span class="muted">(optional; or click a focus pill on the left)</span></label>
-        <input id="focusPic" type="text" placeholder="A specific angle or subtheme">
-
-        <div class="row">
-          <div>
-            <label for="emailPic">Email <span class="muted">(optional)</span></label>
-            <input id="emailPic" type="email" placeholder="you@example.com">
-          </div>
-        </div>
-
-        <div class="row">
-          <button id="btnPicture">Create Picture</button>
-          <button id="btnClearPicture" type="button">Clear</button>
-        </div>
-
-        <div class="status" id="statusPic"></div>
-        <div class="hr"></div>
-
-        <div class="muted small">Picture summary</div>
-        <pre id="pictureSummary"></pre>
-
-        <div class="muted small">Raw response</div>
-        <pre id="pictureRaw"></pre>
-      </section>
+      <textarea id="visionForPictures" placeholder="Vision text… (e.g., Harnessing energy using dirt)"></textarea>
+      <div class="row">
+        <input id="count" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Count (optional, e.g., 3)" style="width:12rem" />
+        <button id="btnCreatePictures" type="button">Create pictures</button>
+      </div>
+      <div id="statusPictures" class="status"></div>
+      <div id="picturesOut" class="cols"></div>
     </div>
+  </section>
 
-    <div class="card" style="margin-top:16px">
-      <h2>Settings</h2>
-      <label for="apiBase">API Base</label>
-      <input id="apiBase" type="text" placeholder="http://127.0.0.1:5001" value="http://127.0.0.1:5001">
-      <p class="muted small">Endpoints used: <code>/jid/create_focuses</code> and <code>/jid/create_pictures</code>.</p>
+  <!-- Create Focuses -->
+  <section class="panel">
+    <h2 style="margin:.1rem 0 .6rem 0;">Create Focuses</h2>
+    <div class="grid">
+      <textarea id="visionForFocuses" placeholder="Vision text… (the same or another vision)"></textarea>
+      <div class="row">
+        <button id="btnCreateFocuses" type="button">Create focuses</button>
+      </div>
+      <div id="statusFocuses" class="status"></div>
+      <div id="focusesOut" class="grid"></div>
     </div>
-  </div>
+  </section>
 
-<script>
-  const $ = sel => document.querySelector(sel);
-  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  <!-- Usage -->
+  <section class="panel">
+    <div class="row">
+      <button id="btnUsage" class="ghost" type="button" title="Show today’s token usage from JID">Show usage today</button>
+      <div id="usageStatus" class="status"></div>
+    </div>
+    <pre id="usageOut" class="mono" style="display:none; max-width: min(92vw, 820px); overflow:auto; background:#f6f7f9; border:1px solid #e5e7eb; border-radius:.5rem; padding:.6rem .7rem;"></pre>
+  </section>
 
-  const els = {
-    apiBase: $('#apiBase'),
-    // focuses
-    visionFocus: $('#visionFocus'),
-    count: $('#count'),
-    mustInclude: $('#mustInclude'),
-    exclude: $('#exclude'),
-    emailFocus: $('#emailFocus'),
-    btnFocus: $('#btnFocus'),
-    btnClearFocuses: $('#btnClearFocuses'),
-    statusFocus: $('#statusFocus'),
-    focusList: $('#focusList'),
-    focusRaw: $('#focusRaw'),
-    // pictures
-    visionPic: $('#visionPic'),
-    focusPic: $('#focusPic'),
-    emailPic: $('#emailPic'),
-    btnPicture: $('#btnPicture'),
-    btnClearPicture: $('#btnClearPicture'),
-    statusPic: $('#statusPic'),
-    pictureSummary: $('#pictureSummary'),
-    pictureRaw: $('#pictureRaw'),
-  };
-
-  function setBusy(btn, busy=true) {
-    btn.disabled = busy;
-    btn.textContent = busy ? 'Working…' : btn.dataset.default || 'Submit';
-  }
-
-  async function postJSON(path, payload) {
-    const base = els.apiBase.value.replace(/\/+$/,'');
-    const res = await fetch(base + path, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    });
-    const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = {raw:text, status: res.status}; }
-    if (!res.ok) throw Object.assign(new Error('Request failed'), {data, status:res.status});
-    return data;
-  }
-
-  // Focuses flow
-  els.btnFocus.dataset.default = 'Generate Focuses';
-  els.btnFocus.addEventListener('click', async () => {
-    const payload = {
-      vision: els.visionFocus.value.trim(),
-      count: els.count.value.trim(),
-      must_include: els.mustInclude.value.trim(),
-      exclude: els.exclude.value.trim(),
-      email: els.emailFocus.value.trim() || undefined
+  <script>
+    // ------------ Config ------------
+    const LS_EMAIL = 'fg_user_email';
+    const EP = {
+      health: '/jid/healthz',
+      usageToday: '/jid/usage/today',
+      createPictures: '/jid/create_pictures',
+      createFocuses: '/jid/create_focuses'
     };
-    if (!payload.vision) { els.statusFocus.textContent = 'Vision is required.'; els.statusFocus.className='status err'; return; }
 
-    els.statusFocus.textContent = '';
-    els.focusRaw.textContent = '';
-    els.focusList.innerHTML = '';
-    setBusy(els.btnFocus, true);
-    try {
-      const data = await postJSON('/jid/create_focuses', payload);
-      els.focusRaw.textContent = JSON.stringify(data, null, 2);
-      const focuses = Array.isArray(data.focuses) ? data.focuses : (data.focuses ? [data.focuses] : []);
-      if (focuses.length === 0) {
-        els.statusFocus.textContent = 'No focuses returned.';
-        els.statusFocus.className = 'status err';
-      } else {
-        focuses.forEach(f => {
-          const pill = document.createElement('div');
-          pill.className = 'pill';
-          const span = document.createElement('span');
-          span.textContent = f;
-          const btn = document.createElement('button');
-          btn.textContent = 'Use → Picture';
-          btn.addEventListener('click', () => {
-            els.focusPic.value = f;
-            els.visionPic.value = els.visionFocus.value;
-            window.scrollTo({top: document.getElementById('picturesCard').offsetTop - 8, behavior:'smooth'});
-          });
-          pill.appendChild(span);
-          pill.appendChild(btn);
-          els.focusList.appendChild(pill);
-        });
-        els.statusFocus.textContent = `Received ${focuses.length} focus(es).`;
-        els.statusFocus.className = 'status ok';
+    // ------------ Helpers ------------
+    const $ = (id) => document.getElementById(id);
+    function setText(el, msg, cls = '') {
+      if (!el) return;
+      el.className = 'status ' + (cls || '');
+      el.textContent = msg || '';
+    }
+    function escapeHtml(s) {
+      return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+    }
+    async function fetchJSON(url, options = {}, timeoutMs = 300000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const resp = await fetch(url, { ...options, signal: controller.signal });
+        const ct = resp.headers.get('content-type') || '';
+        const isJSON = ct.includes('application/json');
+        const data = isJSON ? await resp.json() : await resp.text();
+        if (!resp.ok) {
+          const detail = isJSON ? (data?.error || data?.detail || JSON.stringify(data)) : data;
+          throw new Error(detail || `HTTP ${resp.status}`);
+        }
+        return data;
+      } finally { clearTimeout(timer); }
+    }
+    function postJSON(url, body, timeoutMs) {
+      return fetchJSON(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      }, timeoutMs);
+    }
+
+    // ------------ Email memory ------------
+    function loadEmail() { const v = (localStorage.getItem(LS_EMAIL) || '').trim().toLowerCase(); if (v) $('email').value = v; }
+    function saveEmail() { const v = ($('email').value || '').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); else localStorage.removeItem(LS_EMAIL); }
+
+    // ------------ Renderers ------------
+    function renderPictures(block) {
+      const mount = $('picturesOut'); mount.innerHTML = '';
+      const pics = Array.isArray(block?.pictures) ? block.pictures : [];
+      if (!pics.length) { mount.innerHTML = '<div class="muted">No pictures returned.</div>'; return; }
+      for (const p of pics) {
+        const card = document.createElement('div'); card.className = 'card';
+        const h = document.createElement('h3'); h.textContent = p.title || 'Untitled picture';
+        const d = document.createElement('div'); d.className = 'muted'; d.textContent = p.description || '';
+        const fn = document.createElement('div'); fn.style.marginTop = '.35rem'; fn.innerHTML = p.function ? `<strong>Function:</strong> ${escapeHtml(p.function)}` : '';
+        const meta = document.createElement('div'); meta.style.marginTop = '.25rem';
+        meta.innerHTML = [
+          p.id ? `<span class="mono">id:${escapeHtml(String(p.id))}</span>` : '',
+          p.status ? `<span class="mono">status:${escapeHtml(p.status)}</span>` : ''
+        ].filter(Boolean).join(' · ');
+        card.append(h, d);
+        if (fn.innerHTML) card.append(fn);
+        if (meta.innerHTML) card.append(meta);
+        mount.append(card);
       }
-    } catch (err) {
-      els.statusFocus.textContent = `Error: ${err.data?.error || err.message}`;
-      els.statusFocus.className = 'status err';
-      els.focusRaw.textContent = JSON.stringify(err.data || {error: err.message}, null, 2);
-    } finally {
-      setBusy(els.btnFocus, false);
     }
-  });
 
-  els.btnClearFocuses.addEventListener('click', () => {
-    els.visionFocus.value = '';
-    els.count.value = '';
-    els.mustInclude.value = '';
-    els.exclude.value = '';
-    els.emailFocus.value = '';
-    els.statusFocus.textContent = '';
-    els.focusList.innerHTML = '';
-    els.focusRaw.textContent = '';
-  });
-
-  // Pictures flow
-  els.btnPicture.dataset.default = 'Create Picture';
-  els.btnPicture.addEventListener('click', async () => {
-    const payload = {
-      vision: els.visionPic.value.trim(),
-      focus: els.focusPic.value.trim() || undefined,
-      email: els.emailPic.value.trim() || undefined
-    };
-    if (!payload.vision) { els.statusPic.textContent = 'Vision is required.'; els.statusPic.className='status err'; return; }
-
-    els.statusPic.textContent = '';
-    els.pictureSummary.textContent = '';
-    els.pictureRaw.textContent = '';
-    setBusy(els.btnPicture, true);
-    try {
-      const data = await postJSON('/jid/create_pictures', payload);
-      els.pictureRaw.textContent = JSON.stringify(data, null, 2);
-      // Try to surface a friendly summary if present
-      const title = data.title || data.picture_title || '(untitled picture)';
-      const desc  = data.description || data.picture_description || '';
-      const fn    = data.function || data.picture_function || '';
-      const exp   = data.explanation || '';
-      const idStr = ['vision_id','picture_id'].filter(k => data[k] !== undefined).map(k => `${k}: ${data[k]}`).join('  ');
-      els.pictureSummary.textContent =
-        `${title}\n\n${desc}\n\nFunction:\n${fn}\n\nExplanation:\n${exp}\n\n${idStr}`;
-      els.statusPic.textContent = 'Picture created.';
-      els.statusPic.className = 'status ok';
-    } catch (err) {
-      els.statusPic.textContent = `Error: ${err.data?.error || err.message}`;
-      els.statusPic.className = 'status err';
-      els.pictureRaw.textContent = JSON.stringify(err.data || {error: err.message}, null, 2);
-    } finally {
-      setBusy(els.btnPicture, false);
+    function renderFocuses(block) {
+      const mount = $('focusesOut'); mount.innerHTML = '';
+      const focuses = Array.isArray(block?.focuses) ? block.focuses : [];
+      if (!focuses.length) { mount.innerHTML = '<div class="muted">No focuses returned.</div>'; return; }
+      for (const f of focuses) {
+        const card = document.createElement('div'); card.className = 'card';
+        const t = document.createElement('div'); t.innerHTML = `<strong>${escapeHtml(f.title || f || 'Focus')}</strong>`;
+        const d = document.createElement('div'); d.className = 'muted'; d.textContent = (f.description || '');
+        card.append(t);
+        if (d.textContent) card.append(d);
+        mount.append(card);
+      }
     }
-  });
 
-  els.btnClearPicture.addEventListener('click', () => {
-    els.visionPic.value = '';
-    els.focusPic.value = '';
-    els.emailPic.value = '';
-    els.statusPic.textContent = '';
-    els.pictureSummary.textContent = '';
-    els.pictureRaw.textContent = '';
-  });
-</script>
+    // ------------ Actions ------------
+    async function doHealth() {
+      setText($('svcStatus'), 'Checking…');
+      try {
+        const d = await fetchJSON(EP.health, {}, 10000);
+        setText($('svcStatus'), `JID OK ${typeof d === 'object' ? JSON.stringify(d) : String(d)}`, 'ok');
+      } catch (e) {
+        setText($('svcStatus'), `JID health failed: ${e.message || e}`, 'error');
+      }
+    }
+
+    async function doCreatePictures() {
+      const email = ($('email').value || '').trim().toLowerCase();
+      const vision = ($('visionForPictures').value || '').trim();
+      const count = parseInt(($('count').value || '').trim(), 10);
+      if (!vision) { setText($('statusPictures'), 'Enter a vision.', 'error'); return; }
+      setText($('statusPictures'), 'Creating pictures…');
+      try {
+        // Keep payload minimal — vision + email (+ count if provided)
+        const payload = { vision };
+        if (email) payload.email = email;
+        if (!Number.isNaN(count) && count > 0) payload.count = count;
+
+        const res = await postJSON(EP.createPictures, payload, 600000);
+        // Expect either a top-level pictures array or a nested block
+        const block = res?.data || res?.result || res;
+        renderPictures(block);
+        setText($('statusPictures'), 'Done.', 'ok');
+        if (email) saveEmail();
+      } catch (e) {
+        setText($('statusPictures'), `Failed: ${e.message || e}`, 'error');
+      }
+    }
+
+    async function doCreateFocuses() {
+      const email = ($('email').value || '').trim().toLowerCase();
+      const vision = ($('visionForFocuses').value || '').trim();
+      if (!vision) { setText($('statusFocuses'), 'Enter a vision.', 'error'); return; }
+      setText($('statusFocuses'), 'Creating focuses…');
+      try {
+        // Minimal payload — vision + email
+        const payload = { vision };
+        if (email) payload.email = email;
+
+        const res = await postJSON(EP.createFocuses, payload, 600000);
+        const block = res?.data || res?.result || res;
+        renderFocuses(block);
+        setText($('statusFocuses'), 'Done.', 'ok');
+        if (email) saveEmail();
+      } catch (e) {
+        setText($('statusFocuses'), `Failed: ${e.message || e}`, 'error');
+      }
+    }
+
+    async function doUsage() {
+      setText($('usageStatus'), 'Loading usage…');
+      $('usageOut').style.display = 'none';
+      try {
+        const d = await fetchJSON(EP.usageToday, {}, 15000);
+        const pretty = JSON.stringify(d, null, 2);
+        $('usageOut').textContent = pretty;
+        $('usageOut').style.display = 'block';
+        setText($('usageStatus'), 'Usage loaded.', 'ok');
+      } catch (e) {
+        setText($('usageStatus'), `Failed: ${e.message || e}`, 'error');
+      }
+    }
+
+    // ------------ Init ------------
+    (function init() {
+      loadEmail();
+      $('saveEmail').addEventListener('click', () => { saveEmail(); setText($('svcStatus'), 'Email saved.', 'ok'); });
+      $('checkHealth').addEventListener('click', doHealth);
+      $('btnCreatePictures').addEventListener('click', doCreatePictures);
+      $('btnCreateFocuses').addEventListener('click', doCreateFocuses);
+      $('btnUsage').addEventListener('click', doUsage);
+    })();
+  </script>
 </body>
 </html>
