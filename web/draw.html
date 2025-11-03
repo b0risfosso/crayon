@@ -123,15 +123,39 @@
         w.document.close();
     }
 
-    async function createWorldForPictureCard(cardNode, visionText, pic){
-        console.log('Creating world with data:', {
-            visionText,
-            picTitle: pic?.title,
-            picDescription: pic?.description,
-            pic
-        });
+    function buildCrayonInputs(visionText, pic) {
+    // vision
+    const vision = String(visionText || '').trim();
+    if (!vision) throw new Error('This item has no vision text.');
 
-        const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
+    // title (picture_short)
+    let picture_short = String(pic?.title || '').trim();
+    if (!picture_short) {
+        // fallback from description or id
+        const fromDesc = String(pic?.description || '').trim();
+        if (fromDesc) picture_short = (fromDesc.length > 80 ? fromDesc.slice(0, 77) + '…' : fromDesc);
+        else if (pic?.id != null) picture_short = `Picture ${pic.id}`;
+        else picture_short = 'Untitled picture';
+    }
+
+    // description (picture_description)
+    let picture_description = String(pic?.description || '').trim();
+    if (!picture_description) {
+        // fallback from function or title
+        const fromFn = String(pic?.function || '').trim();
+        if (fromFn) picture_description = fromFn;
+        else picture_description = picture_short; // last resort
+    }
+
+    return { vision, picture_short, picture_description };
+    }
+
+
+    async function createWorldForPictureCard(cardNode, visionText, pic){
+        // choose email
+        const emailInput = document.getElementById('email');
+        const email = (emailInput?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
+
         const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
         const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
         const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
@@ -142,11 +166,13 @@
         cardNode.append(status);
 
         try {
+            const req = buildCrayonInputs(visionText, pic); // <-- makes all required fields non-empty
+
             // 1) Wax stack
             const wsPayload = {
-            vision: visionText,
-            picture_short: pic.title || '',
-            picture_description: pic.description || '',
+            vision: req.vision,
+            picture_short: req.picture_short,
+            picture_description: req.picture_description,
             constraints, deployment_context, readiness_target
             };
             const wsRes = await postJSON(EP_CRAYON.waxStack, wsPayload, 600000);
@@ -157,11 +183,11 @@
 
             // 2) Worldwright
             const wwPayload = {
-            vision: visionText,
-            picture_short: pic.title || '',
-            picture_description: pic.description || '',
+            vision: req.vision,
+            picture_short: req.picture_short,
+            picture_description: req.picture_description,
             wax_stack,
-            email: email || undefined, // let server accept None if not provided
+            email: email || undefined,
             constraints, deployment_context, readiness_target
             };
             const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
@@ -175,7 +201,7 @@
             status.className = 'status error';
             status.textContent = `Failed: ${e.message || e}`;
         }
-    }
+        }
 
 
         // ------------ Helpers ------------
