@@ -245,12 +245,7 @@ def _ensure_focuses_json_array(s: Optional[str]) -> list:
     except Exception:
         pass
     # Fallback: convert a single line into one object
-    line = str(s).strip()
-    parts = re.split(r"\s*[—–-:]\s*", line, maxsplit=1)
-    left = (parts[0] or "").strip()
-    right = (parts[1] if len(parts) > 1 else "").strip() or line
-    dim = re.sub(r"\b[Dd]imension\b$", "", left).strip() or "General"
-    return [{"dimension": dim, "focus": right, "goal": None}]
+    return [{"dimension": None, "focus": s}]
 
 def _merge_focus_arrays(a: list, b: list) -> list:
     """

@@ -374,23 +374,7 @@ def _focus_string_to_json_array(focus_text: str) -> str:
     s = (focus_text or "").strip()
     if not s:
         return json.dumps([], ensure_ascii=False)
-
-    # Split on first occurrence of em/en dash, hyphen, or colon
-    m = re.split(r"\s*[—–-:]\s*", s, maxsplit=1)
-    left = (m[0] or "").strip()
-    right = (m[1] if len(m) > 1 else "").strip()
-
-    # Extract 'X Dimension' → X
-    dim = left
-    dim = re.sub(r"\b[Dd]imension\b$", "", dim).strip() or left
-
-    if not right:
-        right = s  # no separator found; store whole string as 'focus', dimension 'General'
-
-    if not dim or dim.lower() == "dimension":
-        dim = "General"
-
-    return json.dumps([{"dimension": dim, "focus": right, "goal": None}], ensure_ascii=False)
+    return json.dumps([{"dimension": None, "focus": s}], ensure_ascii=False)
 
 
 
