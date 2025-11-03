@@ -22,7 +22,8 @@ from db_shared import (
     init_picture_db, init_usage_db, log_usage, connect, USAGE_DB,
     upsert_vision_by_text_email,   # reuse your redundancy-aware vision upsert
     upsert_wax_by_content,
-    upsert_world_by_html,
+    upsert_world_by_html, find_or_create_picture_by_signature, upsert_wax_by_picture_append,
+    
 )
 
 from prompts import wax_architect_prompt
@@ -320,7 +321,7 @@ def crayon_wax_stack():
             endpoint_name="/crayon/wax_stack",
         )
 
-        # --- Persist: upsert vision, then upsert wax by content hash -----------
+        # --- Persist: upsert vision (same as before) --------------------------
         vision_id = upsert_vision_by_text_email(
             text=vision,
             email=email,
@@ -332,16 +333,31 @@ def crayon_wax_stack():
                 "readiness_target": readiness_target,
             },
         )
-        wax_title = f"Wax Stack for: {picture_short or vision}"
-        wax_id = upsert_wax_by_content(
+
+        # --- NEW: find or create the picture row ------------------------------
+        picture_id = find_or_create_picture_by_signature(
             vision_id=vision_id,
+            title=picture_short,
+            description=picture_description,
+            email=email,
+            source="crayon",
+            default_status="draft",
+            metadata={"from": "wax_stack_endpoint"}
+        )
+
+        # --- NEW: upsert wax by (picture_id, email) with APPEND policy --------
+        wax_title = f"Wax Stack for: {picture_short or vision}"
+        wax_id = upsert_wax_by_picture_append(
+            vision_id=vision_id,
+            picture_id=picture_id,
             title=wax_title,
             content=output,
             email=email,
             source="crayon",
             metadata={
                 "constraints": constraints,
-                "picture_description": picture_description,
+                "deployment_context": deployment_context,
+                "readiness_target": readiness_target
             },
         )
 
@@ -354,12 +370,14 @@ def crayon_wax_stack():
             "deployment_context": deployment_context,
             "readiness_target": readiness_target,
             "wax_stack": output,
-            "wax_id": wax_id
+            "picture_id": picture_id,      # NEW
+            "wax_id": wax_id               # same id if appending to existing wax row
         }), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
+
 
 
 @app.route("/crayon/wax_worldwright", methods=["POST"])

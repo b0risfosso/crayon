@@ -71,6 +71,157 @@ def find_picture_id_by_signature(
     finally:
         conn.close()
 
+
+# Find-or-create picture by (vision_id, title, description, email)
+def find_or_create_picture_by_signature(
+    *,
+    vision_id: int,
+    title: str,
+    description: str,
+    email: Optional[str],
+    source: Optional[str] = "crayon",
+    default_status: str = "draft",
+    metadata: Optional[Dict[str, Any]] = None
+) -> int:
+    pic_id = find_picture_id_by_signature(
+        vision_id=vision_id,
+        title=title,
+        description=description,
+        email=email,
+    )
+    if pic_id:
+        return pic_id
+    return create_picture(
+        vision_id=vision_id,
+        focus=None,
+        title=title,
+        description=description,
+        function=None,
+        explanation=None,
+        email=email,
+        order_index=0,
+        status=default_status,
+        source=source,
+        metadata=metadata or {},
+        assets={},
+    )
+
+import json
+import hashlib
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+def find_wax_id_by_picture_email(*, picture_id: int, email: Optional[str]) -> Optional[int]:
+    conn = connect(PICTURE_DB)
+    try:
+        if email is None:
+            row = conn.execute(
+                "SELECT id FROM waxes WHERE picture_id=? AND email IS NULL LIMIT 1",
+                (picture_id,)
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id FROM waxes WHERE picture_id=? AND email=? LIMIT 1",
+                (picture_id, email)
+            ).fetchone()
+        return int(row[0]) if row else None
+    finally:
+        conn.close()
+
+def update_wax_append(
+    wax_id: int,
+    *,
+    add_content: str,
+    email: Optional[str],
+    source: Optional[str] = "crayon",
+    metadata_merge: Optional[Dict[str, Any]] = None,
+    separator: str = "\n\n---\n\n"
+) -> int:
+    """
+    Append new content to an existing wax row; update content_hash and metadata.
+    """
+    conn = connect(PICTURE_DB)
+    try:
+        row = conn.execute("SELECT content, metadata FROM waxes WHERE id=?", (wax_id,)).fetchone()
+        if not row:
+            return wax_id
+        cur_content, cur_meta = row
+        new_content = (cur_content or "") + (separator + add_content if add_content else "")
+        new_hash = _sha256(new_content)
+        merged_meta = _json_merge(cur_meta, json.dumps(metadata_merge or {}, ensure_ascii=False))
+        conn.execute(
+            "UPDATE waxes SET content=?, content_hash=?, email=?, source=?, metadata=?, updated_at=? WHERE id=?",
+            (new_content, new_hash, email, source, merged_meta, _iso_now(), wax_id)
+        )
+        conn.commit()
+        return wax_id
+    finally:
+        conn.close()
+
+def create_wax_for_picture(
+    *,
+    vision_id: int,
+    picture_id: int,
+    title: Optional[str],
+    content: str,
+    email: Optional[str],
+    source: Optional[str] = "crayon",
+    metadata: Optional[Dict[str, Any]] = None
+) -> int:
+    conn = connect(PICTURE_DB)
+    try:
+        now = _iso_now()
+        meta_s = json.dumps(metadata or {}, ensure_ascii=False)
+        content_hash = _sha256(content)
+        cur = conn.execute(
+            """
+            INSERT INTO waxes
+                (vision_id, picture_id, title, content, content_hash, email, source, metadata, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            (vision_id, picture_id, title, content, content_hash, email, source, meta_s, now, now)
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+def upsert_wax_by_picture_append(
+    *,
+    vision_id: int,
+    picture_id: int,
+    title: Optional[str],
+    content: str,
+    email: Optional[str],
+    source: Optional[str] = "crayon",
+    metadata: Optional[Dict[str, Any]] = None
+) -> int:
+    """
+    Idempotency policy:
+      - If a wax exists for (picture_id, email): APPEND new content to existing row.
+      - Else: CREATE a new row.
+    """
+    existing = find_wax_id_by_picture_email(picture_id=picture_id, email=email)
+    if existing:
+        return update_wax_append(
+            existing,
+            add_content=content,
+            email=email,
+            source=source,
+            metadata_merge=metadata,
+        )
+    return create_wax_for_picture(
+        vision_id=vision_id,
+        picture_id=picture_id,
+        title=title,
+        content=content,
+        email=email,
+        source=source,
+        metadata=metadata,
+    )
+
+
 def update_picture_fields(
     picture_id: int,
     *,

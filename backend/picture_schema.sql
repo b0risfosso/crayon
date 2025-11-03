@@ -51,6 +51,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_pictures_slug ON pictures(slug);
 CREATE TABLE IF NOT EXISTS waxes (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     vision_id     INTEGER NOT NULL,
+    picture_id    INTEGER,                   -- NEW: tie wax to a specific picture
     title         TEXT,
     content       TEXT NOT NULL,              -- full Wax Stack text
     content_hash  TEXT,                       -- sha256(content) for idempotency
