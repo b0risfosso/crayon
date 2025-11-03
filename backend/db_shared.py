@@ -62,10 +62,10 @@ def find_picture_id_by_signature(
         row = conn.execute(
             f"""
             SELECT id FROM pictures
-            WHERE vision_id = ? AND title = ? AND description = ? AND {email_clause}
+            WHERE vision_id = ? AND description = ? AND {email_clause}
             ORDER BY created_at ASC LIMIT 1
             """,
-            (vision_id, title, description, *email_args),
+            (vision_id, description, *email_args),
         ).fetchone()
         return int(row[0]) if row else None
     finally:
