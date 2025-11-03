@@ -22,7 +22,7 @@ except Exception:
 from models import PicturesResponse
 from prompts import create_pictures_prompt
 from db_shared import (
-    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB,
+    init_picture_db, init_usage_db, log_usage, connect, USAGE_DB, PICTURE_DB,
     create_vision, create_picture, upsert_vision_by_text_email, find_picture_id_by_signature, update_picture_fields, update_vision_fields
 )
 
@@ -672,7 +672,7 @@ def jid_by_email():
         return jsonify({"error": "email is required"}), 400
 
     try:
-        conn = connect()
+        conn = connect(PICTURE_DB)
         cur = conn.cursor()
 
         # 1) visions for this email
