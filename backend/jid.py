@@ -633,7 +633,9 @@ def jid_explain_picture():
         return jsonify({"error": f"Unhandled error: {e}"}), 500
 
 
-
+def _row_to_dict(cursor, row):
+    # convenience to get dict rows without changing global connection settings
+    return { d[0]: row[i] for i, d in enumerate(cursor.description) }
 
 # ------------------------------------------------------------------------------
 # Health check and startup
@@ -662,3 +664,71 @@ def usage_today():
     finally:
         conn.close()
 
+
+@app.route("/jid/by_email", methods=["GET"])
+def jid_by_email():
+    email = (request.args.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+
+    try:
+        conn = connect()
+        cur = conn.cursor()
+
+        # 1) visions for this email
+        cur.execute("""
+            SELECT id, text, focuses, status, slug, created_at, updated_at
+            FROM visions
+            WHERE (email = ? OR (email IS NULL AND ? = ''))  -- prefer exact match; keep NULL if you use it
+            ORDER BY COALESCE(updated_at, created_at) DESC, id DESC
+        """, (email, email))
+        vision_rows = cur.fetchall()
+
+        visions = []
+        vision_ids = []
+        for r in vision_rows:
+            d = _row_to_dict(cur, r)
+            vid = d["id"]
+            vision_ids.append(vid)
+
+            # parse focuses (TEXT -> JSON list) defensively
+            f_raw = d.get("focuses")
+            try:
+                f_list = json.loads(f_raw) if f_raw else []
+                if isinstance(f_list, dict) and "focuses" in f_list:
+                    f_list = f_list["focuses"]
+            except Exception:
+                f_list = []
+            d["focuses"] = f_list
+
+            d.pop("slug", None)  # not needed for this view
+            visions.append({**d, "pictures": []})
+
+        # early return if no visions
+        if not vision_ids:
+            return jsonify({"email": email, "visions": []})
+
+        # 2) pictures for those visions, restricted to this email
+        q_marks = ",".join("?" for _ in vision_ids)
+        cur.execute(f"""
+            SELECT id, vision_id, title, description, function, status, created_at, updated_at
+            FROM pictures
+            WHERE vision_id IN ({q_marks})
+              AND (email = ? OR (email IS NULL AND ? = ''))
+            ORDER BY COALESCE(updated_at, created_at) DESC, id DESC
+        """, (*vision_ids, email, email))
+        pic_rows = cur.fetchall()
+
+        # index visions by id
+        vmap = { v["id"]: v for v in visions }
+
+        for r in pic_rows:
+            d = _row_to_dict(cur, r)
+            vid = d.pop("vision_id", None)
+            if vid in vmap:
+                vmap[vid]["pictures"].append(d)
+
+        return jsonify({"email": email, "visions": visions})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

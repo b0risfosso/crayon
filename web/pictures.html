@@ -1,231 +1,181 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>JID Visualizer — Visions • Focuses • Pictures</title>
-<style>
-  :root{--bg:#f9fafb;--panel:#fff;--ink:#0f172a;--mut:#6b7280;--line:#e5e7eb;--pill:#eef2ff}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
-  .wrap{max-width:1200px;margin:20px auto;padding:0 16px}
-  header{display:flex;gap:12px;align-items:center;margin-bottom:12px}
-  h1{font-size:20px;margin:0}
-  input,select,button{border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;color:var(--ink)}
-  button{cursor:pointer}
-  .grid{display:grid;gap:16px;grid-template-columns:320px 1fr}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
-  .card h2{font-size:15px;margin:0 0 8px}
-  .mut{color:var(--mut);font-size:12px}
-  .list{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow:auto}
-  .vision-item{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
-  .vision-item h3{margin:0 0 6px;font-size:14px}
-  .counts{display:flex;gap:10px;font-size:12px;color:var(--mut)}
-  .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;background:var(--pill);border-radius:999px;margin:4px 6px 0 0}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  .grid2{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
-  .pic{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
-  .pic h4{margin:0 0 6px;font-size:14px}
-  .small{font-size:12px}
-  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#f3f4f6;border:1px solid var(--line);padding:2px 6px;border-radius:6px}
-  .toolbar{display:flex;gap:8px;align-items:center;margin-top:6px}
-  .json{white-space:pre-wrap;background:#0b1020;color:#e5e7eb;border-radius:10px;padding:10px;overflow:auto}
-</style>
+  <meta charset="utf-8" />
+  <title>Fantasiagenesis · Pictures by Email (JID)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 20px; }
+    header h1 { margin: 0 0 .3rem 0; font-size: clamp(1.2rem, 2.4vw, 1.6rem); }
+    .muted { opacity: .85; }
+    .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .panel { border:1px solid #e5e7eb; border-radius:.6rem; padding:.85rem 1rem; background:#fafafb; }
+    .panel + .panel { margin-top:.9rem; }
+    input[type="email"] { height:2.4rem; padding:.55rem .7rem; border:1px solid #cdd0d5; border-radius:.55rem; width:min(92vw, 440px); }
+    button { padding:.6rem .9rem; border:0; border-radius:.55rem; background:#0b5cff; color:#fff; cursor:pointer; }
+    button.secondary { background:#4b5563; }
+    .status { font-size:.92rem; min-height:1.2em; margin-top:.35rem; }
+    .status.error { color:#b00020; white-space:pre-wrap; }
+    .status.ok { color:#065f46; }
+    .vlist { display:grid; gap:.85rem; }
+    .vision { border:1px solid #e5e7eb; border-radius:.6rem; background:#fff; padding:.75rem .85rem; }
+    .vision h2 { margin:.1rem 0 .2rem 0; font-size:1.05rem; }
+    .meta { font-size:.85rem; opacity:.9; }
+    .chips { display:flex; gap:.4rem; flex-wrap:wrap; margin:.45rem 0 .3rem 0; }
+    .chip { border:1px solid #d1d5db; border-radius:.45rem; padding:.15rem .45rem; background:#f9fafb; font-size:.85rem; }
+    .pics { display:grid; gap:.55rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top:.5rem; }
+    .pic { border:1px solid #e5e7eb; border-radius:.6rem; background:#fdfdfd; padding:.6rem .7rem; }
+    .pic h3 { margin:.05rem 0 .25rem 0; font-size:1rem; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .sep { height:1px; background:#eee; margin:.6rem 0; }
+    .empty { padding:.4rem 0; color:#6b7280; }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>JID Visualizer</h1>
-    <span class="mut">Explore visions, see focuses, and browse pictures.</span>
+  <header class="row" style="justify-content: space-between;">
+    <div>
+      <h1>Pictures by Email</h1>
+      <div class="muted">Shows your visions, focuses, and pictures as stored by JID.</div>
+    </div>
+    <nav class="row">
+      <a href="/draw" class="muted">✏️ Draw</a>
+      <a href="/jid" class="muted">🧩 JID</a>
+    </nav>
   </header>
 
-  <div class="card" style="margin-bottom:12px">
+  <section class="panel">
     <div class="row">
-      <div style="width:300px">
-        <label class="mut">Search visions</label>
-        <input id="search" placeholder="keywords…" style="width:100%"/>
-      </div>
-      <div style="width:140px">
-        <label class="mut">Page size</label>
-        <select id="limit" style="width:100%">
-          <option>10</option><option selected>25</option><option>50</option><option>100</option>
-        </select>
-      </div>
-      <div style="display:flex;align-items:flex-end">
-        <button id="btnLoad">Load</button>
-      </div>
+      <input type="email" id="email" placeholder="you@example.com" />
+      <button id="loadBtn" type="button">Load</button>
+      <button id="saveBtn" class="secondary" type="button">Save email</button>
     </div>
-  </div>
+    <div id="status" class="status"></div>
+  </section>
 
-  <div class="grid">
-    <!-- LEFT: Visions -->
-    <section class="card">
-      <h2>Visions</h2>
-      <div id="visions" class="list"></div>
-    </section>
+  <section id="results" class="panel" style="display:none;">
+    <div id="summary" class="muted" style="margin-bottom:.5rem;"></div>
+    <div id="visions" class="vlist"></div>
+  </section>
 
-    <!-- RIGHT: Details -->
-    <section class="card">
-      <h2 id="detailTitle">Details</h2>
+  <script>
+    const LS_EMAIL = 'fg_user_email';
+    const EP = { byEmail: '/jid/by_email' }; // alias exists at /by_email too
 
-      <div id="visionBlock" style="margin-bottom:10px"></div>
-      <div class="row" id="focusBar"></div>
+    const $ = (id) => document.getElementById(id);
+    function setStatus(msg, level='') {
+      const el = $('status');
+      el.className = 'status ' + (level || '');
+      el.textContent = msg || '';
+    }
+    function escapeHtml(s) {
+      return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;')
+                            .replaceAll('>','&gt;').replaceAll('"','&quot;')
+                            .replaceAll("'",'&#39;');
+    }
+    async function fetchJSON(url, options={}, timeoutMs=60000){
+      const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+      try {
+        const r = await fetch(url, { ...options, signal: ctrl.signal });
+        const ct = r.headers.get('content-type')||'';
+        const data = ct.includes('application/json') ? await r.json() : await r.text();
+        if (!r.ok) throw new Error((data && (data.error||data.detail)) || `HTTP ${r.status}`);
+        return data;
+      } finally { clearTimeout(t); }
+    }
 
-      <div class="toolbar">
-        <span class="mut">Filter pictures by focus:</span>
-        <input id="focusFilter" placeholder="type to filter…" style="flex:1"/>
-        <button id="btnRefresh">Refresh</button>
-        <button id="btnShowJSON">Toggle JSON</button>
-      </div>
+    function loadEmail(){ const v = (localStorage.getItem(LS_EMAIL)||'').trim().toLowerCase(); if (v) $('email').value = v; }
+    function saveEmail(){ const v = ($('email').value||'').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); }
 
-      <div id="jsonPane" class="json" style="display:none;margin-top:10px"></div>
-      <div id="pictures" class="grid2" style="margin-top:12px"></div>
-    </section>
-  </div>
-</div>
+    function render(data){
+      const visions = Array.isArray(data?.visions) ? data.visions : [];
+      $('results').style.display = 'block';
+      $('summary').textContent = `${visions.length} vision${visions.length===1?'':'s'} for ${data?.email || ''}`;
 
-<script>
-const $ = s => document.querySelector(s);
-const el = {
-  search:  $('#search'),
-  limit:   $('#limit'),
-  btnLoad: $('#btnLoad'),
-  visions: $('#visions'),
-  detailTitle: $('#detailTitle'),
-  visionBlock: $('#visionBlock'),
-  focusBar: $('#focusBar'),
-  focusFilter: $('#focusFilter'),
-  btnRefresh: $('#btnRefresh'),
-  pictures: $('#pictures'),
-  btnShowJSON: $('#btnShowJSON'),
-  jsonPane: $('#jsonPane'),
-};
+      const mount = $('visions');
+      mount.innerHTML = '';
 
-let CURRENT_VISION = null;
-let LAST_JSON = {};
+      if (!visions.length){
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No data for this email yet.';
+        mount.append(empty);
+        return;
+      }
 
-function api(path, params) {
-  const base = '';
-  const url = new URL(base + path);
-  if (params) Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
-  return fetch(url).then(async res => {
-    const text = await res.text();
-    try { return JSON.parse(text) } catch { return {raw:text, status:res.status} }
-  });
-}
+      for (const v of visions){
+        const box = document.createElement('div'); box.className = 'vision';
 
-function renderVisions(items) {
-  el.visions.innerHTML = '';
-  items.forEach(v => {
-    const div = document.createElement('div');
-    div.className = 'vision-item';
-    div.innerHTML = `
-      <h3 class="vision-title">#${v.id} — ${escapeHtml(v.vision_text || v.vision || '(no text)')}</h3>
-      <div class="counts">
-        <span>pictures: <span class="kbd">${v.picture_count ?? 0}</span></span>
-        <span>focuses: <span class="kbd">${v.focus_count ?? 0}</span></span>
-        <span>${v.created_at ? new Date(v.created_at).toLocaleString() : ''}</span>
-      </div>
-      <div class="toolbar" style="margin-top:6px">
-        <button data-id="${v.id}" class="btn-open">Open</button>
-      </div>
-    `;
-    div.querySelector('.btn-open').addEventListener('click', () => openVision(v.id));
-    el.visions.appendChild(div);
-  });
-}
+        const title = document.createElement('h2');
+        title.textContent = v.text || '(Untitled vision)';
+        box.append(title);
 
-async function loadVisions() {
-  const data = await api('/jid/visions', {
-    search: el.search.value.trim(),
-    limit:  el.limit.value
-  });
-  LAST_JSON.list_visions = data;
-  renderVisions(data.items || []);
-}
+        const meta = document.createElement('div'); meta.className = 'meta mono';
+        meta.textContent = `id:${v.id} · status:${v.status || '—'} · updated:${v.updated_at || v.created_at || '—'}`;
+        box.append(meta);
 
-async function openVision(id) {
-  const data = await api(`/jid/visions/${id}`);
-  LAST_JSON.vision_detail = data;
-  CURRENT_VISION = id;
+        // focuses chips (if any)
+        const f = Array.isArray(v.focuses) ? v.focuses : [];
+        if (f.length){
+          const chips = document.createElement('div'); chips.className = 'chips';
+          for (const it of f){
+            const dim = (it && (it.dimension || it.title || it.name)) || 'Focus';
+            const chip = document.createElement('div'); chip.className = 'chip';
+            chip.innerHTML = `<strong>${escapeHtml(dim)}</strong>`;
+            chips.append(chip);
+          }
+          box.append(chips);
+        }
 
-  const v = data.vision || {};
-  el.detailTitle.textContent = `Vision #${v.id ?? id}`;
-  el.visionBlock.innerHTML = `
-    <div style="border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff">
-      <div class="mut">Vision text</div>
-      <div>${escapeHtml(v.vision_text || v.vision || '')}</div>
-    </div>
-  `;
+        box.append(document.createElement('div')).className = 'sep';
 
-  el.focusBar.innerHTML = '';
-  (data.focuses || []).forEach(f => {
-    const pill = document.createElement('div');
-    pill.className = 'pill';
-    pill.textContent = f.focus_text || f.focus || '';
-    pill.addEventListener('click', () => {
-      el.focusFilter.value = f.focus_text || f.focus || '';
-      refreshPictures();
-    });
-    el.focusBar.appendChild(pill);
-  });
+        // pictures grid
+        const pics = Array.isArray(v.pictures) ? v.pictures : [];
+        if (!pics.length){
+          const empty = document.createElement('div'); empty.className = 'empty';
+          empty.textContent = 'No pictures for this vision yet.';
+          box.append(empty);
+        } else {
+          const grid = document.createElement('div'); grid.className = 'pics';
+          for (const p of pics){
+            const card = document.createElement('div'); card.className = 'pic';
+            const h3 = document.createElement('h3'); h3.textContent = p.title || 'Untitled picture';
+            const d  = document.createElement('div'); d.className = 'muted'; d.textContent = p.description || '';
+            const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
+            fn.innerHTML = p.function ? `<strong>Function:</strong> ${escapeHtml(p.function)}` : '';
+            const pm = document.createElement('div'); pm.className = 'meta mono';
+            pm.textContent = `id:${p.id} · status:${p.status || '—'} · updated:${p.updated_at || p.created_at || '—'}`;
+            card.append(h3, d);
+            if (p.function) card.append(fn);
+            card.append(pm);
+            grid.append(card);
+          }
+          box.append(grid);
+        }
 
-  renderPictures(data.pictures || []);
-}
+        mount.append(box);
+      }
+    }
 
-function renderPictures(items) {
-  el.pictures.innerHTML = '';
-  const needle = el.focusFilter.value.trim().toLowerCase();
-  items
-    .filter(p => !needle || ((p.focus || '').toLowerCase().includes(needle)))
-    .forEach(p => {
-      const card = document.createElement('div');
-      card.className = 'pic';
-      card.innerHTML = `
-        <h4>${escapeHtml(p.title || '(untitled)')}</h4>
-        ${p.focus ? `<div class="small mut">Focus: ${escapeHtml(p.focus)}</div>` : ''}
-        ${p.description ? `<div class="small" style="margin-top:6px">${escapeHtml(p.description)}</div>` : ''}
-        ${p.function ? `<div class="small" style="margin-top:6px"><b>Function:</b> ${escapeHtml(p.function)}</div>` : ''}
-        ${p.explanation ? `<div class="small" style="margin-top:6px"><b>Explanation:</b> ${escapeHtml(p.explanation)}</div>` : ''}
-        <div class="small mut" style="margin-top:6px">${p.created_at ? new Date(p.created_at).toLocaleString() : ''}</div>
-        <div class="toolbar">
-          <button class="btn-json" data-id="${p.id}">JSON</button>
-        </div>
-      `;
-      card.querySelector('.btn-json').addEventListener('click', async () => {
-        const one = await api(`/jid/pictures/${p.id}`);
-        LAST_JSON[`picture_${p.id}`] = one;
-        toggleJSON(JSON.stringify(one, null, 2));
-      });
-      el.pictures.appendChild(card);
-    });
-}
+    async function load(){
+      const email = ($('email').value || '').trim().toLowerCase();
+      if (!email){ setStatus('Enter an email.', 'error'); return; }
+      setStatus('Loading…');
+      try{
+        const data = await fetchJSON(`${EP.byEmail}?email=${encodeURIComponent(email)}`, {}, 120000);
+        render(data);
+        setStatus('Done.', 'ok');
+      }catch(e){
+        setStatus(`Failed: ${e.message || e}`, 'error');
+      }
+    }
 
-async function refreshPictures() {
-  if (!CURRENT_VISION) return;
-  const focus = el.focusFilter.value.trim();
-  const data = await api(`/jid/visions/${CURRENT_VISION}/pictures`, { focus });
-  LAST_JSON.refresh_pictures = data;
-  renderPictures(data.items || []);
-}
-
-function toggleJSON(textMaybe) {
-  if (textMaybe) {
-    el.jsonPane.textContent = textMaybe;
-    el.jsonPane.style.display = 'block';
-    return;
-  }
-  el.jsonPane.style.display = (el.jsonPane.style.display === 'none' ? 'block' : 'none');
-  if (el.jsonPane.style.display === 'block') {
-    el.jsonPane.textContent = JSON.stringify(LAST_JSON, null, 2);
-  }
-}
-
-function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
-
-el.btnLoad.addEventListener('click', loadVisions);
-el.btnRefresh.addEventListener('click', refreshPictures);
-el.btnShowJSON.addEventListener('click', () => toggleJSON());
-document.addEventListener('DOMContentLoaded', loadVisions);
-</script>
+    (function init(){
+      loadEmail();
+      $('loadBtn').addEventListener('click', load);
+      $('saveBtn').addEventListener('click', ()=>{ saveEmail(); setStatus('Email saved.', 'ok'); });
+    })();
+  </script>
 </body>
 </html>
