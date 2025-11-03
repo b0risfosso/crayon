@@ -515,10 +515,3 @@ def usage_today():
     finally:
         conn.close()
 
-# -------------------------- If-main (local testing) ---------------------------
-if __name__ == "__main__":
-    # Minimal test server to exercise the endpoint without your full stack
-    port = int(os.getenv("CRAYON_PORT", "5001"))
-    print(f"[crayon] Starting test server on http://127.0.0.1:{port}")
-    app.run(host="0.0.0.0", port=port, debug=True)
-
