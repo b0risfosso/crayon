@@ -161,18 +161,40 @@
     }
 
     function renderFocuses(block) {
-      const mount = $('focusesOut'); mount.innerHTML = '';
-      const focuses = Array.isArray(block?.focuses) ? block.focuses : [];
-      if (!focuses.length) { mount.innerHTML = '<div class="muted">No focuses returned.</div>'; return; }
-      for (const f of focuses) {
-        const card = document.createElement('div'); card.className = 'card';
-        const t = document.createElement('div'); t.innerHTML = `<strong>${escapeHtml(f.title || f || 'Focus')}</strong>`;
-        const d = document.createElement('div'); d.className = 'muted'; d.textContent = (f.description || '');
-        card.append(t);
-        if (d.textContent) card.append(d);
-        mount.append(card);
-      }
+        const mount = $('focusesOut');
+        mount.innerHTML = '';
+
+        // Accept either { focuses: [...] } or a raw array
+        const items = Array.isArray(block?.focuses) ? block.focuses
+                    : Array.isArray(block)           ? block
+                    : [];
+
+        if (!items.length) {
+            mount.innerHTML = '<div class="muted">No focuses returned.</div>';
+            return;
+        }
+
+        for (let i = 0; i < items.length; i++) {
+            const f = items[i] ?? {};
+            // Normalize multiple possible shapes
+            const dimension = f.dimension || f.title || f.name || `Focus ${i + 1}`;
+            const text      = (typeof f === 'string') ? f
+                            : f.focus || f.description || '';
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            const head = document.createElement('div');
+            head.innerHTML = `<strong>${escapeHtml(dimension)}</strong>`;
+            const body = document.createElement('div');
+            body.className = 'muted';
+            body.textContent = text;
+
+            card.append(head);
+            if (text) card.append(body);
+            mount.append(card);
+        }
     }
+
 
     // ------------ Actions ------------
     async function doHealth() {
