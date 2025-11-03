@@ -62,6 +62,77 @@
   <script>
     const LS_EMAIL = 'fg_user_email';
     const EP = { byEmail: '/jid/by_email' }; // alias exists at /by_email too
+    // ---- Crayon endpoints
+    const EP_CRAYON = {
+    waxStack: '/crayon/wax_stack',
+    world: '/crayon/wax_worldwright'
+    };
+
+    // Normalize various possible response shapes
+    function pickWaxStack(res){
+        if (!res) return '';
+        if (typeof res.wax_stack === 'string') return res.wax_stack;
+        if (res.data && typeof res.data.wax_stack === 'string') return res.data.wax_stack;
+        if (res.result && typeof res.result.wax_stack === 'string') return res.result.wax_stack;
+        // Sometimes the LLM returns a big text field
+        if (typeof res.wax === 'string') return res.wax;
+        return '';
+    }
+
+    function openHtmlInNewTab(html){
+        const w = window.open('', '_blank');
+        if (!w) { alert('Popup blocked: allow popups to see the world.'); return; }
+        w.document.open();
+        w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
+        w.document.close();
+    }
+
+    async function createWorldForPictureCard(cardNode, visionText, pic){
+        const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
+        const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
+        const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
+        const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
+
+        const status = document.createElement('div');
+        status.className = 'status';
+        status.textContent = 'Building wax…';
+        cardNode.append(status);
+
+        try {
+            // 1) Wax stack
+            const wsPayload = {
+            vision: visionText,
+            picture_short: pic.title || '',
+            picture_description: pic.description || '',
+            constraints, deployment_context, readiness_target
+            };
+            const wsRes = await postJSON(EP_CRAYON.waxStack, wsPayload, 600000);
+            const wax_stack = pickWaxStack(wsRes);
+            if (!wax_stack) throw new Error('No wax_stack returned.');
+
+            status.textContent = 'Wax ready. Building world…';
+
+            // 2) Worldwright
+            const wwPayload = {
+            vision: visionText,
+            picture_short: pic.title || '',
+            picture_description: pic.description || '',
+            wax_stack,
+            email: email || undefined, // let server accept None if not provided
+            constraints, deployment_context, readiness_target
+            };
+            const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
+            const html = worldRes?.html || worldRes?.data?.html || worldRes?.result?.html;
+            if (!html) throw new Error('No world HTML returned.');
+
+            status.className = 'status ok';
+            status.textContent = 'World built. Opening…';
+            openHtmlInNewTab(html);
+        } catch (e) {
+            status.className = 'status error';
+            status.textContent = `Failed: ${e.message || e}`;
+        }
+    }
 
     const $ = (id) => document.getElementById(id);
     function setStatus(msg, level='') {
