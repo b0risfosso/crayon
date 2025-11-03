@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Picture & Focus Console</title>
+<style>
+  :root{
+    --bg:#f9fafb; --panel:#ffffff; --text:#0f172a; --muted:#6b7280; --line:#e5e7eb;
+    --btn:#111827; --btnText:#fff; --ok:#16a34a; --err:#dc2626;
+  }
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif}
+  .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+  h1{font-size:20px;margin:0 0 16px}
+  .grid{display:grid;grid-template-columns:1fr;gap:16px}
+  @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card h2{font-size:16px;margin:0 0 10px}
+  label{display:block;font-weight:600;margin:10px 0 6px}
+  textarea,input,select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;color:var(--text)}
+  textarea{min-height:110px;resize:vertical}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row > *{flex:1}
+  button{appearance:none;border:1px solid #0000;background:var(--btn);color:var(--btnText);padding:9px 12px;border-radius:9px;cursor:pointer}
+  button[disabled]{opacity:.6;cursor:progress}
+  .muted{color:var(--muted);font-size:12px}
+  .hr{height:1px;background:var(--line);margin:12px 0}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff}
+  .pill button{background:#fff;color:var(--text);border:1px solid var(--line);padding:4px 8px;border-radius:999px}
+  pre{background:#0b1020;color:#e5e7eb;padding:12px;border-radius:10px;overflow:auto;max-height:260px}
+  .status{margin-top:8px;font-weight:600}
+  .ok{color:var(--ok)} .err{color:var(--err)}
+  .small{font-size:12px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Picture & Focus Console</h1>
+    <p class="muted">Create focuses from a vision, then turn a selected focus into a picture. Or, create a picture directly from a vision.</p>
+
+    <div class="grid">
+      <!-- FOCUSES -->
+      <section class="card" id="focusesCard">
+        <h2>Create Focuses</h2>
+        <label for="visionFocus">Vision</label>
+        <textarea id="visionFocus" placeholder="Describe your vision…"></textarea>
+
+        <div class="row">
+          <div>
+            <label for="count">Count <span class="muted">(optional)</span></label>
+            <input id="count" type="number" min="1" max="20" placeholder="e.g., 6">
+          </div>
+          <div>
+            <label for="mustInclude">Must include <span class="muted">(optional)</span></label>
+            <input id="mustInclude" type="text" placeholder="comma-separated phrases">
+          </div>
+          <div>
+            <label for="exclude">Exclude <span class="muted">(optional)</span></label>
+            <input id="exclude" type="text" placeholder="comma-separated phrases">
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="emailFocus">Email <span class="muted">(optional)</span></label>
+            <input id="emailFocus" type="email" placeholder="you@example.com">
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="btnFocus">Generate Focuses</button>
+          <button id="btnClearFocuses" type="button">Clear</button>
+        </div>
+
+        <div class="status" id="statusFocus"></div>
+        <div class="hr"></div>
+
+        <div>
+          <div class="muted small">Returned focuses</div>
+          <div class="list" id="focusList"></div>
+          <div class="muted small">Raw response</div>
+          <pre id="focusRaw"></pre>
+        </div>
+      </section>
+
+      <!-- PICTURES -->
+      <section class="card" id="picturesCard">
+        <h2>Create Pictures</h2>
+
+        <label for="visionPic">Vision</label>
+        <textarea id="visionPic" placeholder="Describe your vision…"></textarea>
+
+        <label for="focusPic">Focus <span class="muted">(optional; or click a focus pill on the left)</span></label>
+        <input id="focusPic" type="text" placeholder="A specific angle or subtheme">
+
+        <div class="row">
+          <div>
+            <label for="emailPic">Email <span class="muted">(optional)</span></label>
+            <input id="emailPic" type="email" placeholder="you@example.com">
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="btnPicture">Create Picture</button>
+          <button id="btnClearPicture" type="button">Clear</button>
+        </div>
+
+        <div class="status" id="statusPic"></div>
+        <div class="hr"></div>
+
+        <div class="muted small">Picture summary</div>
+        <pre id="pictureSummary"></pre>
+
+        <div class="muted small">Raw response</div>
+        <pre id="pictureRaw"></pre>
+      </section>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Settings</h2>
+      <label for="apiBase">API Base</label>
+      <input id="apiBase" type="text" placeholder="http://127.0.0.1:5001" value="http://127.0.0.1:5001">
+      <p class="muted small">Endpoints used: <code>/jid/create_focuses</code> and <code>/jid/create_pictures</code>.</p>
+    </div>
+  </div>
+
+<script>
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+  const els = {
+    apiBase: $('#apiBase'),
+    // focuses
+    visionFocus: $('#visionFocus'),
+    count: $('#count'),
+    mustInclude: $('#mustInclude'),
+    exclude: $('#exclude'),
+    emailFocus: $('#emailFocus'),
+    btnFocus: $('#btnFocus'),
+    btnClearFocuses: $('#btnClearFocuses'),
+    statusFocus: $('#statusFocus'),
+    focusList: $('#focusList'),
+    focusRaw: $('#focusRaw'),
+    // pictures
+    visionPic: $('#visionPic'),
+    focusPic: $('#focusPic'),
+    emailPic: $('#emailPic'),
+    btnPicture: $('#btnPicture'),
+    btnClearPicture: $('#btnClearPicture'),
+    statusPic: $('#statusPic'),
+    pictureSummary: $('#pictureSummary'),
+    pictureRaw: $('#pictureRaw'),
+  };
+
+  function setBusy(btn, busy=true) {
+    btn.disabled = busy;
+    btn.textContent = busy ? 'Working…' : btn.dataset.default || 'Submit';
+  }
+
+  async function postJSON(path, payload) {
+    const base = els.apiBase.value.replace(/\/+$/,'');
+    const res = await fetch(base + path, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = {raw:text, status: res.status}; }
+    if (!res.ok) throw Object.assign(new Error('Request failed'), {data, status:res.status});
+    return data;
+  }
+
+  // Focuses flow
+  els.btnFocus.dataset.default = 'Generate Focuses';
+  els.btnFocus.addEventListener('click', async () => {
+    const payload = {
+      vision: els.visionFocus.value.trim(),
+      count: els.count.value.trim(),
+      must_include: els.mustInclude.value.trim(),
+      exclude: els.exclude.value.trim(),
+      email: els.emailFocus.value.trim() || undefined
+    };
+    if (!payload.vision) { els.statusFocus.textContent = 'Vision is required.'; els.statusFocus.className='status err'; return; }
+
+    els.statusFocus.textContent = '';
+    els.focusRaw.textContent = '';
+    els.focusList.innerHTML = '';
+    setBusy(els.btnFocus, true);
+    try {
+      const data = await postJSON('/jid/create_focuses', payload);
+      els.focusRaw.textContent = JSON.stringify(data, null, 2);
+      const focuses = Array.isArray(data.focuses) ? data.focuses : (data.focuses ? [data.focuses] : []);
+      if (focuses.length === 0) {
+        els.statusFocus.textContent = 'No focuses returned.';
+        els.statusFocus.className = 'status err';
+      } else {
+        focuses.forEach(f => {
+          const pill = document.createElement('div');
+          pill.className = 'pill';
+          const span = document.createElement('span');
+          span.textContent = f;
+          const btn = document.createElement('button');
+          btn.textContent = 'Use → Picture';
+          btn.addEventListener('click', () => {
+            els.focusPic.value = f;
+            els.visionPic.value = els.visionFocus.value;
+            window.scrollTo({top: document.getElementById('picturesCard').offsetTop - 8, behavior:'smooth'});
+          });
+          pill.appendChild(span);
+          pill.appendChild(btn);
+          els.focusList.appendChild(pill);
+        });
+        els.statusFocus.textContent = `Received ${focuses.length} focus(es).`;
+        els.statusFocus.className = 'status ok';
+      }
+    } catch (err) {
+      els.statusFocus.textContent = `Error: ${err.data?.error || err.message}`;
+      els.statusFocus.className = 'status err';
+      els.focusRaw.textContent = JSON.stringify(err.data || {error: err.message}, null, 2);
+    } finally {
+      setBusy(els.btnFocus, false);
+    }
+  });
+
+  els.btnClearFocuses.addEventListener('click', () => {
+    els.visionFocus.value = '';
+    els.count.value = '';
+    els.mustInclude.value = '';
+    els.exclude.value = '';
+    els.emailFocus.value = '';
+    els.statusFocus.textContent = '';
+    els.focusList.innerHTML = '';
+    els.focusRaw.textContent = '';
+  });
+
+  // Pictures flow
+  els.btnPicture.dataset.default = 'Create Picture';
+  els.btnPicture.addEventListener('click', async () => {
+    const payload = {
+      vision: els.visionPic.value.trim(),
+      focus: els.focusPic.value.trim() || undefined,
+      email: els.emailPic.value.trim() || undefined
+    };
+    if (!payload.vision) { els.statusPic.textContent = 'Vision is required.'; els.statusPic.className='status err'; return; }
+
+    els.statusPic.textContent = '';
+    els.pictureSummary.textContent = '';
+    els.pictureRaw.textContent = '';
+    setBusy(els.btnPicture, true);
+    try {
+      const data = await postJSON('/jid/create_pictures', payload);
+      els.pictureRaw.textContent = JSON.stringify(data, null, 2);
+      // Try to surface a friendly summary if present
+      const title = data.title || data.picture_title || '(untitled picture)';
+      const desc  = data.description || data.picture_description || '';
+      const fn    = data.function || data.picture_function || '';
+      const exp   = data.explanation || '';
+      const idStr = ['vision_id','picture_id'].filter(k => data[k] !== undefined).map(k => `${k}: ${data[k]}`).join('  ');
+      els.pictureSummary.textContent =
+        `${title}\n\n${desc}\n\nFunction:\n${fn}\n\nExplanation:\n${exp}\n\n${idStr}`;
+      els.statusPic.textContent = 'Picture created.';
+      els.statusPic.className = 'status ok';
+    } catch (err) {
+      els.statusPic.textContent = `Error: ${err.data?.error || err.message}`;
+      els.statusPic.className = 'status err';
+      els.pictureRaw.textContent = JSON.stringify(err.data || {error: err.message}, null, 2);
+    } finally {
+      setBusy(els.btnPicture, false);
+    }
+  });
+
+  els.btnClearPicture.addEventListener('click', () => {
+    els.visionPic.value = '';
+    els.focusPic.value = '';
+    els.emailPic.value = '';
+    els.statusPic.textContent = '';
+    els.pictureSummary.textContent = '';
+    els.pictureRaw.textContent = '';
+  });
+</script>
+</body>
+</html>
