@@ -638,12 +638,12 @@ def jid_explain_picture():
 # ------------------------------------------------------------------------------
 # Health check and startup
 
-@app.route("/healthz")
+@app.route("/jid/healthz")
 def healthz():
     return jsonify({"status": "ok", "time": _iso_today()}), 200
 
 
-@app.route("/usage/today", methods=["GET"])
+@app.route("/jid/usage/today", methods=["GET"])
 def usage_today():
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     model = request.args.get("model", DEFAULT_MODEL)
