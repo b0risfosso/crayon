@@ -128,7 +128,9 @@
           box.append(chips);
         }
 
-        box.append(document.createElement('div')).className = 'sep';
+        const sep = document.createElement('div');
+        sep.className = 'sep';
+        box.append(sep);
 
         // pictures grid
         const pics = Array.isArray(v.pictures) ? v.pictures : [];
