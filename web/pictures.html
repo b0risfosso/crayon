@@ -71,7 +71,7 @@ const EP_CRAYON = {
 };
 
 // ---------- Shared JSON helpers ----------
-async function fetchWithTimeout(url, options={}, timeoutMs=300000){
+async function fetchWithTimeout(url, options={}, timeoutMs=600000){
   const controller = new AbortController();
   const timer = setTimeout(()=> controller.abort(), timeoutMs);
   try {
