@@ -223,7 +223,7 @@
       } finally { clearTimeout(t); }
     }
 
-    function render(data){
+    async function render(data){
       const visions = Array.isArray(data?.visions) ? data.visions : [];
       $('results').style.display = 'block';
       $('summary').textContent = `${visions.length} vision${visions.length===1?'':'s'} for ${data?.email || ''}`;
@@ -358,7 +358,7 @@ if (!pics.length){
       setStatus('Loading…');
       try{
         const data = await fetchJSON(`${EP.byEmail}?email=${encodeURIComponent(BORIS_EMAIL)}`, {}, 120000);
-        render(data);
+        await render(data);
         setStatus('Done.', 'ok');
       }catch(e){
         setStatus(`Failed: ${e.message || e}`, 'error');

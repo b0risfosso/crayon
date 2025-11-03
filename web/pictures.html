@@ -218,7 +218,7 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
     function loadEmail(){ const v = (localStorage.getItem(LS_EMAIL)||'').trim().toLowerCase(); if (v) $('email').value = v; }
     function saveEmail(){ const v = ($('email').value||'').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); }
 
-    function render(data){
+    async function render(data){
       const visions = Array.isArray(data?.visions) ? data.visions : [];
       $('results').style.display = 'block';
       $('summary').textContent = `${visions.length} vision${visions.length===1?'':'s'} for ${data?.email || ''}`;
@@ -355,7 +355,7 @@ if (!pics.length){
       setStatus('Loading…');
       try{
         const data = await fetchJSON(`${EP.byEmail}?email=${encodeURIComponent(email)}`, {}, 120000);
-        render(data);
+        await render(data);
         setStatus('Done.', 'ok');
       }catch(e){
         setStatus(`Failed: ${e.message || e}`, 'error');
