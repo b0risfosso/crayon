@@ -66,25 +66,29 @@ CREATE TABLE IF NOT EXISTS waxes (
 CREATE INDEX IF NOT EXISTS idx_waxes_vision ON waxes(vision_id);
 CREATE INDEX IF NOT EXISTS idx_waxes_email ON waxes(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_waxes_content_hash ON waxes(content_hash);
+CREATE INDEX IF NOT EXISTS idx_waxes_picture ON waxes(picture_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_waxes_pic_email ON waxes(picture_id, email);
 
 
 CREATE TABLE IF NOT EXISTS worlds (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     vision_id     INTEGER NOT NULL,
-    wax_id        INTEGER,                    -- optional link to waxes.id
+    picture_id    INTEGER,                    -- NEW: tie world to a specific picture
+    wax_id        INTEGER,
     title         TEXT,
     html          TEXT NOT NULL,              -- full HTML document
-    html_hash     TEXT,                       -- sha256(html) for idempotency
+    html_hash     TEXT,                       -- optional: last content hash
     email         TEXT,
-    source        TEXT,                       -- 'crayon' | other
+    source        TEXT,
     metadata      TEXT,                       -- JSON
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL,
     FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE CASCADE,
+    FOREIGN KEY (picture_id) REFERENCES pictures(id) ON DELETE SET NULL,
     FOREIGN KEY (wax_id)    REFERENCES waxes(id)   ON DELETE SET NULL
 );
-
-CREATE INDEX IF NOT EXISTS idx_worlds_vision ON worlds(vision_id);
-CREATE INDEX IF NOT EXISTS idx_worlds_email  ON worlds(email);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_worlds_html_hash ON worlds(html_hash);
+CREATE INDEX IF NOT EXISTS idx_worlds_vision     ON worlds(vision_id);
+CREATE INDEX IF NOT EXISTS idx_worlds_picture    ON worlds(picture_id);
+CREATE INDEX IF NOT EXISTS idx_worlds_email      ON worlds(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_worlds_pic_email ON worlds(picture_id, email);
 

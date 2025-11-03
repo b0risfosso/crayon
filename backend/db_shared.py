@@ -696,3 +696,114 @@ def upsert_world_by_html(
         vision_id=vision_id, wax_id=watx_id if (watx_id:=wax_id) else None,
         title=title, html=html, email=email, source=source, metadata=metadata
     )
+
+
+
+# --------- World lookup/update by (picture_id, email) with overwrite policy ----
+from typing import Optional, Dict, Any
+import json, hashlib
+
+def _sha256(text: str) -> str:
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+def find_world_id_by_picture_email(*, picture_id: int, email: Optional[str]) -> Optional[int]:
+    conn = connect(PICTURE_DB)
+    try:
+        if email is None:
+            row = conn.execute(
+                "SELECT id FROM worlds WHERE picture_id=? AND email IS NULL LIMIT 1",
+                (picture_id,)
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id FROM worlds WHERE picture_id=? AND email=? LIMIT 1",
+                (picture_id, email)
+            ).fetchone()
+        return int(row[0]) if row else None
+    finally:
+        conn.close()
+
+def create_world_for_picture(
+    *,
+    vision_id: int,
+    picture_id: int,
+    wax_id: Optional[int],
+    title: Optional[str],
+    html: str,
+    email: Optional[str],
+    source: Optional[str] = "crayon",
+    metadata: Optional[Dict[str, Any]] = None
+) -> int:
+    conn = connect(PICTURE_DB)
+    try:
+        now = _iso_now()
+        meta_s = json.dumps(metadata or {}, ensure_ascii=False)
+        html_hash = _sha256(html)
+        cur = conn.execute(
+            """
+            INSERT INTO worlds
+                (vision_id, picture_id, wax_id, title, html, html_hash, email, source, metadata, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (vision_id, picture_id, wax_id, title, html, html_hash, email, source, meta_s, now, now)
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+def update_world_overwrite(
+    world_id: int,
+    *,
+    wax_id: Optional[int],
+    html: str,
+    email: Optional[str],
+    source: Optional[str] = "crayon",
+    metadata_merge: Optional[Dict[str, Any]] = None
+) -> int:
+    conn = connect(PICTURE_DB)
+    try:
+        row = conn.execute("SELECT metadata FROM worlds WHERE id=?", (world_id,)).fetchone()
+        cur_meta = row[0] if row else None
+        merged_meta = _json_merge(cur_meta, json.dumps(metadata_merge or {}, ensure_ascii=False))
+        conn.execute(
+            "UPDATE worlds SET wax_id=?, html=?, html_hash=?, email=?, source=?, metadata=?, updated_at=? WHERE id=?",
+            (wax_id, html, _sha256(html), email, source, merged_meta, _iso_now(), world_id)
+        )
+        conn.commit()
+        return world_id
+    finally:
+        conn.close()
+
+def upsert_world_by_picture_overwrite(
+    *,
+    vision_id: int,
+    picture_id: int,
+    wax_id: Optional[int],
+    title: Optional[str],
+    html: str,
+    email: Optional[str],
+    source: Optional[str] = "crayon",
+    metadata: Optional[Dict[str, Any]] = None
+) -> int:
+    existing = find_world_id_by_picture_email(picture_id=picture_id, email=email)
+    if existing:
+        return update_world_overwrite(
+            existing,
+            wax_id=wax_id,
+            html=html,
+            email=email,
+            source=source,
+            metadata_merge=metadata
+        )
+    return create_world_for_picture(
+        vision_id=vision_id,
+        picture_id=picture_id,
+        wax_id=wax_id,
+        title=title,
+        html=html,
+        email=email,
+        source=source,
+        metadata=metadata
+    )

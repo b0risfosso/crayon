@@ -23,7 +23,7 @@ from db_shared import (
     upsert_vision_by_text_email,   # reuse your redundancy-aware vision upsert
     upsert_wax_by_content,
     upsert_world_by_html, find_or_create_picture_by_signature, upsert_wax_by_picture_append,
-    
+
 )
 
 from prompts import wax_architect_prompt
@@ -424,9 +424,23 @@ def crayon_wax_worldwright():
                 "readiness_target": readiness_target,
             },
         )
+
+        # --- NEW: find/create the picture row (by title+description+email) ----
+        picture_id = find_or_create_picture_by_signature(
+            vision_id=vision_id,
+            title=picture_short,
+            description=picture_description,
+            email=email,
+            source="crayon",
+            default_status="draft",
+            metadata={"from": "wax_worldwright_endpoint"}
+        )
+
+
         wax_title = f"Wax Stack for: {picture_short or vision}"
         wax_id = upsert_wax_by_content(
             vision_id=vision_id,
+            picture_id=picture_id,
             title=wax_title,
             content=wax_stack,   # NOTE: this is the provided wax stack (input), not the HTML
             email=email,
@@ -438,8 +452,9 @@ def crayon_wax_worldwright():
             },
         )
         world_title = f"World: {picture_short or vision}"
-        world_id = upsert_world_by_html(
+        world_id = upsert_world_by_picture_overwrite(
             vision_id=vision_id,
+            picture_id=picture_id,
             wax_id=wax_id,
             title=world_title,
             html=html,
@@ -457,6 +472,7 @@ def crayon_wax_worldwright():
             "vision": vision,
             "vision_id": vision_id,
             "picture_short": picture_short,
+            "picture_id": picture_id,             # NEW
             "deployment_context": deployment_context,
             "readiness_target": readiness_target,
             "wax_id": wax_id,
