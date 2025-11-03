@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Fantasiagenesis · Pictures</title>
+  <title>Fantasiagenesis · Pictures (Boris)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { color-scheme: light; }
@@ -13,7 +13,7 @@
     .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     .panel { border:1px solid #e5e7eb; border-radius:.6rem; padding:.85rem 1rem; background:#fafafb; }
     .panel + .panel { margin-top:.9rem; }
-    input[type="email"] { height:2.4rem; padding:.55rem .7rem; border:1px solid #cdd0d5; border-radius:.55rem; width:min(92vw, 440px); }
+    input[type="email"], input[type="text"] { height:2.4rem; padding:.55rem .7rem; border:1px solid #cdd0d5; border-radius:.55rem; }
     button { padding:.6rem .9rem; border:0; border-radius:.55rem; background:#0b5cff; color:#fff; cursor:pointer; }
     button.secondary { background:#4b5563; }
     .status { font-size:.92rem; min-height:1.2em; margin-top:.35rem; }
@@ -31,24 +31,37 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .sep { height:1px; background:#eee; margin:.6rem 0; }
     .empty { padding:.4rem 0; color:#6b7280; }
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
   <header class="row" style="justify-content: space-between;">
     <div>
-      <h1>Pictures</h1>
-      <div class="muted">Shows your pictures</div>
+      <h1>Pictures (Boris)</h1>
+      <div class="muted">Auto-loaded for <code class="mono">boris@fantasiagenesis.com</code></div>
     </div>
     <nav class="row">
       <a href="/draw" class="muted">✏️ Draw</a>
+      <a href="/jid" class="muted">🧩 JID</a>
     </nav>
   </header>
 
-  <section class="panel">
+  <!-- Hidden email row (prefilled & disabled) -->
+  <section class="panel hidden" id="emailPanel">
     <div class="row">
       <input type="email" id="email" placeholder="you@example.com" />
       <button id="loadBtn" type="button">Load</button>
       <button id="saveBtn" class="secondary" type="button">Save email</button>
+    </div>
+    <div id="status" class="status"></div>
+  </section>
+
+  <!-- Optional build context (constraints/deploy/readiness); keep visible in case you want to set them -->
+  <section class="panel" id="ctxPanel">
+    <div class="row" style="gap:.6rem; flex-wrap:wrap;">
+      <input id="ctxConstraints" type="text" placeholder="Constraints (optional)" style="width:min(92vw,460px)">
+      <input id="ctxDeploy" type="text" placeholder="Deployment context (optional)" style="width:min(92vw,360px)">
+      <input id="ctxReadiness" type="text" placeholder="Readiness target (optional)" style="width:min(92vw,280px)">
     </div>
     <div id="status" class="status"></div>
   </section>
@@ -59,119 +72,120 @@
   </section>
 
   <script>
-    const LS_EMAIL = 'fg_user_email';
+    // Hard-coded Boris email
+    const BORIS_EMAIL = 'boris@fantasiagenesis.com';
+
     const EP = { byEmail: '/jid/by_email' }; // alias exists at /by_email too
 
     // ---- Crayon endpoints
-const EP_CRAYON = {
-  waxStack: '/crayon/wax_stack',
-  world: '/crayon/wax_worldwright'
-};
-
-// ---------- Shared JSON helpers ----------
-async function fetchWithTimeout(url, options={}, timeoutMs=300000){
-  const controller = new AbortController();
-  const timer = setTimeout(()=> controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function postJSON(url, body, timeoutMs=600000){
-  const resp = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  }, timeoutMs);
-  let data;
-  try {
-    data = await resp.json();
-  } catch {
-    throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
-  }
-  if (!resp.ok || data?.ok === false) {
-    const msg = (data && (data.error || data.detail)) ?
-      `${data.error || ''} ${data.detail || ''}`.trim() :
-      `HTTP ${resp.status}`;
-    throw new Error(msg);
-  }
-  return data;
-}
-
-
-// Normalize various possible response shapes
-function pickWaxStack(res){
-  if (!res) return '';
-  if (typeof res.wax_stack === 'string') return res.wax_stack;
-  if (res.data && typeof res.data.wax_stack === 'string') return res.data.wax_stack;
-  if (res.result && typeof res.result.wax_stack === 'string') return res.result.wax_stack;
-  // Sometimes the LLM returns a big text field
-  if (typeof res.wax === 'string') return res.wax;
-  return '';
-}
-
-function openHtmlInNewTab(html){
-  const w = window.open('', '_blank');
-  if (!w) { alert('Popup blocked: allow popups to see the world.'); return; }
-  w.document.open();
-  w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
-  w.document.close();
-}
-
-async function createWorldForPictureCard(cardNode, visionText, pic){
-  const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
-  const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
-  const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
-  const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
-
-  const status = document.createElement('div');
-  status.className = 'status';
-  status.textContent = 'Building wax…';
-  cardNode.append(status);
-
-  try {
-    // 1) Wax stack
-    const wsPayload = {
-      vision: visionText,
-      picture_short: pic.title || '',
-      picture_description: pic.description || '',
-      constraints, deployment_context, readiness_target
+    const EP_CRAYON = {
+      waxStack: '/crayon/wax_stack',
+      world: '/crayon/wax_worldwright'
     };
-    const wsRes = await postJSON(EP_CRAYON.waxStack, wsPayload, 600000);
-    const wax_stack = pickWaxStack(wsRes);
-    if (!wax_stack) throw new Error('No wax_stack returned.');
 
-    status.textContent = 'Wax ready. Building world…';
+    // ---------- Shared JSON helpers ----------
+    async function fetchWithTimeout(url, options={}, timeoutMs=300000){
+      const controller = new AbortController();
+      const timer = setTimeout(()=> controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
 
-    // 2) Worldwright
-    const wwPayload = {
-      vision: visionText,
-      picture_short: pic.title || '',
-      picture_description: pic.description || '',
-      wax_stack,
-      email: email || undefined, // let server accept None if not provided
-      constraints, deployment_context, readiness_target
-    };
-    const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
-    const html = worldRes?.html || worldRes?.data?.html || worldRes?.result?.html;
-    if (!html) throw new Error('No world HTML returned.');
+    async function postJSON(url, body, timeoutMs=600000){
+      const resp = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }, timeoutMs);
+      let data;
+      try {
+        data = await resp.json();
+      } catch {
+        throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
+      }
+      if (!resp.ok || data?.ok === false) {
+        const msg = (data && (data.error || data.detail)) ?
+          `${data.error || ''} ${data.detail || ''}`.trim() :
+          `HTTP ${resp.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    }
 
-    status.className = 'status ok';
-    status.textContent = 'World built. Opening…';
-    openHtmlInNewTab(html);
-  } catch (e) {
-    status.className = 'status error';
-    status.textContent = `Failed: ${e.message || e}`;
-  }
-}
+    // Normalize various possible response shapes
+    function pickWaxStack(res){
+      if (!res) return '';
+      if (typeof res.wax_stack === 'string') return res.wax_stack;
+      if (res.data && typeof res.data.wax_stack === 'string') return res.data.wax_stack;
+      if (res.result && typeof res.result.wax_stack === 'string') return res.result.wax_stack;
+      if (typeof res.wax === 'string') return res.wax;
+      return '';
+    }
 
-    
+    function openHtmlInNewTab(html){
+      const w = window.open('', '_blank');
+      if (!w) { alert('Popup blocked: allow popups to see the world.'); return; }
+      w.document.open();
+      w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
+      w.document.close();
+    }
 
+    async function createWorldForPictureCard(cardNode, visionText, pic){
+      // Always use Boris' email for this page
+      const email = BORIS_EMAIL;
+      const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
+      const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
+      const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
+
+      const status = document.createElement('div');
+      status.className = 'status';
+      status.textContent = 'Building wax…';
+      cardNode.append(status);
+
+      try {
+        // 1) Wax stack
+        const wsPayload = {
+          vision: visionText,
+          picture_short: pic.title || '',
+          picture_description: pic.description || '',
+          constraints, deployment_context, readiness_target
+        };
+        const wsRes = await postJSON(EP_CRAYON.waxStack, wsPayload, 600000);
+        const wax_stack = pickWaxStack(wsRes);
+        if (!wax_stack) throw new Error('No wax_stack returned.');
+
+        status.textContent = 'Wax ready. Building world…';
+
+        // 2) Worldwright
+        const wwPayload = {
+          vision: visionText,
+          picture_short: pic.title || '',
+          picture_description: pic.description || '',
+          wax_stack,
+          email, // hard-coded
+          constraints, deployment_context, readiness_target
+        };
+        const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
+        const html = worldRes?.html || worldRes?.data?.html || worldRes?.result?.html;
+        if (!html) throw new Error('No world HTML returned.');
+
+        status.className = 'status ok';
+        status.textContent = 'World built. Opening…';
+        openHtmlInNewTab(html);
+      } catch (e) {
+        status.className = 'status error';
+        status.textContent = `Failed: ${e.message || e}`;
+      }
+    }
+
+    // ----- Minimal utilities for the page -----
     const $ = (id) => document.getElementById(id);
     function setStatus(msg, level='') {
-      const el = $('status');
+      const el = document.querySelector('#ctxPanel #status') || $('status');
+      if (!el) return;
       el.className = 'status ' + (level || '');
       el.textContent = msg || '';
     }
@@ -190,9 +204,6 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
         return data;
       } finally { clearTimeout(t); }
     }
-
-    function loadEmail(){ const v = (localStorage.getItem(LS_EMAIL)||'').trim().toLowerCase(); if (v) $('email').value = v; }
-    function saveEmail(){ const v = ($('email').value||'').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); }
 
     function render(data){
       const visions = Array.isArray(data?.visions) ? data.visions : [];
@@ -255,23 +266,22 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
             const pm = document.createElement('div'); pm.className = 'meta mono';
             pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
 
-            // --- NEW: create picture (wax + world) — this time we can use the actual vision text `v.text`
+            // create picture (wax + world)
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.textContent = 'create picture';
             btn.style.marginTop = '.5rem';
             btn.addEventListener('click', async () => {
-                const visionText = v?.text || '';
-                if (!visionText) { alert('This vision has no text.'); return; }
-                await createWorldForPictureCard(card, visionText, p);
+              const visionText = v?.text || '';
+              if (!visionText) { alert('This vision has no text.'); return; }
+              await createWorldForPictureCard(card, visionText, p);
             });
 
             card.append(h3, d);
             if (p?.function) card.append(fn);
             card.append(pm, btn);
             grid.append(card);
-            }
-
+          }
           box.append(grid);
         }
 
@@ -279,12 +289,10 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
       }
     }
 
-    async function load(){
-      const email = ($('email').value || '').trim().toLowerCase();
-      if (!email){ setStatus('Enter an email.', 'error'); return; }
+    async function loadForBoris(){
       setStatus('Loading…');
       try{
-        const data = await fetchJSON(`${EP.byEmail}?email=${encodeURIComponent(email)}`, {}, 120000);
+        const data = await fetchJSON(`${EP.byEmail}?email=${encodeURIComponent(BORIS_EMAIL)}`, {}, 120000);
         render(data);
         setStatus('Done.', 'ok');
       }catch(e){
@@ -293,9 +301,16 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
     }
 
     (function init(){
-      loadEmail();
-      $('loadBtn').addEventListener('click', load);
-      $('saveBtn').addEventListener('click', ()=>{ saveEmail(); setStatus('Email saved.', 'ok'); });
+      // Prefill (and keep hidden) input with Boris' email, then autoload.
+      const emailInput = document.getElementById('email');
+      if (emailInput) {
+        emailInput.value = BORIS_EMAIL;
+        emailInput.setAttribute('disabled', 'disabled');
+      }
+      document.getElementById('emailPanel')?.classList.add('hidden');
+
+      // Autoload immediately
+      loadForBoris();
     })();
   </script>
 </body>
