@@ -57,7 +57,17 @@
   <section class="panel">
     <h2 style="margin:.1rem 0 .6rem 0;">Create Pictures</h2>
     <div class="grid">
-      <textarea id="visionForPictures" placeholder="Vision text… (e.g., Harnessing energy using dirt)"></textarea>
+      <!-- Single-line Vision -->
+      <input id="visionInputForPictures" type="text" placeholder="Vision (single line, e.g., Harnessing energy using dirt)" />
+
+      <!-- Optional single-line Focus -->
+      <input id="focusForPictures" type="text" placeholder="Focus (optional, e.g., Microbial fuel cells in campus garden)" />
+
+      <div class="row">
+        <input id="count" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Count (optional, e.g., 3)" style="width:12rem" />
+        <button id="btnCreatePictures" type="button">Create pictures</button>
+      </div>
+
       <div class="row">
         <input id="count" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Count (optional, e.g., 3)" style="width:12rem" />
         <button id="btnCreatePictures" type="button">Create pictures</button>
@@ -71,7 +81,9 @@
   <section class="panel">
     <h2 style="margin:.1rem 0 .6rem 0;">Create Focuses</h2>
     <div class="grid">
-      <textarea id="visionForFocuses" placeholder="Vision text… (the same or another vision)"></textarea>
+      <!-- Single-line Vision -->
+      <input id="visionInputForFocuses" type="text" placeholder="Vision (single line)" />
+
       <div class="row">
         <button id="btnCreateFocuses" type="button">Create focuses</button>
       </div>
@@ -162,7 +174,7 @@
     }
 
 
-    async function createWorldForPictureCard(cardNode, visionText, pic){
+    async function createWorldForPictureCard(cardNode, visionText, pic, focusText){
         // choose email
         const emailInput = document.getElementById('email');
         const email = (emailInput?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
@@ -180,7 +192,7 @@
               picture_title: req.picture_short,          // map our normalized title to new key
               picture_description: req.picture_description,
               picture_function: String(pic?.function || '').trim(),
-              focus: ''                                   // draw.html has no per-vision focus context
+              focus: String(focusText || '').trim() || undefined                                   // draw.html has no per-vision focus context
             }, 600000);
 
             status.textContent = 'Crayon ready. Drawing world…';
@@ -278,11 +290,12 @@
                 btn.textContent = 'create picture';
                 btn.style.marginTop = '.5rem';
                 btn.addEventListener('click', async () => {
-                    // Find the active vision text (for draw.html we used the one in the "Create Pictures" textarea)
-                    const visionText = (document.getElementById('visionForPictures')?.value || '').trim();
-                    if (!visionText) { alert('Enter a vision (Create Pictures section) first.'); return; }
-                    await createWorldForPictureCard(card, visionText, p);
+                  const visionText = (document.getElementById('visionInputForPictures')?.value || '').trim();
+                  if (!visionText) { alert('Enter a vision first.'); return; }
+                  const focusText = (document.getElementById('focusForPictures')?.value || '').trim();
+                  await createWorldForPictureCard(card, visionText, p, focusText);
                 });
+
 
                 card.append(h, d);
                 if (fn.innerHTML) card.append(fn);
@@ -341,26 +354,29 @@
 
     async function doCreatePictures() {
       const email = ($('email').value || '').trim().toLowerCase();
-      const vision = ($('visionForPictures').value || '').trim();
-      const count = parseInt(($('count').value || '').trim(), 10);
+      const vision = ($('visionInputForPictures').value || '').trim();
+      const focus  = ($('focusForPictures').value || '').trim();
+      const count  = parseInt(($('count').value || '').trim(), 10);
+
       if (!vision) { setText($('statusPictures'), 'Enter a vision.', 'error'); return; }
       setText($('statusPictures'), 'Creating pictures…');
+
       try {
-        // Keep payload minimal — vision + email (+ count if provided)
         const payload = { vision };
         if (email) payload.email = email;
+        if (focus) payload.focus = focus;  // <-- new optional field
         if (!Number.isNaN(count) && count > 0) payload.count = count;
 
-        const res = await postJSON(EP.createPictures, payload, 600000);
-        // Expect either a top-level pictures array or a nested block
+        const res = await postJSON('/jid/create_pictures', payload, 600000);
         const block = res?.data || res?.result || res;
         renderPictures(block);
         setText($('statusPictures'), 'Done.', 'ok');
-        if (email) saveEmail();
+        if (email) localStorage.setItem('fg_user_email', email);
       } catch (e) {
         setText($('statusPictures'), `Failed: ${e.message || e}`, 'error');
       }
     }
+
 
     async function doCreateFocuses() {
       const email = ($('email').value || '').trim().toLowerCase();
