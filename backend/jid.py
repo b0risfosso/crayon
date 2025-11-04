@@ -302,7 +302,7 @@ def run_vision_to_focuses_llm(
 def run_explain_picture(
     vision_text: str,
     picture_title: str,
-    picture_description:, str,
+    picture_description: str,
     picture_function: str,
     *,
     focus: str = "",
