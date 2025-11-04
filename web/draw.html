@@ -82,7 +82,7 @@
     <h2 style="margin:.1rem 0 .6rem 0;">Create Focuses</h2>
     <div class="grid">
       <!-- Single-line Vision -->
-      <input id="visionInputForFocuses" type="text" placeholder="Vision (single line)" />
+      <input id="visionInputForFocuses" type="text" placeholder="Vision (creating solar microgrids in the city of Chicago)" />
 
       <div class="row">
         <button id="btnCreateFocuses" type="button">Create focuses</button>
@@ -380,7 +380,7 @@
 
     async function doCreateFocuses() {
       const email = ($('email').value || '').trim().toLowerCase();
-      const vision = ($('visionForFocuses').value || '').trim();
+      const vision = ($('visionInputForFocuses').value || '').trim();
       if (!vision) { setText($('statusFocuses'), 'Enter a vision.', 'error'); return; }
       setText($('statusFocuses'), 'Creating focuses…');
       try {
