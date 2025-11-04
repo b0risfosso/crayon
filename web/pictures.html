@@ -33,6 +33,7 @@
     .empty { padding:.4rem 0; color:#6b7280; }
     button.view { background: #059669; }       /* green */
     button.create { background: #0b5cff; }     /* blue */
+    button.recreate { background: #f59e0b; }   /* amber */
   </style>
 </head>
 <body>
@@ -241,7 +242,7 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
                             .replaceAll('>','&gt;').replaceAll('"','&quot;')
                             .replaceAll("'",'&#39;');
     }
-    async function fetchJSON(url, options={}, timeoutMs=60000){
+    async function fetchJSON(url, options={}, timeoutMs=600000){
       const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), timeoutMs);
       try {
         const r = await fetch(url, { ...options, signal: ctrl.signal });
@@ -347,6 +348,24 @@ if (!pics.length){
           alert(`Failed to load world: ${e.message || e}`);
         }
       });
+
+      // ---- RECREATE (amber): re-run wax_worldwright for this picture
+      const recreate = document.createElement('button');
+      recreate.type = 'button';
+      recreate.textContent = 'recreate';
+      recreate.className = 'recreate';
+      recreate.style.marginTop = '.5rem';
+      recreate.style.marginLeft = '.4rem';
+      recreate.addEventListener('click', async () => {
+        const visionText = v?.text || '';
+        if (!visionText) { alert('This vision has no text.'); return; }
+        await createWorldForPictureCard(card, visionText, p);
+      });
+
+      card.append(h3, d);
+      if (p?.function) card.append(fn);
+      card.append(pm, btn, recreate);
+      grid.append(card);
     } else {
       // ---- CREATE MODE (blue)
       btn.textContent = 'create picture';

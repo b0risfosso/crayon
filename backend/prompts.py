@@ -332,12 +332,12 @@ Return **one** `<html>` document (and nothing else) that:
 Embed the full input under:
 `<script type="application/json" id="worldSpec">…</script>`
 
-This JSON payload is provided to you as `{spec_json}`. Insert it verbatim. It may include the sections produced by the Vision Interpreter:
+This JSON payload is provided to you as {{spec_json}}. Insert it verbatim. It may include the sections produced by the Vision Interpreter:
 
 * Meaning, Components, How It Works, How It Realizes the Vision
 * Agents, Flows, Invariants & Safety, Scenarios, Faults
 * World Walkthrough Blueprint (World in One Breath, What You’re Seeing, How It Behaves, Why It Realizes the Vision)
-* Plus original fields: vision, focus, picture {title, description, function}, constraints, readiness_target, etc.
+* Plus original fields: vision, focus, picture {{title, description, function}}, constraints, readiness_target, etc.
 
 On load:
 
@@ -353,7 +353,7 @@ Show a red banner if any fail (keep sim running):
 
 * Parsed spec OK.
 * ≥ 1 agent, ≥ 1 flow, ≥ 1 KPI/goal (can derive from Agents or Readiness Target).
-* Every state var has `{unit, min, max, default}` (tag `arb` if unknown; flag with ⚠).
+* Every state var has `{{unit, min, max, default}}` (tag `arb` if unknown; flag with ⚠).
 * Units registry active; no incompatible operations.
 * Conservation auditor active for at least one quantity (energy, mass, money, information budget). Drift ≤ 1% per 10s after 5s warm-up (unless scenario/fault dictates otherwise).
 * At least 1 scenario and 1 fault defined.
@@ -384,7 +384,7 @@ Each failing item must include a **Jump** link to the related node in the spec v
 
 ### 3) Agents & Update Pattern
 
-* Instantiate one Agent per spec entry: `{id, kind, sensors[], actuators[], state{}, resources[], goals[], update(dt), interfaces}`.
+* Instantiate one Agent per spec entry: `{{id, kind, sensors[], actuators[], state{}, resources[], goals[], update(dt), interfaces}}`.
 * **Sensors** include `noise_rms` and `delay_ms` defaults if missing.
 * **Actuators** include `min, max, slew` (rate limit).
 * **Update Law**: implement first-order lags where relevant: `y += (dt/τ)*(x - y)`.
@@ -425,7 +425,7 @@ Each failing item must include a **Jump** link to the related node in the spec v
 
 ### B) Left Panel — State Inspector
 
-* Tabular view: `{agent, var, value, unit, min, max, Δ}` with cells turning red on constraint hits.
+* Tabular view: `{{agent, var, value, unit, min, max, Δ}}` with cells turning red on constraint hits.
 * **Plain-language ticker** updating once/second describing the current situation in human terms.
 
 ### C) Center — World Canvas
@@ -466,7 +466,7 @@ Each failing item must include a **Jump** link to the related node in the spec v
 
 * **No dead motion**: never animate without underlying state change.
 * Every visible number shows its unit.
-* Next to any key live metric, show the micro-equation or law (e.g., `Ṫ = (P_in − losses)/C`), with constants revealed on click.
+* Next to any key live metric, show the micro-equation or law (e.g., `Ṫ = (P_in − losses)/C`), with constants revealed on click.
 
 ---
 
@@ -478,7 +478,7 @@ Each failing item must include a **Jump** link to the related node in the spec v
 * Expose a minimal read-only debug shim:
 
   ```
-  window.world = { spec, agents, kpis, bus:{publish,subscribe}, tick: ()=>step(dt) };
+  window.world = {{ spec, agents, kpis, bus:{{publish,subscribe}}, tick: ()=>step(dt) }};
   ```
 * Persist seed, scenario, and last-pass/fail in localStorage for reproducibility.
 
@@ -488,7 +488,7 @@ Each failing item must include a **Jump** link to the related node in the spec v
 
 * Use a single `update(dt)` per agent; perform SENSE→PLAN→ACT per step.
 * Keep rendering thin; batch DOM writes once per RAF.
-* Decision traces: store lightweight objects per agent `{inputs, rule, actuation, expectation}`.
+* Decision traces: store lightweight objects per agent `{{inputs, rule, actuation, expectation}}`.
 * For delays, keep ring buffers per sensor; for noise, add Gaussian with seeded PRNG.
 
 ---
@@ -496,5 +496,4 @@ Each failing item must include a **Jump** link to the related node in the spec v
 ## USE THIS EXACT DATA PAYLOAD (embed verbatim under #worldSpec)
 
 {spec_json}
-
 """
