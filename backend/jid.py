@@ -122,9 +122,9 @@ def build_explain_picture_prompt(vision_text: str, picture_title: str, picture_d
     try:
         return explain_picture_prompt.format(
             vision=vision_text.strip(),
-            picture_title=picture_text.strip(),
-            picture_description=picture_text.strip(),
-            picture_function=picture_text.strip(),
+            picture_title=picture_title.strip(),
+            picture_description=picture_description.strip(),
+            picture_function=picture_function.strip(),
             focus=(focus or "")
         )
     except KeyError as ke:
@@ -458,6 +458,7 @@ def persist_focuses_to_db(result, *, email: str | None, source: str = "jid") -> 
 def persist_explanation_to_db(
     *,
     vision_text: str,
+    picture_title: str,
     picture_text: str,
     explanation_text: str,
     focus: str | None,
@@ -488,7 +489,7 @@ def persist_explanation_to_db(
             )
 
         # 2) Title + picture dedup / update
-        title = _extract_title_from_picture_text(picture_text)
+        title = picture_title
         existing_pid = find_picture_id_by_signature(
             vision_id=vision_id,
             title=title,
@@ -634,6 +635,7 @@ def jid_explain_picture():
         # Persist to DB (vision + single picture with explanation in metadata)
         ids = persist_explanation_to_db(
             vision_text=vision_text,
+            picture_title=picture_title,
             picture_text=picture_desc,
             explanation_text=result_text,
             focus=(focus or None),
@@ -644,7 +646,7 @@ def jid_explain_picture():
         return jsonify({
             "vision": vision_text,
             "focus": focus,
-            "picture": picture_text,
+            "picture": picture_desc,
             "explanation": result_text,
             **ids  # includes vision_id, picture_id if saved
         }), 200
