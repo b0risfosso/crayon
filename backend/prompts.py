@@ -299,7 +299,7 @@ Return one <html> document (no extra commentary) that:
 - runs an autonomous loop (no user clicks required)
 - exposes transparent, inspectable state (status panes, logs, charts)
 - renders a functional simulation loop aligned to the picture (not a toy “animation”)
-- provides an walkthrough/explanation of how the world works and what the viewer sees
+- provides an walkthrough/explanation of how the world works and what the viewer sees (walkthrough should be simple and fully coherent such that a novel user can read the walkthrough and have an immediate understanding of the world)
 
 ## World Model Requirements
 1) Spec Ingestion
@@ -330,7 +330,7 @@ Return one <html> document (no extra commentary) that:
 - Rolling log buffer; serialize to localStorage periodically.
 
 ## UI Requirements (Light theme)
-Top bar (vision/picture/context), Left panel (world status), Center (graph/canvas of agents & flows), Right panel (KPIs, resources tables, events log, safety panel), Bottom strip (Description of world, how it operates and behaves, and how the viewer can understand and interact with the world). Be responsive; avoid heavy frameworks.
+Top bar (vision/picture/context), Left panel (world status), Center (graph/canvas of agents & flows), Right panel (KPIs, resources tables, events log, safety panel), Bottom strip (Description of the vision + picture + summary of explanation, give a summary of the components, a summary of how it operates and behaves, and how this world realizes the vision). Be responsive; avoid heavy frameworks.
 
 ## Data & Units
 Declare units and keep simple dimensional consistency checks. Align variables to wax implements.

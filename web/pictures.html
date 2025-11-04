@@ -112,7 +112,7 @@ async function postJSON(url, body, timeoutMs=600000){
 // Batch check which pictures already have worlds
 async function lookupExistingWorldsByPictureIds(ids){
   if (!Array.isArray(ids) || !ids.length) return {};
-  const res = await postJSON('/crayon/worlds/lookup', { picture_ids: ids }, 60000);
+  const res = await postJSON('/crayon/worlds/lookup', { picture_ids: ids }, 600000);
   // returns { worlds: { "<picId>": { id, picture_id, updated_at }, ... } }
   return res?.worlds || {};
 }
@@ -202,7 +202,7 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
      }, 600000);
 
     status.textContent = 'Crayon ready. Drawing world…';
-    
+
     const explanation = pickExplanation(expRes);
     if (!explanation) throw new Error('No explanation returned.');
 

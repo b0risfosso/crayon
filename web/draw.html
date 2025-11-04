@@ -185,12 +185,15 @@
 
             status.textContent = 'Crayon ready. Drawing world…';
 
+            const explanation = pickExplanation(expRes);
+            if (!explanation) throw new Error('No explanation returned.');
+
             // 2) Worldwright
             const wwPayload = {
             vision: req.vision,
             picture_short: req.picture_short,
             picture_description: req.picture_description,
-            picture_explanation: expRes.explanation,
+            picture_explanation: explanation,
             email: email || undefined,
             constraints, deployment_context, readiness_target
             };
