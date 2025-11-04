@@ -625,7 +625,7 @@ def jid_explain_picture():
             picture_title=picture_title,
             picture_description=picture_desc,
             picture_function=picture_func,
-            focus=focus
+            focus=focus,
             email=email,
             model=DEFAULT_MODEL,
             endpoint_name="/jid/explain_picture",
