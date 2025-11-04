@@ -194,8 +194,7 @@
             picture_short: req.picture_short,
             picture_description: req.picture_description,
             picture_explanation: explanation,
-            email: email || undefined,
-            constraints, deployment_context, readiness_target
+            email: email || undefined
             };
             const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
             const html = worldRes?.html || worldRes?.data?.html || worldRes?.result?.html;
