@@ -118,11 +118,13 @@ def build_create_focuses_prompt(vision_text: str, count: str = "", must_include:
     return create_focuses_prompt.format(vision=vision_text.strip(), count=(count or ""), must_include=(must_include or ""), exclude=(exclude or ""))
 
 
-def build_explain_picture_prompt(vision_text: str, picture_text: str, focus: str = "") -> str:
+def build_explain_picture_prompt(vision_text: str, picture_title: str, picture_description: str, picture_function: str, focus: str = "") -> str:
     try:
         return explain_picture_prompt.format(
             vision=vision_text.strip(),
-            picture=picture_text.strip(),
+            picture_title=picture_text.strip(),
+            picture_description=picture_text.strip(),
+            picture_function=picture_text.strip(),
             focus=(focus or "")
         )
     except KeyError as ke:
@@ -297,9 +299,11 @@ def run_vision_to_focuses_llm(
 
     return parsed
 
-def run_explain_picture_llm(
+def run_explain_picture(
     vision_text: str,
-    picture_text: str,
+    picture_title: str,
+    picture_description:, str,
+    picture_function: str,
     *,
     focus: str = "",
     email: Optional[str] = None,
@@ -313,7 +317,7 @@ def run_explain_picture_llm(
             f"Daily token limit reached for {model}: {today_tokens}/{DAILY_MAX_TOKENS_LIMIT}"
         )
 
-    prompt_text = build_explain_picture_prompt(vision_text, picture_text, focus)
+    prompt_text = build_explain_picture_prompt(vision_text, picture_title, picture_description, picture_function, focus)
 
     usage_in = 0
     usage_out = 0
@@ -594,17 +598,34 @@ def jid_create_focuses():
 def jid_explain_picture():
     payload = request.get_json(force=True) or {}
     vision_text = (payload.get("vision") or "").strip()
-    picture_text = (payload.get("picture") or "").strip()
+    picture_title = (payload.get("picture_title") or "").strip()
+    picture_desc = (payload.get("picture_description") or "").strip()
+    picture_func = (payload.get("picture_function") or "").strip()
     focus = (payload.get("focus") or "").strip()
-    if not vision_text or not picture_text:
-        return jsonify({"error": "Missing 'vision' or 'picture'"}), 400
+
+
+        # Back-compat shims (if callers still send old keys)
+    if not picture_title:
+        picture_title = (payload.get("picture_short") or "").strip()
+    if not picture_desc:
+        picture_desc = (payload.get("picture_desc") or payload.get("description") or "").strip()
+
+    # Minimal validation (require a vision and at least some picture context)
+    if not vision_text or not (picture_title or picture_desc):
+        return jsonify({
+            "error": "Missing required fields",
+            "detail": "Provide 'vision' and at least one of 'picture_title' or 'picture_description'."
+        }), 400
+
 
     email = payload.get("email")
     try:
-        result_text = run_explain_picture_llm(
-            vision_text=vision_text,
-            picture_text=picture_text,
-            focus=focus,
+        result_text = run_explain_picture(
+            vision=vision_text,
+            picture_title=picture_title,
+            picture_description=picture_desc,
+            picture_function=picture_func,
+            focus=focus
             email=email,
             model=DEFAULT_MODEL,
             endpoint_name="/jid/explain_picture",
@@ -613,7 +634,7 @@ def jid_explain_picture():
         # Persist to DB (vision + single picture with explanation in metadata)
         ids = persist_explanation_to_db(
             vision_text=vision_text,
-            picture_text=picture_text,
+            picture_text=picture_desc,
             explanation_text=result_text,
             focus=(focus or None),
             email=email,

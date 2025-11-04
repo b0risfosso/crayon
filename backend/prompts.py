@@ -168,7 +168,10 @@ VISION: "{vision}"
 
 FOCUS (optional): "{focus}"
 
-PICTURE: "{picture}"
+PICTURE: 
+"{picture_title}"
+"{picture_description}"
+"{picture_function}"
 
 ---
 
@@ -284,7 +287,7 @@ Output only the Wax Stack and Executive Summary.
 
 
 wax_worldwright_prompt = r"""
-You are Wax Worldwright, an LLM that turns a vision + picture + wax stack into a single self-contained HTML file that runs a believable, autonomous world. The page should feel like a living system: components behave as agents with sensors, actuators, internal state, and goals. No theatrics; everything shown must correspond to functional logic derived from the wax.
+You are a Worldwright, an LLM that turns a vision + picture + description into a single self-contained HTML file that runs a believable, autonomous world. The page should feel like a living system: components behave as agents with sensors, actuators, internal state, and goals. No theatrics; everything shown must correspond to functional logic derived from the picture.
 
 ## Output (exactly one artifact)
 Return one <html> document (no extra commentary) that:
@@ -292,15 +295,16 @@ Return one <html> document (no extra commentary) that:
 - loads instantly in a modern browser
 - runs an autonomous loop (no user clicks required)
 - exposes transparent, inspectable state (status panes, logs, charts)
-- renders a functional simulation loop aligned to the wax (not a toy “animation”)
+- renders a functional simulation loop aligned to the picture (not a toy “animation”)
+- provides an walkthrough/explanation of how the world works and what the viewer sees
 
 ## World Model Requirements
 1) Spec Ingestion
 - Embed the full input as JSON in <script type="application/json" id="worldSpec">…</script>.
 - On load, parse it; validate essential fields; synthesize sensible defaults for missing items.
 
-2) Entities & Agents (from Wax)
-- For each wax component, instantiate an Agent with:
+2) Entities & Agents (from Description)
+- For each derived component, instantiate an Agent with:
   id, kind, resources, sensors[], actuators[], state, goals, update(dt), interfaces.
 
 3) Environment
@@ -323,7 +327,7 @@ Return one <html> document (no extra commentary) that:
 - Rolling log buffer; serialize to localStorage periodically.
 
 ## UI Requirements (Light theme)
-Top bar (vision/picture/context), Left panel (world status), Center (graph/canvas of agents & flows), Right panel (KPIs, resources tables, events log, safety panel), Bottom strip (readiness evidence checklist that autocompletes when conditions are met). Be responsive; avoid heavy frameworks.
+Top bar (vision/picture/context), Left panel (world status), Center (graph/canvas of agents & flows), Right panel (KPIs, resources tables, events log, safety panel), Bottom strip (Description of world, how it operates and behaves, and how the viewer can understand and interact with the world). Be responsive; avoid heavy frameworks.
 
 ## Data & Units
 Declare units and keep simple dimensional consistency checks. Align variables to wax implements.

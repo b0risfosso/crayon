@@ -115,6 +115,18 @@
         return '';
     }
 
+    function buildFocusStringFromVision(v){
+      // v.focuses may be an array of {dimension, focus} or similar
+      if (!v || !Array.isArray(v.focuses) || !v.focuses.length) return '';
+      // Join as "Dimension: focus" bullets, or just dimensions if that’s all you store
+      const parts = v.focuses.map(it => {
+        const dim = (it?.dimension || it?.title || it?.name || '').trim();
+        const f   = (it?.focus || '').trim();
+        return f ? `${dim}: ${f}` : (dim || '');
+      }).filter(Boolean);
+      return parts.join(' • ');
+    }
+
     function openHtmlInNewTab(html){
         const w = window.open('', '_blank');
         if (!w) { alert('Popup blocked: allow popups to see the world.'); return; }
@@ -156,37 +168,30 @@
         const emailInput = document.getElementById('email');
         const email = (emailInput?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
 
-        const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
-        const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
-        const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
-
         const status = document.createElement('div');
         status.className = 'status';
-        status.textContent = 'Building wax…';
+        status.textContent = 'Building crayon…';
         cardNode.append(status);
 
         try {
             const req = buildCrayonInputs(visionText, pic); // <-- makes all required fields non-empty
 
-            // 1) Wax stack
-            const wsPayload = {
-            vision: req.vision,
-            picture_short: req.picture_short,
-            picture_description: req.picture_description,
-            constraints, deployment_context, readiness_target
-            };
-            const wsRes = await postJSON(EP_CRAYON.waxStack, wsPayload, 600000);
-            const wax_stack = pickWaxStack(wsRes);
-            if (!wax_stack) throw new Error('No wax_stack returned.');
+            const expRes = await postJSON('/jid/explain_picture', {
+              vision: req.vision,
+              picture_title: req.picture_short,          // map our normalized title to new key
+              picture_description: req.picture_description,
+              picture_function: String(pic?.function || '').trim(),
+              focus: ''                                   // draw.html has no per-vision focus context
+            }, 600000);
 
-            status.textContent = 'Wax ready. Building world…';
+            status.textContent = 'Crayon ready. Drawing world…';
 
             // 2) Worldwright
             const wwPayload = {
             vision: req.vision,
             picture_short: req.picture_short,
             picture_description: req.picture_description,
-            wax_stack,
+            picture_explanation: explanation,
             email: email || undefined,
             constraints, deployment_context, readiness_target
             };
@@ -235,6 +240,14 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body || {})
             }, timeoutMs);
+        }
+
+        function pickExplanation(res){
+          if (!res) return '';
+          if (typeof res.explanation === 'string') return res.explanation;
+          if (res.data && typeof res.data.explanation === 'string') return res.data.explanation;
+          if (res.result && typeof res.result.explanation === 'string') return res.result.explanation;
+          return '';
         }
 
         // ------------ Email memory ------------

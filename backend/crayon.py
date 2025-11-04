@@ -137,7 +137,8 @@ def build_wax_worldwright_prompt(
     constraints: str = "",
     deployment_context: str = "",
     readiness_target: str = "",
-    wax_stack: str = ""
+    wax_stack: str = "",
+    picture_explanation: str = "",
 ) -> str:
     """
     Builds the instruction prompt and injects a compact JSON 'spec_json' block
@@ -147,10 +148,7 @@ def build_wax_worldwright_prompt(
         "vision": (vision or "").strip(),
         "picture_short": (picture_short or "").strip(),
         "picture_description": (picture_description or "").strip(),
-        "constraints": (constraints or "").strip(),
-        "deployment_context": (deployment_context or "").strip(),
-        "readiness_target": (readiness_target or "").strip(),
-        "wax_stack": (wax_stack or "").strip(),
+        "picture_explanation": (picture_explanation or "").strip(),
     }
     spec_json = json.dumps(spec, ensure_ascii=False, separators=(",", ":"))
     return wax_worldwright_prompt.format(spec_json=spec_json)
@@ -227,6 +225,7 @@ def run_wax_worldwright(
     vision: str,
     picture_short: str,
     picture_description: str,
+    picture_explanation: str,
     constraints: str = "",
     deployment_context: str = "",
     readiness_target: str = "",
@@ -249,6 +248,7 @@ def run_wax_worldwright(
         vision=vision,
         picture_short=picture_short,
         picture_description=picture_description,
+        picture_explanation=picture_explanation,
         constraints=constraints,
         deployment_context=deployment_context,
         readiness_target=readiness_target,
@@ -389,10 +389,13 @@ def crayon_wax_worldwright():
     picture_description = (payload.get("picture_description") or "").strip()
     wax_stack = (payload.get("wax_stack") or "").strip()
 
-    if not vision or not picture_short or not picture_description or not wax_stack:
-        return jsonify({
-            "error": "Missing required field(s). Required: 'vision', 'picture_short', 'picture_description', 'wax_stack'"
-        }), 400
+    picture_explanation = (payload.get("picture_explanation") or "").strip()
+    if not vision or not picture_short or not picture_description:
+        return jsonify({"error": "Missing 'vision', 'picture_short', or 'picture_description'"}), 400
+
+    if not wax_stack and not picture_explanation:
+        return jsonify({"error": "Provide either 'wax_stack' or 'picture_explanation'"}), 400
+
 
     constraints = (payload.get("constraints") or "").strip()
     deployment_context = (payload.get("deployment_context") or "").strip()
@@ -404,13 +407,11 @@ def crayon_wax_worldwright():
             vision=vision,
             picture_short=picture_short,
             picture_description=picture_description,
+            wax_stack=wax_stack,
+            picture_explanation=picture_explanation,   # <-- NEW
             constraints=constraints,
             deployment_context=deployment_context,
             readiness_target=readiness_target,
-            wax_stack=wax_stack,
-            email=email,
-            model=DEFAULT_MODEL,
-            endpoint_name="/crayon/wax_worldwright",
         )
 
         # --- Persist: upsert vision, upsert wax (from provided wax_stack), then upsert world by html hash
