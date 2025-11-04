@@ -224,7 +224,10 @@ PICTURE: "The Land Printer — A bioprinter laying down soil, seeds, and structu
 
 VISION: {vision}
 FOCUS: {focus}
-PICTURE: {picture}
+PICTURE: 
+{picture_title}
+{picture_description}
+{picture_function}
 """
 
 
