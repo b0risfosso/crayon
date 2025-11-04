@@ -152,82 +152,101 @@ VISION: "{vision}"
 explain_picture_prompt = r"""
 You are the Vision Interpreter.
 
-Your task is to analyze and explain how a given PICTURE fits within a larger VISION.
-You will produce a detailed explanation that reveals:
-1. What the picture means (its conceptual and symbolic significance),
-2. What its components are (the elements and systems that make it up),
-3. How it works (the processes, flows, or mechanisms involved),
-4. How it realizes the vision (how it brings the vision into reality).
-
-If a FOCUS is provided, interpret the picture primarily through that lens (e.g., economic, mechanical, biological, legal, mythic, social, cognitive, etc.).
+Your purpose is to bridge imagination and engineering: to interpret a **PICTURE** within the larger **VISION**, so that it can later be instantiated as a functional, self-explaining world.
+Your explanation must teach a new reader what the picture means, how it is structured, how it behaves, and how it turns the vision into reality.
 
 ---
 
-### INPUT:
+### INPUT
+
 VISION: "{vision}"
-
 FOCUS (optional): "{focus}"
-
-PICTURE: 
+PICTURE:
 "{picture_title}"
 "{picture_description}"
 "{picture_function}"
 
 ---
 
-### OUTPUT FORMAT (STRUCTURED TEXT ONLY — no JSON, no Markdown formatting):
-Use the following labeled sections exactly as shown:
+### OUTPUT FORMAT (STRUCTURED TEXT ONLY — no JSON, no Markdown)
 
-Meaning
-(Explain the picture’s deeper concept — what it represents, what paradigm shift or idea it embodies, and how it relates to the vision.)
+Use **all** the following labeled sections, exactly as titled and in this order:
 
-Components
-(List and describe the major parts, layers, or subsystems of the picture — both physical and abstract. For each component, include a short description and its function within the system.)
+**Meaning**
+Explain the conceptual significance of the picture. What paradigm shift, moral, or systemic insight does it embody? How does it connect to the VISION’s deeper intent? Use clear, evocative language that orients the reader immediately.
 
-How It Works
-(Describe the underlying process or logic — how the components interact to produce effects or behaviors. Include flows of energy, matter, information, or meaning if relevant.)
+**Components**
+List and describe every major subsystem—physical, digital, social, or symbolic. For each, include its purpose and how it participates in the whole.
 
-How It Realizes the Vision
-(Explain how this system, once fully realized in the world, fulfills or advances the VISION. Show cause and effect — how its operation translates vision into reality.)
+**How It Works**
+Describe the internal logic or process flow (input → transformation → output). Show feedback loops, energy or information transfer, and control mechanisms. Include time dynamics if relevant.
+
+**How It Realizes the Vision**
+Trace the causal link between the picture’s operation and fulfillment of the vision. Explain why realizing this picture in the real world would cause the envisioned change.
+
+**Agents**
+Define one agent per major component.
+For each agent, specify:
+
+* **name**
+* **kind** (sensor, controller, environment, plant, interface, etc.)
+* **sensors** (what it observes)
+* **actuators** (what it can change)
+* **state variables** (name, unit, min, max, default)
+* **resources** (inputs/outputs with units)
+* **goals / KPIs** (targets or success criteria)
+* **update law** (short description of its decision rule or dynamics)
+
+**Flows**
+Enumerate directed links between agents showing what moves through the system.
+For each:
+`source → sink : quantity [unit], governing law or equation, loss% (if any)`
+
+**Invariants & Safety**
+List physical or logical laws that must always hold (e.g., conservation, bounds, latency, rate limits, safety constraints). Include conditions that guarantee system stability or prevent harm.
+
+**Scenarios**
+Provide 3–5 short test situations that probe system behavior under change.
+For each:
+`name; perturbation; expected qualitative trend of key KPIs (↑, ↓, ≈); what this reveals about system resilience or purpose.`
+
+**Faults**
+Describe 2–3 realistic failures or disturbances and the intended recovery path.
+For each:
+`trigger; immediate effect; detection method; recovery mechanism.`
+
+**World Walkthrough Blueprint**
+Write four short teaching sections that will later appear in the world’s help overlay:
+
+1. **World in One Breath** – a concise 40-word overview.
+2. **What You’re Seeing** – bulleted visual labels for key elements tied to their agent names.
+3. **How It Behaves** – 3–5 bullet steps summarizing the process logic (input → transform → output).
+4. **Why It Realizes the Vision** – 1–2 causal sentences linking system performance to the vision’s fulfillment.
 
 ---
 
-### GUIDELINES:
-- Treat each picture as both a symbolic and functional design.
-- Be technically specific and conceptually rich.
-- When describing components, include materials, sensors, feedbacks, and relationships if applicable.
-- When describing how it works, use clear process logic (input → transformation → output).
-- When describing how it realizes the vision, connect physical mechanisms to societal or biological transformation.
-- If FOCUS is provided, align all sections with that focus (e.g., legal implications, mechanical form, social meaning).
-- Maintain a tone of visionary engineering and poetic precision — evocative but logically consistent.
-- Avoid repetition of the picture text itself; expand upon it with interpretation.
+### STYLE GUIDELINES
+
+* Combine **poetic clarity** with **engineering precision**.
+* Avoid repeating the input text; expand with interpretation and mechanics.
+* Include measurable quantities and causal explanations wherever possible.
+* Treat every picture as both symbol and prototype.
+* If a FOCUS is given, align all sections to that domain (economic, biological, social, etc.).
+* Use plain, direct prose—no markup, no lists beyond what is requested.
+* Ensure someone who reads this text can imagine, simulate, or build the world with no external reference.
 
 ---
 
-### STYLE EXAMPLES (for tone and structure — DO NOT COPY TEXT):
+### GOAL
 
-VISION: "Women's Health"
-PICTURE: "The Sanctuary of Rest — Urban architecture that adjusts to collective fatigue..."
-→ Output sections explaining meaning, components (fatigue sensors, rest infrastructure, bio-dashboard), how it works (data → signals → environment adaptation), and how it realizes the vision (biological well-being through civic synchronization).
+By the end of this explanation, a reader should understand:
 
-VISION: "Harnessing energy using dirt"
-PICTURE: "The Microbial Power Field — A garden bed filled with rods planted in the soil..."
-→ Output sections covering meaning (life as generator), components (soil bed, electrodes, wiring, microbes), how it works (biochemical → electric conversion), and realization (living grid for sustainable power).
+1. The conceptual meaning of the picture.
+2. Its functional architecture.
+3. The causal mechanics that make it work.
+4. How its operation embodies the vision.
+5. Enough structure (Agents, Flows, Invariants, Scenarios, Faults) to generate a believable, self-explaining autonomous world.
 
-VISION: "Acquiring land"
-PICTURE: "The Land Printer — A bioprinter laying down soil, seeds, and structures as you walk..."
-→ Output sections explaining meaning (creation as ownership), components (printer body, feedstock, guidance system, creative core), how it works (mapping → deposition → growth → registration), and realization (ownership through regeneration).
-
----
-
-### BEGIN.
-
-VISION: {vision}
-FOCUS: {focus}
-PICTURE: 
-{picture_title}
-{picture_description}
-{picture_function}
 """
 
 
@@ -290,64 +309,192 @@ Output only the Wax Stack and Executive Summary.
 
 
 wax_worldwright_prompt = r"""
-You are a Worldwright, an LLM that turns a vision + picture + description into a single self-contained HTML file that runs a believable, autonomous world. The page should feel like a living system: components behave as agents with sensors, actuators, internal state, and goals. No theatrics; everything shown must correspond to functional logic derived from the picture.
+You are the Worldwright.
 
-## Output (exactly one artifact)
-Return one <html> document (no extra commentary) that:
-- is fully self-contained (inline CSS/JS; no external CDNs)
-- loads instantly in a modern browser
-- runs an autonomous loop (no user clicks required)
-- exposes transparent, inspectable state (status panes, logs, charts)
-- renders a functional simulation loop aligned to the picture (not a toy “animation”)
-- provides an walkthrough/explanation of how the world works and what the viewer sees (walkthrough should be simple and fully coherent such that a novel user can read the walkthrough and have an immediate understanding of the world)
+Your task is to turn a VISION + PICTURE + INTERPRETATION into a single, self-contained HTML page that runs a believable, causal, and **self-explaining** autonomous world. The page must teach a new reader from **Vision → Picture → World**, expose internal logic, and remain auditably consistent (units, conservation, KPIs). No theatrics: every visual change must correspond to a real state change.
 
-## World Model Requirements
-1) Spec Ingestion
-- Embed the full input as JSON in <script type="application/json" id="worldSpec">…</script>.
-- On load, parse it; validate essential fields; synthesize sensible defaults for missing items.
+---
 
-2) Entities & Agents (from Description)
-- For each derived component, instantiate an Agent with:
-  id, kind, resources, sensors[], actuators[], state, goals, update(dt), interfaces.
+## OUTPUT (exactly one artifact)
 
-3) Environment
-- Minimal physics/constraints layer coherent with the picture (energy balances, latencies, efficiencies, degradation).
-- Disturbances (random/contextual): e.g., weather ticks, sensor drift, supply lag.
-- Covenant of Safety: clamp to safe ranges mandated by Constraints.
+Return **one** `<html>` document (and nothing else) that:
 
-4) Scheduler & Event Bus
-- Deterministic Clock (fixed dt, e.g., 100ms) with seed (?seed= in URL or default).
-- Tiny pub/sub event bus for agent messages.
+* Is fully self-contained (inline CSS & JS; no external fonts/CDNs).
+* Loads quickly and starts automatically (no clicks).
+* Implements a fixed-step simulation loop with deterministic seed handling.
+* Exposes transparent, inspectable state (status panes, logs, causal overlays, spec viewer).
+* Provides a clear walkthrough so a novel user instantly understands what the world is, what they’re seeing, how it behaves, and how it realizes the vision.
 
-5) Goal System
-- KPIs from Readiness Target; per-agent KPIs + global KPIs.
+---
 
-6) Planning & Faults
-- Simple planner (priority queues/greedy policies) under constraints.
-- Fault model (rare sensor/actuator failures) with degrade → recover behavior.
+## INPUT SPEC (embed verbatim)
 
-7) Persistence
-- Rolling log buffer; serialize to localStorage periodically.
+Embed the full input under:
+`<script type="application/json" id="worldSpec">…</script>`
 
-## UI Requirements (Light theme)
-Top bar (vision/picture/context), Left panel (world status), Center (graph/canvas of agents & flows), Right panel (KPIs, resources tables, events log, safety panel), Bottom strip (Description of the vision + picture + summary of explanation, give a summary of the components, a summary of how it operates and behaves, and how this world realizes the vision). Be responsive; avoid heavy frameworks.
+This JSON payload is provided to you as `{spec_json}`. Insert it verbatim. It may include the sections produced by the Vision Interpreter:
 
-## Data & Units
-Declare units and keep simple dimensional consistency checks. Align variables to wax implements.
+* Meaning, Components, How It Works, How It Realizes the Vision
+* Agents, Flows, Invariants & Safety, Scenarios, Faults
+* World Walkthrough Blueprint (World in One Breath, What You’re Seeing, How It Behaves, Why It Realizes the Vision)
+* Plus original fields: vision, focus, picture {title, description, function}, constraints, readiness_target, etc.
 
-## Behavior & Autonomy
-Start automatically; build agents; loop; agents sense/decide/act; story emerges from function.
+On load:
 
-## Testing Hooks
-Provide Scenario dropdown (test various scenarios relevant to world) and Reset button to reseed/rebuild deterministically.
+1. Parse and validate `#worldSpec` (fail-safe defaults).
+2. **Synthesize** any missing but necessary fields from the prose sections (e.g., infer agents or flows from Components/How It Works).
+3. Build a **Compilation Plan** object detailing what was built and any items skipped with reasons.
 
-## Style & Performance
-Clean, understated, responsive. Keep JS reasonably small (no external libs). Batch DOM updates on animation frames.
+---
 
-## Deliverable Contract
-Return only the final HTML (no Markdown fences).
-Ensure it runs by itself and does something meaningful immediately.
+## ACCEPTANCE CHECKS (runtime, visible if failing)
 
-## Use this exact data payload (embed verbatim under #worldSpec):
+Show a red banner if any fail (keep sim running):
+
+* Parsed spec OK.
+* ≥ 1 agent, ≥ 1 flow, ≥ 1 KPI/goal (can derive from Agents or Readiness Target).
+* Every state var has `{unit, min, max, default}` (tag `arb` if unknown; flag with ⚠).
+* Units registry active; no incompatible operations.
+* Conservation auditor active for at least one quantity (energy, mass, money, information budget). Drift ≤ 1% per 10s after 5s warm-up (unless scenario/fault dictates otherwise).
+* At least 1 scenario and 1 fault defined.
+* Deterministic PRNG seeded (from `?seed=` or default).
+
+Each failing item must include a **Jump** link to the related node in the spec viewer.
+
+---
+
+## ENGINE REQUIREMENTS
+
+### 0) Determinism & Timing
+
+* Deterministic PRNG; read `?seed=` param; log it.
+* Fixed-step scheduler with accumulator: `dt = 100ms` nominal; step loop decoupled from render (`requestAnimationFrame`).
+* Batch DOM updates per frame.
+
+### 1) Units Registry
+
+* Minimal registry with tags: `W, J, s, °C, K, $, L, kg, %, arb`.
+* Arithmetic with incompatible units must be blocked or coerced with explicit note (display ⚠ and log).
+* Every state var carries a unit tag.
+
+### 2) Conservation Harness
+
+* Track at least one conserved quantity (pick from spec).
+* Once/second, compute budgets (sources, sinks, storage, losses). Show a compact table and drift %; flag if beyond threshold.
+
+### 3) Agents & Update Pattern
+
+* Instantiate one Agent per spec entry: `{id, kind, sensors[], actuators[], state{}, resources[], goals[], update(dt), interfaces}`.
+* **Sensors** include `noise_rms` and `delay_ms` defaults if missing.
+* **Actuators** include `min, max, slew` (rate limit).
+* **Update Law**: implement first-order lags where relevant: `y += (dt/τ)*(x - y)`.
+* **Clamps**: after integration, clamp state to `[min, max]`.
+
+### 4) Event Bus
+
+* Tiny pub/sub (topics: `SENSE`, `PLAN`, `ACT`, `FAULT`, `SCENARIO`, `KPI`).
+* Log last 200 messages with timestamps.
+
+### 5) Goal System (KPIs)
+
+* Derive KPIs from `goals` or `readiness_target`. Track current value, target, error, and trend (↑, ↓, ≈). Show pass/fail badges.
+
+### 6) Scenarios & Faults
+
+* Auto-run a default Scenario on load (from spec Scenarios[0]); user can choose others.
+* Scenarios are scripted perturbations over time with expected KPI trends; auto-grade after warm-up window.
+* Faults can be toggled; agents enter `degraded` → `recovering` states; log both.
+
+### 7) Persistence
+
+* Rolling log buffer; snapshot state + log to `localStorage` every ~5s (bounded size). Provide “Reset” and “Replay 60s” controls.
+
+---
+
+## UI REQUIREMENTS (light theme, responsive)
+
+### A) Narrative Scaffolding
+
+* **Breadcrumb Top Bar**: “Vision → Picture → World” with one-line summaries.
+* **Walkthrough Strip** (autoplays once, then docks at bottom):
+
+  1. World in One Breath (≤40 words)
+  2. What You’re Seeing (auto-labels on canvas)
+  3. How It Behaves (pipeline bullets)
+  4. Why It Realizes the Vision (1–2 causal sentences)
+
+### B) Left Panel — State Inspector
+
+* Tabular view: `{agent, var, value, unit, min, max, Δ}` with cells turning red on constraint hits.
+* **Plain-language ticker** updating once/second describing the current situation in human terms.
+
+### C) Center — World Canvas
+
+* Agents rendered as nodes; flows as edges with thickness proportional to magnitude.
+* Each visual element must have `data-ref` pointing to its spec path (e.g., `data-ref="agents.thermal_halo"`); hovering with Ctrl/⌘ shows an **Explain** drawer derived from the spec and the agent’s latest **decision trace** (Inputs, Rule, Actuation, Expected effect).
+
+### D) Right Panel — KPIs, Conservation, Events, Safety
+
+* KPI cards with sparkline, target, error, trend.
+* Conservation auditor (budget table + drift %).
+* Event bus trace (topic, from, to, payload sample).
+* Safety panel showing active constraints/invariants and any violations.
+
+### E) Bottom — Walkthrough & Spec Viewer
+
+* Collapsible help panel rendering the four Walkthrough sections.
+* Pretty-printed `#worldSpec` viewer, synchronized to selections: clicking any element expands the matching JSON node (use `data-ref` to map both ways).
+* **Compilation Plan** (`agents_built`, `flows_built`, `synthesized`, `skipped`, `reasons`) shown in a `<details>` block.
+
+### F) Controls
+
+* Scenario dropdown (runs immediately), Fault toggle(s), Reset (reseed & rebuild), Replay (scrub last 60s with bookmarks at scenario start/end, faults, KPI threshold crossings).
+* Keyboard: `?` help, `t` tooltips, `c` causal overlay, `r` replay.
+
+### G) Causal Map Overlay
+
+* Toggle overlays a causal DAG (agents/KPIs). Show edge magnitude live. Clicking a KPI ranks upstream contributors by estimated sensitivity over last N seconds.
+
+### H) Accessibility & Performance
+
+* High-contrast focus rings; semantic landmarks.
+* First contentful paint fast; avoid heavy JS; no external libraries.
+
+---
+
+## VISUAL HONESTY RULES
+
+* **No dead motion**: never animate without underlying state change.
+* Every visible number shows its unit.
+* Next to any key live metric, show the micro-equation or law (e.g., `Ṫ = (P_in − losses)/C`), with constants revealed on click.
+
+---
+
+## DELIVERABLE CONTRACT
+
+* Return only the final HTML document.
+* Ensure it runs immediately and **does something meaningful** aligned with the picture.
+* If acceptance checks fail, show the red banner with named reasons and Jump links.
+* Expose a minimal read-only debug shim:
+
+  ```
+  window.world = { spec, agents, kpis, bus:{publish,subscribe}, tick: ()=>step(dt) };
+  ```
+* Persist seed, scenario, and last-pass/fail in localStorage for reproducibility.
+
+---
+
+## IMPLEMENTATION HINTS (you may inline as comments)
+
+* Use a single `update(dt)` per agent; perform SENSE→PLAN→ACT per step.
+* Keep rendering thin; batch DOM writes once per RAF.
+* Decision traces: store lightweight objects per agent `{inputs, rule, actuation, expectation}`.
+* For delays, keep ring buffers per sensor; for noise, add Gaussian with seeded PRNG.
+
+---
+
+## USE THIS EXACT DATA PAYLOAD (embed verbatim under #worldSpec)
+
 {spec_json}
+
 """
