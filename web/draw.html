@@ -100,7 +100,6 @@
     };
     // ---- Crayon endpoints
     const EP_CRAYON = {
-    waxStack: '/crayon/wax_stack',
     world: '/crayon/wax_worldwright'
     };
 
@@ -191,7 +190,7 @@
             vision: req.vision,
             picture_short: req.picture_short,
             picture_description: req.picture_description,
-            picture_explanation: explanation,
+            picture_explanation: expRes.explanation,
             email: email || undefined,
             constraints, deployment_context, readiness_target
             };

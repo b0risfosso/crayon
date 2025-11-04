@@ -66,7 +66,6 @@
 
     // ---- Crayon endpoints
 const EP_CRAYON = {
-  waxStack: '/crayon/wax_stack',
   world: '/crayon/wax_worldwright'
 };
 
@@ -203,13 +202,16 @@ async function createWorldForPictureCard(cardNode, visionText, pic){
      }, 600000);
 
     status.textContent = 'Crayon ready. Drawing world…';
+    
+    const explanation = pickExplanation(expRes);
+    if (!explanation) throw new Error('No explanation returned.');
 
     // 2) Worldwright
     const wwPayload = {
       vision: visionText,
       picture_short: pic.title || '',
       picture_description: pic.description || '',
-      wax_stack,
+      picture_explanation: explanation,
       email: email || undefined, // let server accept None if not provided
       constraints, deployment_context, readiness_target
     };
