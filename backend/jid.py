@@ -621,7 +621,7 @@ def jid_explain_picture():
     email = payload.get("email")
     try:
         result_text = run_explain_picture(
-            vision=vision_text,
+            vision_text=vision_text,
             picture_title=picture_title,
             picture_description=picture_desc,
             picture_function=picture_func,
