@@ -384,23 +384,25 @@ def crayon_wax_stack():
 @app.route("/crayon/wax_worldwright", methods=["POST"])
 def crayon_wax_worldwright():
     payload = request.get_json(force=True) or {}
-    vision = (payload.get("vision") or "").strip()
-    picture_short = (payload.get("picture_short") or "").strip()
+    
+    vision              = (payload.get("vision") or "").strip()
+    picture_short       = (payload.get("picture_short") or "").strip()
     picture_description = (payload.get("picture_description") or "").strip()
-    wax_stack = (payload.get("wax_stack") or "").strip()
 
+
+    wax_stack           = (payload.get("wax_stack") or "").strip()
     picture_explanation = (payload.get("picture_explanation") or "").strip()
+
     if not vision or not picture_short or not picture_description:
         return jsonify({"error": "Missing 'vision', 'picture_short', or 'picture_description'"}), 400
 
     if not wax_stack and not picture_explanation:
         return jsonify({"error": "Provide either 'wax_stack' or 'picture_explanation'"}), 400
 
-
-    constraints = (payload.get("constraints") or "").strip()
-    deployment_context = (payload.get("deployment_context") or "").strip()
-    readiness_target = (payload.get("readiness_target") or "").strip()
-    email = payload.get("email")
+    constraints         = (payload.get("constraints") or "").strip()
+    deployment_context  = (payload.get("deployment_context") or "").strip()
+    readiness_target    = (payload.get("readiness_target") or "").strip()
+    email               = (payload.get("email") or None)
 
     try:
         html = run_wax_worldwright(
@@ -438,27 +440,28 @@ def crayon_wax_worldwright():
             metadata={"from": "wax_worldwright_endpoint"}
         )
 
+        wax_id = None
+        if wax_stack:
+            wax_title = f"Wax Stack for: {picture_short or vision}"
+            wax_id = upsert_wax_by_content(
+                vision_id=vision_id,
+                picture_id=picture_id,
+                title=wax_title,
+                content=wax_stack,
+                email=email,
+                source="crayon",
+                metadata={
+                    "constraints": constraints,
+                    "picture_description": picture_description,
+                    "source_for_world": "wax_worldwright_input"
+                },
+            )
 
-        wax_title = f"Wax Stack for: {picture_short or vision}"
-        wax_id = upsert_wax_by_content(
-            vision_id=vision_id,
-            picture_id=picture_id,
-            title=wax_title,
-            content=wax_stack,   # NOTE: this is the provided wax stack (input), not the HTML
-            email=email,
-            source="crayon",
-            metadata={
-                "constraints": constraints,
-                "picture_description": picture_description,
-                "source_for_world": "wax_worldwright_input"
-            },
-        )
-        
         world_title = f"World: {picture_short or vision}"
         world_id = upsert_world_by_picture_overwrite(
             vision_id=vision_id,
             picture_id=picture_id,
-            wax_id=wax_id,
+            wax_id=wax_id,   # may be None
             title=world_title,
             html=html,
             email=email,
@@ -467,6 +470,7 @@ def crayon_wax_worldwright():
                 "constraints": constraints,
                 "deployment_context": deployment_context,
                 "readiness_target": readiness_target,
+                "picture_explanation_present": bool(picture_explanation),
             },
         )
 
