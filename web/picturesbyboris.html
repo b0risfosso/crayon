@@ -34,6 +34,7 @@
     .hidden { display:none !important; }
     button.view { background: #059669; }       /* green */
     button.create { background: #0b5cff; }     /* blue */
+    button.recreate { background: #f59e0b; }   /* amber */
 
   </style>
 </head>
@@ -55,16 +56,6 @@
       <input type="email" id="email" placeholder="you@example.com" />
       <button id="loadBtn" type="button">Load</button>
       <button id="saveBtn" class="secondary" type="button">Save email</button>
-    </div>
-    <div id="status" class="status"></div>
-  </section>
-
-  <!-- Optional build context (constraints/deploy/readiness); keep visible in case you want to set them -->
-  <section class="panel" id="ctxPanel">
-    <div class="row" style="gap:.6rem; flex-wrap:wrap;">
-      <input id="ctxConstraints" type="text" placeholder="Constraints (optional)" style="width:min(92vw,460px)">
-      <input id="ctxDeploy" type="text" placeholder="Deployment context (optional)" style="width:min(92vw,360px)">
-      <input id="ctxReadiness" type="text" placeholder="Readiness target (optional)" style="width:min(92vw,280px)">
     </div>
     <div id="status" class="status"></div>
   </section>
@@ -121,7 +112,7 @@
     // Batch check which pictures already have worlds
     async function lookupExistingWorldsByPictureIds(ids){
       if (!Array.isArray(ids) || !ids.length) return {};
-      const res = await postJSON('/crayon/worlds/lookup', { picture_ids: ids }, 60000);
+      const res = await postJSON('/crayon/worlds/lookup', { picture_ids: ids }, 600000);
       // returns { worlds: { "<picId>": { id, picture_id, updated_at }, ... } }
       return res?.worlds || {};
     }
@@ -249,7 +240,7 @@
                             .replaceAll('>','&gt;').replaceAll('"','&quot;')
                             .replaceAll("'",'&#39;');
     }
-    async function fetchJSON(url, options={}, timeoutMs=60000){
+    async function fetchJSON(url, options={}, timeoutMs=600000){
       const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), timeoutMs);
       try {
         const r = await fetch(url, { ...options, signal: ctrl.signal });
@@ -350,6 +341,24 @@ if (!pics.length){
           alert(`Failed to load world: ${e.message || e}`);
         }
       });
+
+      // ---- RECREATE (amber)
+      const recreate = document.createElement('button');
+      recreate.type = 'button';
+      recreate.textContent = 'recreate';
+      recreate.className = 'recreate';
+      recreate.style.marginTop = '.5rem';
+      recreate.style.marginLeft = '.4rem';
+      recreate.addEventListener('click', async () => {
+        const visionText = v?.text || '';
+        if (!visionText) { alert('This vision has no text.'); return; }
+        await createWorldForPictureCard(card, visionText, p);
+      });
+
+      card.append(h3, d);
+      if (p?.function) card.append(fn);
+      card.append(pm, btn, recreate);
+      grid.append(card);
     } else {
       // ---- CREATE MODE (blue)
       btn.textContent = 'create picture';
