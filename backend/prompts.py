@@ -384,7 +384,7 @@ Each failing item must include a **Jump** link to the related node in the spec v
 
 ### 3) Agents & Update Pattern
 
-* Instantiate one Agent per spec entry: `{{id, kind, sensors[], actuators[], state{}, resources[], goals[], update(dt), interfaces}}`.
+* Instantiate one Agent per spec entry: `{{id, kind, sensors[], actuators[], state{{}}, resources[], goals[], update(dt), interfaces}}`.
 * **Sensors** include `noise_rms` and `delay_ms` defaults if missing.
 * **Actuators** include `min, max, slew` (rate limit).
 * **Update Law**: implement first-order lags where relevant: `y += (dt/τ)*(x - y)`.
