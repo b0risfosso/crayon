@@ -364,7 +364,7 @@ if (!pics.length){
       btn.addEventListener('click', async () => {
         try {
           const html = await fetchWorldHtml(existing.id);
-          openHtmlInNewTab(html);
+          openTextInNewTab(html);
         } catch(e) {
           alert(`Failed to load world: ${e.message || e}`);
         }
