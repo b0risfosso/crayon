@@ -87,6 +87,8 @@ def _maybe_connect(db_path: str):
     return sqlite3.connect(db_path)
 
 
+class _DD(dict):
+    def __missing__(self, k): return ""
 
 
 def _iso_today() -> str:
@@ -754,8 +756,8 @@ def run_prompt_collection():
 
         # Soft-missing optional fields: switch to format_map if desired
         try:
-            system_text = system_tmpl.format(**inputs) if isinstance(system_tmpl, str) else None
-            prompt_text = user_tmpl.format(**inputs)
+            system_text = system_tmpl.format_map(_DD(**inputs)) if isinstance(system_tmpl, str) else None
+            prompt_text = user_tmpl.format_map(_DD(**inputs))
         except KeyError as ke:
             results.append({"key": key, "error": f"missing input variable: {ke}"})
             continue
