@@ -67,8 +67,9 @@
 
     // ---- Crayon endpoints
 const EP_CRAYON = {
-  world: '/crayon/wax_worldwright'
+  runCollection: '/crayon/run_collection'
 };
+
 
 // ---------- Shared JSON helpers ----------
 async function fetchWithTimeout(url, options={}, timeoutMs=600000){
@@ -146,6 +147,107 @@ function openHtmlInNewTab(html){
   w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
   w.document.close();
 }
+
+function loadCollection(){
+  const v = (localStorage.getItem(LS_COLLECTION)||'').trim();
+  const el = document.getElementById('collectionName');
+  if (el) el.value = v;
+  return v;
+}
+function saveCollection(){
+  const el = document.getElementById('collectionName');
+  const v = (el?.value||'').trim();
+  if (v) localStorage.setItem(LS_COLLECTION, v);
+  return v;
+}
+
+// Open a new tab backed by architecture_viewer.html and stream content via postMessage
+function openArchitectureInNewTab({ title, subtitle, body }){
+  const viewerUrl = '/architecture_viewer.html'; // place this file at your web root or adjust path
+  const w = window.open(viewerUrl, '_blank');
+  if (!w) { alert('Popup blocked: allow popups to view architectures.'); return; }
+  // hand off payload when the new window signals it is ready (or after a short delay fallback)
+  const payload = { kind: 'architecture', title, subtitle, body };
+  function send(){
+    try { w.postMessage(payload, window.location.origin); } catch(_) {}
+  }
+  // attempt immediate + delayed (in case of load lag)
+  setTimeout(send, 80);
+  setTimeout(send, 300);
+  setTimeout(send, 800);
+}
+
+// NEW: explain picture, then run a collection of architect prompts, open each in viewer tabs
+async function runArchitectsForPictureCard(cardNode, visionText, pic){
+  const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
+  const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
+  const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
+  const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
+  const collection = (document.getElementById('collectionName')?.value || localStorage.getItem(LS_COLLECTION) || '').trim() || 'duet_worldwright_x_wax';
+
+  const status = document.createElement('div');
+  status.className = 'status';
+  status.textContent = `Explaining picture…`;
+  cardNode.append(status);
+
+  try {
+    // Build normalized inputs for the explain step
+    const req = buildCrayonInputs(visionText, pic);
+    const expRes = await postJSON('/jid/explain_picture', {
+      vision: req.vision,
+      picture_title: req.picture_short,
+      picture_description: req.picture_description,
+      picture_function: String(pic?.function || '').trim(),
+      focus: String(pic?.focus || '').trim()
+    }, 600000);
+
+    const explanation = pickExplanation(expRes);
+    if (!explanation) throw new Error('No explanation returned.');
+
+    status.textContent = `Running collection: ${collection}…`;
+
+    // Assemble inputs for architects
+    const inputs = {
+      vision: req.vision,
+      picture: `${req.picture_short}\n\n${req.picture_description}`,
+      picture_explanation: explanation,
+      constraints,
+      deployment_context,
+      readiness_target,
+      context: deployment_context,
+      integration_context: deployment_context,
+      integrations: ''
+    };
+
+    const collRes = await postJSON(EP_CRAYON.runCollection, {
+      collection,
+      inputs,
+      store: true,
+      email,
+      // Optional: thread IDs if you have them
+      picture_id: pic?.id || undefined
+    }, 1000000);
+
+    const results = Array.isArray(collRes?.results) ? collRes.results : [];
+    if (!results.length) throw new Error('Collection returned no items.');
+
+    status.className = 'status ok';
+    status.textContent = `Opened ${results.length} architect tab${results.length>1?'s':''}.`;
+
+    // Open each architecture in its own viewer tab
+    for (const r of results){
+      const key = r?.key || 'architecture';
+      const title = `${key.replace(/_/g,' ').toUpperCase()}`;
+      const subtitle = (pic?.title || 'Untitled picture');
+      const body = String(r?.output || '').trim() || '(no output)';
+      openArchitectureInNewTab({ title, subtitle, body });
+    }
+  } catch (e) {
+    status.className = 'status error';
+    status.textContent = `Failed: ${e.message || e}`;
+  }
+}
+
 
 function buildCrayonInputs(visionText, pic) {
     // vision
@@ -370,12 +472,12 @@ if (!pics.length){
       grid.append(card);
     } else {
       // ---- CREATE MODE (blue)
-      btn.textContent = 'create picture';
+      btn.textContent = 'architect picture';
       btn.className = 'create';
       btn.addEventListener('click', async () => {
         const visionText = v?.text || '';
         if (!visionText) { alert('This vision has no text.'); return; }
-        await createWorldForPictureCard(card, visionText, p);
+        await runArchitectsForPictureCard(card, visionText, p);
         // Optional: after creating, try upgrading the button to "view"
         try {
           const m = await lookupExistingWorldsByPictureIds([p.id]);
@@ -422,11 +524,22 @@ if (!pics.length){
       }
     }
 
-    (function init(){
-      loadEmail();
-      $('loadBtn').addEventListener('click', load);
-      $('saveBtn').addEventListener('click', ()=>{ saveEmail(); setStatus('Email saved.', 'ok'); });
-    })();
+    function initCollectionUI(){
+  loadCollection();
+  document.getElementById('saveCollection')?.addEventListener('click', ()=>{
+    saveCollection();
+    setStatus('Collection saved.', 'ok');
+  });
+}
+
+(function init(){
+  loadEmail();
+  initCollectionUI();
+  $('loadBtn').addEventListener('click', load);
+  $('saveBtn').addEventListener('click', ()=>{ saveEmail(); setStatus('Email saved.', 'ok'); });
+})();
+
+
   </script>
 </body>
 </html>
