@@ -188,7 +188,7 @@ def _run_chat(system_text: str | None, user_text: str, *, model: Optional[str] =
     m = model or "gpt-5-mini-2025-08-07"
     messages = []
     resp = client.responses.create(
-        model=model,
+        model=m,
         input=user_text
     )
 
