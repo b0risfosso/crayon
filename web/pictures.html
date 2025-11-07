@@ -186,7 +186,7 @@ async function runArchitectsForPictureCard(cardNode, visionText, pic){
   const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
   const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
   const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
-  const collection = (document.getElementById('collectionName')?.value || localStorage.getItem(LS_COLLECTION) || '').trim() || 'duet_worldwright_x_wax';
+  const collection = (localStorage.getItem(LS_COLLECTION) || '').trim() || 'architects_all';
 
   // transient status line on the card
   let status = cardNode.querySelector('.status');
