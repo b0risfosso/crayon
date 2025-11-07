@@ -201,7 +201,7 @@ def _run_chat(system_text: str | None, user_text: str, *, model: Optional[str] =
         "usage": getattr(resp, "usage", None) and resp.usage.model_dump(),
         "id": resp.id,
     }
-    return out, meta
+    return content, meta
 
 _PROMPT_OUTPUTS_TABLE_READY = False
 _PROMPT_OUTPUTS_TABLE_LOCK = threading.Lock()
