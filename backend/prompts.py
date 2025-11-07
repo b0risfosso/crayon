@@ -1117,3 +1117,13 @@ PROMPT_COLLECTIONS = {
         {"key": "intel_arch", "system": _SYS["intel"], "template": intelligence_architect_prompt},
     ],
 }
+
+# Unified default: runs all 5 core architects in sequence
+PROMPT_COLLECTIONS["architects_all"] = [
+    {"key": "wax_arch", "system": _SYS["wax"], "template": wax_architect_v2_prompt},
+    {"key": "worldwright_arch", "system": _SYS["worldwright"], "template": worldwright_architect_prompt_v2},
+    {"key": "code_arch", "system": _SYS["code"], "template": code_architect_prompt},
+    {"key": "garden_arch", "system": _SYS["garden"], "template": garden_architect_prompt},
+    {"key": "intel_arch", "system": _SYS["intel"], "template": intelligence_architect_prompt},
+]
+

@@ -35,8 +35,8 @@ from prompts import wax_worldwright_prompt
 from prompts import PROMPT_COLLECTIONS  # expects a dict[str, list[dict]]
 import sqlite3  # if not already imported
 
-import json
 import threading
+
 
 
 
@@ -800,3 +800,92 @@ def run_prompt_collection():
         "results": results,
         "stored": stored
     })
+
+
+@app.get("/crayon/architectures")
+def list_architectures():
+    """
+    Query params:
+      picture_id (int)               -- required unless vision_id provided
+      vision_id  (int)               -- optional
+      collection (str)               -- optional filter (e.g., 'duet_worldwright_x_wax')
+      include_body (0|1)             -- include output_text (default 0)
+      limit (int)                    -- default 50
+    Returns: { items: [{ id, collection, prompt_key, created_at, model, email, ...(maybe output_text) }], count }
+    """
+    pic_id = request.args.get("picture_id", type=int)
+    vis_id = request.args.get("vision_id", type=int)
+    if not pic_id and not vis_id:
+        return jsonify({"error": "picture_id or vision_id is required"}), 400
+
+    collection = (request.args.get("collection") or "").strip() or None
+    include_body = bool(int(request.args.get("include_body", "0")))
+    limit = request.args.get("limit", default=50, type=int)
+    db_path = _safe_get_picture_db_path()
+
+    # Ensure table (no-op if already created)
+    try:
+        _ensure_prompt_outputs_table(db_path)
+    except Exception:
+        return jsonify({"items": [], "count": 0})
+
+    cols = "id, collection, prompt_key, created_at, model, email"
+    if include_body:
+        cols += ", output_text"
+
+    where = []
+    args = []
+    if pic_id:
+        where.append("picture_id = ?")
+        args.append(pic_id)
+    if vis_id:
+        where.append("vision_id = ?")
+        args.append(vis_id)
+    if collection:
+        where.append("collection = ?")
+        args.append(collection)
+
+    sql = f"SELECT {cols} FROM prompt_outputs"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
+    args.append(limit)
+
+    items = []
+    with _maybe_connect(db_path) as conn:
+        cur = conn.execute(sql, tuple(args))
+        cols_list = [d[0] for d in cur.description]
+        for row in cur.fetchall():
+            items.append({k: v for k, v in zip(cols_list, row)})
+    return jsonify({"items": items, "count": len(items)})
+
+
+@app.get("/crayon/architecture/<int:arch_id>")
+def get_architecture(arch_id: int):
+    db_path = _safe_get_picture_db_path()
+    try:
+        _ensure_prompt_outputs_table(db_path)
+    except Exception:
+        return jsonify({"error": "not found"}), 404
+
+    with _maybe_connect(db_path) as conn:
+        cur = conn.execute("""
+            SELECT id, vision_id, picture_id, collection, prompt_key, prompt_text, system_text,
+                   output_text, model, email, metadata, created_at
+            FROM prompt_outputs
+            WHERE id = ?
+        """, (arch_id,))
+        row = cur.fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+
+    cols = [d[0] for d in cur.description]
+    rec = {k: v for k, v in zip(cols, row)}
+    # Try to parse metadata
+    try:
+        if rec.get("metadata"):
+            rec["metadata"] = json.loads(rec["metadata"])
+    except Exception:
+        pass
+    return jsonify(rec)
+
