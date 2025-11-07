@@ -33,9 +33,7 @@
     .empty { padding:.4rem 0; color:#6b7280; }
     .hidden { display:none !important; }
     button.view { background: #059669; }       /* green */
-    button.create { background: #0b5cff; }     /* blue */
-    button.recreate { background: #f59e0b; }   /* amber */
-
+    .note { font-size:.9rem; color:#6b7280; margin-top:.6rem; }
   </style>
 </head>
 <body>
@@ -69,13 +67,9 @@
     // Hard-coded Boris email
     const BORIS_EMAIL = 'boris@fantasiagenesis.com';
 
-    const EP = { byEmail: '/jid/by_email' }; // alias exists at /by_email too
-
-    // ---- Crayon endpoints
-    const EP_CRAYON = {
-      waxStack: '/crayon/wax_stack',
-      world: '/crayon/wax_worldwright'
-    };
+    // Endpoints
+    const EP = { byEmail: '/jid/by_email' };
+    const EP_CRAYON = { listArchitectures: '/crayon/architectures' };
 
     // ---------- Shared JSON helpers ----------
     async function fetchWithTimeout(url, options={}, timeoutMs=300000){
@@ -86,159 +80,6 @@
       } finally {
         clearTimeout(timer);
       }
-    }
-
-    async function postJSON(url, body, timeoutMs=600000){
-      const resp = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      }, timeoutMs);
-      let data;
-      try {
-        data = await resp.json();
-      } catch {
-        throw new Error(`Non-JSON response from ${url} (status ${resp.status})`);
-      }
-      if (!resp.ok || data?.ok === false) {
-        const msg = (data && (data.error || data.detail)) ?
-          `${data.error || ''} ${data.detail || ''}`.trim() :
-          `HTTP ${resp.status}`;
-        throw new Error(msg);
-      }
-      return data;
-    }
-
-    // Batch check which pictures already have worlds
-    async function lookupExistingWorldsByPictureIds(ids){
-      if (!Array.isArray(ids) || !ids.length) return {};
-      const res = await postJSON('/crayon/worlds/lookup', { picture_ids: ids }, 600000);
-      // returns { worlds: { "<picId>": { id, picture_id, updated_at }, ... } }
-      return res?.worlds || {};
-    }
-
-    async function fetchWorldHtml(worldId){
-      const r = await fetch(`/crayon/world/html?id=${encodeURIComponent(worldId)}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      return j?.html || '';
-    }
-
-    function pickExplanation(res){
-      if (!res) return '';
-      if (typeof res.explanation === 'string') return res.explanation;
-      if (res.data && typeof res.data.explanation === 'string') return res.data.explanation;
-      if (res.result && typeof res.result.explanation === 'string') return res.result.explanation;
-      return '';
-    }
-
-    function buildCrayonInputs(visionText, pic) {
-    // vision
-    const vision = String(visionText || '').trim();
-    if (!vision) throw new Error('This item has no vision text.');
-
-    // title (picture_short)
-    let picture_short = String(pic?.title || '').trim();
-    if (!picture_short) {
-        // fallback from description or id
-        const fromDesc = String(pic?.description || '').trim();
-        if (fromDesc) picture_short = (fromDesc.length > 80 ? fromDesc.slice(0, 77) + '…' : fromDesc);
-        else if (pic?.id != null) picture_short = `Picture ${pic.id}`;
-        else picture_short = 'Untitled picture';
-    }
-
-    // description (picture_description)
-    let picture_description = String(pic?.description || '').trim();
-    if (!picture_description) {
-        // fallback from function or title
-        const fromFn = String(pic?.function || '').trim();
-        if (fromFn) picture_description = fromFn;
-        else picture_description = picture_short; // last resort
-    }
-
-    return { vision, picture_short, picture_description };
-    }
-
-    // Normalize various possible response shapes
-    function pickWaxStack(res){
-      if (!res) return '';
-      if (typeof res.wax_stack === 'string') return res.wax_stack;
-      if (res.data && typeof res.data.wax_stack === 'string') return res.data.wax_stack;
-      if (res.result && typeof res.result.wax_stack === 'string') return res.result.wax_stack;
-      if (typeof res.wax === 'string') return res.wax;
-      return '';
-    }
-
-    function openHtmlInNewTab(html){
-      const w = window.open('', '_blank');
-      if (!w) { alert('Popup blocked: allow popups to see the world.'); return; }
-      w.document.open();
-      w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
-      w.document.close();
-    }
-
-    async function createWorldForPictureCard(cardNode, visionText, pic){
-      // Always use Boris' email for this page
-      const email = BORIS_EMAIL;
-      const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
-      const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
-      const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
-
-      const status = document.createElement('div');
-      status.className = 'status';
-      status.textContent = 'Building crayon…';
-      cardNode.append(status);
-
-      try {
-        const req = buildCrayonInputs(visionText, pic); // <-- makes all required fields non-empty
-
-      const expRes = await postJSON('/jid/explain_picture', {
-        vision: req.vision,
-        picture_title: req.picture_short,
-        picture_description: req.picture_description,
-        picture_function: String(pic?.function || '').trim(),
-        focus: String(pic?.focus || '').trim()
-      }, 600000);
-
-        status.textContent = 'Crayon ready. Drawing world…';
-
-        const explanation = pickExplanation(expRes);
-        if (!explanation) throw new Error('No explanation returned.');
-
-        // 2) Worldwright
-        const wwPayload = {
-          vision: visionText,
-          picture_short: pic.title || '',
-          picture_description: pic.description || '',
-          picture_explanation: explanation,
-          email, // hard-coded
-          constraints, deployment_context, readiness_target
-        };
-        const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
-        const html = worldRes?.html || worldRes?.data?.html || worldRes?.result?.html;
-        if (!html) throw new Error('No world HTML returned.');
-
-        status.className = 'status ok';
-        status.textContent = 'World built. Opening…';
-        openHtmlInNewTab(html);
-      } catch (e) {
-        status.className = 'status error';
-        status.textContent = `Failed: ${e.message || e}`;
-      }
-    }
-
-    // ----- Minimal utilities for the page -----
-    const $ = (id) => document.getElementById(id);
-    function setStatus(msg, level='') {
-      const el = document.querySelector('#ctxPanel #status') || $('status');
-      if (!el) return;
-      el.className = 'status ' + (level || '');
-      el.textContent = msg || '';
-    }
-    function escapeHtml(s) {
-      return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;')
-                            .replaceAll('>','&gt;').replaceAll('"','&quot;')
-                            .replaceAll("'",'&#39;');
     }
     async function fetchJSON(url, options={}, timeoutMs=600000){
       const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), timeoutMs);
@@ -251,6 +92,69 @@
       } finally { clearTimeout(t); }
     }
 
+    // ----- Minimal utilities for the page -----
+    const $ = (id) => document.getElementById(id);
+    function setStatus(msg, level='') {
+      const el = document.querySelector('#emailPanel #status') || $('status');
+      if (!el) return;
+      el.className = 'status ' + (level || '');
+      el.textContent = msg || '';
+    }
+    function escapeHtml(s) {
+      return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;')
+                            .replaceAll('>','&gt;').replaceAll('"','&quot;')
+                            .replaceAll("'",'&#39;');
+    }
+
+    // ------------------------------------------
+    // Architecture endpoints helpers (READ ONLY)
+    // ------------------------------------------
+    async function getArchitecturesForPicture(pictureId, {collection=null, includeBody=false} = {}){
+      const params = new URLSearchParams();
+      if (pictureId) params.set('picture_id', pictureId);
+      if (collection) params.set('collection', collection);
+      if (includeBody) params.set('include_body', '1');
+      const url = `${EP_CRAYON.listArchitectures}?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) return {items:[], count:0};
+      return await res.json();
+    }
+
+    // Open ONE new tab that displays multiple architectures for a single picture
+    function openArchitecturesInNewTab({ pictureTitle, items }){
+      const viewerUrl = '/architecture_viewer.html'; // adjust path if needed
+      const w = window.open(viewerUrl, '_blank');
+      if (!w) { alert('Popup blocked: allow popups to view architectures.'); return; }
+      const payload = { kind: 'architectures-batch', pictureTitle, items };
+      const send = () => { try { w.postMessage(payload, window.location.origin); } catch(_) {} };
+      setTimeout(send, 80);
+      setTimeout(send, 300);
+      setTimeout(send, 800);
+    }
+
+    async function viewExistingArchitectures(pic, {collection=null} = {}){
+      const {items} = await getArchitecturesForPicture(pic?.id, {collection, includeBody:true});
+      if (!items?.length) { alert('No saved architectures for this picture.'); return; }
+
+      // Normalize viewer items for the batch page
+      const viewerItems = items.map(it => ({
+        key: it.prompt_key || 'architecture',
+        title: `${(it.collection||'').toUpperCase()} · ${(it.prompt_key||'').toUpperCase()}`,
+        subtitle: (pic?.title || `Picture #${pic?.id||''}`),
+        body: String(it.output_text||'').trim(),
+        meta: {
+          collection: it.collection || '',
+          created_at: it.created_at || '',
+          model: it.model || ''
+        }
+      }));
+
+      openArchitecturesInNewTab({ pictureTitle: pic?.title || `Picture #${pic?.id||''}`, items: viewerItems });
+    }
+
+    // ------------------------------------------
+    // Render (READ ONLY UI)
+    // ------------------------------------------
     async function render(data){
       const visions = Array.isArray(data?.visions) ? data.visions : [];
       $('results').style.display = 'block';
@@ -296,106 +200,70 @@
         box.append(sep);
 
         // pictures grid
-        // pictures grid
-const pics = Array.isArray(v.pictures) ? v.pictures : [];
-if (!pics.length){
-  const empty = document.createElement('div'); empty.className = 'empty';
-  empty.textContent = 'No pictures for this vision yet.';
-  box.append(empty);
-} else {
-  const grid = document.createElement('div'); grid.className = 'pics';
-
-  // --- NEW: batch-lookup worlds for these pic ids
-  const picIds = pics.map(p => p?.id).filter(x => x != null);
-  let worldMap = {};
-  try {
-    worldMap = await lookupExistingWorldsByPictureIds(picIds);
-  } catch(e) {
-    // non-fatal; just leave as empty map
-    console.warn('world lookup failed', e);
-  }
-
-  for (const p of pics){
-    const card = document.createElement('div'); card.className = 'pic';
-    const h3 = document.createElement('h3'); h3.textContent = p?.title || 'Untitled picture';
-    const d  = document.createElement('div'); d.className = 'muted'; d.textContent = p?.description || '';
-    const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
-    if (p?.function) fn.innerHTML = `<strong>Function:</strong> ${escapeHtml(p.function)}`;
-    const pm = document.createElement('div'); pm.className = 'meta mono';
-    pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.style.marginTop = '.5rem';
-
-    const existing = p?.id != null ? worldMap[String(p.id)] : null;
-    if (existing?.id) {
-      // ---- VIEW MODE (green)
-      btn.textContent = 'view picture';
-      btn.className = 'view';
-      btn.addEventListener('click', async () => {
-        try {
-          const html = await fetchWorldHtml(existing.id);
-          openHtmlInNewTab(html);
-        } catch(e) {
-          alert(`Failed to load world: ${e.message || e}`);
+        const pics = Array.isArray(v.pictures) ? v.pictures : [];
+        if (!pics.length){
+          const empty = document.createElement('div'); empty.className = 'empty';
+          empty.textContent = 'No pictures for this vision yet.';
+          box.append(empty);
+          mount.append(box);
+          continue;
         }
-      });
 
-      // ---- RECREATE (amber)
-      const recreate = document.createElement('button');
-      recreate.type = 'button';
-      recreate.textContent = 'recreate';
-      recreate.className = 'recreate';
-      recreate.style.marginTop = '.5rem';
-      recreate.style.marginLeft = '.4rem';
-      recreate.addEventListener('click', async () => {
-        const visionText = v?.text || '';
-        if (!visionText) { alert('This vision has no text.'); return; }
-        await createWorldForPictureCard(card, visionText, p);
-      });
+        const grid = document.createElement('div'); grid.className = 'pics';
 
-      card.append(h3, d);
-      if (p?.function) card.append(fn);
-      card.append(pm, btn, recreate);
-      grid.append(card);
-    } else {
-      // ---- CREATE MODE (blue)
-      btn.textContent = 'create picture';
-      btn.className = 'create';
-      btn.addEventListener('click', async () => {
-        const visionText = v?.text || '';
-        if (!visionText) { alert('This vision has no text.'); return; }
-        await createWorldForPictureCard(card, visionText, p);
-        // Optional: after creating, try upgrading the button to "view"
-        try {
-          const m = await lookupExistingWorldsByPictureIds([p.id]);
-          const w = m && m[String(p.id)];
-          if (w?.id) {
-            btn.textContent = 'view picture';
-            btn.className = 'view';
-            btn.replaceWith(btn.cloneNode(true)); // remove old handler
-            const newBtn = card.querySelector('button.view');
-            newBtn?.addEventListener('click', async () => {
-              try {
-                const html = await fetchWorldHtml(w.id);
-                openHtmlInNewTab(html);
-              } catch(e) { alert(`Failed to load world: ${e.message || e}`); }
-            });
+        // Check for architectures per picture (READ ONLY)
+        const existenceChecks = await Promise.all(pics.map(async (p) => {
+          const pid = p?.id;
+          if (pid == null) return { id: null, count: 0 };
+          try {
+            const { count } = await getArchitecturesForPicture(pid, { collection: null, includeBody: false });
+            return { id: pid, count: Number(count) || 0 };
+          } catch {
+            return { id: pid, count: 0 };
           }
-        } catch(_) {}
-      });
-    }
+        }));
+        const archCountByPic = Object.fromEntries(existenceChecks.map(x => [String(x.id), x.count]));
 
-    card.append(h3, d);
-    if (p?.function) card.append(fn);
-    card.append(pm, btn);
-    grid.append(card);
-  }
-  box.append(grid);
-}
+        for (const p of pics){
+          const card = document.createElement('div'); card.className = 'pic';
 
+          const h3 = document.createElement('h3'); h3.textContent = p?.title || 'Untitled picture';
+          const d  = document.createElement('div'); d.className = 'muted'; d.textContent = p?.description || '';
+          const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
+          if (p?.function) fn.innerHTML = `<strong>Function:</strong> ${escapeHtml(p.function)}`;
+          const pm = document.createElement('div'); pm.className = 'meta mono';
+          pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
 
+          const existingCount = p?.id != null ? (archCountByPic[String(p.id)] || 0) : 0;
+
+          if (existingCount > 0){
+            // GREEN: view existing architectures (one tab with all)
+            const viewBtn = document.createElement('button');
+            viewBtn.type = 'button';
+            viewBtn.style.marginTop = '.5rem';
+            viewBtn.textContent = 'view architectures';
+            viewBtn.className = 'view';
+            viewBtn.addEventListener('click', async () => {
+              await viewExistingArchitectures(p, { collection: null });
+            });
+
+            card.append(h3, d);
+            if (p?.function) card.append(fn);
+            card.append(pm, viewBtn);
+          } else {
+            // read-only: show a muted note (no run/create actions here)
+            const note = document.createElement('div');
+            note.className = 'note';
+            note.textContent = 'no architectures yet';
+            card.append(h3, d);
+            if (p?.function) card.append(fn);
+            card.append(pm, note);
+          }
+
+          grid.append(card);
+        }
+
+        box.append(grid);
         mount.append(box);
       }
     }
