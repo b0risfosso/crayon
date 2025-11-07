@@ -31,6 +31,15 @@ from prompts import wax_architect_prompt
 
 from prompts import wax_worldwright_prompt
 
+# NEW: collections runner
+from prompts import PROMPT_COLLECTIONS  # expects a dict[str, list[dict]]
+import sqlite3  # if not already imported
+
+import json
+import threading
+
+
+
 
 
 
@@ -51,6 +60,8 @@ SYSTEM_MSG_WAX_HTML = (
     "The HTML must be self-contained, with inline CSS and JS, and must run autonomously."
 )
 
+_PROMPT_OUTPUTS_TABLE_READY = False
+_PROMPT_OUTPUTS_TABLE_LOCK = threading.Lock()
 
 
 app = Flask(__name__)
@@ -59,6 +70,22 @@ client = OpenAI()
 # Init DBs
 init_picture_db()
 init_usage_db()
+
+# NEW: tiny safe helpers (won't clash with existing names)
+def _now_utc_iso():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+def _safe_get_picture_db_path():
+    # Reuse your configured DB path if you have one; otherwise fall back
+    return os.environ.get("PICTURE_DB", "/var/www/site/data/picture.db")
+
+def _maybe_connect(db_path: str):
+    # If you already have a connect(...) helper, use that.
+    if "connect" in globals() and callable(globals()["connect"]):
+        return globals()["connect"](db_path)
+    return sqlite3.connect(db_path)
+
 
 
 
@@ -153,6 +180,89 @@ def build_wax_worldwright_prompt(
     spec_json = json.dumps(spec, ensure_ascii=False, separators=(",", ":"))
     return wax_worldwright_prompt.format(spec_json=spec_json)
 
+
+# NEW: chat completion wrapper; uses your existing client/model if available
+def _run_chat(system_text: str | None, user_text: str, *, model: Optional[str] = None):
+    m = model or "gpt-5-mini-2025-08-07"
+    messages = []
+    resp = client.responses.create(
+        model=model,
+        input=user_text
+    )
+
+    usage = _usage_from_resp(resp)
+    usage_in = usage["input"]
+    usage_out = usage["output"]
+
+    content = resp.output_text
+    meta = {
+        "usage": getattr(resp, "usage", None) and resp.usage.model_dump(),
+        "id": resp.id,
+    }
+    return out, meta
+
+_PROMPT_OUTPUTS_TABLE_READY = False
+_PROMPT_OUTPUTS_TABLE_LOCK = threading.Lock()
+
+def _ensure_prompt_outputs_table(db_path: str):
+    global _PROMPT_OUTPUTS_TABLE_READY
+    if _PROMPT_OUTPUTS_TABLE_READY:
+        return
+    with _PROMPT_OUTPUTS_TABLE_LOCK:
+        if _PROMPT_OUTPUTS_TABLE_READY:
+            return
+        with _maybe_connect(db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS prompt_outputs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vision_id INTEGER,
+                    picture_id INTEGER,
+                    collection TEXT NOT NULL,
+                    prompt_key TEXT NOT NULL,
+                    prompt_text TEXT NOT NULL,
+                    system_text TEXT,
+                    output_text TEXT NOT NULL,
+                    model TEXT,
+                    email TEXT,
+                    metadata TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE SET NULL,
+                    FOREIGN KEY (picture_id) REFERENCES pictures(id) ON DELETE SET NULL
+                )
+            """)
+            conn.commit()
+        _PROMPT_OUTPUTS_TABLE_READY = True
+
+def _store_prompt_output_row(
+    db_path: str,
+    *,
+    vision_id: int | None,
+    picture_id: int | None,
+    collection: str,
+    prompt_key: str,
+    prompt_text: str,
+    system_text: str | None,
+    output_text: str,
+    model: str | None,
+    email: str | None,
+    metadata: dict | None,
+    created_at: str
+) -> None:
+    """Open, insert, commit, close (no persistent connection)."""
+    with _maybe_connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO prompt_outputs
+                (vision_id, picture_id, collection, prompt_key, prompt_text, system_text,
+                 output_text, model, email, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                vision_id, picture_id, collection, prompt_key, prompt_text, system_text,
+                output_text, model, email, json.dumps(metadata) if metadata else None, created_at
+            )
+        )
+        conn.commit()
 
 
 # Example (adapt to your existing LLM call function and logging):
@@ -598,3 +708,95 @@ def crayon_world_html():
 
     d = _dictify(cur, row)
     return jsonify({"id": d["id"], "html": d["html"]})
+
+
+# NEW ENDPOINT: run a named collection of prompts in one shot@app.post("/crayon/run_collection")
+def run_prompt_collection():
+    data = request.get_json(force=True, silent=True) or {}
+    collection = (data.get("collection") or "").strip()
+    inputs = data.get("inputs") or {}
+    model = data.get("model")
+    store = bool(data.get("store", False))
+    email = data.get("email")
+    vision_id = data.get("vision_id")
+    picture_id = data.get("picture_id")
+
+    if not collection:
+        return jsonify({"error": "collection is required"}), 400
+    if collection not in PROMPT_COLLECTIONS:
+        return jsonify({"error": f"unknown collection '{collection}'"}), 404
+
+    items = PROMPT_COLLECTIONS[collection]
+    if not isinstance(items, list) or not all(isinstance(x, dict) and "key" in x for x in items):
+        return jsonify({"error": f"collection '{collection}' has invalid structure"}), 500
+
+    results = []
+    stored = 0
+    now = _now_utc_iso()
+    db_path = _safe_get_picture_db_path()
+
+    # Ensure table exists once (short-lived connection under the hood)
+    if store:
+        try:
+            _ensure_prompt_outputs_table(db_path)
+        except Exception:
+            # If table creation fails, we continue returning results but won’t store
+            store = False
+
+    for item in items:
+        key = item["key"]
+        system_tmpl = item.get("system")
+        user_tmpl = item.get("template")
+        if not user_tmpl:
+            results.append({"key": key, "error": "missing 'template' in collection item"})
+            continue
+
+        # Soft-missing optional fields: switch to format_map if desired
+        try:
+            system_text = system_tmpl.format(**inputs) if isinstance(system_tmpl, str) else None
+            prompt_text = user_tmpl.format(**inputs)
+        except KeyError as ke:
+            results.append({"key": key, "error": f"missing input variable: {ke}"})
+            continue
+
+        try:
+            output_text, meta = _run_chat(system_text, prompt_text, model=model)
+        except Exception as e:
+            results.append({"key": key, "prompt": prompt_text, "system": system_text, "error": str(e)})
+            continue
+
+        rec = {
+            "key": key,
+            "prompt": prompt_text,
+            "system": system_text,
+            "output": output_text,
+            "metadata": meta,
+        }
+        results.append(rec)
+
+        if store:
+            try:
+                _store_prompt_output_row(
+                    db_path,
+                    vision_id=vision_id if isinstance(vision_id, int) else None,
+                    picture_id=picture_id if isinstance(picture_id, int) else None,
+                    collection=collection,
+                    prompt_key=key,
+                    prompt_text=prompt_text,
+                    system_text=system_text,
+                    output_text=output_text,
+                    model=model or globals().get("DEFAULT_MODEL") or "gpt-5",
+                    email=email,
+                    metadata=rec.get("metadata"),
+                    created_at=now,
+                )
+                stored += 1
+            except Exception:
+                # Don’t fail the request on a write error
+                pass
+
+    return jsonify({
+        "collection": collection,
+        "results": results,
+        "stored": stored
+    })

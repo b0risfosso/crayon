@@ -137,25 +137,6 @@ function pickWaxStack(res){
   return '';
 }
 
-function openTextInNewTab(text){
-  const w = window.open('', '_blank');
-  if (!w) { alert('Popup blocked: allow popups to see the HTML.'); return; }
-  const escaped = escapeHtml(String(text ?? ''));
-  w.document.open();
-  w.document.write(`<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>World HTML (raw)</title>
-  <style>
-    body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 16px; }
-    pre { white-space: pre; overflow: auto; font-size: 13px; line-height: 1.4; }
-  </style>
-</head>
-<body><pre>${escaped}</pre></body>
-</html>`);
-  w.document.close();
-}
 
 
 function openHtmlInNewTab(html){

@@ -92,3 +92,28 @@ CREATE INDEX IF NOT EXISTS idx_worlds_picture    ON worlds(picture_id);
 CREATE INDEX IF NOT EXISTS idx_worlds_email      ON worlds(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_worlds_pic_email ON worlds(picture_id, email);
 
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS prompt_outputs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    vision_id    INTEGER,                  -- nullable
+    picture_id   INTEGER,                  -- nullable
+    collection   TEXT NOT NULL,            -- e.g., 'garden_architect'
+    prompt_key   TEXT NOT NULL,            -- e.g., 'soil_profile'
+    prompt_text  TEXT NOT NULL,            -- fully rendered user prompt
+    system_text  TEXT,                     -- rendered system prompt (if any)
+    output_text  TEXT NOT NULL,            -- model completion
+    model        TEXT,
+    email        TEXT,
+    metadata     TEXT,                     -- JSON (token counts, finish_reason, latency, etc.)
+    created_at   TEXT NOT NULL,
+    FOREIGN KEY (vision_id)  REFERENCES visions(id)   ON DELETE SET NULL,
+    FOREIGN KEY (picture_id) REFERENCES pictures(id)  ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_outputs_collection ON prompt_outputs(collection);
+CREATE INDEX IF NOT EXISTS idx_prompt_outputs_pic ON prompt_outputs(picture_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_outputs_vision ON prompt_outputs(vision_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_outputs_email ON prompt_outputs(email);
+
+
