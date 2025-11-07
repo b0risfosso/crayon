@@ -735,6 +735,7 @@ def run_prompt_collection():
 
     results = []
     stored = 0
+    store_errors = []  # <— add this
     now = _now_utc_iso()
     db_path = _safe_get_picture_db_path()
 
@@ -794,14 +795,14 @@ def run_prompt_collection():
                     created_at=now,
                 )
                 stored += 1
-            except Exception:
-                # Don’t fail the request on a write error
-                pass
+            except Exception as e:
+                store_errors.append(f"{key}: {type(e).__name__}: {e}")  # <— capture the reason
 
     return jsonify({
         "collection": collection,
         "results": results,
-        "stored": stored
+        "stored": stored,
+        "store_errors": store_errors
     })
 
 
