@@ -30,7 +30,9 @@
     .card h3 { margin: 0 0 .25rem 0; font-size: 1rem; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .inline { display: inline-flex; align-items: center; gap: .5rem; }
-    code { background: #f6f7f9; padding: .12rem .3rem; border-radius: .3rem; }
+    .hint { margin-top:.8rem; font-size:.9rem; color:#6b7280; }
+    .hint a { color:#0b5cff; text-decoration:none; }
+    .hint a:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -69,6 +71,8 @@
       </div>
       <div id="statusPictures" class="status"></div>
       <div id="picturesOut" class="cols"></div>
+      <!-- Hint for viewing architectures -->
+      <div class="hint">Once your pictures appear, open the <a href="/pictures" target="_blank">Pictures</a> page to view or run architects for them.</div>
     </div>
   </section>
 
@@ -96,8 +100,8 @@
     <pre id="usageOut" class="mono" style="display:none; max-width: min(92vw, 820px); overflow:auto; background:#f6f7f9; border:1px solid #e5e7eb; border-radius:.5rem; padding:.6rem .7rem;"></pre>
   </section>
 
+  <!-- Scripts (same as before, no world/architect logic) -->
   <script>
-    // ------------ Config ------------
     const LS_EMAIL = 'fg_user_email';
     const EP = {
       health: '/jid/healthz',
@@ -105,245 +109,82 @@
       createPictures: '/jid/create_pictures',
       createFocuses: '/jid/create_focuses'
     };
-    // ---- Crayon endpoints
-    const EP_CRAYON = {
-    world: '/crayon/wax_worldwright'
-    };
 
-    // Normalize various possible response shapes
-    function pickWaxStack(res){
-        if (!res) return '';
-        if (typeof res.wax_stack === 'string') return res.wax_stack;
-        if (res.data && typeof res.data.wax_stack === 'string') return res.data.wax_stack;
-        if (res.result && typeof res.result.wax_stack === 'string') return res.result.wax_stack;
-        // Sometimes the LLM returns a big text field
-        if (typeof res.wax === 'string') return res.wax;
-        return '';
+    const $ = (id) => document.getElementById(id);
+    function setText(el, msg, cls = '') {
+      if (!el) return;
+      el.className = 'status ' + (cls || '');
+      el.textContent = msg || '';
     }
-
-    function buildFocusStringFromVision(v){
-      // v.focuses may be an array of {dimension, focus} or similar
-      if (!v || !Array.isArray(v.focuses) || !v.focuses.length) return '';
-      // Join as "Dimension: focus" bullets, or just dimensions if that’s all you store
-      const parts = v.focuses.map(it => {
-        const dim = (it?.dimension || it?.title || it?.name || '').trim();
-        const f   = (it?.focus || '').trim();
-        return f ? `${dim}: ${f}` : (dim || '');
-      }).filter(Boolean);
-      return parts.join(' • ');
-    }
-
-    function openHtmlInNewTab(html){
-        const w = window.open('', '_blank');
-        if (!w) { alert('Popup blocked: allow popups to see the world.'); return; }
-        w.document.open();
-        w.document.write(html || '<!doctype html><title>World</title><pre>No HTML</pre>');
-        w.document.close();
-    }
-
-    function buildCrayonInputs(visionText, pic) {
-    // vision
-    const vision = String(visionText || '').trim();
-    if (!vision) throw new Error('This item has no vision text.');
-
-    // title (picture_short)
-    let picture_short = String(pic?.title || '').trim();
-    if (!picture_short) {
-        // fallback from description or id
-        const fromDesc = String(pic?.description || '').trim();
-        if (fromDesc) picture_short = (fromDesc.length > 80 ? fromDesc.slice(0, 77) + '…' : fromDesc);
-        else if (pic?.id != null) picture_short = `Picture ${pic.id}`;
-        else picture_short = 'Untitled picture';
-    }
-
-    // description (picture_description)
-    let picture_description = String(pic?.description || '').trim();
-    if (!picture_description) {
-        // fallback from function or title
-        const fromFn = String(pic?.function || '').trim();
-        if (fromFn) picture_description = fromFn;
-        else picture_description = picture_short; // last resort
-    }
-
-    return { vision, picture_short, picture_description };
-    }
-
-
-    async function createWorldForPictureCard(cardNode, visionText, pic, focusText){
-        // choose email
-        const emailInput = document.getElementById('email');
-        const email = (emailInput?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
-
-        const status = document.createElement('div');
-        status.className = 'status';
-        status.textContent = 'Building crayon…';
-        cardNode.append(status);
-
-        try {
-            const req = buildCrayonInputs(visionText, pic); // <-- makes all required fields non-empty
-
-            const expRes = await postJSON('/jid/explain_picture', {
-              vision: req.vision,
-              picture_title: req.picture_short,          // map our normalized title to new key
-              picture_description: req.picture_description,
-              picture_function: String(pic?.function || '').trim(),
-              focus: String(focusText || '').trim() || undefined                                   // draw.html has no per-vision focus context
-            }, 600000);
-
-            status.textContent = 'Crayon ready. Drawing world…';
-
-            const explanation = pickExplanation(expRes);
-            if (!explanation) throw new Error('No explanation returned.');
-
-            // 2) Worldwright
-            const wwPayload = {
-            vision: req.vision,
-            picture_short: req.picture_short,
-            picture_description: req.picture_description,
-            picture_explanation: explanation,
-            email: email || undefined
-            };
-            const worldRes = await postJSON(EP_CRAYON.world, wwPayload, 600000);
-            const html = worldRes?.html || worldRes?.data?.html || worldRes?.result?.html;
-            if (!html) throw new Error('No world HTML returned.');
-
-            status.className = 'status ok';
-            status.textContent = 'World built. Opening…';
-            openHtmlInNewTab(html);
-        } catch (e) {
-            status.className = 'status error';
-            status.textContent = `Failed: ${e.message || e}`;
-        }
-        }
-
-
-        // ------------ Helpers ------------
-        const $ = (id) => document.getElementById(id);
-        function setText(el, msg, cls = '') {
-            if (!el) return;
-            el.className = 'status ' + (cls || '');
-            el.textContent = msg || '';
-            }
-            function escapeHtml(s) {
-            return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
-            }
-            async function fetchJSON(url, options = {}, timeoutMs = 600000) {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), timeoutMs);
-            try {
-                const resp = await fetch(url, { ...options, signal: controller.signal });
-                const ct = resp.headers.get('content-type') || '';
-                const isJSON = ct.includes('application/json');
-                const data = isJSON ? await resp.json() : await resp.text();
-                if (!resp.ok) {
-                const detail = isJSON ? (data?.error || data?.detail || JSON.stringify(data)) : data;
-                throw new Error(detail || `HTTP ${resp.status}`);
-                }
-                return data;
-            } finally { clearTimeout(timer); }
-            }
-            function postJSON(url, body, timeoutMs) {
-            return fetchJSON(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body || {})
-            }, timeoutMs);
-        }
-
-        function pickExplanation(res){
-          if (!res) return '';
-          if (typeof res.explanation === 'string') return res.explanation;
-          if (res.data && typeof res.data.explanation === 'string') return res.data.explanation;
-          if (res.result && typeof res.result.explanation === 'string') return res.result.explanation;
-          return '';
-        }
-
-        // ------------ Email memory ------------
-        function loadEmail() { const v = (localStorage.getItem(LS_EMAIL) || '').trim().toLowerCase(); if (v) $('email').value = v; }
-        function saveEmail() { const v = ($('email').value || '').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); else localStorage.removeItem(LS_EMAIL); }
-
-        // ------------ Renderers ------------
-        function renderPictures(block) {
-            const mount = $('picturesOut'); mount.innerHTML = '';
-            const pics = Array.isArray(block?.pictures) ? block.pictures : [];
-            if (!pics.length) { mount.innerHTML = '<div class="muted">No pictures returned.</div>'; return; }
-            for (const p of pics) {
-                const card = document.createElement('div'); card.className = 'card';
-                const h = document.createElement('h3'); h.textContent = p.title || 'Untitled picture';
-                const d = document.createElement('div'); d.className = 'muted'; d.textContent = p.description || '';
-                const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
-                fn.innerHTML = p.function ? `<strong>Function:</strong> ${escapeHtml(p.function)}` : '';
-                const meta = document.createElement('div'); meta.style.marginTop = '.25rem';
-                meta.innerHTML = [
-                    p.id ? `<span class="mono">id:${escapeHtml(String(p.id))}</span>` : '',
-                    p.status ? `<span class="mono">status:${escapeHtml(p.status)}</span>` : ''
-                ].filter(Boolean).join(' · ');
-
-                // --- NEW: create picture -> wax + world
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.textContent = 'create picture';
-                btn.style.marginTop = '.5rem';
-                btn.addEventListener('click', async () => {
-                  const visionText = (document.getElementById('visionInputForPictures')?.value || '').trim();
-                  if (!visionText) { alert('Enter a vision first.'); return; }
-                  const focusText = (document.getElementById('focusForPictures')?.value || '').trim();
-                  await createWorldForPictureCard(card, visionText, p, focusText);
-                });
-
-
-                card.append(h, d);
-                if (fn.innerHTML) card.append(fn);
-                if (meta.innerHTML) card.append(meta);
-                card.append(btn);
-                mount.append(card);
-            }
-        }
-
-        function renderFocuses(block) {
-            const mount = $('focusesOut');
-            mount.innerHTML = '';
-
-            // Accept either { focuses: [...] } or a raw array
-            const items = Array.isArray(block?.focuses) ? block.focuses
-                        : Array.isArray(block)           ? block
-                        : [];
-
-            if (!items.length) {
-                mount.innerHTML = '<div class="muted">No focuses returned.</div>';
-                return;
-            }
-
-            for (let i = 0; i < items.length; i++) {
-                const f = items[i] ?? {};
-                // Normalize multiple possible shapes
-                const dimension = f.dimension || f.title || f.name || `Focus ${i + 1}`;
-                const text      = (typeof f === 'string') ? f
-                                : f.focus || f.description || '';
-
-                const card = document.createElement('div');
-                card.className = 'card';
-                const head = document.createElement('div');
-                head.innerHTML = `<strong>${escapeHtml(dimension)}</strong>`;
-                const body = document.createElement('div');
-                body.className = 'muted';
-                body.textContent = text;
-
-                card.append(head);
-                if (text) card.append(body);
-                mount.append(card);
-            }
-        }
-
-
-    // ------------ Actions ------------
-    async function doHealth() {
-      setText($('svcStatus'), 'Checking…');
+    async function fetchJSON(url, options = {}, timeoutMs = 600000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const d = await fetchJSON(EP.health, {}, 10000);
-        setText($('svcStatus'), `JID OK ${typeof d === 'object' ? JSON.stringify(d) : String(d)}`, 'ok');
-      } catch (e) {
-        setText($('svcStatus'), `JID health failed: ${e.message || e}`, 'error');
+        const resp = await fetch(url, { ...options, signal: controller.signal });
+        const ct = resp.headers.get('content-type') || '';
+        const isJSON = ct.includes('application/json');
+        const data = isJSON ? await resp.json() : await resp.text();
+        if (!resp.ok) {
+          const detail = isJSON ? (data?.error || data?.detail || JSON.stringify(data)) : data;
+          throw new Error(detail || `HTTP ${resp.status}`);
+        }
+        return data;
+      } finally { clearTimeout(timer); }
+    }
+    function postJSON(url, body, timeoutMs) {
+      return fetchJSON(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      }, timeoutMs);
+    }
+    function loadEmail() {
+      const v = (localStorage.getItem(LS_EMAIL) || '').trim().toLowerCase();
+      if (v) $('email').value = v;
+    }
+    function saveEmail() {
+      const v = ($('email').value || '').trim().toLowerCase();
+      if (v) localStorage.setItem(LS_EMAIL, v);
+      else localStorage.removeItem(LS_EMAIL);
+    }
+
+    function renderPictures(block) {
+      const mount = $('picturesOut'); mount.innerHTML = '';
+      const pics = Array.isArray(block?.pictures) ? block.pictures : [];
+      if (!pics.length) { mount.innerHTML = '<div class="muted">No pictures returned.</div>'; return; }
+      for (const p of pics) {
+        const card = document.createElement('div'); card.className = 'card';
+        const h = document.createElement('h3'); h.textContent = p.title || 'Untitled picture';
+        const d = document.createElement('div'); d.className = 'muted'; d.textContent = p.description || '';
+        const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
+        fn.innerHTML = p.function ? `<strong>Function:</strong> ${p.function}` : '';
+        const meta = document.createElement('div'); meta.style.marginTop = '.25rem';
+        meta.innerHTML = [
+          p.id ? `<span class="mono">id:${p.id}</span>` : '',
+          p.status ? `<span class="mono">status:${p.status}</span>` : ''
+        ].filter(Boolean).join(' · ');
+        card.append(h, d);
+        if (fn.innerHTML) card.append(fn);
+        if (meta.innerHTML) card.append(meta);
+        mount.append(card);
+      }
+    }
+
+    function renderFocuses(block) {
+      const mount = $('focusesOut');
+      mount.innerHTML = '';
+      const items = Array.isArray(block?.focuses) ? block.focuses : Array.isArray(block) ? block : [];
+      if (!items.length) { mount.innerHTML = '<div class="muted">No focuses returned.</div>'; return; }
+      for (let i = 0; i < items.length; i++) {
+        const f = items[i] ?? {};
+        const dim = f.dimension || f.title || f.name || `Focus ${i + 1}`;
+        const text = (typeof f === 'string') ? f : f.focus || f.description || '';
+        const card = document.createElement('div'); card.className = 'card';
+        const head = document.createElement('div'); head.innerHTML = `<strong>${dim}</strong>`;
+        const body = document.createElement('div'); body.className = 'muted'; body.textContent = text;
+        card.append(head);
+        if (text) card.append(body);
+        mount.append(card);
       }
     }
 
@@ -352,26 +193,19 @@
       const vision = ($('visionInputForPictures').value || '').trim();
       const focus  = ($('focusForPictures').value || '').trim();
       const count  = parseInt(($('count').value || '').trim(), 10);
-
       if (!vision) { setText($('statusPictures'), 'Enter a vision.', 'error'); return; }
       setText($('statusPictures'), 'Creating pictures…');
-
       try {
         const payload = { vision };
         if (email) payload.email = email;
-        if (focus) payload.focus = focus;  // <-- new optional field
+        if (focus) payload.focus = focus;
         if (!Number.isNaN(count) && count > 0) payload.count = count;
-
         const res = await postJSON('/jid/create_pictures', payload, 600000);
-        const block = res?.data || res?.result || res;
-        renderPictures(block);
+        renderPictures(res?.data || res?.result || res);
         setText($('statusPictures'), 'Done.', 'ok');
-        if (email) localStorage.setItem('fg_user_email', email);
-      } catch (e) {
-        setText($('statusPictures'), `Failed: ${e.message || e}`, 'error');
-      }
+        if (email) localStorage.setItem(LS_EMAIL, email);
+      } catch (e) { setText($('statusPictures'), `Failed: ${e.message || e}`, 'error'); }
     }
-
 
     async function doCreateFocuses() {
       const email = ($('email').value || '').trim().toLowerCase();
@@ -379,27 +213,21 @@
       if (!vision) { setText($('statusFocuses'), 'Enter a vision.', 'error'); return; }
       setText($('statusFocuses'), 'Creating focuses…');
       try {
-        // Minimal payload — vision + email
         const payload = { vision };
         if (email) payload.email = email;
-
-        const res = await postJSON(EP.createFocuses, payload, 600000);
-        const block = res?.data || res?.result || res;
-        renderFocuses(block);
+        const res = await postJSON('/jid/create_focuses', payload, 600000);
+        renderFocuses(res?.data || res?.result || res);
         setText($('statusFocuses'), 'Done.', 'ok');
         if (email) saveEmail();
-      } catch (e) {
-        setText($('statusFocuses'), `Failed: ${e.message || e}`, 'error');
-      }
+      } catch (e) { setText($('statusFocuses'), `Failed: ${e.message || e}`, 'error'); }
     }
 
     async function doUsage() {
       setText($('usageStatus'), 'Loading usage…');
       $('usageOut').style.display = 'none';
       try {
-        const d = await fetchJSON(EP.usageToday, {}, 15000);
-        const pretty = JSON.stringify(d, null, 2);
-        $('usageOut').textContent = pretty;
+        const d = await fetchJSON('/jid/usage/today', {}, 15000);
+        $('usageOut').textContent = JSON.stringify(d, null, 2);
         $('usageOut').style.display = 'block';
         setText($('usageStatus'), 'Usage loaded.', 'ok');
       } catch (e) {
@@ -407,11 +235,9 @@
       }
     }
 
-    // ------------ Init ------------
     (function init() {
       loadEmail();
       $('saveEmail').addEventListener('click', () => { saveEmail(); setText($('svcStatus'), 'Email saved.', 'ok'); });
-      //$('checkHealth').addEventListener('click', doHealth);
       $('btnCreatePictures').addEventListener('click', doCreatePictures);
       $('btnCreateFocuses').addEventListener('click', doCreateFocuses);
       $('btnUsage').addEventListener('click', doUsage);
