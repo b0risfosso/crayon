@@ -179,21 +179,27 @@ function openArchitectureInNewTab({ title, subtitle, body }){
 }
 
 // NEW: explain picture, then run a collection of architect prompts, open each in viewer tabs
+// Explain picture, run a collection, store results — but DO NOT open viewer automatically.
+// After success, flip button to "view architectures".
 async function runArchitectsForPictureCard(cardNode, visionText, pic){
   const email = (document.getElementById('email')?.value || localStorage.getItem('fg_user_email') || '').trim().toLowerCase();
   const constraints = (document.getElementById('ctxConstraints')?.value || '').trim();
   const deployment_context = (document.getElementById('ctxDeploy')?.value || '').trim();
   const readiness_target = (document.getElementById('ctxReadiness')?.value || '').trim();
-  const collection = ('architects_all');
+  const collection = (document.getElementById('collectionName')?.value || localStorage.getItem(LS_COLLECTION) || '').trim() || 'duet_worldwright_x_wax';
 
-
-  const status = document.createElement('div');
+  // transient status line on the card
+  let status = cardNode.querySelector('.status');
+  if (!status){
+    status = document.createElement('div');
+    status.className = 'status';
+    cardNode.append(status);
+  }
   status.className = 'status';
   status.textContent = `Building picture…`;
-  cardNode.append(status);
 
   try {
-    // Build normalized inputs for the explain step
+    // 1) explain
     const req = buildCrayonInputs(visionText, pic);
     const expRes = await postJSON('/jid/explain_picture', {
       vision: req.vision,
@@ -206,9 +212,8 @@ async function runArchitectsForPictureCard(cardNode, visionText, pic){
     const explanation = pickExplanation(expRes);
     if (!explanation) throw new Error('No explanation returned.');
 
+    // 2) run collection
     status.textContent = `Running collection: ${collection}…`;
-
-    // Assemble inputs for architects
     const inputs = {
       vision: req.vision,
       picture: `${req.picture_short}\n\n${req.picture_description}`,
@@ -221,34 +226,41 @@ async function runArchitectsForPictureCard(cardNode, visionText, pic){
       integrations: ''
     };
 
-    const collRes = await postJSON(EP_CRAYON.runCollection, {
+    const collRes = await postJSON('/crayon/run_collection', {
       collection,
       inputs,
       store: true,
       email,
-      // Optional: thread IDs if you have them
       picture_id: pic?.id || undefined
     }, 1000000);
 
     const results = Array.isArray(collRes?.results) ? collRes.results : [];
     if (!results.length) throw new Error('Collection returned no items.');
 
+    // 3) success: flip the primary button to "view architectures"
     status.className = 'status ok';
-    status.textContent = `Opened ${results.length} architect tab${results.length>1?'s':''}.`;
+    status.textContent = `Architectures saved (${results.length}).`;
 
-    // Open each architecture in its own viewer tab
-    for (const r of results){
-      const key = r?.key || 'architecture';
-      const title = `${key.replace(/_/g,' ').toUpperCase()}`;
-      const subtitle = (pic?.title || 'Untitled picture');
-      const body = String(r?.output || '').trim() || '(no output)';
-      openArchitectureInNewTab({ title, subtitle, body });
+    // find the primary action button on this card
+    // (assumes first button is the primary; adjust selector if yours differs)
+    const primaryBtn = cardNode.querySelector('button.create, button.view, button.recreate') || cardNode.querySelector('button');
+    if (primaryBtn){
+      // remove old handlers by cloning
+      const replacement = primaryBtn.cloneNode(true);
+      replacement.textContent = 'view architectures';
+      replacement.className = 'view';
+      replacement.onclick = async () => {
+        const preferredCollection = (document.getElementById('collectionName')?.value || localStorage.getItem(LS_COLLECTION) || '').trim() || null;
+        await viewExistingArchitectures(pic, { collection: preferredCollection });
+      };
+      primaryBtn.replaceWith(replacement);
     }
   } catch (e) {
     status.className = 'status error';
     status.textContent = `Failed: ${e.message || e}`;
   }
 }
+
 
 async function getArchitecturesForPicture(pictureId, {collection=null, includeBody=false} = {}){
   const params = new URLSearchParams();
