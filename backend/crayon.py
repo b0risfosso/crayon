@@ -710,6 +710,7 @@ def crayon_world_html():
     return jsonify({"id": d["id"], "html": d["html"]})
 
 
+@app.post("/crayon/run_collection")
 # NEW ENDPOINT: run a named collection of prompts in one shot@app.post("/crayon/run_collection")
 def run_prompt_collection():
     data = request.get_json(force=True, silent=True) or {}
