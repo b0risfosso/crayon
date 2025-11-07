@@ -806,90 +806,58 @@ def run_prompt_collection():
     })
 
 
-@app.get("/crayon/architectures")
-def list_architectures():
-    """
-    Query params:
-      picture_id (int)               -- required unless vision_id provided
-      vision_id  (int)               -- optional
-      collection (str)               -- optional filter (e.g., 'duet_worldwright_x_wax')
-      include_body (0|1)             -- include output_text (default 0)
-      limit (int)                    -- default 50
-    Returns: { items: [{ id, collection, prompt_key, created_at, model, email, ...(maybe output_text) }], count }
-    """
-    pic_id = request.args.get("picture_id", type=int)
-    vis_id = request.args.get("vision_id", type=int)
-    if not pic_id and not vis_id:
-        return jsonify({"error": "picture_id or vision_id is required"}), 400
+def run_explain_picture(
+    vision_text: str,
+    picture_title: str,
+    picture_description: str,
+    picture_function: str,
+    *,
+    focus: str = "",
+    email: Optional[str] = None,
+    model: str = DEFAULT_MODEL,
+    endpoint_name: str = "/jid/explain_picture",
+) -> str:
+    """Generate structured text explanation (not JSON)."""
+    today_tokens = get_today_model_tokens(model)
+    if today_tokens >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model}: {today_tokens}/{DAILY_MAX_TOKENS_LIMIT}"
+        )
 
-    collection = (request.args.get("collection") or "").strip() or None
-    include_body = bool(int(request.args.get("include_body", "0")))
-    limit = request.args.get("limit", default=50, type=int)
-    db_path = _safe_get_picture_db_path()
+    prompt_text = build_explain_picture_prompt(vision_text, picture_title, picture_description, picture_function, focus)
 
-    # Ensure table (no-op if already created)
+    usage_in = 0
+    usage_out = 0
+    request_id = None
+
+    resp = client.responses.create(
+        model=model,
+        input=prompt_text
+    )
+
+    usage = _usage_from_resp(resp)
+    usage_in = usage["input"]
+    usage_out = usage["output"]
+
+    content = resp.output_text
+
+    
+
+    # Log usage
     try:
-        _ensure_prompt_outputs_table(db_path)
-    except Exception:
-        return jsonify({"items": [], "count": 0})
+        log_usage(
+            app="jid",
+            model=model,
+            tokens_in=usage_in,
+            tokens_out=usage_out,
+            endpoint=endpoint_name,
+            email=email,
+            request_id=request_id,
+            duration_ms=0,
+            cost_usd=0.0,
+            meta={"purpose": "explain_picture"},
+        )
+    except Exception as e:
+        print(f"[WARN] usage logging failed (explain_picture): {e}")
 
-    cols = "id, collection, prompt_key, created_at, model, email"
-    if include_body:
-        cols += ", output_text"
-
-    where = []
-    args = []
-    if pic_id:
-        where.append("picture_id = ?")
-        args.append(pic_id)
-    if vis_id:
-        where.append("vision_id = ?")
-        args.append(vis_id)
-    if collection:
-        where.append("collection = ?")
-        args.append(collection)
-
-    sql = f"SELECT {cols} FROM prompt_outputs"
-    if where:
-        sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
-    args.append(limit)
-
-    items = []
-    with _maybe_connect(db_path) as conn:
-        cur = conn.execute(sql, tuple(args))
-        cols_list = [d[0] for d in cur.description]
-        for row in cur.fetchall():
-            items.append({k: v for k, v in zip(cols_list, row)})
-    return jsonify({"items": items, "count": len(items)})
-
-
-@app.get("/crayon/architecture/<int:arch_id>")
-def get_architecture(arch_id: int):
-    db_path = _safe_get_picture_db_path()
-    try:
-        _ensure_prompt_outputs_table(db_path)
-    except Exception:
-        return jsonify({"error": "not found"}), 404
-
-    with _maybe_connect(db_path) as conn:
-        cur = conn.execute("""
-            SELECT id, vision_id, picture_id, collection, prompt_key, prompt_text, system_text,
-                   output_text, model, email, metadata, created_at
-            FROM prompt_outputs
-            WHERE id = ?
-        """, (arch_id,))
-        row = cur.fetchone()
-    if not row:
-        return jsonify({"error": "not found"}), 404
-
-    cols = [d[0] for d in cur.description]
-    rec = {k: v for k, v in zip(cols, row)}
-    # Try to parse metadata
-    try:
-        if rec.get("metadata"):
-            rec["metadata"] = json.loads(rec["metadata"])
-    except Exception:
-        pass
-    return jsonify(rec)
-
+    return content.strip()

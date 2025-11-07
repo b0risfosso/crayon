@@ -5,7 +5,8 @@ import os
 import re
 import json
 from datetime import datetime, timezone
-from typing import Optional
+import time
+from typing import Optional, Dict, Any
 
 from flask import Flask, request, jsonify
 
@@ -31,6 +32,11 @@ from prompts import create_focuses_prompt
 
 from prompts import explain_picture_prompt
 
+import threading
+import queue
+import uuid
+
+
 
 
 # ------------------------------------------------------------------------------
@@ -38,6 +44,8 @@ from prompts import explain_picture_prompt
 DEFAULT_MODEL = os.getenv("JID_LLM_MODEL", "gpt-5-mini-2025-08-07")
 DAILY_MAX_TOKENS_LIMIT = int(os.getenv("DAILY_MAX_TOKENS_LIMIT", "10000000"))  # 10M
 DEFAULT_ENDPOINT_NAME = "/jid/create_pictures"
+
+
 
 SYSTEM_MSG = (
     "You are a precise JSON generator. Always return STRICT JSON with the exact keys requested. "
@@ -50,6 +58,107 @@ client = OpenAI()
 # Init DBs
 init_picture_db()
 init_usage_db()
+
+# ---- Create-Pictures work queue ---------------------------------------------
+_CREATE_PICTURES_Q: "queue.Queue[_CreatePicturesTask]" = queue.Queue()
+_CREATE_PICTURES_WORKERS = []
+_CREATE_PICTURES_WORKER_COUNT = int(os.getenv("CREATE_PICTURES_WORKERS", "2"))
+
+class _CreatePicturesTask:
+    __slots__ = ("task_id", "payload", "result", "error", "event")
+    def __init__(self, payload: dict):
+        self.task_id = str(uuid.uuid4())
+        self.payload = payload
+        self.result = None
+        self.error = None
+        self.event = threading.Event()
+
+
+def _create_pictures_worker():
+    while True:
+        task = _CREATE_PICTURES_Q.get()
+        try:
+            # task.payload is what we enqueued; find the registry entry
+            state = _get_task(task.task_id)
+            if state:
+                state.status = "running"
+                state.started_ts = time.time()
+
+            status_code, body = _create_pictures_sync(task.payload)
+
+            task.result = (status_code, body)
+
+            if state:
+                state.status = "done"
+                state.http_status = status_code
+                state.result = body
+                state.finished_ts = time.time()
+        except Exception as e:
+            task.error = e
+            state = _get_task(task.task_id)
+            if state:
+                state.status = "error"
+                state.error = str(e)
+                state.finished_ts = time.time()
+        finally:
+            task.event.set()
+            _CREATE_PICTURES_Q.task_done()
+            _cleanup_tasks()
+
+
+def _start_create_pictures_workers_once():
+    # idempotent start
+    if _CREATE_PICTURES_WORKERS:
+        return
+    for _ in range(_CREATE_PICTURES_WORKER_COUNT):
+        t = threading.Thread(target=_create_pictures_worker, name="create_pictures_worker", daemon=True)
+        t.start()
+        _CREATE_PICTURES_WORKERS.append(t)
+
+# Call once during startup (e.g., right after app = Flask(__name__))
+_start_create_pictures_workers_once()
+
+
+# ---- Task registry (thread-safe) --------------------------------------------
+class _TaskState:
+    # queued -> running -> done | error
+    def __init__(self, payload: dict):
+        self.task_id: str = str(uuid.uuid4())
+        self.status: str = "queued"
+        self.payload: dict = payload
+        self.created_ts: float = time.time()
+        self.started_ts: Optional[float] = None
+        self.finished_ts: Optional[float] = None
+        self.result: Optional[dict] = None     # body from _create_pictures_sync
+        self.http_status: Optional[int] = None  # HTTP code from sync fn
+        self.error: Optional[str] = None
+
+_TASKS: Dict[str, _TaskState] = {}
+_TASKS_LOCK = threading.Lock()
+
+def _register_task(payload: dict) -> _TaskState:
+    t = _TaskState(payload)
+    with _TASKS_LOCK:
+        _TASKS[t.task_id] = t
+    return t
+
+def _get_task(task_id: str) -> Optional[_TaskState]:
+    with _TASKS_LOCK:
+        return _TASKS.get(task_id)
+
+# Optional: automatic cleanup for finished tasks
+_TASK_RETENTION_SECONDS = int(os.getenv("CREATE_PICTURES_RETENTION_SEC", "86400"))  # 1 day
+
+def _cleanup_tasks():
+    now = time.time()
+    with _TASKS_LOCK:
+        to_delete = []
+        for tid, t in _TASKS.items():
+            if t.finished_ts and (now - t.finished_ts) > _TASK_RETENTION_SECONDS:
+                to_delete.append(tid)
+        for tid in to_delete:
+            _TASKS.pop(tid, None)
+
 
 # ------------------------------------------------------------------------------
 # Token utilities
@@ -118,29 +227,12 @@ def build_create_focuses_prompt(vision_text: str, count: str = "", must_include:
     return create_focuses_prompt.format(vision=vision_text.strip(), count=(count or ""), must_include=(must_include or ""), exclude=(exclude or ""))
 
 
-def build_explain_picture_prompt(vision_text: str, picture_title: str, picture_description: str, picture_function: str, focus: str = "") -> str:
-    try:
-        return explain_picture_prompt.format(
-            vision=vision_text.strip(),
-            picture_title=picture_title.strip(),
-            picture_description=picture_description.strip(),
-            picture_function=picture_function.strip(),
-            focus=(focus or "")
-        )
-    except KeyError as ke:
-        raise RuntimeError(
-            f"Prompt formatting failed on placeholder {ke!r}. "
-            "Ensure braces in prompts.py are doubled {{ like this }}."
-        )
-
-
 def _extract_title_from_picture_text(picture_text: str) -> str:
     raw = (picture_text or "").strip()
     for sep in [" — ", " - ", " —", ":", "–", "—", "|"]:
         if sep in raw:
             return raw.split(sep, 1)[0].strip()
     return (raw[:64] + ("…" if len(raw) > 64 else "")).strip()
-
 
 # ------------------------------------------------------------------------------
 # LLM call
@@ -528,9 +620,18 @@ def persist_explanation_to_db(
         return {}
 
 
-@app.route("/jid/create_pictures", methods=["POST"])
-def jid_create_pictures():
-    payload = request.get_json(force=True) or {}
+def _create_pictures_sync(payload: dict) -> tuple[int, dict]:
+    """
+    Pure, synchronous body that used to live inside the endpoint.
+    Expects a single item payload: { vision, focus, email?, count?, must_include?, exclude?, ... }
+    Returns (status_code, response_json_dict).
+    """
+    # --- example input normalization (keep exactly what your old code expects) ---
+    # vision_text = payload["vision"]  # or however it was named
+    # focus = payload.get("focus", "")
+    # ... run your existing create pipeline ...
+    # return 200, PicturesResponse(...).model_dump()
+
     vision_text = (payload.get("vision") or "").strip()
     if not vision_text:
         return jsonify({"error": "Missing 'vision'"}), 400
@@ -557,6 +658,45 @@ def jid_create_pictures():
         return jsonify({"error": str(e)}), 429
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
+
+
+
+@app.route("/jid/create_pictures", methods=["POST"])
+def create_pictures_submit():
+    """
+    Async submit-only:
+      - Accepts single object, {items:[...]}, or a top-level list.
+      - Enqueues each item.
+      - Returns { task_ids: [ ... ] }
+    """
+    try:
+        data = request.get_json(force=True, silent=False)
+    except Exception:
+        return jsonify({"error": "invalid JSON"}), 400
+
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict) and "items" in data and isinstance(data["items"], list):
+        items = data["items"]
+    elif isinstance(data, dict):
+        items = [data]
+    else:
+        return jsonify({"error": "expected object or list"}), 400
+
+    if not items:
+        return jsonify({"error": "no items to process"}), 400
+
+    task_ids = []
+    for payload in items:
+        # make a registry state and a queue task that points to it
+        state = _register_task(payload)
+        qtask = _CreatePicturesTask(payload=payload)
+        qtask.task_id = state.task_id   # ensure worker looks up the same id
+        _CREATE_PICTURES_Q.put(qtask)
+        task_ids.append(state.task_id)
+
+    return jsonify({"task_ids": task_ids}), 202
+
 
 
 
@@ -595,67 +735,6 @@ def jid_create_focuses():
         return jsonify({"error": f"Unhandled error: {e}"}), 500
 
 
-@app.route("/jid/explain_picture", methods=["POST"])
-def jid_explain_picture():
-    payload = request.get_json(force=True) or {}
-    vision_text = (payload.get("vision") or "").strip()
-    picture_title = (payload.get("picture_title") or "").strip()
-    picture_desc = (payload.get("picture_description") or "").strip()
-    picture_func = (payload.get("picture_function") or "").strip()
-    focus = (payload.get("focus") or "").strip()
-
-
-        # Back-compat shims (if callers still send old keys)
-    if not picture_title:
-        picture_title = (payload.get("picture_short") or "").strip()
-    if not picture_desc:
-        picture_desc = (payload.get("picture_desc") or payload.get("description") or "").strip()
-
-    # Minimal validation (require a vision and at least some picture context)
-    if not vision_text or not (picture_title or picture_desc):
-        return jsonify({
-            "error": "Missing required fields",
-            "detail": "Provide 'vision' and at least one of 'picture_title' or 'picture_description'."
-        }), 400
-
-
-    email = payload.get("email")
-    try:
-        result_text = run_explain_picture(
-            vision_text=vision_text,
-            picture_title=picture_title,
-            picture_description=picture_desc,
-            picture_function=picture_func,
-            focus=focus,
-            email=email,
-            model=DEFAULT_MODEL,
-            endpoint_name="/jid/explain_picture",
-        )
-
-        # Persist to DB (vision + single picture with explanation in metadata)
-        ids = persist_explanation_to_db(
-            vision_text=vision_text,
-            picture_title=picture_title,
-            picture_text=picture_desc,
-            explanation_text=result_text,
-            focus=(focus or None),
-            email=email,
-            source="jid",
-        )
-
-        return jsonify({
-            "vision": vision_text,
-            "focus": focus,
-            "picture": picture_desc,
-            "explanation": result_text,
-            **ids  # includes vision_id, picture_id if saved
-        }), 200
-    except RuntimeError as e:
-        return jsonify({"error": str(e)}), 429
-    except Exception as e:
-        return jsonify({"error": f"Unhandled error: {e}"}), 500
-
-
 def _row_to_dict(cursor, row):
     # convenience to get dict rows without changing global connection settings
     return { d[0]: row[i] for i, d in enumerate(cursor.description) }
@@ -668,90 +747,51 @@ def healthz():
     return jsonify({"status": "ok", "time": _iso_today()}), 200
 
 
-@app.route("/jid/usage/today", methods=["GET"])
-def usage_today():
-    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    model = request.args.get("model", DEFAULT_MODEL)
-    conn = connect(USAGE_DB)
-    try:
-        row = conn.execute(
-            "SELECT tokens_in, tokens_out, total_tokens, calls FROM totals_daily WHERE day=? AND model=?",
-            (day, model),
-        ).fetchone()
-        data = {"day": day, "model": model}
-        if row:
-            data.update({"tokens_in": row[0], "tokens_out": row[1], "total_tokens": row[2], "calls": row[3]})
-        else:
-            data.update({"tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "calls": 0})
-        return jsonify(data), 200
-    finally:
-        conn.close()
+def _serialize_state(t: _TaskState) -> dict:
+    return {
+        "task_id": t.task_id,
+        "status": t.status,  # queued | running | done | error
+        "created_ts": t.created_ts,
+        "started_ts": t.started_ts,
+        "finished_ts": t.finished_ts,
+        "http_status": t.http_status,
+        "error": t.error,
+        # Keep result lightweight here (None unless include_result=true)
+    }
 
+@app.route("/jid/create_pictures/status", methods=["GET"])
+def create_pictures_status():
+    """
+    Query:
+      - task_id=<id>  (single)
+      - or ids=<id1,id2,...> (multiple)
+      - optional include_result=true to embed finished results inline
+    """
+    include_result = request.args.get("include_result", "false").lower() == "true"
 
-@app.route("/jid/by_email", methods=["GET"])
-def jid_by_email():
-    email = (request.args.get("email") or "").strip().lower()
-    if not email:
-        return jsonify({"error": "email is required"}), 400
+    ids_param = request.args.get("ids")
+    task_id = request.args.get("task_id")
 
-    try:
-        conn = connect(PICTURE_DB)
-        cur = conn.cursor()
+    if not ids_param and not task_id:
+        return jsonify({"error": "provide task_id or ids"}), 400
 
-        # 1) visions for this email
-        cur.execute("""
-            SELECT id, text, focuses, status, slug, created_at, updated_at
-            FROM visions
-            WHERE (email = ? OR (email IS NULL AND ? = ''))  -- prefer exact match; keep NULL if you use it
-            ORDER BY COALESCE(updated_at, created_at) DESC, id DESC
-        """, (email, email))
-        vision_rows = cur.fetchall()
+    ids = []
+    if task_id:
+        ids = [task_id]
+    if ids_param:
+        ids.extend([s.strip() for s in ids_param.split(",") if s.strip()])
 
-        visions = []
-        vision_ids = []
-        for r in vision_rows:
-            d = _row_to_dict(cur, r)
-            vid = d["id"]
-            vision_ids.append(vid)
+    out = []
+    for tid in ids:
+        t = _get_task(tid)
+        if not t:
+            out.append({"task_id": tid, "status": "unknown"})
+            continue
+        d = _serialize_state(t)
+        if include_result and t.status in ("done", "error"):
+            # Return result body only when done; for error, result is None
+            d["result"] = t.result
+        out.append(d)
 
-            # parse focuses (TEXT -> JSON list) defensively
-            f_raw = d.get("focuses")
-            try:
-                f_list = json.loads(f_raw) if f_raw else []
-                if isinstance(f_list, dict) and "focuses" in f_list:
-                    f_list = f_list["focuses"]
-            except Exception:
-                f_list = []
-            d["focuses"] = f_list
+    return jsonify({"tasks": out}), 200
 
-            d.pop("slug", None)  # not needed for this view
-            visions.append({**d, "pictures": []})
-
-        # early return if no visions
-        if not vision_ids:
-            return jsonify({"email": email, "visions": []})
-
-        # 2) pictures for those visions, restricted to this email
-        q_marks = ",".join("?" for _ in vision_ids)
-        cur.execute(f"""
-            SELECT id, vision_id, title, description, function, status, created_at, updated_at
-            FROM pictures
-            WHERE vision_id IN ({q_marks})
-              AND (email = ? OR (email IS NULL AND ? = ''))
-            ORDER BY COALESCE(updated_at, created_at) DESC, id DESC
-        """, (*vision_ids, email, email))
-        pic_rows = cur.fetchall()
-
-        # index visions by id
-        vmap = { v["id"]: v for v in visions }
-
-        for r in pic_rows:
-            d = _row_to_dict(cur, r)
-            vid = d.pop("vision_id", None)
-            if vid in vmap:
-                vmap[vid]["pictures"].append(d)
-
-        return jsonify({"email": email, "visions": visions})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500

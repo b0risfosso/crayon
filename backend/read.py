@@ -1,0 +1,274 @@
+# read.py
+from __future__ import annotations
+
+import os
+import json
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from typing import Optional, Iterable
+
+from flask import Flask, request, jsonify
+
+# Pull shared DB paths and connect() from your project
+# (These exist in your codebase alongside jid.py/canvas.py)
+from db_shared import connect, USAGE_DB, PICTURE_DB
+
+# ------------------------------------------------------------------------------
+# Flask app
+
+app = Flask(__name__)
+
+# ------------------------------------------------------------------------------
+# Local helpers used by the read endpoints
+
+def _safe_get_picture_db_path() -> str:
+    """
+    Resolve the path to the picture DB. Prefer env override, else shared constant.
+    """
+    return os.getenv("PICTURE_DB", PICTURE_DB)
+
+@contextmanager
+def _maybe_connect(db_path: str):
+    """
+    Short-lived sqlite connection contextmanager for read endpoints.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def _row_to_dict(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict:
+    return {d[0]: row[i] for i, d in enumerate(cursor.description)}
+
+def _ensure_prompt_outputs_table(db_path: str) -> None:
+    """
+    Create prompt_outputs table if missing.
+    Matches the columns used by canvas.run_collection storage.
+    """
+    ddl = """
+    CREATE TABLE IF NOT EXISTS prompt_outputs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vision_id INTEGER,
+        picture_id INTEGER,
+        collection TEXT,
+        prompt_key TEXT,
+        prompt_text TEXT,
+        system_text TEXT,
+        output_text TEXT,
+        model TEXT,
+        email TEXT,
+        metadata TEXT,
+        created_at TEXT
+    );
+    """
+    with _maybe_connect(db_path) as conn:
+        conn.execute(ddl)
+        conn.commit()
+
+# ------------------------------------------------------------------------------
+# Defaults (model fallback if caller omits)
+DEFAULT_MODEL = os.getenv("LLM_MODEL", "gpt-5-mini-2025-08-07")
+
+# ------------------------------------------------------------------------------
+# Endpoints
+
+@app.route("/read/usage", methods=["GET"])
+def usage_today():
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    model = request.args.get("model", DEFAULT_MODEL)
+    conn = connect(USAGE_DB)
+    try:
+        row = conn.execute(
+            "SELECT tokens_in, tokens_out, total_tokens, calls FROM totals_daily WHERE day=? AND model=?",
+            (day, model),
+        ).fetchone()
+        data = {"day": day, "model": model}
+        if row:
+            data.update({"tokens_in": row[0], "tokens_out": row[1], "total_tokens": row[2], "calls": row[3]})
+        else:
+            data.update({"tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "calls": 0})
+        return jsonify(data), 200
+    finally:
+        conn.close()
+
+
+@app.get("/read/architectures")
+def list_architectures():
+    """
+    Query params:
+      picture_id (int)               -- required unless vision_id provided
+      vision_id  (int)               -- optional
+      collection (str)               -- optional filter (e.g., 'duet_worldwright_x_wax')
+      include_body (0|1)             -- include output_text (default 0)
+      limit (int)                    -- default 50
+    Returns: { items: [{ id, collection, prompt_key, created_at, model, email, ...(maybe output_text) }], count }
+    """
+    pic_id = request.args.get("picture_id", type=int)
+    vis_id = request.args.get("vision_id", type=int)
+    if not pic_id and not vis_id:
+        return jsonify({"error": "picture_id or vision_id is required"}), 400
+
+    collection = (request.args.get("collection") or "").strip() or None
+    include_body = bool(int(request.args.get("include_body", "0")))
+    limit = request.args.get("limit", default=50, type=int)
+    db_path = _safe_get_picture_db_path()
+
+    # Ensure table (no-op if already created)
+    try:
+        _ensure_prompt_outputs_table(db_path)
+    except Exception:
+        return jsonify({"items": [], "count": 0})
+
+    cols = "id, collection, prompt_key, created_at, model, email"
+    if include_body:
+        cols += ", output_text"
+
+    where = []
+    args = []
+    if pic_id:
+        where.append("picture_id = ?")
+        args.append(pic_id)
+    if vis_id:
+        where.append("vision_id = ?")
+        args.append(vis_id)
+    if collection:
+        where.append("collection = ?")
+        args.append(collection)
+
+    sql = f"SELECT {cols} FROM prompt_outputs"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
+    args.append(limit)
+
+    items = []
+    with _maybe_connect(db_path) as conn:
+        cur = conn.execute(sql, tuple(args))
+        cols_list = [d[0] for d in cur.description]
+        for row in cur.fetchall():
+            items.append({k: v for k, v in zip(cols_list, row)})
+    return jsonify({"items": items, "count": len(items)})
+
+
+@app.get("/read/architecture/<int:arch_id>")
+def get_architecture(arch_id: int):
+    db_path = _safe_get_picture_db_path()
+    try:
+        _ensure_prompt_outputs_table(db_path)
+    except Exception:
+        return jsonify({"error": "not found"}), 404
+
+    with _maybe_connect(db_path) as conn:
+        cur = conn.execute("""
+            SELECT id, vision_id, picture_id, collection, prompt_key, prompt_text, system_text,
+                   output_text, model, email, metadata, created_at
+            FROM prompt_outputs
+            WHERE id = ?
+        """, (arch_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        cols = [d[0] for d in cur.description]
+    rec = {k: v for k, v in zip(cols, row)}
+    # Try to parse metadata
+    try:
+        if rec.get("metadata"):
+            rec["metadata"] = json.loads(rec["metadata"])
+    except Exception:
+        pass
+    return jsonify(rec)
+
+
+@app.route("/read/by_email", methods=["GET"])
+def read_by_email():
+    email = (request.args.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+
+    try:
+        conn = connect(PICTURE_DB)
+        cur = conn.cursor()
+
+        # 1) visions for this email
+        cur.execute("""
+            SELECT id, text, focuses, status, slug, created_at, updated_at
+            FROM visions
+            WHERE (email = ? OR (email IS NULL AND ? = ''))
+            ORDER BY COALESCE(updated_at, created_at) DESC, id DESC
+        """, (email, email))
+        vision_rows = cur.fetchall()
+
+        visions = []
+        vision_ids = []
+        for r in vision_rows:
+            d = _row_to_dict(cur, r)
+            vid = d["id"]
+            vision_ids.append(vid)
+
+            # parse focuses (TEXT -> JSON list) defensively
+            f_raw = d.get("focuses")
+            try:
+                f_list = json.loads(f_raw) if f_raw else []
+                if isinstance(f_list, dict) and "focuses" in f_list:
+                    f_list = f_list["focuses"]
+            except Exception:
+                f_list = []
+            d["focuses"] = f_list
+
+            d.pop("slug", None)  # not needed for this view
+            visions.append({**d, "pictures": []})
+
+        # early return if no visions
+        if not vision_ids:
+            return jsonify({"email": email, "visions": []})
+
+        # 2) pictures for those visions, restricted to this email
+        q_marks = ",".join("?" for _ in vision_ids)
+        cur.execute(f"""
+            SELECT id, vision_id, title, description, function, status, created_at, updated_at
+            FROM pictures
+            WHERE vision_id IN ({q_marks})
+              AND (email = ? OR (email IS NULL AND ? = ''))
+            ORDER BY COALESCE(updated_at, created_at) DESC, id DESC
+        """, (*vision_ids, email, email))
+        pic_rows = cur.fetchall()
+
+        # index visions by id
+        vmap = { v["id"]: v for v in visions }
+
+        for r in pic_rows:
+            d = _row_to_dict(cur, r)
+            vid = d.pop("vision_id", None)
+            if vid in vmap:
+                vmap[vid]["pictures"].append(d)
+
+        return jsonify({"email": email, "visions": visions})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+# ------------------------------------------------------------------------------
+# Optional: simple health check
+@app.get("/read/healthz")
+def healthz():
+    return jsonify({"status": "ok"}), 200
+
+
+# ------------------------------------------------------------------------------
+# Entrypoint (optional if you run via gunicorn)
+if __name__ == "__main__":
+    # Bind to localhost by default; override with READ_HOST/READ_PORT
+    host = os.getenv("READ_HOST", "127.0.0.1")
+    port = int(os.getenv("READ_PORT", "9020"))
+    app.run(host=host, port=port, debug=False)
