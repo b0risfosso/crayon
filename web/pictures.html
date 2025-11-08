@@ -321,143 +321,148 @@
     // Render
     // ------------------------------------------
     async function render(data){
-      const visions = Array.isArray(data?.visions) ? data.visions : [];
-      $('results').style.display = 'block';
-      $('summary').textContent = `${visions.length} vision${visions.length===1?'':'s'} for ${data?.email || ''}`;
+  const visions = Array.isArray(data?.visions) ? data.visions : [];
+  $('results').style.display = 'block';
+  $('summary').textContent = `${visions.length} vision${visions.length===1?'':'s'} for ${data?.email || ''}`;
 
-      const mount = $('visions');
-      mount.innerHTML = '';
+  const mount = $('visions');
+  mount.innerHTML = '';
 
-      if (!visions.length){
-        const empty = document.createElement('div');
-        empty.className = 'empty';
-        empty.textContent = 'No data for this email yet.';
-        mount.append(empty);
-        return;
+  if (!visions.length){
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'No data for this email yet.';
+    mount.append(empty);
+    return;
+  }
+
+  const preferredCollection = (localStorage.getItem('architects_all') || '').trim() || null;
+
+  for (const v of visions){
+    const box = document.createElement('div');
+    box.className = 'vision';
+
+    const title = document.createElement('h2');
+    title.textContent = v.text || '(Untitled vision)';
+    box.append(title);
+
+    const meta = document.createElement('div'); meta.className = 'meta mono';
+    meta.textContent = `id:${v.id} · status:${v.status || '—'} · updated:${v.updated_at || v.created_at || '—'}`;
+    box.append(meta);
+
+    // focuses chips (if any)
+    const f = Array.isArray(v.focuses) ? v.focuses : [];
+    if (f.length){
+      const chips = document.createElement('div'); chips.className = 'chips';
+      for (const it of f){
+        const dim = (it && (it.dimension || it.title || it.name)) || 'Focus';
+        const chip = document.createElement('div'); chip.className = 'chip';
+        chip.innerHTML = `<strong>${escapeHtml(dim)}</strong>`;
+        chips.append(chip);
       }
-
-      const preferredCollection = (localStorage.getItem('architects_all') || '').trim() || null;
-
-      for (const v of visions){
-        const box = document.createElement('div');
-        box.className = 'vision';
-
-        const title = document.createElement('h2');
-        title.textContent = v.text || '(Untitled vision)';
-        box.append(title);
-
-        const meta = document.createElement('div'); meta.className = 'meta mono';
-        meta.textContent = `id:${v.id} · status:${v.status || '—'} · updated:${v.updated_at || v.created_at || '—'}`;
-        box.append(meta);
-
-        // focuses chips (if any)
-        const f = Array.isArray(v.focuses) ? v.focuses : [];
-        if (f.length){
-          const chips = document.createElement('div'); chips.className = 'chips';
-          for (const it of f){
-            const dim = (it && (it.dimension || it.title || it.name)) || 'Focus';
-            const chip = document.createElement('div'); chip.className = 'chip';
-            chip.innerHTML = `<strong>${escapeHtml(dim)}</strong>`;
-            chips.append(chip);
-          }
-          box.append(chips);
-        }
-
-        const sep = document.createElement('div');
-        sep.className = 'sep';
-        box.append(sep);
-
-        // pictures grid
-        const pics = Array.isArray(v.pictures) ? v.pictures : [];
-        if (!pics.length){
-          const empty = document.createElement('div'); empty.className = 'empty';
-          empty.textContent = 'No pictures for this vision yet.';
-          box.append(empty);
-          mount.append(box);
-          continue;
-        }
-
-        const grid = document.createElement('div'); grid.className = 'pics';
-
-        // For speed, check existence per picture in parallel
-        const pictureIds = pics.map(p => p.id).filter(id => id != null);
-        const countsMap = await getArchitectureCountsForPictures(pictureIds, { collection: preferredCollection });
-        const existingCount = (countsMap[String(p.id)]?.total) || 0;
-
-        for (const p of pics){
-          const card = document.createElement('div'); card.className = 'pic';
-
-          const h3 = document.createElement('h3'); h3.textContent = p?.title || 'Untitled picture';
-          const d  = document.createElement('div'); d.className = 'muted'; d.textContent = p?.description || '';
-          const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
-          if (p?.function) fn.innerHTML = `<strong>Function:</strong> ${escapeHtml(p.function)}`;
-          const pm = document.createElement('div'); pm.className = 'meta mono';
-          pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
-
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.style.marginTop = '.5rem';
-
-          if (existingCount > 0){
-            // GREEN: view existing architectures
-            btn.textContent = 'view architectures';
-            btn.className = 'view';
-            btn.addEventListener('click', async () => {
-              await viewExistingArchitectures(p, { collection: preferredCollection || null });
-            });
-
-            // Optional: secondary "rerun architects" (re-enqueue)
-            const rerun = document.createElement('button');
-            rerun.type = 'button';
-            rerun.textContent = 'rerun architects';
-            rerun.className = 'recreate';
-            rerun.style.marginTop = '.5rem';
-            rerun.style.marginLeft = '.4rem';
-            rerun.addEventListener('click', async () => {
-              const visionText = v?.text || '';
-              if (!visionText) { alert('This vision has no text.'); return; }
-              await runArchitectsForPictureCard(card, visionText, p);
-            });
-
-            card.append(h3, d);
-            if (p?.function) card.append(fn);
-            card.append(pm, btn, rerun);
-          } else {
-            // BLUE: run architects (enqueue → poll → flip to view)
-            btn.textContent = 'run architects';
-            btn.className = 'create';
-            btn.addEventListener('click', async () => {
-              const visionText = v?.text || '';
-              if (!visionText) { alert('This vision has no text.'); return; }
-              await runArchitectsForPictureCard(card, visionText, p);
-
-              // After run, flip to "view architectures" if stored
-              try {
-                const { count } = await getArchitecturesForPicture(p.id, { collection: preferredCollection || null });
-                if ((Number(count) || 0) > 0){
-                  const replacement = btn.cloneNode(true);
-                  replacement.textContent = 'view architectures';
-                  replacement.className = 'view';
-                  replacement.onclick = async () => {
-                    await viewExistingArchitectures(p, { collection: preferredCollection || null });
-                  };
-                  btn.replaceWith(replacement);
-                }
-              } catch {}
-            });
-
-            card.append(h3, d);
-            if (p?.function) card.append(fn);
-            card.append(pm, btn);
-          }
-
-          grid.append(card);
-        }
-
-        box.append(grid);
-        mount.append(box);
-      }
+      box.append(chips);
     }
+
+    const sep = document.createElement('div');
+    sep.className = 'sep';
+    box.append(sep);
+
+    // pictures grid
+    const pics = Array.isArray(v.pictures) ? v.pictures : [];
+    if (!pics.length){
+      const empty = document.createElement('div'); empty.className = 'empty';
+      empty.textContent = 'No pictures for this vision yet.';
+      box.append(empty);
+      mount.append(box);
+      continue;
+    }
+
+    const grid = document.createElement('div'); grid.className = 'pics';
+
+    // Batch counts ONCE per vision
+    const pictureIds = pics.map(p => p?.id).filter(id => id != null);
+    const countsMap = pictureIds.length
+      ? await getArchitectureCountsForPictures(pictureIds, { collection: preferredCollection })
+      : {};
+
+    for (const p of pics){
+      const card = document.createElement('div'); card.className = 'pic';
+
+      const h3 = document.createElement('h3'); h3.textContent = p?.title || 'Untitled picture';
+      const d  = document.createElement('div'); d.className = 'muted'; d.textContent = p?.description || '';
+      const fn = document.createElement('div'); fn.style.marginTop = '.35rem';
+      if (p?.function) fn.innerHTML = `<strong>Function:</strong> ${escapeHtml(p.function)}`;
+      const pm = document.createElement('div'); pm.className = 'meta mono';
+      pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.style.marginTop = '.5rem';
+
+      // ✅ Now per-picture, using the batched map:
+      const existingCount = Number(countsMap?.[String(p?.id)]?.total || 0);
+
+      if (existingCount > 0){
+        // GREEN: view existing architectures
+        btn.textContent = 'view architectures';
+        btn.className = 'view';
+        btn.addEventListener('click', async () => {
+          await viewExistingArchitectures(p, { collection: preferredCollection || null });
+        });
+
+        // Optional: secondary "rerun architects" (re-enqueue)
+        const rerun = document.createElement('button');
+        rerun.type = 'button';
+        rerun.textContent = 'rerun architects';
+        rerun.className = 'recreate';
+        rerun.style.marginTop = '.5rem';
+        rerun.style.marginLeft = '.4rem';
+        rerun.addEventListener('click', async () => {
+          const visionText = v?.text || '';
+          if (!visionText) { alert('This vision has no text.'); return; }
+          await runArchitectsForPictureCard(card, visionText, p);
+        });
+
+        card.append(h3, d);
+        if (p?.function) card.append(fn);
+        card.append(pm, btn, rerun);
+      } else {
+        // BLUE: run architects (enqueue → poll → flip to view)
+        btn.textContent = 'run architects';
+        btn.className = 'create';
+        btn.addEventListener('click', async () => {
+          const visionText = v?.text || '';
+          if (!visionText) { alert('This vision has no text.'); return; }
+          await runArchitectsForPictureCard(card, visionText, p);
+
+          // After run, flip to "view architectures" if stored
+          try {
+            const { count } = await getArchitecturesForPicture(p.id, { collection: preferredCollection || null });
+            if ((Number(count) || 0) > 0){
+              const replacement = btn.cloneNode(true);
+              replacement.textContent = 'view architectures';
+              replacement.className = 'view';
+              replacement.onclick = async () => {
+                await viewExistingArchitectures(p, { collection: preferredCollection || null });
+              };
+              btn.replaceWith(replacement);
+            }
+          } catch {}
+        });
+
+        card.append(h3, d);
+        if (p?.function) card.append(fn);
+        card.append(pm, btn);
+      }
+
+      grid.append(card);
+    }
+
+    box.append(grid);
+    mount.append(box);
+  }
+}
+
 
     // ------------------------------------------
     // Load flow
