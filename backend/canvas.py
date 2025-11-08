@@ -269,6 +269,61 @@ def build_wax_worldwright_prompt(
     spec_json = json.dumps(spec, ensure_ascii=False, separators=(",", ":"))
     return wax_worldwright_prompt.format(spec_json=spec_json)
 
+def run_explain_picture(
+    vision_text: str,
+    picture_title: str,
+    picture_description: str,
+    picture_function: str,
+    *,
+    focus: str = "",
+    email: Optional[str] = None,
+    model: str = DEFAULT_MODEL,
+    endpoint_name: str = "/jid/explain_picture",
+) -> str:
+    """Generate structured text explanation (not JSON)."""
+    today_tokens = get_today_model_tokens(model)
+    if today_tokens >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model}: {today_tokens}/{DAILY_MAX_TOKENS_LIMIT}"
+        )
+
+    prompt_text = build_explain_picture_prompt(vision_text, picture_title, picture_description, picture_function, focus)
+
+    usage_in = 0
+    usage_out = 0
+    request_id = None
+
+    resp = client.responses.create(
+        model=model,
+        input=prompt_text
+    )
+
+    usage = _usage_from_resp(resp)
+    usage_in = usage["input"]
+    usage_out = usage["output"]
+
+    content = resp.output_text
+
+    
+
+    # Log usage
+    try:
+        log_usage(
+            app="jid",
+            model=model,
+            tokens_in=usage_in,
+            tokens_out=usage_out,
+            endpoint=endpoint_name,
+            email=email,
+            request_id=request_id,
+            duration_ms=0,
+            cost_usd=0.0,
+            meta={"purpose": "explain_picture"},
+        )
+    except Exception as e:
+        print(f"[WARN] usage logging failed (explain_picture): {e}")
+
+    return content.strip()
 
 # NEW: chat completion wrapper; uses your existing client/model if available
 def _run_chat(system_text: str | None, user_text: str, *, model: Optional[str] = None):
