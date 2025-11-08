@@ -821,136 +821,104 @@ def canvas_explain_picture():
 
 
 @app.post("/canvas/initialize_canvas")
-def initialize_canvas():
+def initialize_canvas_submit():
     """
-    One call that:
-      1) gets PICTURE_EXPLANATION (via run_explain_picture)
-      2) persists the explanation (vision/picture/explanation) to DB
-      3) runs the prompt collection with that explanation
-      4) stores collection outputs (short-lived DB connections per write)
-
-    Expected JSON body (mirrors your example):
-      {
-        "vision": "...",
-        "picture_title": "...",
-        "picture_description": "...",
-        "picture_function": "...",
-        "focus": "...",
-        "collection": "architects_all",
-        "constraints": "...",
-        "deployment_context": "...",
-        "readiness_target": "...",
-        "integrations": "",
-        "email": "user@example.com",
-        "picture_id": 123,          # optional (will be set from persistence if omitted)
-        "vision_id": 456,           # optional (ditto)
-        "model": null,              # collection model override
-        "explain_model": null,      # optional override for the explanation call
-        "explain_temperature": null,# if your _run_chat honors temperature; safe to ignore
-        "store": true               # default True
-      }
+    SUBMIT-ONLY (async):
+      - Accepts single object, {items:[...]}, or a top-level list.
+      - Enqueues each item and returns 202 with { task_ids:[...] }.
     """
-    data = request.get_json(force=True, silent=True) or {}
-
-    # 1) Explain the picture
-    vision_text = (data.get("vision") or "").strip()
-    picture_title = (data.get("picture_title") or "").strip() or (data.get("picture_short") or "").strip()
-    picture_desc = (data.get("picture_description") or "").strip() or (data.get("picture_desc") or data.get("description") or "").strip()
-    picture_func = (data.get("picture_function") or "").strip()
-    focus = (data.get("focus") or "").strip()
-
-    if not vision_text or not (picture_title or picture_desc):
-        return jsonify({
-            "ok": False,
-            "error": "Missing required fields",
-            "detail": "Provide 'vision' and at least one of 'picture_title' or 'picture_description'."
-        }), 400
-
-    email = (data.get("email") or "").strip().lower() or None
-    explain_model = data.get("explain_model") or DEFAULT_MODEL
-
     try:
-        explanation_text = run_explain_picture(
-            vision_text=vision_text,
-            picture_title=picture_title,
-            picture_description=picture_desc,
-            picture_function=picture_func,
-            focus=focus,
-            email=email,
-            model=explain_model,
-            endpoint_name="/canvas/initialize_canvas",
-        ).strip()
-    except RuntimeError as e:
-        return jsonify({"ok": False, "error": str(e)}), 429
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Unhandled error during explanation: {e}"}), 500
+        data = request.get_json(force=True, silent=False)
+    except Exception:
+        return jsonify({"error": "invalid JSON"}), 400
 
-    if not explanation_text:
-        return jsonify({"ok": False, "error": "No explanation produced"}), 422
-
-    # 2) Persist the explanation to DB (get/propagate IDs)
-    try:
-        ids = persist_explanation_to_db(
-            vision_text=vision_text,
-            picture_title=picture_title,
-            picture_text=picture_desc,
-            explanation_text=explanation_text,
-            focus=(focus or None),
-            email=email,
-            source="canvas",
-        ) or {}
-    except Exception as e:
-        # Non-fatal for running the collection; but return as warning
-        ids = {}
-        persist_warning = f"Failed to persist explanation: {type(e).__name__}: {e}"
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict) and isinstance(data.get("items"), list):
+        items = data["items"]
+    elif isinstance(data, dict):
+        items = [data]
     else:
-        persist_warning = None
+        return jsonify({"error": "expected object or list"}), 400
 
-    # Respect explicit IDs if the client sent them; otherwise prefer persisted IDs
-    vision_id = data.get("vision_id") if isinstance(data.get("vision_id"), int) else ids.get("vision_id")
-    picture_id = data.get("picture_id") if isinstance(data.get("picture_id"), int) else ids.get("picture_id")
+    if not items:
+        return jsonify({"error": "no items to process"}), 400
 
-    # 3) Prepare inputs for the collection (matches your example contract)
-    picture_compound = f"{picture_title}\n\n{picture_desc}".strip()
-    inputs = {
-        "vision": vision_text,
-        "picture": picture_compound,
-        "picture_explanation": explanation_text,
-        "constraints": data.get("constraints", ""),
-        "deployment_context": data.get("deployment_context", ""),
-        "readiness_target": data.get("readiness_target", ""),
-        # aliases used by some prompts
-        "context": data.get("deployment_context", ""),
-        "integration_context": data.get("deployment_context", ""),
-        "integrations": data.get("integrations", "")
+    task_ids = []
+    for payload in items:
+        state = _register_task(payload)
+        qtask = _InitCanvasTask(payload=payload)
+        qtask.task_id = state.task_id  # bind same id for worker lookup
+        _CREATE_INIT_Q.put(qtask)
+        task_ids.append(state.task_id)
+
+    return jsonify({"task_ids": task_ids}), 202
+
+
+def _serialize_state(t: _TaskState) -> dict:
+    return {
+        "task_id": t.task_id,
+        "status": t.status,  # queued | running | done | error
+        "created_ts": t.created_ts,
+        "started_ts": t.started_ts,
+        "finished_ts": t.finished_ts,
+        "http_status": t.http_status,
+        "error": t.error,
     }
 
-    # 4) Run the collection + store outputs
-    rc = _run_collection_core(
-        collection=(data.get("collection") or "").strip(),
-        inputs=inputs,
-        model=data.get("model"),
-        store=bool(data.get("store", True)),
-        email=email,
-        vision_id=vision_id if isinstance(vision_id, int) else None,
-        picture_id=picture_id if isinstance(picture_id, int) else None,
-    )
 
-    if "error" in rc:
-        return jsonify({"ok": False, "explanation": explanation_text, **rc}), 400
+@app.get("/canvas/initialize_canvas/status")
+def initialize_canvas_status():
+    """
+    Query:
+      - task_id=<id> (single) OR ids=<id1,id2,...> (multiple)
+      - include_result=true to embed finished results inline
+    """
+    include_result = request.args.get("include_result", "false").lower() == "true"
+    ids_param = request.args.get("ids")
+    task_id = request.args.get("task_id")
 
-    resp = {
-        "ok": True,
-        "explanation": explanation_text,
-        "vision": vision_text,
-        "focus": focus,
-        "picture_title": picture_title,
-        "picture_description": picture_desc,
-        "vision_id": vision_id,
-        "picture_id": picture_id,
-        **rc
-    }
-    if persist_warning:
-        resp["persist_warning"] = persist_warning
+    if not ids_param and not task_id:
+        return jsonify({"error": "provide task_id or ids"}), 400
 
-    return jsonify(resp), 200
+    ids = []
+    if task_id:
+        ids.append(task_id)
+    if ids_param:
+        ids.extend([s.strip() for s in ids_param.split(",") if s.strip()])
+
+    out = []
+    for tid in ids:
+        t = _get_task(tid)
+        if not t:
+            out.append({"task_id": tid, "status": "unknown"})
+            continue
+        d = _serialize_state(t)
+        if include_result and t.status in ("done", "error"):
+            d["result"] = t.result
+        out.append(d)
+
+    return jsonify({"tasks": out}), 200
+
+
+@app.get("/canvas/initialize_canvas/result")
+def initialize_canvas_result():
+    """
+    GET /canvas/initialize_canvas/result?task_id=...
+    202 if not ready, 200 with body when done, 500 with error
+    """
+    tid = request.args.get("task_id")
+    if not tid:
+        return jsonify({"error": "task_id required"}), 400
+
+    t = _get_task(tid)
+    if not t:
+        return jsonify({"error": "unknown task_id"}), 404
+
+    if t.status in ("queued", "running"):
+        return jsonify({"status": t.status}), 202
+    if t.status == "error":
+        return jsonify({"status": "error", "error": t.error}), 500
+
+    # done
+    return jsonify(t.result or {}), (t.http_status or 200)
