@@ -891,3 +891,65 @@ def create_pictures_status():
             out.append(_serialize_state(state))
 
     return jsonify({"tasks": out}), 200
+
+
+@app.route("/jid/create_pictures/result", methods=["GET"])
+def create_pictures_result():
+    """
+    Fetch the final result for a single create_pictures task.
+
+    Query params:
+      - task_id=<uuid>    (required)
+      - wrapper=true|false (default false)
+          false -> return the original body exactly (status code = stored http_status or 200)
+          true  -> return a wrapper with metadata + result
+
+    Responses:
+      400 if task_id missing
+      404 if unknown task_id
+      202 while queued/running
+      500 if task errored (includes error string)
+      200 (or stored http_status) with final JSON body when done
+    """
+    tid = request.args.get("task_id", "").strip()
+    if not tid:
+        return jsonify({"error": "task_id required"}), 400
+
+    wrapper = (request.args.get("wrapper", "false").lower() == "true")
+
+    state = _get_task(tid)
+    if state is None:
+        return jsonify({"error": "unknown task_id", "task_id": tid}), 404
+
+    # Not ready yet
+    if state.status in ("queued", "running"):
+        return jsonify({
+            "task_id": state.task_id,
+            "status": state.status
+        }), 202
+
+    # Error case
+    if state.status == "error":
+        if wrapper:
+            return jsonify({
+                "task_id": state.task_id,
+                "status": "error",
+                "error": state.error
+            }), 500
+        else:
+            return jsonify({"error": state.error or "task failed", "task_id": state.task_id}), 500
+
+    # Done: return the original body with its stored HTTP status (default 200)
+    body_plain = _to_plain(state.result)
+    http_status = state.http_status or 200
+
+    if wrapper:
+        return jsonify({
+            "task_id": state.task_id,
+            "status": "done",
+            "http_status": http_status,
+            "result": body_plain
+        }), 200
+
+    # No wrapper: behave like the original synchronous endpoint
+    return jsonify(body_plain), http_status
