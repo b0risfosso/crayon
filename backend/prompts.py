@@ -6,16 +6,10 @@
 create_pictures_prompt = r"""
 You are the Vision Architect.
 
-Your task is to take a VISION and translate it into a complete set of PICTURES.
-Each picture must represent a physical, social, or metaphysical *system* that—if drawn in reality, in its fully functioning form—would bring the VISION into existence.
+Your task is to take a VISION and translate it into a coherent set of PICTURES.
+Each picture represents a distinct *system* (physical, social, or metaphysical) that, if fully realized, would make the VISION real.
 
-Optionally, you may be given a **FOCUS** describing a specific dimension, perspective, or thematic lens to emphasize when creating the pictures
-(e.g., "Economic Dimension — Ownership, incentives, and cooperation",
-"Mechanical Dimension — Form, structure, and motion",
-"Legal Dimension — Documents, titles, ownership structures, zoning boundaries",
-"Technological Dimension — Mapping tools, sensors, drones, automation").
-
-When a FOCUS is provided, interpret the vision *through that lens* and ensure all pictures reflect, exemplify, or elaborate that focus while still realizing the overall vision.
+When a **FOCUS** is provided, interpret the VISION through that lens—every picture should embody that perspective while still serving the overall goal.
 
 ---
 
@@ -26,7 +20,7 @@ FOCUS (optional): "{focus}"
 ---
 
 ### OUTPUT FORMAT (STRICT JSON ONLY):
-Return **ONLY** valid JSON (no Markdown, no commentary) matching this schema:
+Return ONLY valid JSON (no Markdown, no commentary) matching this schema:
 
 {{
   "vision": "string",
@@ -34,53 +28,56 @@ Return **ONLY** valid JSON (no Markdown, no commentary) matching this schema:
   "pictures": [
     {{
       "title": "string",
-      "picture": "string",      // visual description (geometry, materials, colors, forces/flows)
-      "function": "string"      // real-world role; how it operates; how it realizes the vision through the focus
+      "picture": "string",   // the core idea or governing logic of the system (1–2 sentences)
+      "function": "string"   // real-world role; how it operates; how it realizes the vision through the focus
     }}
   ]
 }}
 
-Rules for the JSON:
+Rules:
 - Do not include trailing commas.
 - Use double quotes for all keys and string values.
 - Include 6–12 pictures unless the vision strongly implies fewer or more.
-- Keep text concise but specific (poetic precision, not fluff).
-- If FOCUS is empty or null, generate pictures from a holistic perspective across all relevant dimensions.
+- Keep text concise but potent (conceptual precision, not narrative flourish).
+- Focus on causal structure: what is this system *for*, and what principle makes it *work*.
+- If FOCUS is empty or null, derive a balanced set of pictures across relevant dimensions.
 
 ---
 
 ### GUIDELINES:
-- Each picture represents one essential subsystem or manifestation of the vision.
-- Together, the pictures form a complete architecture (physical, social, energetic, informational, symbolic).
-- When FOCUS is provided, weave that lens into all pictures (e.g., economic structures, mechanical forms, legal architectures).
-- Avoid generic descriptions; make each feel like a living artifact or buildable machine.
-- Use mythic-technical titles (e.g., "The Flavor Forge", "The Solar Spine", "The Resonance Dome").
-- If the vision implies a city/ecosystem/civilization, distribute across scales (micro → macro).
+- Each picture should represent a unique structural function within the whole architecture.
+- “Picture” captures the core insight, law, or organizing idea.
+- “Function” describes how this subsystem contributes to realizing the vision—its operational logic, stripped to essentials.
+- Avoid decorative visual descriptions or worldbuilding language.
+- Use simple, short but descriptive titles that clearly convey each picture's purpose
+- Together, the pictures should outline the living skeleton of the vision.
 
 ---
 
-### EXAMPLES (for style only — do NOT copy text):
-VISION: "Creating the perfect burger: a burger from the gods themselves..."
-OUTPUT: includes things like “Flavor Forge”, “Bun Genesis Wheel”, “Sauce Altar”, etc.
-
-VISION: "Building the prosperity of Chicago."
-OUTPUT: includes things like “Solar Spine”, “Civic Forge”, “Learning River”, etc.
-
-VISION: "Creating solar microgrids."
-FOCUS: "Economic Dimension — Ownership, incentives, and cooperation."
-OUTPUT: Pictures emphasize cooperative markets, ownership models, and incentive mechanisms within the solar grid ecosystem.
-
-VISION: "Acquiring land."
-FOCUS: "Legal Dimension — Documents, titles, ownership structures, zoning boundaries."
-OUTPUT: Pictures focus on legal instruments, governance architectures, and data-backed territorial recognition.
+### EXAMPLES (for style only):
+VISION: "Building the infrastructure for ecological imagination."
+OUTPUT:
+[
+  {{
+    "title": "Regenerative Curriculum",
+    "picture": "Imagination becomes ecological when stories and ecosystems share a feedback loop.",
+    "function": "Trains communities to turn narratives into restoration protocols, linking creative practice to measurable regeneration."
+  }},
+  {{
+    "title": "Living Archive",
+    "picture": "Knowledge must grow like a forest—distributed, seeded, and adaptive.",
+    "function": "A continuously updating library of ecological experiments and cultural methods that evolve through collective use."
+  }}
+]
 
 ---
 
-### BEGIN.
+### BEGIN
 
 VISION: "{vision}"
 FOCUS: "{focus}"
 """
+
 
 create_focuses_prompt = r"""
 You are the Focus Cartographer.
