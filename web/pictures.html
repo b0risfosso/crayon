@@ -198,14 +198,28 @@
       while (true) {
         const url = `${EP.initStatus}?task_id=${encodeURIComponent(taskId)}`;
         const data = await fetchJSON(url, {}, 60000);
-        const t = Array.isArray(data?.tasks) ? data.tasks.find(x => x.task_id === taskId) : null;
+
+        // Accept BOTH shapes:
+        // 1) { tasks: [{ task_id, status, ...}, ...] }
+        // 2) { status: "queued" | "running" | "done" | "error" }
+        let t = null;
+        if (Array.isArray(data?.tasks)) {
+          t = data.tasks.find(x => x.task_id === taskId) || null;
+        } else if (typeof data?.status === 'string') {
+          t = { task_id: taskId, status: data.status };
+        }
+
         const st = t?.status || 'unknown';
-        if (st === 'done' || st === 'error' || st === 'unknown') return t || { status: st };
+
+        // Keep polling on 'unknown' instead of returning immediately
+        if (st === 'done' || st === 'error') return t;
+
         await new Promise(r => setTimeout(r, delay));
         delay = Math.min(delay * 1.4, 6000);
         if (Date.now() - start > timeoutMs) throw new Error('Timeout waiting for initialize_canvas');
       }
     }
+
 
     async function fetchInitializeResult(taskId){
       const url = `${EP.initResult}?task_id=${encodeURIComponent(taskId)}`;
