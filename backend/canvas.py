@@ -27,6 +27,8 @@ from db_shared import (
 
 )
 
+from prompts import explain_picture_prompt
+
 from prompts import wax_architect_prompt
 
 from prompts import wax_worldwright_prompt
