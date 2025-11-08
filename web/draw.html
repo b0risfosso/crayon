@@ -228,7 +228,7 @@
     function renderPictures(block) {
       const mount = $('picturesOut'); mount.innerHTML = '';
       const pics = Array.isArray(block?.pictures) ? block.pictures : [];
-      if (!pics.length) { mount.innerHTML = '<div class="muted">No pictures returned.</div>'; return; }
+      if (!pics.length) { mount.innerHTML = '<div class="muted">Done.</div>'; return; }
       for (const p of pics) {
         const card = document.createElement('div'); card.className = 'card';
         const h = document.createElement('h3'); h.textContent = p.title || 'Untitled picture';
