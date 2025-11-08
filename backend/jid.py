@@ -819,26 +819,75 @@ def _serialize_state(t: _TaskState) -> dict:
 
 @app.route("/jid/create_pictures/status", methods=["GET"])
 def create_pictures_status():
-    include_result = request.args.get("include_result", "false").lower() == "true"
-    # ... build ids ...
-    out = []
-    for tid in ids:
-        t = _get_task(tid)
-        if not t:
-            out.append({"task_id": tid, "status": "unknown"})
-            continue
+    """
+    Query status for one or more queued create_pictures tasks.
+
+    Query params:
+      - task_id=<uuid>           (single id)  OR
+      - ids=<uuid1,uuid2,...>    (comma-separated)
+      - include_result=true|false   (default false) — if true and task done/error,
+                                    embed the (plain) result payload for each task.
+
+    Response:
+      200 {
+        "tasks": [
+          {
+            "task_id": "...",
+            "status": "queued|running|done|error|unknown",
+            "created_ts": <unix>,
+            "started_ts": <unix|null>,
+            "finished_ts": <unix|null>,
+            "http_status": <int|null>,
+            "error": "<string|null>",
+            "result": { ... }          # present only if include_result=true and done/error
+          },
+          ...
+        ]
+      }
+      400 { "error": "..." }  on bad query
+    """
+    include_result = (request.args.get("include_result", "false").lower() == "true")
+
+    ids_param = request.args.get("ids")
+    single_id = request.args.get("task_id")
+
+    if not ids_param and not single_id:
+        return jsonify({"error": "provide task_id=<id> or ids=<id1,id2,...>"}), 400
+
+    task_ids = []
+    if single_id:
+        task_ids.append(single_id.strip())
+    if ids_param:
+        task_ids.extend([s.strip() for s in ids_param.split(",") if s.strip()])
+
+    if not task_ids:
+        return jsonify({"error": "no valid task ids provided"}), 400
+
+    def _serialize_state(state) -> dict:
+        # state may be None (unknown task)
+        if state is None:
+            return {"task_id": None, "status": "unknown"}
+
         d = {
-            "task_id": t.task_id,
-            "status": t.status,
-            "created_ts": t.created_ts,
-            "started_ts": t.started_ts,
-            "finished_ts": t.finished_ts,
-            "http_status": t.http_status,
-            "error": t.error,
+            "task_id": state.task_id,
+            "status": state.status,               # queued | running | done | error
+            "created_ts": state.created_ts,
+            "started_ts": state.started_ts,
+            "finished_ts": state.finished_ts,
+            "http_status": state.http_status,
+            "error": state.error,
         }
-        if include_result and t.status in ("done", "error"):
-            d["result"] = _to_plain(t.result)
-        out.append(d)
+        if include_result and state.status in ("done", "error"):
+            # Ensure result is plain JSON-serializable
+            d["result"] = _to_plain(state.result)
+        return d
+
+    out = []
+    for tid in task_ids:
+        state = _get_task(tid)
+        if state is None:
+            out.append({"task_id": tid, "status": "unknown"})
+        else:
+            out.append(_serialize_state(state))
+
     return jsonify({"tasks": out}), 200
-
-
