@@ -74,25 +74,80 @@ class _CreatePicturesTask:
         self.event = threading.Event()
 
 
+import json as _json
+import dataclasses
+try:
+    from flask import Response as _FlaskResponse
+except Exception:
+    _FlaskResponse = None
+
+def _to_plain(obj):
+    """
+    Coerce objects to JSON-serializable plain Python.
+    - Flask Response  -> its JSON body if possible, else parsed text, else raw text
+    - pydantic v2     -> model_dump()
+    - dataclasses     -> asdict()
+    - everything else -> obj (must already be serializable)
+    """
+    # Flask Response?
+    if _FlaskResponse is not None and isinstance(obj, _FlaskResponse):
+        # Try JSON
+        try:
+            js = obj.get_json(silent=True)
+            if js is not None:
+                return js
+        except Exception:
+            pass
+        # Try parse text
+        try:
+            txt = obj.get_data(as_text=True)
+            try:
+                return _json.loads(txt)
+            except Exception:
+                return {"raw": txt}
+        except Exception:
+            return {"raw": "<unreadable response>"}
+
+    # pydantic model?
+    if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
+        try:
+            return obj.model_dump()
+        except Exception:
+            pass
+
+    # dataclass?
+    try:
+        if dataclasses.is_dataclass(obj):
+            return dataclasses.asdict(obj)
+    except Exception:
+        pass
+
+    return obj
+
+
+
 def _create_pictures_worker():
-    # Push app context for everything inside this thread
     with app.app_context():
         while True:
             task = _CREATE_PICTURES_Q.get()
+            state = None
             try:
                 state = _get_task(task.task_id)
                 if state:
                     state.status = "running"
                     state.started_ts = time.time()
 
-                # DO NOT call jsonify here; return plain dict + code
                 status_code, body = _create_pictures_sync(task.payload)
 
-                task.result = (status_code, body)
+                # ⬇️ Ensure result is plain JSON-serializable data
+                body_plain = _to_plain(body)
+
+                task.result = (status_code, body_plain)
+
                 if state:
                     state.status = "done"
                     state.http_status = status_code
-                    state.result = body
+                    state.result = body_plain
                     state.finished_ts = time.time()
             except Exception as e:
                 task.error = e
@@ -106,6 +161,7 @@ def _create_pictures_worker():
                 _cleanup_tasks()
 
 
+
 def _start_create_pictures_workers_once():
     # idempotent start
     if _CREATE_PICTURES_WORKERS:
@@ -117,6 +173,8 @@ def _start_create_pictures_workers_once():
 
 # Call once during startup (e.g., right after app = Flask(__name__))
 _start_create_pictures_workers_once()
+
+
 
 
 # ---- Task registry (thread-safe) --------------------------------------------
@@ -653,11 +711,11 @@ def _create_pictures_sync(payload: dict) -> tuple[int, dict]:
         payload_out = result.dict()
         payload_out.update(ids)  # adds vision_id and picture_ids if saved
 
-        return jsonify(payload_out), 200
+        return payload_out, 200
     except RuntimeError as e:
-        return jsonify({"error": str(e)}), 429
+        return {"error": str(e)}, 429
     except Exception as e:
-        return jsonify({"error": f"Unhandled error: {e}"}), 500
+        return {"error": f"Unhandled error: {e}"}, 500
 
 
 
@@ -761,37 +819,26 @@ def _serialize_state(t: _TaskState) -> dict:
 
 @app.route("/jid/create_pictures/status", methods=["GET"])
 def create_pictures_status():
-    """
-    Query:
-      - task_id=<id>  (single)
-      - or ids=<id1,id2,...> (multiple)
-      - optional include_result=true to embed finished results inline
-    """
     include_result = request.args.get("include_result", "false").lower() == "true"
-
-    ids_param = request.args.get("ids")
-    task_id = request.args.get("task_id")
-
-    if not ids_param and not task_id:
-        return jsonify({"error": "provide task_id or ids"}), 400
-
-    ids = []
-    if task_id:
-        ids = [task_id]
-    if ids_param:
-        ids.extend([s.strip() for s in ids_param.split(",") if s.strip()])
-
+    # ... build ids ...
     out = []
     for tid in ids:
         t = _get_task(tid)
         if not t:
             out.append({"task_id": tid, "status": "unknown"})
             continue
-        d = _serialize_state(t)
+        d = {
+            "task_id": t.task_id,
+            "status": t.status,
+            "created_ts": t.created_ts,
+            "started_ts": t.started_ts,
+            "finished_ts": t.finished_ts,
+            "http_status": t.http_status,
+            "error": t.error,
+        }
         if include_result and t.status in ("done", "error"):
-            # Return result body only when done; for error, result is None
-            d["result"] = t.result
+            d["result"] = _to_plain(t.result)
         out.append(d)
-
     return jsonify({"tasks": out}), 200
+
 
