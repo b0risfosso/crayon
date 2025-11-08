@@ -301,7 +301,7 @@
           const r = await fetchInitializeResult(taskId);
           throw new Error(String(r?.body?.error || 'Worker error'));
         }
-        if (st?.status === 'unknown') throw new Error('Unknown task status');
+        // if (st?.status === 'unknown') throw new Error('Unknown task status');
 
         // Optional: check result body for warnings
         const r = await fetchInitializeResult(taskId);

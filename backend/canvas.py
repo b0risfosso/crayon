@@ -165,6 +165,7 @@ def _now_utc_iso():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+
 def _safe_get_picture_db_path():
     # Reuse your configured DB path if you have one; otherwise fall back
     return os.environ.get("PICTURE_DB", "/var/www/site/data/picture.db")
@@ -869,11 +870,6 @@ def _serialize_state(t: _TaskState) -> dict:
 
 @app.get("/canvas/initialize_canvas/status")
 def initialize_canvas_status():
-    """
-    Query:
-      - task_id=<id> (single) OR ids=<id1,id2,...> (multiple)
-      - include_result=true to embed finished results inline
-    """
     include_result = request.args.get("include_result", "false").lower() == "true"
     ids_param = request.args.get("ids")
     task_id = request.args.get("task_id")
@@ -881,24 +877,35 @@ def initialize_canvas_status():
     if not ids_param and not task_id:
         return jsonify({"error": "provide task_id or ids"}), 400
 
-    ids = []
-    if task_id:
-        ids.append(task_id)
+    # Multi-ID path -> always array shape
     if ids_param:
-        ids.extend([s.strip() for s in ids_param.split(",") if s.strip()])
+        ids = [s.strip() for s in ids_param.split(",") if s.strip()]
+        out = []
+        for tid in ids:
+            t = _get_task(tid)
+            if not t:
+                out.append({"task_id": tid, "status": "unknown"})
+                continue
+            d = _serialize_state(t)
+            if include_result and t.status in ("done", "error"):
+                d["result"] = t.result
+            out.append(d)
+        # 200 if at least one is done/error; otherwise 202 is also reasonable.
+        code = 200 if any(x.get("status") in ("done","error") for x in out) else 202
+        return jsonify({"tasks": out}), code
 
-    out = []
-    for tid in ids:
-        t = _get_task(tid)
-        if not t:
-            out.append({"task_id": tid, "status": "unknown"})
-            continue
-        d = _serialize_state(t)
-        if include_result and t.status in ("done", "error"):
-            d["result"] = t.result
-        out.append(d)
+    # Single-ID path -> return the same array shape for consistency
+    t = _get_task(task_id)
+    if not t:
+        return jsonify({"tasks": [{"task_id": task_id, "status": "unknown"}]}), 404
 
-    return jsonify({"tasks": out}), 200
+    d = _serialize_state(t)
+    if include_result and t.status in ("done","error"):
+        d["result"] = t.result
+
+    code = 202 if t.status in ("queued","running") else (500 if t.status == "error" else 200)
+    return jsonify({"tasks": [d]}), code
+
 
 
 @app.get("/canvas/initialize_canvas/result")
