@@ -37,6 +37,12 @@
     .tasks .item { padding:.2rem .35rem; border:1px dashed #cbd5e1; border-radius:.4rem; margin:.25rem 0; background:#fff; }
     .spinner { display:inline-block; width:1em; height:1em; border:.15em solid #dbeafe; border-top-color:#3b82f6; border-radius:50%; animation:spin 1s linear infinite; vertical-align:-.2em; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* repeater row */
+    .vision-row { display:grid; grid-template-columns: 1fr 1fr auto; gap:.5rem; align-items:center; }
+    .vision-row input[type="text"] { width: 100%; }
+    .vision-actions { display:flex; gap:.4rem; }
+    .remove-btn { background:#ef4444; }
   </style>
 </head>
 <body>
@@ -59,14 +65,22 @@
     <div id="svcStatus" class="status"></div>
   </section>
 
-  <!-- Create Pictures -->
+  <!-- Create Pictures (multi-vision) -->
   <section class="panel">
     <h2 style="margin:.1rem 0 .6rem 0;">Create Pictures</h2>
     <div class="grid">
-      <input id="visionInputForPictures" type="text" placeholder="Vision (single line, e.g., Harnessing energy using dirt)" />
-      <input id="focusForPictures" type="text" placeholder="Focus (optional, e.g., Microbial fuel cells in campus garden)" />
+      <div class="row" style="justify-content: space-between;">
+        <div class="muted">Submit one or more vision + focus entries.</div>
+        <div class="vision-actions">
+          <button id="btnAddVision" type="button" class="ghost">Add vision</button>
+          <button id="btnClearVisions" type="button" class="secondary">Clear all</button>
+        </div>
+      </div>
+
+      <div id="visionsMount" class="grid"></div>
+
       <div class="row">
-        <input id="count" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Count (optional, e.g., 3)" style="width:12rem" />
+        <input id="countGlobal" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Count for each (optional, e.g., 3)" style="width:14rem" />
         <button id="btnCreatePictures" type="button">Create pictures</button>
       </div>
 
@@ -104,9 +118,9 @@
     const EP = {
       health: '/jid/healthz',
       usageToday: '/read/usage',
-      createPictures: '/jid/create_pictures',              // async submit
+      createPictures: '/jid/create_pictures',              // async submit (batch)
       statusPictures: '/jid/create_pictures/status',       // poll status
-      resultPictures: '/jid/create_pictures/result',       // optional (unused; we use include_result=true)
+      resultPictures: '/jid/create_pictures/result',       // optional
       createFocuses: '/jid/create_focuses'
     };
 
@@ -146,6 +160,68 @@
       const v = ($('email').value || '').trim().toLowerCase();
       if (v) localStorage.setItem(LS_EMAIL, v);
       else localStorage.removeItem(LS_EMAIL);
+    }
+
+    // ---------- Vision rows (repeater) ----------
+    function makeRow(idSuffix) {
+      const wrap = document.createElement('div');
+      wrap.className = 'vision-row';
+      wrap.dataset.rowId = idSuffix;
+
+      const vision = document.createElement('input');
+      vision.type = 'text';
+      vision.placeholder = 'Vision (e.g., Harnessing energy using dirt)';
+      vision.className = 'vision-input';
+      vision.autocomplete = 'off';
+
+      const focus = document.createElement('input');
+      focus.type = 'text';
+      focus.placeholder = 'Focus (optional, e.g., Microbial fuel cells in campus garden)';
+      focus.className = 'focus-input';
+      focus.autocomplete = 'off';
+
+      const actions = document.createElement('div');
+      actions.className = 'vision-actions';
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'remove-btn';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', () => {
+        wrap.remove();
+      });
+
+      actions.appendChild(remove);
+      wrap.append(vision, focus, actions);
+      return wrap;
+    }
+
+    function addVisionRow(prefill = {}) {
+      const idSuffix = Math.random().toString(36).slice(2, 8);
+      const row = makeRow(idSuffix);
+      if (prefill.vision) row.querySelector('.vision-input').value = prefill.vision;
+      if (prefill.focus)  row.querySelector('.focus-input').value  = prefill.focus;
+      $('visionsMount').appendChild(row);
+    }
+
+    function clearVisions() {
+      $('visionsMount').innerHTML = '';
+    }
+
+    function collectVisionItems(email, countGlobal) {
+      const rows = Array.from(document.querySelectorAll('#visionsMount .vision-row'));
+      const items = [];
+      for (const r of rows) {
+        const v = (r.querySelector('.vision-input')?.value || '').trim();
+        const f = (r.querySelector('.focus-input')?.value || '').trim();
+        if (!v) continue; // skip empty rows
+        const item = { vision: v };
+        if (f) item.focus = f;
+        if (email) item.email = email;
+        if (!Number.isNaN(countGlobal) && countGlobal > 0) item.count = countGlobal;
+        items.push(item);
+      }
+      return items;
     }
 
     // ---- Render helpers -------------------------------------------------------
@@ -202,27 +278,22 @@
       });
     }
 
-    // Merge pictures arrays from multiple task results
     function mergePictureResults(taskBlocks) {
       const merged = { pictures: [] };
       for (const blk of taskBlocks) {
         const body = blk?.result || blk?.body || blk;
         if (body && Array.isArray(body.pictures)) merged.pictures.push(...body.pictures);
-        // some implementations return {data:{pictures:[]}}
         if (body?.data && Array.isArray(body.data.pictures)) merged.pictures.push(...body.data.pictures);
       }
       return merged;
     }
 
     async function pollUntilDone(taskIds, onTick) {
-      // simple linear backoff: 1s → 2s → 3s … (cap at 5s)
       let delay = 1000;
       const maxDelay = 5000;
-
-      // map of id -> last status
       const statuses = Object.fromEntries(taskIds.map(id => [id, 'queued']));
       const done = new Set();
-      const results = []; // finished items with embedded result
+      const results = [];
 
       while (done.size < taskIds.length) {
         const q = encodeURIComponent(taskIds.join(','));
@@ -249,24 +320,22 @@
     // ---- Actions --------------------------------------------------------------
     async function doCreatePictures() {
       const email = ($('email').value || '').trim().toLowerCase();
-      const vision = ($('visionInputForPictures').value || '').trim();
-      const focus  = ($('focusForPictures').value || '').trim();
-      const count  = parseInt(($('count').value || '').trim(), 10);
+      const countGlobal = parseInt(($('countGlobal').value || '').trim(), 10);
 
-      if (!vision) { setText($('statusPictures'), 'Enter a vision.', 'error'); return; }
+      // gather items
+      const items = collectVisionItems(email, countGlobal);
+      if (!items.length) {
+        setText($('statusPictures'), 'Add at least one vision.', 'error');
+        return;
+      }
 
-      // submit
-      setText($('statusPictures'), 'Submitting to queue…');
+      // submit batch
+      setText($('statusPictures'), `Submitting ${items.length} item(s) to queue…`);
       $('picturesOut').innerHTML = '';
       $('taskList').innerHTML = '';
 
       try {
-        const payload = { vision };
-        if (email) payload.email = email;
-        if (focus) payload.focus = focus;
-        if (!Number.isNaN(count) && count > 0) payload.count = count;
-
-        const submit = await postJSON(EP.createPictures, payload, 600000);
+        const submit = await postJSON(EP.createPictures, { items }, 600000);
         const taskIds = Array.isArray(submit?.task_ids) ? submit.task_ids : [];
 
         if (!taskIds.length) { setText($('statusPictures'), 'No task_ids returned.', 'error'); return; }
@@ -275,13 +344,12 @@
         renderTasks(taskIds, Object.fromEntries(taskIds.map(id => [id, 'queued'])));
 
         // poll
-        const finished = await pollUntilDone(taskIds, (statuses /* id->status */, results) => {
+        const finished = await pollUntilDone(taskIds, (statuses, results) => {
           renderTasks(taskIds, statuses);
           const running = Object.values(statuses).filter(s => s === 'running' || s === 'queued').length;
           setText($('statusPictures'), running ? `Processing… (${taskIds.length - running}/${taskIds.length} done)` : 'Finalizing…');
         });
 
-        // any error?
         const anyErr = finished.find(t => t.status === 'error');
         if (anyErr) {
           setText($('statusPictures'), `One or more tasks failed: ${anyErr.error || 'unknown error'}`, 'error');
@@ -289,7 +357,6 @@
           setText($('statusPictures'), 'Done.', 'ok');
         }
 
-        // combine and render all pictures from finished results
         const merged = mergePictureResults(finished);
         renderPictures(merged);
 
@@ -333,9 +400,15 @@
     (function init() {
       loadEmail();
       $('saveEmail').addEventListener('click', () => { saveEmail(); setText($('svcStatus'), 'Email saved.', 'ok'); });
+
+      $('btnAddVision').addEventListener('click', () => addVisionRow());
+      $('btnClearVisions').addEventListener('click', clearVisions);
       $('btnCreatePictures').addEventListener('click', doCreatePictures);
       $('btnCreateFocuses').addEventListener('click', doCreateFocuses);
       $('btnUsage').addEventListener('click', doUsage);
+
+      // start with one empty row for convenience
+      addVisionRow();
     })();
   </script>
 </body>
