@@ -66,13 +66,15 @@
     // Constants / endpoints
     // ------------------------------------------
     const LS_EMAIL = 'fg_user_email';
-    // Default collection key used when running architects (you can change this or add a UI later)
     const LS_COLLECTION = 'architects_all';
 
-    const EP = { byEmail: '/jid/by_email' };
-    const EP_CRAYON = {
-      runCollection: '/crayon/run_collection',
-      listArchitectures: '/crayon/architectures'
+    // Use READ endpoints & the new combined queue endpoint
+    const EP = {
+      byEmail: '/read/by_email',
+      listArchitectures: '/read/architectures',
+      initCanvas: '/canvas/initialize_canvas',
+      initStatus: '/canvas/initialize_canvas/status',
+      initResult: '/canvas/initialize_canvas/result'
     };
 
     // ------------------------------------------
@@ -133,38 +135,20 @@
     function saveEmail(){ const v = ($('email').value||'').trim().toLowerCase(); if (v) localStorage.setItem(LS_EMAIL, v); }
 
     // ------------------------------------------
-    // Picture explain helpers
+    // READ service helpers
     // ------------------------------------------
-    function pickExplanation(res){
-      if (!res) return '';
-      if (typeof res.explanation === 'string') return res.explanation;
-      if (res.data && typeof res.data.explanation === 'string') return res.data.explanation;
-      if (res.result && typeof res.result.explanation === 'string') return res.result.explanation;
-      return '';
-    }
-    function buildCrayonInputs(visionText, pic) {
-      const vision = String(visionText || '').trim();
-      if (!vision) throw new Error('This item has no vision text.');
-      let picture_short = String(pic?.title || '').trim();
-      if (!picture_short) {
-        const fromDesc = String(pic?.description || '').trim();
-        if (fromDesc) picture_short = (fromDesc.length > 80 ? fromDesc.slice(0, 77) + '…' : fromDesc);
-        else if (pic?.id != null) picture_short = `Picture ${pic.id}`;
-        else picture_short = 'Untitled picture';
-      }
-      let picture_description = String(pic?.description || '').trim();
-      if (!picture_description) {
-        const fromFn = String(pic?.function || '').trim();
-        if (fromFn) picture_description = fromFn;
-        else picture_description = picture_short;
-      }
-      return { vision, picture_short, picture_description };
+    async function getArchitecturesForPicture(pictureId, {collection=null, includeBody=false} = {}){
+      const params = new URLSearchParams();
+      if (pictureId) params.set('picture_id', pictureId);
+      if (collection) params.set('collection', collection);
+      if (includeBody) params.set('include_body', '1');
+      const url = `${EP.listArchitectures}?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) return {items:[], count:0};
+      return await res.json();
     }
 
-    // ------------------------------------------
-    // Architect storage / viewing
-    // ------------------------------------------
-
+    // New helper: batched counts
     async function getArchitectureCountsForPictures(pictureIds, { collection=null } = {}) {
       if (!pictureIds.length) return {};
       const params = new URLSearchParams();
@@ -173,17 +157,6 @@
       const url = `/read/architectures/counts?${params.toString()}`;
       const data = await fetchJSON(url, {}, 120000);
       return data?.counts || {};
-    }
-
-    async function getArchitecturesForPicture(pictureId, {collection=null, includeBody=false} = {}){
-      const params = new URLSearchParams();
-      if (pictureId) params.set('picture_id', pictureId);
-      if (collection) params.set('collection', collection);
-      if (includeBody) params.set('include_body', '1');
-      const url = `${EP_CRAYON.listArchitectures}?${params.toString()}`;
-      const res = await fetch(url);
-      if (!res.ok) return {items:[], count:0};
-      return await res.json();
     }
 
     // Open ONE new tab that displays multiple architectures for a single picture
@@ -202,7 +175,6 @@
       const {items} = await getArchitecturesForPicture(pic?.id, {collection, includeBody:true});
       if (!items?.length) { alert('No saved architectures for this picture.'); return; }
 
-      // Normalize viewer items for the batch page
       const viewerItems = items.map(it => ({
         key: it.prompt_key || 'architecture',
         title: `${(it.collection||'').toUpperCase()} · ${(it.prompt_key||'').toUpperCase()}`,
@@ -214,21 +186,72 @@
           model: it.model || ''
         }
       }));
-
       openArchitecturesInNewTab({ pictureTitle: pic?.title || `Picture #${pic?.id||''}`, items: viewerItems });
     }
 
     // ------------------------------------------
-    // Run architects: explain → run_collection (store), no auto-open; flip to "view"
+    // Queue polling helpers (initialize_canvas)
     // ------------------------------------------
+    async function pollInitializeStatus(taskId, {timeoutMs=900000, intervalMs=1500} = {}){
+      const start = Date.now();
+      let delay = intervalMs;
+      while (true) {
+        const url = `${EP.initStatus}?task_id=${encodeURIComponent(taskId)}`;
+        const data = await fetchJSON(url, {}, 60000);
+        const t = Array.isArray(data?.tasks) ? data.tasks.find(x => x.task_id === taskId) : null;
+        const st = t?.status || 'unknown';
+        if (st === 'done' || st === 'error' || st === 'unknown') return t || { status: st };
+        await new Promise(r => setTimeout(r, delay));
+        delay = Math.min(delay * 1.4, 6000);
+        if (Date.now() - start > timeoutMs) throw new Error('Timeout waiting for initialize_canvas');
+      }
+    }
+
+    async function fetchInitializeResult(taskId){
+      const url = `${EP.initResult}?task_id=${encodeURIComponent(taskId)}`;
+      const resp = await fetch(url);
+      const body = await resp.json().catch(()=> ({}));
+      return { ok: resp.ok, status: resp.status, body };
+    }
+
+    // ------------------------------------------
+    // Run architects for a picture via /canvas/initialize_canvas (queued)
+    // ------------------------------------------
+    function buildInitializePayload(visionText, pic){
+      const vision = String(visionText || '').trim();
+      if (!vision) throw new Error('This item has no vision text.');
+
+      let picture_title = String(pic?.title || '').trim();
+      if (!picture_title) {
+        const fromDesc = String(pic?.description || '').trim();
+        if (fromDesc) picture_title = (fromDesc.length > 80 ? fromDesc.slice(0, 77) + '…' : fromDesc);
+        else if (pic?.id != null) picture_title = `Picture ${pic.id}`;
+        else picture_title = 'Untitled picture';
+      }
+      let picture_description = String(pic?.description || '').trim();
+      if (!picture_description) {
+        const fromFn = String(pic?.function || '').trim();
+        if (fromFn) picture_description = fromFn;
+        else picture_description = picture_title;
+      }
+
+      return {
+        vision,
+        picture_title,
+        picture_description,
+        picture_function: String(pic?.function || '').trim(),
+        focus: String(pic?.focus || '').trim()
+      };
+    }
+
     async function runArchitectsForPictureCard(cardNode, visionText, pic){
       const email = (document.getElementById('email')?.value || localStorage.getItem(LS_EMAIL) || '').trim().toLowerCase();
-      const constraints = '';                 // add inputs if you wire constraint fields in UI
+      const constraints = '';
       const deployment_context = '';
       const readiness_target = '';
       const collection = (localStorage.getItem(LS_COLLECTION) || '').trim() || 'architects_all';
 
-      // transient status line on the card
+      // status area on card
       let status = cardNode.querySelector('.status');
       if (!status){
         status = document.createElement('div');
@@ -236,50 +259,45 @@
         cardNode.append(status);
       }
       status.className = 'status';
-      status.textContent = `Explaining picture…`;
+      status.textContent = `Submitting job…`;
 
       try {
-        // 1) explain
-        const req = buildCrayonInputs(visionText, pic);
-        const expRes = await postJSON('/jid/explain_picture', {
-          vision: req.vision,
-          picture_title: req.picture_short,
-          picture_description: req.picture_description,
-          picture_function: String(pic?.function || '').trim(),
-          focus: String(pic?.focus || '').trim()
-        }, 600000);
-
-        const explanation = pickExplanation(expRes);
-        if (!explanation) throw new Error('No explanation returned.');
-
-        // 2) run collection
-        status.textContent = `Running collection: ${collection}…`;
-        const inputs = {
-          vision: req.vision,
-          picture: `${req.picture_short}\n\n${req.picture_description}`,
-          picture_explanation: explanation,
+        // 1) Build payload & submit to queue
+        const base = buildInitializePayload(visionText, pic);
+        const payload = {
+          ...base,
+          collection,
           constraints,
           deployment_context,
           readiness_target,
-          context: deployment_context,
-          integration_context: deployment_context,
-          integrations: ''
+          integrations: '',
+          email,
+          picture_id: pic?.id || undefined,
+          store: true
         };
 
-        const collRes = await postJSON(EP_CRAYON.runCollection, {
-          collection,
-          inputs,
-          store: true,
-          email,
-          picture_id: pic?.id || undefined
-        }, 1000000);
+        const submit = await postJSON(EP.initCanvas, payload, 600000);
+        const taskId = Array.isArray(submit?.task_ids) ? submit.task_ids[0] : null;
+        if (!taskId) throw new Error('No task_id returned');
 
-        const results = Array.isArray(collRes?.results) ? collRes.results : [];
-        if (!results.length) throw new Error('Collection returned no items.');
+        // 2) Poll status
+        status.textContent = `Queued…`;
+        const st = await pollInitializeStatus(taskId, { timeoutMs: 30 * 60 * 1000 });
+        if (st?.status === 'error') {
+          const r = await fetchInitializeResult(taskId);
+          throw new Error(String(r?.body?.error || 'Worker error'));
+        }
+        if (st?.status === 'unknown') throw new Error('Unknown task status');
 
-        // 3) success: flip the primary button to "view architectures"
+        // Optional: check result body for warnings
+        const r = await fetchInitializeResult(taskId);
+        if (!r.ok) {
+          throw new Error(String(r?.body?.error || `Initialize failed (HTTP ${r.status})`));
+        }
+
+        // 3) Success → flip button to "view architectures"
         status.className = 'status ok';
-        status.textContent = `Architectures saved (${results.length}).`;
+        status.textContent = `Architectures generated.`;
 
         const primaryBtn = cardNode.querySelector('button.create, button.view, button.recreate') || cardNode.querySelector('button');
         if (primaryBtn){
@@ -287,11 +305,12 @@
           replacement.textContent = 'view architectures';
           replacement.className = 'view';
           replacement.onclick = async () => {
-            const preferredCollection = (localStorage.getItem(LS_COLLECTION) || '').trim() || null;
+            const preferredCollection = (localStorage.getItem('architects_all') || '').trim() || null;
             await viewExistingArchitectures(pic, { collection: preferredCollection });
           };
           primaryBtn.replaceWith(replacement);
         }
+
       } catch (e) {
         status.className = 'status error';
         status.textContent = `Failed: ${e.message || e}`;
@@ -360,9 +379,10 @@
 
         const grid = document.createElement('div'); grid.className = 'pics';
 
-        
+        // For speed, check existence per picture in parallel
         const pictureIds = pics.map(p => p.id).filter(id => id != null);
         const countsMap = await getArchitectureCountsForPictures(pictureIds, { collection: preferredCollection });
+        const existingCount = (countsMap[String(p.id)]?.total) || 0;
 
         for (const p of pics){
           const card = document.createElement('div'); card.className = 'pic';
@@ -378,8 +398,6 @@
           btn.type = 'button';
           btn.style.marginTop = '.5rem';
 
-          const existingCount = p?.id != null ? (countsMap[String(p.id)] || 0) : 0;
-
           if (existingCount > 0){
             // GREEN: view existing architectures
             btn.textContent = 'view architectures';
@@ -388,7 +406,7 @@
               await viewExistingArchitectures(p, { collection: preferredCollection || null });
             });
 
-            // Optional: secondary "rerun architects" button
+            // Optional: secondary "rerun architects" (re-enqueue)
             const rerun = document.createElement('button');
             rerun.type = 'button';
             rerun.textContent = 'rerun architects';
@@ -405,7 +423,7 @@
             if (p?.function) card.append(fn);
             card.append(pm, btn, rerun);
           } else {
-            // BLUE: run architects (no auto-open; flip to view on success)
+            // BLUE: run architects (enqueue → poll → flip to view)
             btn.textContent = 'run architects';
             btn.className = 'create';
             btn.addEventListener('click', async () => {
@@ -413,7 +431,7 @@
               if (!visionText) { alert('This vision has no text.'); return; }
               await runArchitectsForPictureCard(card, visionText, p);
 
-              // After run, flip to "view architectures" if now stored
+              // After run, flip to "view architectures" if stored
               try {
                 const { count } = await getArchitecturesForPicture(p.id, { collection: preferredCollection || null });
                 if ((Number(count) || 0) > 0){
