@@ -75,35 +75,35 @@ class _CreatePicturesTask:
 
 
 def _create_pictures_worker():
-    while True:
-        task = _CREATE_PICTURES_Q.get()
-        try:
-            # task.payload is what we enqueued; find the registry entry
-            state = _get_task(task.task_id)
-            if state:
-                state.status = "running"
-                state.started_ts = time.time()
+    # Push app context for everything inside this thread
+    with app.app_context():
+        while True:
+            task = _CREATE_PICTURES_Q.get()
+            try:
+                state = _get_task(task.task_id)
+                if state:
+                    state.status = "running"
+                    state.started_ts = time.time()
 
-            status_code, body = _create_pictures_sync(task.payload)
+                # DO NOT call jsonify here; return plain dict + code
+                status_code, body = _create_pictures_sync(task.payload)
 
-            task.result = (status_code, body)
-
-            if state:
-                state.status = "done"
-                state.http_status = status_code
-                state.result = body
-                state.finished_ts = time.time()
-        except Exception as e:
-            task.error = e
-            state = _get_task(task.task_id)
-            if state:
-                state.status = "error"
-                state.error = str(e)
-                state.finished_ts = time.time()
-        finally:
-            task.event.set()
-            _CREATE_PICTURES_Q.task_done()
-            _cleanup_tasks()
+                task.result = (status_code, body)
+                if state:
+                    state.status = "done"
+                    state.http_status = status_code
+                    state.result = body
+                    state.finished_ts = time.time()
+            except Exception as e:
+                task.error = e
+                if state:
+                    state.status = "error"
+                    state.error = str(e)
+                    state.finished_ts = time.time()
+            finally:
+                task.event.set()
+                _CREATE_PICTURES_Q.task_done()
+                _cleanup_tasks()
 
 
 def _start_create_pictures_workers_once():
