@@ -265,6 +265,67 @@ def healthz():
     return jsonify({"status": "ok"}), 200
 
 
+@app.get("/read/architectures/counts")
+def architecture_counts():
+    """
+    Query:
+      picture_ids: CSV of ints (required unless vision_id provided)
+      vision_id: int (optional) -> counts for all pictures in this vision
+      collection: str (optional) -> filter counts by collection
+    Returns:
+      {
+        "counts": { "<picture_id>": { "total": N, "by_collection": { "<coll>": n, ... } }, ... }
+      }
+    """
+    pic_ids_csv = (request.args.get("picture_ids") or "").strip()
+    vision_id = request.args.get("vision_id", type=int)
+    collection = (request.args.get("collection") or "").strip() or None
+    db_path = _safe_get_picture_db_path()
+
+    try:
+        _ensure_prompt_outputs_table(db_path)
+    except Exception:
+        return jsonify({"counts": {}})
+
+    where = []
+    args = []
+    if vision_id:
+        where.append("picture_id IN (SELECT id FROM pictures WHERE vision_id = ?)")
+        args.append(vision_id)
+    else:
+        if not pic_ids_csv:
+            return jsonify({"error": "picture_ids or vision_id is required"}), 400
+        try:
+            pic_ids = [int(x) for x in pic_ids_csv.split(",") if x.strip()]
+        except Exception:
+            return jsonify({"error": "invalid picture_ids"}), 400
+        if not pic_ids:
+            return jsonify({"counts": {}})
+        marks = ",".join("?" for _ in pic_ids)
+        where.append(f"picture_id IN ({marks})")
+        args.extend(pic_ids)
+
+    if collection:
+        where.append("collection = ?")
+        args.append(collection)
+
+    sql = f"""
+        SELECT picture_id, collection, COUNT(*) AS n
+        FROM prompt_outputs
+        {"WHERE " + " AND ".join(where) if where else ""}
+        GROUP BY picture_id, collection
+    """
+
+    out = {}
+    with _maybe_connect(db_path) as conn:
+        for pid, coll, n in conn.execute(sql, tuple(args)).fetchall():
+            d = out.setdefault(str(pid), {"total": 0, "by_collection": {}})
+            d["total"] += int(n or 0)
+            d["by_collection"][coll or ""] = int(n or 0)
+
+    return jsonify({"counts": out})
+
+
 # ------------------------------------------------------------------------------
 # Entrypoint (optional if you run via gunicorn)
 if __name__ == "__main__":

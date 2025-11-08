@@ -164,6 +164,17 @@
     // ------------------------------------------
     // Architect storage / viewing
     // ------------------------------------------
+
+    async function getArchitectureCountsForPictures(pictureIds, { collection=null } = {}) {
+      if (!pictureIds.length) return {};
+      const params = new URLSearchParams();
+      params.set('picture_ids', pictureIds.join(','));
+      if (collection) params.set('collection', collection);
+      const url = `/read/architectures/counts?${params.toString()}`;
+      const data = await fetchJSON(url, {}, 120000);
+      return data?.counts || {};
+    }
+
     async function getArchitecturesForPicture(pictureId, {collection=null, includeBody=false} = {}){
       const params = new URLSearchParams();
       if (pictureId) params.set('picture_id', pictureId);
@@ -306,7 +317,7 @@
         return;
       }
 
-      const preferredCollection = (localStorage.getItem(LS_COLLECTION) || '').trim();
+      const preferredCollection = (localStorage.getItem('architects_all') || '').trim() || null;
 
       for (const v of visions){
         const box = document.createElement('div');
@@ -349,18 +360,9 @@
 
         const grid = document.createElement('div'); grid.className = 'pics';
 
-        // For speed, check existence per picture in parallel
-        const existenceChecks = await Promise.all(pics.map(async (p) => {
-          const pid = p?.id;
-          if (pid == null) return { id: null, count: 0 };
-          try {
-            const { count } = await getArchitecturesForPicture(pid, { collection: preferredCollection || null, includeBody: false });
-            return { id: pid, count: Number(count) || 0 };
-          } catch {
-            return { id: pid, count: 0 };
-          }
-        }));
-        const archCountByPic = Object.fromEntries(existenceChecks.map(x => [String(x.id), x.count]));
+        
+        const pictureIds = pics.map(p => p.id).filter(id => id != null);
+        const countsMap = await getArchitectureCountsForPictures(pictureIds, { collection: preferredCollection });
 
         for (const p of pics){
           const card = document.createElement('div'); card.className = 'pic';
@@ -376,7 +378,7 @@
           btn.type = 'button';
           btn.style.marginTop = '.5rem';
 
-          const existingCount = p?.id != null ? (archCountByPic[String(p.id)] || 0) : 0;
+          const existingCount = p?.id != null ? (countsMap[String(p.id)] || 0) : 0;
 
           if (existingCount > 0){
             // GREEN: view existing architectures

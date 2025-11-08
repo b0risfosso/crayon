@@ -33,6 +33,10 @@
     .hint { margin-top:.8rem; font-size:.9rem; color:#6b7280; }
     .hint a { color:#0b5cff; text-decoration:none; }
     .hint a:hover { text-decoration:underline; }
+    .tasks { font-size:.9rem; margin-top:.35rem; }
+    .tasks .item { padding:.2rem .35rem; border:1px dashed #cbd5e1; border-radius:.4rem; margin:.25rem 0; background:#fff; }
+    .spinner { display:inline-block; width:1em; height:1em; border:.15em solid #dbeafe; border-top-color:#3b82f6; border-radius:50%; animation:spin 1s linear infinite; vertical-align:-.2em; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -59,19 +63,16 @@
   <section class="panel">
     <h2 style="margin:.1rem 0 .6rem 0;">Create Pictures</h2>
     <div class="grid">
-      <!-- Single-line Vision -->
       <input id="visionInputForPictures" type="text" placeholder="Vision (single line, e.g., Harnessing energy using dirt)" />
-
-      <!-- Optional single-line Focus -->
       <input id="focusForPictures" type="text" placeholder="Focus (optional, e.g., Microbial fuel cells in campus garden)" />
-
       <div class="row">
         <input id="count" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Count (optional, e.g., 3)" style="width:12rem" />
         <button id="btnCreatePictures" type="button">Create pictures</button>
       </div>
+
       <div id="statusPictures" class="status"></div>
+      <div id="taskList" class="tasks"></div>
       <div id="picturesOut" class="cols"></div>
-      <!-- Hint for viewing architectures -->
       <div class="hint">Once your pictures appear, open the <a href="/pictures" target="_blank">Pictures</a> page to view or run architects for them.</div>
     </div>
   </section>
@@ -80,9 +81,7 @@
   <section class="panel">
     <h2 style="margin:.1rem 0 .6rem 0;">Create Focuses</h2>
     <div class="grid">
-      <!-- Single-line Vision -->
       <input id="visionInputForFocuses" type="text" placeholder="Vision (creating solar microgrids in the city of Chicago)" />
-
       <div class="row">
         <button id="btnCreateFocuses" type="button">Create focuses</button>
       </div>
@@ -100,13 +99,14 @@
     <pre id="usageOut" class="mono" style="display:none; max-width: min(92vw, 820px); overflow:auto; background:#f6f7f9; border:1px solid #e5e7eb; border-radius:.5rem; padding:.6rem .7rem;"></pre>
   </section>
 
-  <!-- Scripts (same as before, no world/architect logic) -->
   <script>
     const LS_EMAIL = 'fg_user_email';
     const EP = {
       health: '/jid/healthz',
-      usageToday: '/jid/usage/today',
-      createPictures: '/jid/create_pictures',
+      usageToday: '/read/usage',
+      createPictures: '/jid/create_pictures',              // async submit
+      statusPictures: '/jid/create_pictures/status',       // poll status
+      resultPictures: '/jid/create_pictures/result',       // optional (unused; we use include_result=true)
       createFocuses: '/jid/create_focuses'
     };
 
@@ -148,6 +148,7 @@
       else localStorage.removeItem(LS_EMAIL);
     }
 
+    // ---- Render helpers -------------------------------------------------------
     function renderPictures(block) {
       const mount = $('picturesOut'); mount.innerHTML = '';
       const pics = Array.isArray(block?.pictures) ? block.pictures : [];
@@ -188,23 +189,114 @@
       }
     }
 
+    // ---- Queue/Status UI ------------------------------------------------------
+    function renderTasks(taskIds, statuses) {
+      const el = $('taskList');
+      el.innerHTML = '';
+      taskIds.forEach((id) => {
+        const s = statuses[id] || 'queued';
+        const row = document.createElement('div');
+        row.className = 'item mono';
+        row.innerHTML = `<span class="mono">task:${id}</span> · <strong>${s}</strong> ${s==='running'||s==='queued' ? '<span class="spinner" aria-label="loading"></span>' : ''}`;
+        el.append(row);
+      });
+    }
+
+    // Merge pictures arrays from multiple task results
+    function mergePictureResults(taskBlocks) {
+      const merged = { pictures: [] };
+      for (const blk of taskBlocks) {
+        const body = blk?.result || blk?.body || blk;
+        if (body && Array.isArray(body.pictures)) merged.pictures.push(...body.pictures);
+        // some implementations return {data:{pictures:[]}}
+        if (body?.data && Array.isArray(body.data.pictures)) merged.pictures.push(...body.data.pictures);
+      }
+      return merged;
+    }
+
+    async function pollUntilDone(taskIds, onTick) {
+      // simple linear backoff: 1s → 2s → 3s … (cap at 5s)
+      let delay = 1000;
+      const maxDelay = 5000;
+
+      // map of id -> last status
+      const statuses = Object.fromEntries(taskIds.map(id => [id, 'queued']));
+      const done = new Set();
+      const results = []; // finished items with embedded result
+
+      while (done.size < taskIds.length) {
+        const q = encodeURIComponent(taskIds.join(','));
+        const payload = await fetchJSON(`${EP.statusPictures}?ids=${q}&include_result=true`, {}, 600000);
+        const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
+
+        tasks.forEach(t => {
+          statuses[t.task_id] = t.status || 'unknown';
+          if ((t.status === 'done' || t.status === 'error') && !done.has(t.task_id)) {
+            done.add(t.task_id);
+            results.push(t);
+          }
+        });
+
+        onTick(statuses, results);
+
+        if (done.size >= taskIds.length) break;
+        await new Promise(r => setTimeout(r, delay));
+        delay = Math.min(maxDelay, delay + 1000);
+      }
+      return results;
+    }
+
+    // ---- Actions --------------------------------------------------------------
     async function doCreatePictures() {
       const email = ($('email').value || '').trim().toLowerCase();
       const vision = ($('visionInputForPictures').value || '').trim();
       const focus  = ($('focusForPictures').value || '').trim();
       const count  = parseInt(($('count').value || '').trim(), 10);
+
       if (!vision) { setText($('statusPictures'), 'Enter a vision.', 'error'); return; }
-      setText($('statusPictures'), 'Creating pictures…');
+
+      // submit
+      setText($('statusPictures'), 'Submitting to queue…');
+      $('picturesOut').innerHTML = '';
+      $('taskList').innerHTML = '';
+
       try {
         const payload = { vision };
         if (email) payload.email = email;
         if (focus) payload.focus = focus;
         if (!Number.isNaN(count) && count > 0) payload.count = count;
-        const res = await postJSON('/jid/create_pictures', payload, 600000);
-        renderPictures(res?.data || res?.result || res);
-        setText($('statusPictures'), 'Done.', 'ok');
+
+        const submit = await postJSON(EP.createPictures, payload, 600000);
+        const taskIds = Array.isArray(submit?.task_ids) ? submit.task_ids : [];
+
+        if (!taskIds.length) { setText($('statusPictures'), 'No task_ids returned.', 'error'); return; }
+
+        setText($('statusPictures'), `Queued ${taskIds.length} task(s).`);
+        renderTasks(taskIds, Object.fromEntries(taskIds.map(id => [id, 'queued'])));
+
+        // poll
+        const finished = await pollUntilDone(taskIds, (statuses /* id->status */, results) => {
+          renderTasks(taskIds, statuses);
+          const running = Object.values(statuses).filter(s => s === 'running' || s === 'queued').length;
+          setText($('statusPictures'), running ? `Processing… (${taskIds.length - running}/${taskIds.length} done)` : 'Finalizing…');
+        });
+
+        // any error?
+        const anyErr = finished.find(t => t.status === 'error');
+        if (anyErr) {
+          setText($('statusPictures'), `One or more tasks failed: ${anyErr.error || 'unknown error'}`, 'error');
+        } else {
+          setText($('statusPictures'), 'Done.', 'ok');
+        }
+
+        // combine and render all pictures from finished results
+        const merged = mergePictureResults(finished);
+        renderPictures(merged);
+
         if (email) localStorage.setItem(LS_EMAIL, email);
-      } catch (e) { setText($('statusPictures'), `Failed: ${e.message || e}`, 'error'); }
+      } catch (e) {
+        setText($('statusPictures'), `Failed: ${e.message || e}`, 'error');
+      }
     }
 
     async function doCreateFocuses() {
@@ -215,18 +307,20 @@
       try {
         const payload = { vision };
         if (email) payload.email = email;
-        const res = await postJSON('/jid/create_focuses', payload, 600000);
+        const res = await postJSON(EP.createFocuses, payload, 600000);
         renderFocuses(res?.data || res?.result || res);
         setText($('statusFocuses'), 'Done.', 'ok');
         if (email) saveEmail();
-      } catch (e) { setText($('statusFocuses'), `Failed: ${e.message || e}`, 'error'); }
+      } catch (e) {
+        setText($('statusFocuses'), `Failed: ${e.message || e}`, 'error');
+      }
     }
 
     async function doUsage() {
       setText($('usageStatus'), 'Loading usage…');
       $('usageOut').style.display = 'none';
       try {
-        const d = await fetchJSON('/jid/usage/today', {}, 15000);
+        const d = await fetchJSON(EP.usageToday, {}, 15000);
         $('usageOut').textContent = JSON.stringify(d, null, 2);
         $('usageOut').style.display = 'block';
         setText($('usageStatus'), 'Usage loaded.', 'ok');
@@ -235,6 +329,7 @@
       }
     }
 
+    // ---- Init -----------------------------------------------------------------
     (function init() {
       loadEmail();
       $('saveEmail').addEventListener('click', () => { saveEmail(); setText($('svcStatus'), 'Email saved.', 'ok'); });
