@@ -68,8 +68,11 @@
     const BORIS_EMAIL = 'boris@fantasiagenesis.com';
 
     // Endpoints
-    const EP = { byEmail: '/jid/by_email' };
-    const EP_CRAYON = { listArchitectures: '/crayon/architectures' };
+    const EP = { byEmail: '/read/by_email' };
+    const EP_READ = {
+      listArchitectures: '/read/architectures',
+      counts: '/read/architectures/counts'
+    };
 
     // ---------- Shared JSON helpers ----------
     async function fetchWithTimeout(url, options={}, timeoutMs=300000){
@@ -114,11 +117,22 @@
       if (pictureId) params.set('picture_id', pictureId);
       if (collection) params.set('collection', collection);
       if (includeBody) params.set('include_body', '1');
-      const url = `${EP_CRAYON.listArchitectures}?${params.toString()}`;
+      const url = `${EP_READ.listArchitectures}?${params.toString()}`;
       const res = await fetch(url);
       if (!res.ok) return {items:[], count:0};
       return await res.json();
     }
+
+    async function getArchitectureCountsForPictures(pictureIds, { collection=null } = {}) {
+      if (!pictureIds.length) return {};
+      const params = new URLSearchParams();
+      params.set('picture_ids', pictureIds.join(','));
+      if (collection) params.set('collection', collection);
+      const url = `${EP_READ.counts}?${params.toString()}`;
+      const data = await fetchJSON(url, {}, 120000);
+      return data?.counts || {};
+    }
+
 
     // Open ONE new tab that displays multiple architectures for a single picture
     function openArchitecturesInNewTab({ pictureTitle, items }){
@@ -212,17 +226,8 @@
         const grid = document.createElement('div'); grid.className = 'pics';
 
         // Check for architectures per picture (READ ONLY)
-        const existenceChecks = await Promise.all(pics.map(async (p) => {
-          const pid = p?.id;
-          if (pid == null) return { id: null, count: 0 };
-          try {
-            const { count } = await getArchitecturesForPicture(pid, { collection: null, includeBody: false });
-            return { id: pid, count: Number(count) || 0 };
-          } catch {
-            return { id: pid, count: 0 };
-          }
-        }));
-        const archCountByPic = Object.fromEntries(existenceChecks.map(x => [String(x.id), x.count]));
+        const pictureIds = pics.map(p => p.id).filter(id => id != null);
+        const countsMap = await getArchitectureCountsForPictures(pictureIds);
 
         for (const p of pics){
           const card = document.createElement('div'); card.className = 'pic';
@@ -234,7 +239,7 @@
           const pm = document.createElement('div'); pm.className = 'meta mono';
           pm.textContent = `id:${p?.id ?? '—'} · status:${p?.status || '—'} · updated:${p?.updated_at || p?.created_at || '—'}`;
 
-          const existingCount = p?.id != null ? (archCountByPic[String(p.id)] || 0) : 0;
+          const existingCount = Number(countsMap?.[String(p?.id)]?.total || 0);
 
           if (existingCount > 0){
             // GREEN: view existing architectures (one tab with all)
