@@ -554,10 +554,10 @@ def run_text_to_core_ideas_llm(
         resp = client.responses.parse(
             model=model,
             input=[
-                {"role": "system", "content": "Return ONLY valid JSON matching the response_format."},
+                {"role": "system", "content": "Return ONLY valid JSON matching the text_format."},
                 {"role": "user", "content": prompt_text},
             ],
-            response_format=CoreIdeasResponse,
+            text_format=CoreIdeasResponse,
         )
         u = _usage_from_resp(resp)
         usage_in = u.get("input", usage_in)
