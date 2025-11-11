@@ -221,7 +221,7 @@ Realization: ${v.realization}`;
         const box = document.createElement('div'); box.className = 'vision';
         const h = document.createElement('h4'); h.textContent = r.title || '(Untitled Vision)';
         const pre = document.createElement('pre');
-        pre.textContent = (r.text || '').trim();
+        pre.textContent = `Vision: ${(r.text || '').trim()}\n\nRealization: ${(r.realization || '').trim()}`;
         box.append(h, pre);
         const meta = document.createElement('div'); meta.className = 'muted-small';
         meta.textContent = [r.id ? `id:${r.id}` : null, r.email, r.created_at].filter(Boolean).join(' · ');

@@ -408,10 +408,11 @@ def read_visions_by_core_idea():
         params.append(email)
 
     sql = """
-      SELECT v.id, v.core_idea_id, v.title, v.text, v.email, v.status,
-             v.created_at, v.updated_at
-      FROM visions v
+    SELECT v.id, v.core_idea_id, v.title, v.text, v.focuses, v.email, v.status,
+            v.created_at, v.updated_at
+    FROM visions v
     """
+
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY datetime(v.created_at) DESC, v.id DESC LIMIT ?"
@@ -422,7 +423,22 @@ def read_visions_by_core_idea():
     conn.row_factory = sqlite3.Row
     try:
         cur = conn.execute(sql, params)
-        rows = [dict(r) for r in cur.fetchall()]
+        rows = []
+        for r in cur.fetchall():
+            d = dict(r)
+            # default
+            d["realization"] = None
+            # extract first focus' "focus" field as the realization text
+            try:
+                foc = json.loads(d.get("focuses") or "[]")
+                if isinstance(foc, list) and foc:
+                    f0 = foc[0] or {}
+                    d["realization"] = ((f0.get("focus") or "").strip()) or None
+            except Exception:
+                d["realization"] = None
+            # don't expose raw focuses blob
+            d.pop("focuses", None)
+            rows.append(d)
         return jsonify({"items": rows})
     except Exception as e:
         return jsonify({"error": f"DB error: {e}"}), 500
