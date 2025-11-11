@@ -40,6 +40,12 @@ from sqlite3 import connect
 from models import CoreIdeasResponse
 from prompts import core_ideas_prompt
 
+from models import VisionsResponse  # new
+from prompts import (
+    visions_from_core_idea_prompt,
+    play_visions_from_core_idea_prompt,
+)
+
 
 def _has_column(conn, table, col):
     cur = conn.execute(f"PRAGMA table_info({table})")
@@ -600,6 +606,80 @@ def run_text_to_core_ideas_llm(
         raise
 
 
+def run_core_idea_visions_llm(core_idea: str, *, email: str | None, model: str, endpoint_name: str) -> VisionsResponse:
+    prompt_text = visions_from_core_idea_prompt.format(core_idea=core_idea)
+    usage_in = 0
+    usage_out = 0
+
+    try:
+        resp = client.responses.parse(  # follows your existing JID structured calls
+            model=model,
+            input=[
+                {"role": "system", "content": "Return ONLY valid JSON matching the text_format."},
+                {"role": "user", "content": prompt_text},
+            ],
+            text_format=VisionsResponse,
+        )
+        u = _usage_from_resp(resp)
+        usage_in = u.get("input", usage_in)
+        usage_out = u.get("output", 0)
+        log_usage(app="jid", model=model, tokens_in=usage_in, tokens_out=usage_out,
+                  endpoint=endpoint_name, email=email, request_id=None, duration_ms=0, cost_usd=0.0)
+
+        parsed = getattr(resp, "output_parsed", None) or getattr(resp, "parsed", None)
+        raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
+
+        if parsed is None:
+            # Fallback: parse the raw text as JSON (strip code fences if present)
+            m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.S)
+            raw_json = m.group(1) if m else raw_text
+            parsed = VisionsResponse.model_validate(json.loads(raw_json))
+
+        return resp.output_parsed
+    except Exception:
+        log_usage(app="jid", model=model, tokens_in=usage_in, tokens_out=usage_out,
+                  endpoint=endpoint_name, email=email, request_id=None, duration_ms=0, cost_usd=0.0)
+        raise
+
+def run_core_idea_play_visions_llm(core_idea: str, *, email: str | None, model: str, endpoint_name: str) -> VisionsResponse:
+    prompt_text = play_visions_from_core_idea_prompt.format(core_idea=core_idea)
+    usage_in = 0
+    usage_out = 0
+
+    try:
+        resp = client.responses.parse(
+            model=model,
+            input=[
+                {"role": "system", "content": "Return ONLY valid JSON matching the text_format."},
+                {"role": "user", "content": prompt_text},
+            ],
+            text_format=VisionsResponse,
+        )
+        u = _usage_from_resp(resp)
+        usage_in = u.get("input", usage_in)
+        usage_out = u.get("output", 0)
+        log_usage(app="jid", model=model, tokens_in=usage_in, tokens_out=usage_out,
+                  endpoint=endpoint_name, email=email, request_id=None, duration_ms=0, cost_usd=0.0)
+
+        
+        parsed = getattr(resp, "output_parsed", None) or getattr(resp, "parsed", None)
+        raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
+
+        if parsed is None:
+            # Fallback: parse the raw text as JSON (strip code fences if present)
+            m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.S)
+            raw_json = m.group(1) if m else raw_text
+            parsed = VisionsResponse.model_validate(json.loads(raw_json))
+
+
+        return resp.output_parsed
+    except Exception:
+        log_usage(app="jid", model=model, tokens_in=usage_in, tokens_out=usage_out,
+                  endpoint=endpoint_name, email=email, request_id=None, duration_ms=0, cost_usd=0.0)
+        raise
+
+
+
 def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = None) -> dict:
     """
     Convenience wrapper that returns a plain dict (already Pydantic-validated).
@@ -807,6 +887,57 @@ def persist_core_ideas_to_db(ideas: list[str], *, source: str, email: Optional[s
         return {"inserted": len(ideas)}
     finally:
         conn.close()
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+def fetch_core_idea_text(core_idea_id: int) -> str | None:
+    conn = connect(PICTURE_DB)
+    try:
+        cur = conn.execute("SELECT core_idea FROM core_ideas WHERE id = ?", (core_idea_id,))
+        row = cur.fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+def persist_visions_for_core_idea(
+    core_idea_id: int,
+    items: list[dict],
+    *,
+    email: str | None,
+    origin: str = "jid",
+) -> dict:
+    """
+    Save each generated vision into the visions table, linked by visions.core_idea_id.
+    - title -> visions.title
+    - text  -> a compact joined block of 'Vision' + 'Realization'
+    - source -> origin (e.g., 'jid')
+    - metadata -> JSON blob with original structured fields
+    """
+    ts = _utc_now()
+    db = PICTURE_DB
+    conn = connect(db)
+    try:
+        cur = conn.cursor()
+        inserted = 0
+        for v in items:
+            title = (v.get("title") or "").strip() or None
+            v_text = (v.get("vision") or "").strip()
+            r_text = (v.get("realization") or "").strip()
+            meta = json.dumps({"core_idea_id": core_idea_id, "structured": v}, ensure_ascii=False)
+            cur.execute(
+                """
+                INSERT INTO visions (title, text, focus, email, status, priority, source, slug, metadata, created_at, updated_at, core_idea_id)
+                VALUES (?, ?, ?, ?, 'draft', 0, ?, NULL, ?, ?, ?, ?)
+                """,
+                (title, v_text, r_text, email, origin, meta, ts, ts, core_idea_id),
+            )
+            inserted += 1
+        conn.commit()
+        return {"inserted": inserted}
+    finally:
+        conn.close()
+
 
 
 
@@ -1107,3 +1238,55 @@ def jid_create_core_ideas():
         return jsonify({"error": str(e)}), 429
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {e}"}), 500
+
+
+@app.route("/jid/generate_visions_from_core_idea", methods=["POST"])
+def jid_generate_visions_from_core_idea():
+    """
+    Payload: { "core_idea_id": int, "email": "...", "model": "..." }
+    Uses core_idea_id to fetch text, generates visions, saves them with visions.core_idea_id.
+    """
+    payload = request.get_json(force=True) or {}
+    cid = payload.get("core_idea_id")
+    email = (payload.get("email") or None)
+    model = payload.get("model") or DEFAULT_MODEL
+
+    if not isinstance(cid, int):
+        return jsonify({"error": "core_idea_id (int) is required"}), 400
+
+    core_text = fetch_core_idea_text(cid)
+    if not core_text:
+        return jsonify({"error": f"core_idea_id {cid} not found"}), 404
+
+    try:
+        result = run_core_idea_visions_llm(core_text, email=email, model=model,
+                                           endpoint_name="/jid/generate_visions_from_core_idea")
+        stats = persist_visions_for_core_idea(cid, [v.dict() for v in result.visions], email=email, origin="jid")
+        return jsonify({"core_idea_id": cid, "visions": [v.dict() for v in result.visions], **stats})
+    except Exception as e:
+        return jsonify({"error": f"{e}"}), 500
+
+@app.route("/jid/generate_play_visions_from_core_idea", methods=["POST"])
+def jid_generate_play_visions_from_core_idea():
+    """
+    Payload: { "core_idea_id": int, "email": "...", "model": "..." }
+    """
+    payload = request.get_json(force=True) or {}
+    cid = payload.get("core_idea_id")
+    email = (payload.get("email") or None)
+    model = payload.get("model") or DEFAULT_MODEL
+
+    if not isinstance(cid, int):
+        return jsonify({"error": "core_idea_id (int) is required"}), 400
+
+    core_text = fetch_core_idea_text(cid)
+    if not core_text:
+        return jsonify({"error": f"core_idea_id {cid} not found"}), 404
+
+    try:
+        result = run_core_idea_play_visions_llm(core_text, email=email, model=model,
+                                                endpoint_name="/jid/generate_play_visions_from_core_idea")
+        stats = persist_visions_for_core_idea(cid, [v.dict() for v in result.visions], email=email, origin="jid")
+        return jsonify({"core_idea_id": cid, "visions": [v.dict() for v in result.visions], **stats})
+    except Exception as e:
+        return jsonify({"error": f"{e}"}), 500

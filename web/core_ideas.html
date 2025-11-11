@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Fantasiagenesis · Core Ideas</title>
+  <title>Fantasiagenesis · Core Ideas & Visions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { color-scheme: light; }
@@ -35,13 +35,16 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .ideas-list { display:grid; gap:.5rem; }
     .idea { border:1px solid #e5e7eb; background:#fff; border-radius:.5rem; padding:.5rem .6rem; }
+    .vision { border:1px solid #e5e7eb; background:#fff; border-radius:.6rem; padding:.6rem .7rem; }
+    .vision h4 { margin:.1rem 0 .4rem 0; font-size:1rem; }
+    .vision pre { white-space: pre-wrap; margin:.25rem 0 0 0; }
   </style>
 </head>
 <body>
   <header class="row" style="justify-content: space-between;">
     <div>
-      <h1>Fantasiagenesis · Core Ideas</h1>
-      <div class="muted">Extract and read <strong>core ideas</strong> via JID.</div>
+      <h1>Fantasiagenesis · Core Ideas & Visions</h1>
+      <div class="muted">Extract core ideas, generate visions from a core idea, and read saved items.</div>
     </div>
     <nav class="row">
       <a class="inline" href="/draw" title="Draw">🎨 <span class="muted">Draw</span></a>
@@ -87,11 +90,42 @@
     </div>
   </section>
 
+  <!-- Generate Visions FROM a Core Idea -->
+  <section class="panel">
+    <h2 style="margin:.1rem 0 .6rem 0;">Generate Visions from Core Idea</h2>
+    <div class="grid">
+      <div class="row">
+        <input id="cid" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="core_idea_id (integer)" style="width:16rem" />
+        <button id="btnGenVis" type="button">Generate (Frontiers)</button>
+        <button id="btnGenPlayVis" class="secondary" type="button">Generate (Play)</button>
+      </div>
+      <div id="statusGen" class="status"></div>
+      <div id="visionsOut" class="grid"></div>
+    </div>
+  </section>
+
+  <!-- Read Visions by core_idea_id -->
+  <section class="panel">
+    <h2 style="margin:.1rem 0 .6rem 0;">Read Visions by Core Idea</h2>
+    <div class="grid">
+      <div class="row">
+        <input id="cidRead" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="core_idea_id (integer)" style="width:16rem" />
+        <input id="limVis" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Limit (e.g., 50)" style="width:10rem" />
+        <button id="btnReadVis" class="ghost" type="button">Load Visions</button>
+      </div>
+      <div id="statusReadVis" class="status"></div>
+      <div id="readVisOut" class="grid"></div>
+    </div>
+  </section>
+
   <script>
     const LS_EMAIL = 'fg_user_email';
     const EP = {
       createCoreIdeas: '/jid/create_core_ideas',
-      readCoreIdeas: '/read/core_ideas'
+      readCoreIdeas: '/read/core_ideas',
+      genVis: '/jid/generate_visions_from_core_idea',
+      genPlayVis: '/jid/generate_play_visions_from_core_idea',
+      readVisByCI: '/read/visions_by_core_idea'
     };
     const $ = (id) => document.getElementById(id);
     function setText(el, msg, cls = '') {
@@ -131,6 +165,7 @@
       else localStorage.removeItem(LS_EMAIL);
     }
 
+    // Render helpers
     function renderIdeas(list, mountId) {
       const mount = $(mountId);
       mount.innerHTML = '';
@@ -143,11 +178,10 @@
         mount.append(div);
       }
     }
-
-    function renderRead(data) {
+    function renderReadCoreIdeas(data) {
       const mount = $('readOut');
       mount.innerHTML = '';
-      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      const items = Array.isArray(data?.items) ? data.items : [];
       if (!items.length) { mount.innerHTML = '<div class="muted">No rows found.</div>'; return; }
       for (const r of items) {
         const card = document.createElement('div'); card.className = 'card';
@@ -163,7 +197,40 @@
         mount.append(card);
       }
     }
+    function renderVisions(list) {
+      const mount = $('visionsOut');
+      mount.innerHTML = '';
+      const items = Array.isArray(list) ? list : [];
+      if (!items.length) { mount.innerHTML = '<div class="muted">No visions generated yet.</div>'; return; }
+      for (const v of items) {
+        const box = document.createElement('div'); box.className = 'vision';
+        const h = document.createElement('h4'); h.textContent = v.title || '(Untitled Vision)';
+        const pre = document.createElement('pre'); pre.textContent = `Vision: ${v.vision}
 
+Realization: ${v.realization}`;
+        box.append(h, pre);
+        mount.append(box);
+      }
+    }
+    function renderReadVisions(data) {
+      const mount = $('readVisOut');
+      mount.innerHTML = '';
+      const items = Array.isArray(data?.items) ? data.items : [];
+      if (!items.length) { mount.innerHTML = '<div class="muted">No visions found.</div>'; return; }
+      for (const r of items) {
+        const box = document.createElement('div'); box.className = 'vision';
+        const h = document.createElement('h4'); h.textContent = r.title || '(Untitled Vision)';
+        const pre = document.createElement('pre');
+        pre.textContent = (r.text || '').trim();
+        box.append(h, pre);
+        const meta = document.createElement('div'); meta.className = 'muted-small';
+        meta.textContent = [r.id ? `id:${r.id}` : null, r.email, r.created_at].filter(Boolean).join(' · ');
+        box.append(meta);
+        mount.append(box);
+      }
+    }
+
+    // Actions
     async function doExtract() {
       const email = ($('email').value || '').trim().toLowerCase();
       const source = ($('source').value || '').trim();
@@ -185,7 +252,7 @@
       }
     }
 
-    async function doRead() {
+    async function doReadCoreIdeas() {
       const q = new URLSearchParams();
       const src = ($('qSource').value || '').trim();
       const email = ($('qEmail').value || '').trim().toLowerCase();
@@ -197,10 +264,47 @@
       $('readOut').innerHTML = '';
       try {
         const data = await fetchJSON(`${EP.readCoreIdeas}?${q.toString()}`, {}, 60000);
-        renderRead(data);
+        renderReadCoreIdeas(data);
         setText($('statusRead'), `Loaded ${Array.isArray(data?.items) ? data.items.length : 0} row(s).`, 'ok');
       } catch (e) {
         setText($('statusRead'), `Failed: ${e.message || e}`, 'error');
+      }
+    }
+
+    async function doGenVis(endpoint) {
+      const email = ($('email').value || '').trim().toLowerCase();
+      const cid = parseInt(($('cid').value || '').trim(), 10);
+      if (!Number.isInteger(cid)) { setText($('statusGen'), 'Enter a valid core_idea_id (integer).', 'error'); return; }
+      setText($('statusGen'), 'Generating…');
+      $('visionsOut').innerHTML = '';
+      try {
+        const payload = { core_idea_id: cid };
+        if (email) payload.email = email;
+        const res = await postJSON(endpoint, payload, 600000);
+        const visions = res?.visions || [];
+        renderVisions(visions);
+        const saved = res?.inserted ?? visions.length;
+        setText($('statusGen'), `Generated and saved ${saved} vision(s).`, 'ok');
+        if (email) saveEmail();
+      } catch (e) {
+        setText($('statusGen'), `Failed: ${e.message || e}`, 'error');
+      }
+    }
+
+    async function doReadVisions() {
+      const cid = parseInt(($('cidRead').value || '').trim(), 10);
+      const lim = parseInt(($('limVis').value || '').trim(), 10);
+      const qs = new URLSearchParams();
+      if (Number.isInteger(cid)) qs.set('core_idea_id', String(cid));
+      if (!Number.isNaN(lim) && lim > 0) qs.set('limit', String(lim));
+      setText($('statusReadVis'), 'Loading…');
+      $('readVisOut').innerHTML = '';
+      try {
+        const data = await fetchJSON(`${EP.readVisByCI}?${qs.toString()}`, {}, 60000);
+        renderReadVisions(data);
+        setText($('statusReadVis'), `Loaded ${Array.isArray(data?.items) ? data.items.length : 0} vision(s).`, 'ok');
+      } catch (e) {
+        setText($('statusReadVis'), `Failed: ${e.message || e}`, 'error');
       }
     }
 
@@ -208,7 +312,10 @@
       loadEmail();
       $('saveEmail').addEventListener('click', () => { saveEmail(); setText($('svcStatus'), 'Email saved.', 'ok'); });
       $('btnExtract').addEventListener('click', doExtract);
-      $('btnRead').addEventListener('click', doRead);
+      $('btnRead').addEventListener('click', doReadCoreIdeas);
+      $('btnGenVis').addEventListener('click', () => doGenVis(EP.genVis));
+      $('btnGenPlayVis').addEventListener('click', () => doGenVis(EP.genPlayVis));
+      $('btnReadVis').addEventListener('click', doReadVisions);
     })();
   </script>
 </body>

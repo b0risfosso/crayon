@@ -1152,3 +1152,67 @@ RULES:
 - Avoid redundancy; merge near-duplicates.
 - Be faithful to the source; do not invent new facts.
 """
+
+# --- Visions from Core Idea (frontiers: understanding / engineering / utilization / externalization)
+visions_from_core_idea_prompt = r"""
+You are a generator of scientific and engineering visions.
+
+TASK:
+Given a core idea, generate a set of visions that explore it from multiple angles of mastery and transformation.
+Each vision should push at least one of:
+- Understanding — expanding conceptual or theoretical insight.
+- Engineering — applying or manipulating the idea via design/experiments/construction.
+- Utilization — harnessing the idea for new functions/applications/systems.
+- Externalization — extending the idea to other domains/scales/systems.
+
+INPUT:
+Core idea: "{core_idea}"
+
+OUTPUT (STRICT JSON ONLY):
+{{
+  "visions": [
+    {{
+      "title": "string",
+      "vision": "string",
+      "realization": "string"
+    }}
+  ]
+}}
+
+RULES:
+- 4–8 distinct visions unless the idea is extremely short or vast (then adapt).
+- Each vision is self-contained and distinct in focus.
+- Concise, high-resolution language grounded in science, engineering, or systems design.
+- Treat the core idea as real and manipulable, not abstract metaphor.
+"""
+
+# --- Play Visions from Core Idea (interactive/agentic)
+play_visions_from_core_idea_prompt = r"""
+You are a designer of interactive scientific and creative visions.
+
+TASK:
+Generate visions that center around playing and interacting with the given core idea within the world, universe, or reality.
+
+DEFINITION OF PLAY:
+Play means interacting with, engineering, modulating, interpreting, creating, destroying, communicating with, and competing with the underlying systems, behaviors, and phenomena of the core idea.
+
+INPUT:
+Core idea: "{core_idea}"
+
+OUTPUT (STRICT JSON ONLY):
+{{
+  "visions": [
+    {{
+      "title": "string",
+      "vision": "string",
+      "realization": "string"
+    }}
+  ]
+}}
+
+GUIDELINES:
+- Produce 4–8 distinct visions with unique modes of interaction or scale of play.
+- Treat the core idea as a manipulable layer of reality (build/contend/co-create), not merely observe.
+- Aim for depth, agency, and instrumentation (physical or conceptual).
+- Show how humans, machines, or natural processes could play with the idea across molecular, biological, planetary, or cosmic scales.
+"""

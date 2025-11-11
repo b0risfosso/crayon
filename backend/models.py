@@ -87,3 +87,24 @@ try:
     __all__.extend(["CoreIdeasResponse"])
 except Exception:
     __all__ = ["CoreIdeasResponse"]
+
+
+class VisionItem(BaseModel):
+    title: str = Field(..., min_length=1)
+    vision: str = Field(..., min_length=1)
+    realization: str = Field(..., min_length=1)
+
+    @_validator('title', 'vision', 'realization')
+    def _strip(cls, v: str):
+        s = (v or '').strip()
+        if not s:
+            raise ValueError("Empty string not allowed")
+        return s
+
+class VisionsResponse(BaseModel):
+    visions: List[VisionItem] = Field(..., min_items=1)
+
+try:
+    __all__.extend(["VisionItem", "VisionsResponse"])
+except Exception:
+    __all__ = ["VisionItem", "VisionsResponse"]

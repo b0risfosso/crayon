@@ -371,3 +371,60 @@ def read_core_ideas():
         return jsonify({"error": f"DB error: {e}"}), 500
     finally:
         conn.close()
+
+
+@app.get("/read/visions_by_core_idea")
+def read_visions_by_core_idea():
+    """
+    Query visions attached to a specific core_idea_id.
+    Query params:
+      - core_idea_id: int (optional; if omitted returns latest visions with any link)
+      - email: exact match (optional)
+      - limit: int (default 50, max 500)
+    Response:
+      { "items": [ {id, core_idea_id, title, text, email, status, created_at, updated_at} ] }
+    """
+    cid_raw = request.args.get("core_idea_id")
+    email = (request.args.get("email") or "").strip().lower()
+    try:
+        limit = int(request.args.get("limit", "50"))
+    except Exception:
+        limit = 50
+    limit = max(1, min(500, limit))
+
+    clauses, params = [], []
+    if cid_raw is not None and cid_raw != "":
+        try:
+            cid = int(cid_raw)
+            clauses.append("v.core_idea_id = ?")
+            params.append(cid)
+        except Exception:
+            return jsonify({"error": "core_idea_id must be an integer"}), 400
+    else:
+        clauses.append("v.core_idea_id IS NOT NULL")
+
+    if email:
+        clauses.append("LOWER(IFNULL(v.email,'')) = ?")
+        params.append(email)
+
+    sql = """
+      SELECT v.id, v.core_idea_id, v.title, v.text, v.email, v.status,
+             v.created_at, v.updated_at
+      FROM visions v
+    """
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY datetime(v.created_at) DESC, v.id DESC LIMIT ?"
+    params.append(limit)
+
+    path = _db_path()
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.execute(sql, params)
+        rows = [dict(r) for r in cur.fetchall()]
+        return jsonify({"items": rows})
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
