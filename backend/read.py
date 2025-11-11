@@ -417,7 +417,7 @@ def read_visions_by_core_idea():
     sql += " ORDER BY datetime(v.created_at) DESC, v.id DESC LIMIT ?"
     params.append(limit)
 
-    path = _db_path()
+    path = PICTURE_DB
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     try:
