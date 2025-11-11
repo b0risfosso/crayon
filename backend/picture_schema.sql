@@ -120,28 +120,25 @@ CREATE INDEX IF NOT EXISTS idx_prompt_outputs_email ON prompt_outputs(email);
 PRAGMA foreign_keys = ON;
 
 -- 1) New table
+-- Core ideas table (title renamed to "source")
 CREATE TABLE IF NOT EXISTS core_ideas (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    source       TEXT NOT NULL,             -- e.g., source passage, doc, or topic
-    core_idea   TEXT NOT NULL,             -- one distilled idea
-    vision_id   INTEGER,                   -- optional link to visions.id if relevant
-    email       TEXT,                      -- keep parity with other tables
-    source      TEXT,                      -- e.g., 'manual' | 'jid' | 'crayon'
-    metadata    TEXT,                      -- JSON (confidence, offsets, etc.)
-    created_at  TEXT NOT NULL,             -- ISO 8601
-    updated_at  TEXT NOT NULL,             -- ISO 8601
-    FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE SET NULL,
-    CHECK (length(source) > 0),
-    CHECK (length(core_idea) > 0)
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  source      TEXT NOT NULL,       -- passage/doc/topic identifier (was "title")
+  core_idea   TEXT NOT NULL,       -- the distilled idea sentence
+  email       TEXT,
+  origin      TEXT,                -- e.g., 'manual' | 'jid' | 'crayon'
+  metadata    TEXT,                -- JSON
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  CHECK (length(source) > 0),
+  CHECK (length(core_idea) > 0)
 );
 
--- 2) Helpful indexes
-CREATE INDEX IF NOT EXISTS idx_core_ideas_source     ON core_ideas(source);
-CREATE INDEX IF NOT EXISTS idx_core_ideas_vision    ON core_ideas(vision_id);
-CREATE INDEX IF NOT EXISTS idx_core_ideas_email     ON core_ideas(email);
--- Prevent exact duplicates for a given user (adjust if you want true duplicates allowed)
+CREATE INDEX IF NOT EXISTS idx_core_ideas_source ON core_ideas(source);
+CREATE INDEX IF NOT EXISTS idx_core_ideas_email  ON core_ideas(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_core_ideas_dedupe
   ON core_ideas(source, core_idea, IFNULL(email, ''));
+
 
 -- 3) Triggers to maintain updated_at
 CREATE TRIGGER IF NOT EXISTS trg_core_ideas_insert_ts
@@ -161,11 +158,3 @@ BEGIN
   WHERE id = NEW.id;
 END;
 
-
-PRAGMA foreign_keys = ON;
-
-ALTER TABLE visions
-ADD COLUMN IF NOT EXISTS core_idea_id INTEGER
-REFERENCES core_ideas(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_visions_core_idea ON visions(core_idea_id);

@@ -41,6 +41,22 @@ from models import CoreIdeasResponse
 from prompts import core_ideas_prompt
 
 
+def _has_column(conn, table, col):
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    return any(r[1] == col for r in cur.fetchall())
+
+def ensure_visions_core_idea(conn):
+    # Add the column only if missing (old SQLite-safe; no IF NOT EXISTS)
+    if not _has_column(conn, "visions", "core_idea_id"):
+        conn.execute(
+            "ALTER TABLE visions "
+            "ADD COLUMN core_idea_id INTEGER REFERENCES core_ideas(id) ON DELETE SET NULL"
+        )
+    # Index is safe to create repeatedly with IF NOT EXISTS
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_visions_core_idea ON visions(core_idea_id)")
+    conn.commit()
+
+
 
 
 # ------------------------------------------------------------------------------
@@ -747,7 +763,7 @@ def persist_explanation_to_db(
 
 
 
-def persist_core_ideas_to_db(ideas: list[str], *, source: str, email: Optional[str], metadata: Optional[dict] = None) -> dict:
+def persist_core_ideas_to_db(ideas: list[str], *, source: str, email: Optional[str], metadata: Optional[dict] = None, payload_origin: Optional[str] = "jid") -> dict:
     """
     Insert each idea into core_ideas(source, core_idea, email, metadata, created_at, updated_at).
     Assumes triggers set timestamps if present; otherwise we set them.
@@ -775,8 +791,8 @@ def persist_core_ideas_to_db(ideas: list[str], *, source: str, email: Optional[s
         cur = conn.cursor()
         for idea in ideas:
             cur.execute(
-                "INSERT INTO core_ideas (source, core_idea, email, metadata, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-                (source, idea, email, meta_json, ts, ts),
+                "INSERT INTO core_ideas (source, core_idea, email, origin, metadata, created_at, updated_at) VALUES (?,?,?,?,?,?, ?)",
+                (source, idea, email, payload_origin, meta_json, ts, ts),
             )
         conn.commit()
         return {"inserted": len(ideas)}
@@ -1076,7 +1092,7 @@ def jid_create_core_ideas():
 
     try:
         result = run_text_to_core_ideas_llm(text, email=email)
-        stats = persist_core_ideas_to_db(result.ideas, source=source, email=email, metadata={"origin": "jid"})
+        stats = persist_core_ideas_to_db(result.ideas, source=source, email=email, metadata={"origin": "jid"}, payload_origin="jid")
         return jsonify({"ideas": result.ideas, **stats}), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429

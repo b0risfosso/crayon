@@ -14,7 +14,24 @@ def connect(db_path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+def _has_column(conn, table, col):
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    return any(r[1] == col for r in cur.fetchall())
+
+def ensure_visions_core_idea(conn):
+    # Add the column only if missing (old SQLite-safe; no IF NOT EXISTS)
+    if not _has_column(conn, "visions", "core_idea_id"):
+        conn.execute(
+            "ALTER TABLE visions "
+            "ADD COLUMN core_idea_id INTEGER REFERENCES core_ideas(id) ON DELETE SET NULL"
+        )
+    # Index is safe to create repeatedly with IF NOT EXISTS
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_visions_core_idea ON visions(core_idea_id)")
+    conn.commit()
+
+
 # --- init ---
+
 
 def init_picture_db(conn: Optional[sqlite3.Connection]=None) -> None:
     close = False
@@ -22,6 +39,7 @@ def init_picture_db(conn: Optional[sqlite3.Connection]=None) -> None:
         conn, close = connect(PICTURE_DB), True
     try:
         conn.executescript(open("picture_schema.sql", "r", encoding="utf-8").read())
+        ensure_visions_core_idea(conn)
     finally:
         if close:
             conn.close()
