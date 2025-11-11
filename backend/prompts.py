@@ -1126,12 +1126,11 @@ PROMPT_COLLECTIONS["architects_all"] = [
 
 
 # --- Core Ideas Extraction ---
-
 core_ideas_prompt = r"""
 You are a precise distiller of ideas.
 
 TASK:
-Extract the core ideas from the following TEXT. Return a compact list of distinct, non-overlapping ideas. Each idea should be a 2-3 sentences capturing the essence, not examples or citations.
+Extract the core ideas from the following TEXT. Return a compact list of distinct, non-overlapping ideas. Each idea must be a complete, self-contained statement in 2–3 sentences that captures the essence (core claim + brief mechanism, implication, or condition) — not examples or citations.
 
 TEXT:
 "{text}"
@@ -1139,16 +1138,17 @@ TEXT:
 OUTPUT (STRICT JSON ONLY):
 {{
   "ideas": [
-    "string",  // one distilled idea
+    "string",  // one distilled, complete idea (2–3 sentences)
     "string"
   ]
 }}
 
 RULES:
-- 3–12 ideas unless the text is extremely short or long; adjust as needed.
+- Produce 3–12 ideas unless the text is extremely short or long; adjust as needed.
+- Each idea must stand alone: avoid pronouns without clear antecedents; repeat key nouns when needed.
 - No titles. No numbering. No markdown. No commentary.
 - Keep each idea ≤ 400 characters when possible.
+- Prefer precise domain terms from the source; specify causal relations or definitions explicitly.
 - Avoid redundancy; merge near-duplicates.
-- Use clear language faithful to the source.
+- Be faithful to the source; do not invent new facts.
 """
-
