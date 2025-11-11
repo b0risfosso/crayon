@@ -563,6 +563,15 @@ def run_text_to_core_ideas_llm(
         usage_in = u.get("input", usage_in)
         usage_out = u.get("output", 0)
 
+        parsed = getattr(resp, "output_parsed", None) or getattr(resp, "parsed", None)
+        raw_text = getattr(resp, "output_text", None) or getattr(resp, "text", None) or ""
+
+        if parsed is None:
+            # Fallback: parse the raw text as JSON (strip code fences if present)
+            m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.S)
+            raw_json = m.group(1) if m else raw_text
+            parsed = CoreIdeasResponse.model_validate(json.loads(raw_json))
+
         log_usage(
             app="jid",
             model=model,
@@ -574,7 +583,7 @@ def run_text_to_core_ideas_llm(
             duration_ms=0,
             cost_usd=0.0,
         )
-        return resp.output_parsed
+        return parsed
     except Exception:
         # still log approximate input usage
         log_usage(
