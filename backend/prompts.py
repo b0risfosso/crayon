@@ -1124,3 +1124,31 @@ PROMPT_COLLECTIONS["architects_all"] = [
     {"key": "intel_arch", "system": _SYS["intel"], "template": intelligence_architect_prompt},
 ]
 
+
+# --- Core Ideas Extraction ---
+
+core_ideas_prompt = r"""
+You are a precise distiller of ideas.
+
+TASK:
+Extract the core ideas from the following TEXT. Return a compact list of distinct, non-overlapping ideas. Each idea should be a 2-3 sentences capturing the essence, not examples or citations.
+
+TEXT:
+"{text}"
+
+OUTPUT (STRICT JSON ONLY):
+{{
+  "ideas": [
+    "string",  // one distilled idea
+    "string"
+  ]
+}}
+
+RULES:
+- 3–12 ideas unless the text is extremely short or long; adjust as needed.
+- No titles. No numbering. No markdown. No commentary.
+- Keep each idea ≤ 400 characters when possible.
+- Avoid redundancy; merge near-duplicates.
+- Use clear language faithful to the source.
+"""
+

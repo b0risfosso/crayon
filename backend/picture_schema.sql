@@ -117,3 +117,58 @@ CREATE INDEX IF NOT EXISTS idx_prompt_outputs_vision ON prompt_outputs(vision_id
 CREATE INDEX IF NOT EXISTS idx_prompt_outputs_email ON prompt_outputs(email);
 
 
+PRAGMA foreign_keys = ON;
+
+-- 1) New table
+CREATE TABLE IF NOT EXISTS core_ideas (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,             -- e.g., source passage, doc, or topic
+    core_idea   TEXT NOT NULL,             -- one distilled idea
+    vision_id   INTEGER,                   -- optional link to visions.id if relevant
+    email       TEXT,                      -- keep parity with other tables
+    source      TEXT,                      -- e.g., 'manual' | 'jid' | 'crayon'
+    metadata    TEXT,                      -- JSON (confidence, offsets, etc.)
+    created_at  TEXT NOT NULL,             -- ISO 8601
+    updated_at  TEXT NOT NULL,             -- ISO 8601
+    FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE SET NULL,
+    CHECK (length(title) > 0),
+    CHECK (length(core_idea) > 0)
+);
+
+-- 2) Helpful indexes
+CREATE INDEX IF NOT EXISTS idx_core_ideas_title     ON core_ideas(title);
+CREATE INDEX IF NOT EXISTS idx_core_ideas_vision    ON core_ideas(vision_id);
+CREATE INDEX IF NOT EXISTS idx_core_ideas_email     ON core_ideas(email);
+-- Prevent exact duplicates for a given user (adjust if you want true duplicates allowed)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_core_ideas_dedupe
+  ON core_ideas(title, core_idea, IFNULL(email, ''));
+
+-- 3) Triggers to maintain updated_at
+CREATE TRIGGER IF NOT EXISTS trg_core_ideas_insert_ts
+AFTER INSERT ON core_ideas
+BEGIN
+  UPDATE core_ideas
+  SET created_at = COALESCE(NEW.created_at, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updated_at = COALESCE(NEW.updated_at, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_core_ideas_update_ts
+AFTER UPDATE ON core_ideas
+BEGIN
+  UPDATE core_ideas
+  SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  WHERE id = NEW.id;
+END;
+
+
+PRAGMA foreign_keys = ON;
+
+-- Add nullable FK from visions → core_ideas
+ALTER TABLE visions
+  ADD COLUMN core_idea_id INTEGER
+  REFERENCES core_ideas(id) ON DELETE SET NULL;
+
+-- Helpful index for lookups
+CREATE INDEX IF NOT EXISTS idx_visions_core_idea
+  ON visions(core_idea_id);

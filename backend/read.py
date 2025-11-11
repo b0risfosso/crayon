@@ -325,11 +325,49 @@ def architecture_counts():
 
     return jsonify({"counts": out})
 
+@app.get("/read/core_ideas")
+def read_core_ideas():
+    """
+    Query saved core ideas.
+    Query params:
+      - source_like: substring match on source (optional)
+      - email: exact match (optional)
+      - limit: int (default 50, max 500)
+    Response:
+      { "items": [ {id, source, core_idea, email, created_at, updated_at} ] }
+    """
+    source_like = (request.args.get("source_like") or "").strip()
+    email = (request.args.get("email") or "").strip().lower()
+    try:
+        limit = int(request.args.get("limit", "50"))
+    except Exception:
+        limit = 50
+    limit = max(1, min(500, limit))
 
-# ------------------------------------------------------------------------------
-# Entrypoint (optional if you run via gunicorn)
-if __name__ == "__main__":
-    # Bind to localhost by default; override with READ_HOST/READ_PORT
-    host = os.getenv("READ_HOST", "127.0.0.1")
-    port = int(os.getenv("READ_PORT", "9020"))
-    app.run(host=host, port=port, debug=False)
+    sql = """
+      SELECT id, source, core_idea, email, created_at, updated_at
+      FROM core_ideas
+    """
+    clauses, params = [], []
+    if source_like:
+        clauses.append("source LIKE ?")
+        params.append(f"%{source_like}%")
+    if email:
+        clauses.append("LOWER(IFNULL(email,'')) = ?")
+        params.append(email)
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY datetime(created_at) DESC, id DESC LIMIT ?"
+    params.append(limit)
+
+    path = PICTURE_DB
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.execute(sql, params)
+        rows = [dict(r) for r in cur.fetchall()]
+        return jsonify({"items": rows})
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()

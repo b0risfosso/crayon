@@ -56,3 +56,34 @@ try:
     __all__.extend(["FocusItem", "FocusesResponse"])  # type: ignore
 except Exception:
     pass
+
+
+from typing import List
+from pydantic import BaseModel, Field
+try:
+    from pydantic import field_validator as _validator
+except Exception:
+    from pydantic import validator as _validator  # type: ignore
+
+# … keep your existing models …
+
+class CoreIdeasResponse(BaseModel):
+    ideas: List[str] = Field(..., min_items=1)
+
+    @_validator('ideas')
+    def _strip_and_validate(cls, v):
+        cleaned = []
+        for s in v:
+            s2 = (s or '').strip()
+            if not s2:
+                continue
+            cleaned.append(s2)
+        if not cleaned:
+            raise ValueError("At least one non-empty idea is required.")
+        return cleaned
+
+# export symbol
+try:
+    __all__.extend(["CoreIdeasResponse"])
+except Exception:
+    __all__ = ["CoreIdeasResponse"]

@@ -36,6 +36,10 @@ import threading
 import queue
 import uuid
 
+from sqlite3 import connect
+from models import CoreIdeasResponse
+from prompts import core_ideas_prompt
+
 
 
 
@@ -506,6 +510,70 @@ def run_explain_picture(
     return content.strip()
 
 
+def run_text_to_core_ideas_llm(
+    text: str,
+    *,
+    email: Optional[str] = None,
+    model: str = DEFAULT_MODEL,
+    endpoint_name: str = "/jid/create_core_ideas",
+) -> CoreIdeasResponse:
+    """
+    Extract core ideas from arbitrary text using a structured JSON schema.
+    """
+    # Daily limit pre-check
+    today_tokens = get_today_model_tokens(model)
+    if today_tokens >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model}: {today_tokens} / {DAILY_MAX_TOKENS_LIMIT}"
+        )
+
+    prompt_text = core_ideas_prompt.format(text=text)
+
+    # Estimate tokens-in before call
+    usage_in = 0
+    usage_out = 0
+    request_id = None
+
+    try:
+        resp = client.responses.parse(
+            model=model,
+            input=[
+                {"role": "system", "content": "Return ONLY valid JSON matching the response_format."},
+                {"role": "user", "content": prompt_text},
+            ],
+            response_format=CoreIdeasResponse,
+        )
+        u = _usage_from_resp(resp)
+        usage_in = u.get("input", usage_in)
+        usage_out = u.get("output", 0)
+
+        log_usage(
+            app="jid",
+            model=model,
+            tokens_in=usage_in,
+            tokens_out=usage_out,
+            endpoint=endpoint_name,
+            email=email,
+            request_id=request_id,
+            duration_ms=0,
+            cost_usd=0.0,
+        )
+        return resp.output_parsed
+    except Exception:
+        # still log approximate input usage
+        log_usage(
+            app="jid",
+            model=model,
+            tokens_in=usage_in,
+            tokens_out=usage_out,
+            endpoint=endpoint_name,
+            email=email,
+            request_id=request_id,
+            duration_ms=0,
+            cost_usd=0.0,
+        )
+        raise
+
 
 def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = None) -> dict:
     """
@@ -676,6 +744,45 @@ def persist_explanation_to_db(
     except Exception as e:
         print(f"[WARN] persist_explanation_to_db failed: {e}")
         return {}
+
+
+
+def persist_core_ideas_to_db(ideas: list[str], *, source: str, email: Optional[str], metadata: Optional[dict] = None) -> dict:
+    """
+    Insert each idea into core_ideas(source, core_idea, email, metadata, created_at, updated_at).
+    Assumes triggers set timestamps if present; otherwise we set them.
+    """
+    db = PICTURE_DB
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    meta_json = json.dumps(metadata or {}, ensure_ascii=False)
+
+    conn = connect(db)
+    try:
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS core_ideas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            core_idea TEXT NOT NULL,
+            email TEXT,
+            metadata TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """)
+        # If you want dedupe, uncomment the unique index below.
+        # conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_core_ideas_dedupe ON core_ideas(source, core_idea, IFNULL(email,''));")
+
+        cur = conn.cursor()
+        for idea in ideas:
+            cur.execute(
+                "INSERT INTO core_ideas (source, core_idea, email, metadata, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+                (source, idea, email, meta_json, ts, ts),
+            )
+        conn.commit()
+        return {"inserted": len(ideas)}
+    finally:
+        conn.close()
+
 
 
 def _create_pictures_sync(payload: dict) -> tuple[int, dict]:
@@ -953,3 +1060,25 @@ def create_pictures_result():
 
     # No wrapper: behave like the original synchronous endpoint
     return jsonify(body_plain), http_status
+
+
+@app.route("/jid/create_core_ideas", methods=["POST"])
+def jid_create_core_ideas():
+    payload = request.get_json(force=True) or {}
+    text = (payload.get("text") or "").strip()
+    source = (payload.get("source") or "").strip()
+    email = payload.get("email")
+
+    if not text:
+        return jsonify({"error": "Missing 'text'"}), 400
+    if not source:
+        return jsonify({"error": "Missing 'source' (to store in core_ideas.source)"}), 400
+
+    try:
+        result = run_text_to_core_ideas_llm(text, email=email)
+        stats = persist_core_ideas_to_db(result.ideas, source=source, email=email, metadata={"origin": "jid"})
+        return jsonify({"ideas": result.ideas, **stats}), 200
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 429
+    except Exception as e:
+        return jsonify({"error": f"Unhandled error: {e}"}), 500
