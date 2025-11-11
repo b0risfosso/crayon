@@ -122,7 +122,7 @@ PRAGMA foreign_keys = ON;
 -- 1) New table
 CREATE TABLE IF NOT EXISTS core_ideas (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    title       TEXT NOT NULL,             -- e.g., source passage, doc, or topic
+    source       TEXT NOT NULL,             -- e.g., source passage, doc, or topic
     core_idea   TEXT NOT NULL,             -- one distilled idea
     vision_id   INTEGER,                   -- optional link to visions.id if relevant
     email       TEXT,                      -- keep parity with other tables
@@ -131,17 +131,17 @@ CREATE TABLE IF NOT EXISTS core_ideas (
     created_at  TEXT NOT NULL,             -- ISO 8601
     updated_at  TEXT NOT NULL,             -- ISO 8601
     FOREIGN KEY (vision_id) REFERENCES visions(id) ON DELETE SET NULL,
-    CHECK (length(title) > 0),
+    CHECK (length(source) > 0),
     CHECK (length(core_idea) > 0)
 );
 
 -- 2) Helpful indexes
-CREATE INDEX IF NOT EXISTS idx_core_ideas_title     ON core_ideas(title);
+CREATE INDEX IF NOT EXISTS idx_core_ideas_source     ON core_ideas(source);
 CREATE INDEX IF NOT EXISTS idx_core_ideas_vision    ON core_ideas(vision_id);
 CREATE INDEX IF NOT EXISTS idx_core_ideas_email     ON core_ideas(email);
 -- Prevent exact duplicates for a given user (adjust if you want true duplicates allowed)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_core_ideas_dedupe
-  ON core_ideas(title, core_idea, IFNULL(email, ''));
+  ON core_ideas(source, core_idea, IFNULL(email, ''));
 
 -- 3) Triggers to maintain updated_at
 CREATE TRIGGER IF NOT EXISTS trg_core_ideas_insert_ts
@@ -164,11 +164,8 @@ END;
 
 PRAGMA foreign_keys = ON;
 
--- Add nullable FK from visions → core_ideas
-ALTER TABLE visions
-  ADD COLUMN core_idea_id INTEGER
+  ALTER TABLE visions
+  ADD COLUMN IF NOT EXISTS core_idea_id INTEGER
   REFERENCES core_ideas(id) ON DELETE SET NULL;
 
--- Helpful index for lookups
-CREATE INDEX IF NOT EXISTS idx_visions_core_idea
-  ON visions(core_idea_id);
+CREATE INDEX IF NOT EXISTS idx_visions_core_idea ON visions(core_idea_id);
