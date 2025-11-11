@@ -164,8 +164,8 @@ END;
 
 PRAGMA foreign_keys = ON;
 
-  ALTER TABLE visions
-  ADD COLUMN IF NOT EXISTS core_idea_id INTEGER
-  REFERENCES core_ideas(id) ON DELETE SET NULL;
+ALTER TABLE visions
+ADD COLUMN IF NOT EXISTS core_idea_id INTEGER
+REFERENCES core_ideas(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_visions_core_idea ON visions(core_idea_id);
