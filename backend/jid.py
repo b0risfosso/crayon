@@ -924,13 +924,14 @@ def persist_visions_for_core_idea(
             title = (v.get("title") or "").strip() or None
             v_text = (v.get("vision") or "").strip()
             r_text = (v.get("realization") or "").strip()
+            r_focuses = json.dumps([{"dimension": None, "focus": s}])
             meta = json.dumps({"core_idea_id": core_idea_id, "structured": v}, ensure_ascii=False)
             cur.execute(
                 """
-                INSERT INTO visions (title, text, focus, email, status, priority, source, slug, metadata, created_at, updated_at, core_idea_id)
+                INSERT INTO visions (title, text, focuses, email, status, priority, source, slug, metadata, created_at, updated_at, core_idea_id)
                 VALUES (?, ?, ?, ?, 'draft', 0, ?, NULL, ?, ?, ?, ?)
                 """,
-                (title, v_text, r_text, email, origin, meta, ts, ts, core_idea_id),
+                (title, v_text, r_focuses, email, origin, meta, ts, ts, core_idea_id),
             )
             inserted += 1
         conn.commit()
