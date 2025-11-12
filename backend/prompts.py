@@ -1251,7 +1251,7 @@ RULES:
 - Keep precision — real biophysics, chemistry, computation, or systems logic — but describe them as harmonic interactions in the music of matter.
 """
 
-compose_play_visions_prompt = r"""
+composition_play_visions_prompt = r"""
 You are a conductor of interactive scientific and creative realities.
 
 TASK:
