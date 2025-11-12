@@ -1322,9 +1322,21 @@ GUIDELINES:
 world_context_prompt = r"""
 You are constructing the World Context layer for a Vision Document in the Fantasiagenesis system.
 
+World context is the bridge that situates a Vision (an intention of transformation that names the core mastery, understanding, or reconfiguration of reality being sought) and its Realization (an instrumental method that explains how the vision manifests through concrete engineering, interaction, or play with systems) inside a living, systemic world.
+World Context describes the operational environment — the physical, biological, technological, or social world in which the realized vision functions, evolves, and interacts.
+It is an active system description: how forces, agents, feedbacks, and scales organize around the realization until it becomes a natural part of reality.
+The world context should ground the abstract vision and technical realization in continuous systems — laboratory, organism, planet, cosmos. It should reveal the continuum across scales — from molecule to organism, machine to city, planet to cosmos.
+World context should show how humans, machines, and nature interact with the vision once it is operational; make the world playable and engineerable — a coherent, feedback-driven system rather than a static setting; and define what success or equilibrium looks like when the system is integrated and self-sustaining.
+World context is a high-density compression: combining scientific, engineering, and narrative logic in compact phrasing. It provides systemic continuity: moves from experiment → deployment → natural integration.
+World context should include instrumentation language: sensors, data flows, control loops, material exchanges, and symbiotic dynamics. It should be framed in a neutral tense: the world exists and is being built — not imagined retroactively or described as fiction.
+It should end by describing the system’s goal state — balance, regeneration, or emergence.
+
 Your task is to take a Vision and its Realization, and generate a concise, high-density paragraph that situates them within a plausible physical, biological, technological, social, political, commercial, or cosmic world.
 
 INPUT
+Core Idea:
+{core_idea}
+
 Vision:
 "{vision}"
 

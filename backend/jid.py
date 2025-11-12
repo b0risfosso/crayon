@@ -684,9 +684,9 @@ def run_core_idea_play_visions_llm(core_idea: str, *, email: str | None, model: 
         raise
 
 
-def run_world_context_llm(vision: str, realization: str | None, *, email: str | None, model: str, endpoint_name: str) -> WorldContextResponse:
+def run_world_context_llm(core_idea: str, vision: str, realization: str | None, *, email: str | None, model: str, endpoint_name: str) -> WorldContextResponse:
     r_text = realization or ""
-    prompt_text = world_context_prompt.format(vision=vision, realization=r_text)
+    prompt_text = world_context_prompt.format(core_idea=core_idea, vision=vision, realization=r_text)
     usage_in = estimate_tokens(prompt_text, model=model)
     usage_out = 0
     try:
@@ -994,6 +994,33 @@ def fetch_vision_and_realization(vision_id: int):
         except Exception:
             realization = None
         return (vision_text or None), realization
+    finally:
+        conn.close()
+
+def fetch_core_idea_text_for_vision(vision_id: int):
+    """
+    Returns the core_idea text linked to a given vision.
+
+    Looks up the vision's core_idea_id from the visions table,
+    then fetches the corresponding core_idea text from core_ideas.core_idea.
+    Returns None if either is missing.
+    """
+    conn = connect(PICTURE_DB)
+    conn.row_factory = None
+    try:
+        # 1) get core_idea_id for this vision
+        cur = conn.execute("SELECT core_idea_id FROM visions WHERE id = ?", (vision_id,))
+        row = cur.fetchone()
+        if not row or row[0] is None:
+            return None
+        cid = row[0]
+
+        # 2) fetch core_idea text
+        cur = conn.execute("SELECT core_idea FROM core_ideas WHERE id = ?", (cid,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return (row[0] or "").strip() or None
     finally:
         conn.close()
 
@@ -1408,11 +1435,12 @@ def jid_generate_world_context_for_vision():
         return jsonify({"error": "vision_id (int) is required"}), 400
 
     vision_text, realization_text = fetch_vision_and_realization(vid)
+    core_idea_text = fetch_core_idea_text_for_vision(vid)
     if not vision_text:
         return jsonify({"error": f"vision_id {vid} not found or has no text"}), 404
 
     try:
-        (wc_resp, prompt_text) = run_world_context_llm(vision_text, realization_text, email=email, model=model,
+        (wc_resp, prompt_text) = run_world_context_llm(core_idea_text, vision_text, realization_text, email=email, model=model,
                                                        endpoint_name="/jid/generate_world_context_for_vision")
         persist_world_context_output(vid, wc_resp.world_context, email=email, model=model, prompt_text=prompt_text)
         return jsonify({"vision_id": vid, "world_context": wc_resp.world_context})
