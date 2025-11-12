@@ -693,10 +693,10 @@ def run_world_context_llm(vision: str, realization: str | None, *, email: str | 
         resp = client.responses.parse(
             model=model,
             input=[
-                {"role": "system", "content": "Return ONLY valid JSON matching the response_format."},
+                {"role": "system", "content": "Return ONLY valid JSON matching the text_format."},
                 {"role": "user", "content": prompt_text},
             ],
-            response_format=WorldContextResponse,
+            text_format=WorldContextResponse,
         )
         u = _usage_from_resp(resp)
         usage_in = u.get("input", usage_in)
