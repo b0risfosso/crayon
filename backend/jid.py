@@ -609,7 +609,7 @@ def run_text_to_core_ideas_llm(
 
 
 def run_core_idea_visions_llm(core_idea: str, *, email: str | None, model: str, endpoint_name: str) -> VisionsResponse:
-    prompt_text = composition_visions_prompt.format(core_idea=core_idea)
+    prompt_text = visions_from_core_idea_prompt.format(core_idea=core_idea)
     usage_in = 0
     usage_out = 0
 
@@ -644,7 +644,7 @@ def run_core_idea_visions_llm(core_idea: str, *, email: str | None, model: str, 
         raise
 
 def run_core_idea_play_visions_llm(core_idea: str, *, email: str | None, model: str, endpoint_name: str) -> VisionsResponse:
-    prompt_text = composition_play_visions_prompt.format(core_idea=core_idea)
+    prompt_text = play_visions_from_core_idea_prompt.format(core_idea=core_idea)
     usage_in = 0
     usage_out = 0
 
