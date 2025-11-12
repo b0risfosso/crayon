@@ -1184,9 +1184,13 @@ RULES:
 - Each vision is self-contained and distinct in focus.
 - Concise, high-resolution language grounded in science, engineering, or systems design.
 - Treat the core idea as real and manipulable, not abstract metaphor.
-- Integrate rigorous scientific or engineering logic (physics, chemistry, computation, biology) expressed through artistic and creative language.
+- Vision should be worded simply, but express foundational/fundamental perspectives, approaches, and principles.
 - Visions should feel like they are engaging in the art of composing reality.
 """
+
+
+# - Vision should be worded simply, but express foundational/fundamental perspectives, approaches, and principles.
+# - Integrate rigorous scientific or engineering logic (physics, chemistry, computation, biology) expressed through artistic and creative language.
 
 # --- Play Visions from Core Idea (interactive/agentic)
 play_visions_from_core_idea_prompt = r"""
@@ -1215,10 +1219,11 @@ OUTPUT (STRICT JSON ONLY):
 GUIDELINES:
 - Produce 4–8 distinct visions with unique modes of interaction or scale of play.
 - Use "play" as metaphor only; focus visions developing on high agency, beneficial, real-world interactions with the systems and entities found in the core idea.
+- Each vision should provide creative and civilizational syntax that speaks the core idea into being: describe systems that act, invert, move, rewire matter - systems ready to be world-built.
 - Treat the core idea as a manipulable layer of reality (build/contend/co-create), not merely observe.
 - Aim for depth, agency, and instrumentation (physical or conceptual).
 - Show how humans, machines, or natural processes could play with the idea across molecular, biological, planetary, or cosmic scales.
-- Integrate rigorous scientific or engineering logic (physics, chemistry, computation, biology) expressed through artistic and creative language.
+- Vision should be worded simply, but express foundational/fundamental perspectives, approaches, and principles.
 - Visions should feel like they are engaging in the art of composing reality.
 """
 
