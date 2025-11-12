@@ -69,7 +69,7 @@ def ensure_visions_core_idea(conn):
 
 # ------------------------------------------------------------------------------
 # Config
-DEFAULT_MODEL = os.getenv("JID_LLM_MODEL", "gpt-5-mini-2025-08-07")
+DEFAULT_MODEL = os.getenv("JID_LLM_MODEL", "gpt-5")
 DAILY_MAX_TOKENS_LIMIT = int(os.getenv("DAILY_MAX_TOKENS_LIMIT", "10000000"))  # 10M
 DEFAULT_ENDPOINT_NAME = "/jid/create_pictures"
 
