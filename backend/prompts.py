@@ -1184,7 +1184,7 @@ RULES:
 - Each vision is self-contained and distinct in focus.
 - Concise, high-resolution language grounded in science, engineering, or systems design.
 - Treat the core idea as real and manipulable, not abstract metaphor.
-- Vision should be worded simply and creatively, while integrating rigorous scientific or engineering logic (physics, chemistry, computation, biology)
+- Vision should be worded simply and creatively, but express foundational/fundamental/transformative perspectives, approaches, and principles.
 - Visions should feel like they are engaging in the art of composing reality.
 """
 
@@ -1234,7 +1234,7 @@ GUIDELINES:
 - Treat the core idea as a manipulable layer of reality (build/contend/co-create), not merely observe.
 - Aim for depth, agency, and instrumentation (physical or conceptual).
 - Show how humans, machines, or natural processes could play with the idea across molecular, biological, planetary, or cosmic scales.
-- Vision should be worded simply and creatively, while integrating rigorous scientific or engineering logic (physics, chemistry, computation, biology).
+- Vision should be worded simply, but express foundational/fundamental/transformative perspectives, approaches, and principles.
 - Visions should feel like they are engaging in the art of composing reality.
 """
 
