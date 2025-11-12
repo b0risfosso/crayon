@@ -1315,7 +1315,7 @@ Generate a World Context paragraph that:
 - Ends with 1–2 sentences defining what success or equilibrium looks like in this world.
 
 OUTPUT (STRICT JSON ONLY):
-{
+{{
   "world_context": "one paragraph, 4–8 sentences, rich with tangible systems, materials, instrumentation, and modes of interaction."
-}
+}}
 """
