@@ -408,10 +408,11 @@ def read_visions_by_core_idea():
         params.append(email)
 
     sql = """
-    SELECT v.id, v.core_idea_id, v.title, v.text, v.focuses, v.email, v.status,
-            v.created_at, v.updated_at
-    FROM visions v
-    """
+        SELECT v.id, v.core_idea_id, v.title, v.text, v.focuses, v.explanation, v.email, v.status,
+                v.created_at, v.updated_at
+        FROM visions v
+        """
+
 
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)

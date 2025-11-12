@@ -1289,3 +1289,33 @@ GUIDELINES:
 - Emphasize agency, rhythm, and reciprocity: play is a dialogue, not a command.
 - Tone: precise yet artistic, grounded in real mechanisms but aware of their poetic continuity with the larger symphony of existence.
 """
+
+
+# --- World Context Generator ---------------------------------------------------
+world_context_prompt = r"""
+You are constructing the World Context layer for a Vision Document in the Fantasiagenesis system.
+
+Your task is to take a Vision and its Realization, and generate a concise, high-density paragraph that situates them within a plausible physical, biological, technological, social, political, commercial, or cosmic world.
+
+INPUT
+Vision:
+"{vision}"
+
+Realization:
+"{realization}"
+
+TASK
+Generate a World Context paragraph that:
+- Grounds the vision and realization in real or extended physical systems (molecular, biological, ecological, industrial, governmental, commercial, planetary, or cosmic).
+- Describes how humans, machines, or natural systems engage, engineer, or coexist with the realized vision in practice.
+- Shows the continuum from laboratory to environment—how the same principle operates across scales of experimentation, deployment, and natural integration.
+- Uses compressed, multi-domain phrasing (scientific + engineering + narrative) rather than pure prose.
+- Treats the world as a playable, manipulable system—a stage on which the vision is enacted, measured, and evolved.
+- Emphasizes instrumentation, feedback, data flows, and control logic that make the vision operational.
+- Ends with 1–2 sentences defining what success or equilibrium looks like in this world.
+
+OUTPUT (STRICT JSON ONLY):
+{
+  "world_context": "one paragraph, 4–8 sentences, rich with tangible systems, materials, instrumentation, and modes of interaction."
+}
+"""

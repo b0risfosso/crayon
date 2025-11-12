@@ -108,3 +108,26 @@ try:
     __all__.extend(["VisionItem", "VisionsResponse"])
 except Exception:
     __all__ = ["VisionItem", "VisionsResponse"]
+
+
+from pydantic import BaseModel, Field
+try:
+    from pydantic import field_validator as _validator
+except Exception:
+    from pydantic import validator as _validator  # v1 fallback
+
+class WorldContextResponse(BaseModel):
+    world_context: str = Field(..., min_length=10)
+
+    @_validator('world_context')
+    def _strip_wc(cls, v: str):
+        s = (v or '').strip()
+        if not s:
+            raise ValueError("world_context is empty")
+        return s
+
+# export
+try:
+    __all__.extend(["WorldContextResponse"])
+except Exception:
+    __all__ = ["WorldContextResponse"]

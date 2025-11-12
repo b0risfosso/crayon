@@ -48,6 +48,9 @@ from prompts import (
     composition_visions_prompt,
 )
 
+from models import WorldContextResponse
+from prompts import world_context_prompt
+
 
 def _has_column(conn, table, col):
     cur = conn.execute(f"PRAGMA table_info({table})")
@@ -681,6 +684,33 @@ def run_core_idea_play_visions_llm(core_idea: str, *, email: str | None, model: 
         raise
 
 
+def run_world_context_llm(vision: str, realization: str | None, *, email: str | None, model: str, endpoint_name: str) -> WorldContextResponse:
+    r_text = realization or ""
+    prompt_text = world_context_prompt.format(vision=vision, realization=r_text)
+    usage_in = estimate_tokens(prompt_text, model=model)
+    usage_out = 0
+    try:
+        resp = client.responses.parse(
+            model=model,
+            input=[
+                {"role": "system", "content": "Return ONLY valid JSON matching the response_format."},
+                {"role": "user", "content": prompt_text},
+            ],
+            response_format=WorldContextResponse,
+        )
+        u = _usage_from_resp(resp)
+        usage_in = u.get("input", usage_in)
+        usage_out = u.get("output", 0)
+        log_usage(app="jid", model=model, tokens_in=usage_in, tokens_out=usage_out,
+                  endpoint=endpoint_name, email=email, request_id=None, duration_ms=0, cost_usd=0.0)
+        # also return the prompt to persist later
+        resp._fg_prompt_used = prompt_text  # attach for persistence
+        return resp.output_parsed, prompt_text
+    except Exception:
+        log_usage(app="jid", model=model, tokens_in=usage_in, tokens_out=usage_out,
+                  endpoint=endpoint_name, email=email, request_id=None, duration_ms=0, cost_usd=0.0)
+        raise
+
 
 def create_pictures_from_vision(vision_text: str, user_email: Optional[str] = None) -> dict:
     """
@@ -940,6 +970,74 @@ def persist_visions_for_core_idea(
         return {"inserted": inserted}
     finally:
         conn.close()
+
+
+def fetch_vision_and_realization(vision_id: int):
+    """
+    Returns (vision_text, realization_text) from visions table.
+    - vision_text: visions.text (you saved the 'Vision' there)
+    - realization_text: first focuses[].focus if present
+    """
+    conn = connect(PICTURE_DB)
+    conn.row_factory = None
+    try:
+        cur = conn.execute("SELECT text, focuses FROM visions WHERE id = ?", (vision_id,))
+        row = cur.fetchone()
+        if not row:
+            return None, None
+        vision_text, focuses = row[0], row[1]
+        realization = None
+        try:
+            foc = json.loads(focuses or "[]")
+            if isinstance(foc, list) and foc:
+                realization = ((foc[0] or {}).get("focus") or "").strip() or None
+        except Exception:
+            realization = None
+        return (vision_text or None), realization
+    finally:
+        conn.close()
+
+def persist_world_context_output(vision_id: int, world_context: str, *, email: str | None, model: str, prompt_text: str):
+    """
+    - Update visions.explanation with the generated world context
+    - Insert a record into prompt_outputs for traceability
+    """
+    ts = _utc_now()
+    meta = json.dumps({"vision_id": vision_id, "type": "world_context"}, ensure_ascii=False)
+    conn = connect(PICTURE_DB)
+    try:
+        cur = conn.cursor()
+        # update explanation on vision
+        cur.execute(
+            "UPDATE visions SET explanation = ?, updated_at = ? WHERE id = ?",
+            (world_context, ts, vision_id)
+        )
+        # record into prompt_outputs
+        cur.execute(
+            """
+            INSERT INTO prompt_outputs
+              (vision_id, picture_id, collection, prompt_key, prompt_text, system_text, output_text,
+               model, email, metadata, created_at)
+            VALUES
+              (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                vision_id,
+                "world_context",              # collection
+                "world_context_v1",           # prompt_key
+                prompt_text,                  # prompt_text
+                None,                         # system_text
+                world_context,                # output_text
+                model,
+                email,
+                meta,
+                ts,
+            )
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
 
 
 
@@ -1291,5 +1389,32 @@ def jid_generate_play_visions_from_core_idea():
                                                 endpoint_name="/jid/generate_play_visions_from_core_idea")
         stats = persist_visions_for_core_idea(cid, [v.dict() for v in result.visions], email=email, origin="jid")
         return jsonify({"core_idea_id": cid, "visions": [v.dict() for v in result.visions], **stats})
+    except Exception as e:
+        return jsonify({"error": f"{e}"}), 500
+
+@app.route("/jid/generate_world_context_for_vision", methods=["POST"])
+def jid_generate_world_context_for_vision():
+    """
+    Payload: { "vision_id": int, "email": "...", "model": "..." }
+    Uses 'visions.text' as Vision and first item of 'visions.focuses' as Realization.
+    Saves into visions.explanation and prompt_outputs.
+    """
+    payload = request.get_json(force=True) or {}
+    vid = payload.get("vision_id")
+    email = (payload.get("email") or None)
+    model = payload.get("model") or DEFAULT_MODEL
+
+    if not isinstance(vid, int):
+        return jsonify({"error": "vision_id (int) is required"}), 400
+
+    vision_text, realization_text = fetch_vision_and_realization(vid)
+    if not vision_text:
+        return jsonify({"error": f"vision_id {vid} not found or has no text"}), 404
+
+    try:
+        (wc_resp, prompt_text) = run_world_context_llm(vision_text, realization_text, email=email, model=model,
+                                                       endpoint_name="/jid/generate_world_context_for_vision")
+        persist_world_context_output(vid, wc_resp.world_context, email=email, model=model, prompt_text=prompt_text)
+        return jsonify({"vision_id": vid, "world_context": wc_resp.world_context})
     except Exception as e:
         return jsonify({"error": f"{e}"}), 500

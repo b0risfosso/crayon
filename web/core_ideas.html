@@ -125,7 +125,8 @@
       readCoreIdeas: '/read/core_ideas',
       genVis: '/jid/generate_visions_from_core_idea',
       genPlayVis: '/jid/generate_play_visions_from_core_idea',
-      readVisByCI: '/read/visions_by_core_idea'
+      readVisByCI: '/read/visions_by_core_idea',
+      genWorld: '/jid/generate_world_context_for_vision' 
     };
     const $ = (id) => document.getElementById(id);
     function setText(el, msg, cls = '') {
@@ -178,6 +179,20 @@
         mount.append(div);
       }
     }
+    async function doGenWorld(visionId) {
+      const email = ($('email').value || '').trim().toLowerCase();
+      const payload = { vision_id: visionId };
+      if (email) payload.email = email;
+      try {
+        const res = await postJSON(EP.genWorld, payload, 600000);
+        // Update the UI: show the returned world context under the card
+        const el = document.getElementById(`wc-${visionId}`);
+        if (el) el.textContent = res?.world_context || '(no world context returned)';
+      } catch (e) {
+        alert(`World Context failed for vision ${visionId}: ${e.message || e}`);
+      }
+    }
+
     function renderReadCoreIdeas(data) {
       const mount = $('readOut');
       mount.innerHTML = '';
@@ -225,7 +240,18 @@ Realization: ${v.realization}`;
         box.append(h, pre);
         const meta = document.createElement('div'); meta.className = 'muted-small';
         meta.textContent = [r.id ? `id:${r.id}` : null, r.email, r.created_at].filter(Boolean).join(' · ');
-        box.append(meta);
+        const btn = document.createElement('button');
+        btn.className = 'ghost';
+        btn.textContent = 'Generate World Context';
+        btn.onclick = () => doGenWorld(r.id);
+
+        const wc = document.createElement('div');
+        wc.className = 'muted';
+        wc.id = `wc-${r.id}`;
+        wc.style.marginTop = '.35rem';
+        wc.textContent = (r.explanation || '').trim() || '(no world context yet)';
+
+        box.append(meta, btn, wc)
         mount.append(box);
       }
     }
