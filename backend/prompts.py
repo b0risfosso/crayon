@@ -1216,6 +1216,17 @@ OUTPUT (STRICT JSON ONLY):
   ]
 }}
 
+Vision should describe the intention of transformation. It names the core mastery, understanding, or reconfiguration of reality being sought.
+It describes what becomes possible if the idea is fully understood, built, or embodied. Vision should express the goal-state of exploration — the new law, pattern, or dimension to be revealed or mastered.
+It should act as the conceptual attractor — the gravitational center that organizes subsequent engineering, experimentation, and world-building.
+It should compress a philosophical or scientific pursuit into one clear line of aim.
+Vision should be abstract, but precise in what is being changed or revealed; expressed in the language of mastery/authorship (“Engineer,” “Reveal,” “Unify,” “Transform,” “Compose,” “Harness”); describes the why and what of the creative act, not the how.
+
+Realization should describe the instrumental method. It explains how the vision manifests through concrete engineering, interaction, or play with systems.
+It describes the mechanisms, tools, and agents by which the vision becomes real in the world. Realization should define how the vision is enacted — the procedures, apparatus, or feedback loops that bring the transformation about.
+It prodives the bridge between abstract mastery and physical implementation. It provides the blueprint for experimentation, fabrication, or social orchestration.
+Realization should be mechanistic, procedural, or architectural; reference instrumentation, data flows, physical systems, and control logic; describes the how — what is built, how it operates, how the world interacts with it.
+
 GUIDELINES:
 - Produce 4–8 distinct visions with unique modes of interaction or scale of play.
 - Use "play" as metaphor only; focus visions developing on high agency, beneficial, real-world interactions with the systems and entities found in the core idea.
@@ -1252,6 +1263,17 @@ OUTPUT (STRICT JSON ONLY):
     }}
   ]
 }}
+
+Vision should describe the intention of transformation. It names the core mastery, understanding, or reconfiguration of reality being sought.
+It describes what becomes possible if the idea is fully understood, built, or embodied. Vision should express the goal-state of exploration — the new law, pattern, or dimension to be revealed or mastered.
+It should act as the conceptual attractor — the gravitational center that organizes subsequent engineering, experimentation, and world-building.
+It should compress a philosophical or scientific pursuit into one clear line of aim.
+Vision should be abstract, but precise in what is being changed or revealed; expressed in the language of mastery/authorship (“Engineer,” “Reveal,” “Unify,” “Transform,” “Compose,” “Harness”); describes the why and what of the creative act, not the how.
+
+Realization should describe the instrumental method. It explains how the vision manifests through concrete engineering, interaction, or play with systems.
+It describes the mechanisms, tools, and agents by which the vision becomes real in the world. Realization should define how the vision is enacted — the procedures, apparatus, or feedback loops that bring the transformation about.
+It prodives the bridge between abstract mastery and physical implementation. It provides the blueprint for experimentation, fabrication, or social orchestration.
+Realization should be mechanistic, procedural, or architectural; reference instrumentation, data flows, physical systems, and control logic; describes the how — what is built, how it operates, how the world interacts with it.
 
 RULES:
 - 4–8 visions, each a distinct creative act in the larger composition.
