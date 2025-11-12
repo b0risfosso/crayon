@@ -1244,8 +1244,8 @@ OUTPUT (STRICT JSON ONLY):
 }}
 
 RULES:
-- 4–8 visions, each a distinct movement in the larger composition.
-- Write in scientific language infused with musical and systemic metaphor.
+- 4–8 visions, each a distinct creative act in the larger composition.
+- Write in scientific language infused with creative, artistic metaphor.
 - Treat the core idea as a manipulable field, not a fixed topic.
 - Show agency: how humans, machines, or natural processes play, modulate, and evolve within it.
 - Keep precision — real biophysics, chemistry, computation, or systems logic — but describe them as harmonic interactions in the music of matter.
@@ -1258,8 +1258,8 @@ TASK:
 Generate visions that treat play as the act of performing reality — improvising with its forces, tuning its harmonies, and reshaping its patterns through scientific and engineering interaction.
 
 DEFINITION OF PLAY:
-Play means engaging the underlying systems, behaviors, and phenomena of the core idea as if they were musical instruments or dynamic fields — to sense, modulate, compose, disrupt, communicate with, and evolve them. 
-It is not entertainment; it is active participation in the composition of reality.
+Play means engaging the underlying systems, behaviors, and phenomena of the core idea — to sense, modulate, compose, disrupt, communicate with, and evolve them. 
+It is not entertainment or observation; it is active participation in the composition of reality.
 
 INPUT:
 Core idea: "{core_idea}"
@@ -1276,11 +1276,11 @@ OUTPUT (STRICT JSON ONLY):
 }}
 
 GUIDELINES:
-- Produce 4–8 visions, each a distinct *performance mode* or *movement* in the larger play of reality.
+- Produce 4–8 visions, each a distinct creative act in the larger play of reality.
 - Each vision should describe what is being played (the physical or conceptual substrate) and how it is played (instruments, agents, or environmental feedbacks).
-- Treat the core idea as a living score — a manipulable layer of reality that responds to creative and scientific touch.
-- Integrate rigorous scientific or engineering logic (physics, chemistry, computation, biology) expressed through musical, field, or performative language.
+- Treat the core idea as a manipulable layer of reality that responds to creative and scientific touch.
+- Integrate rigorous scientific or engineering logic (physics, chemistry, computation, biology) expressed through artistic and creative language.
 - Explore multiple scales of play: molecular, organismal, ecological, planetary, and cosmic — showing how patterns repeat and transform.
 - Emphasize agency, rhythm, and reciprocity: play is a dialogue, not a command.
-- Tone: precise yet lyrical, grounded in real mechanisms but aware of their poetic continuity with the larger symphony of existence.
+- Tone: precise yet artistic, grounded in real mechanisms but aware of their poetic continuity with the larger symphony of existence.
 """
