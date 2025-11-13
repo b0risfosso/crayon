@@ -158,3 +158,82 @@ BEGIN
   WHERE id = NEW.id;
 END;
 
+PRAGMA foreign_keys = ON;
+
+-- Thoughts table: stores individual thoughts, grouped into collections
+CREATE TABLE IF NOT EXISTS thoughts (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  -- Collection the thought belongs to
+  -- e.g. 'money', 'beauty_infinite_depth', 'solar_energy'
+  collection     TEXT NOT NULL,
+
+  -- Optional short label for the thought
+  title          TEXT,
+
+  -- The actual thought text (short phrase or long excerpt)
+  text           TEXT NOT NULL,
+
+  -- Optional linkage into the rest of your ecosystem
+  vision_id      INTEGER,   -- if this thought emerges from a specific vision
+  core_idea_id   INTEGER,   -- if this thought is distilled from a core_idea
+
+  -- Provenance / authorship / source info
+  source         TEXT,      -- e.g. 'manual', 'book', 'jid', 'crayon'
+  author         TEXT,      -- e.g. 'Boris', 'Marshall, Principles of Economics'
+  context        TEXT,      -- citation, page, URL, or notes about origin
+
+  -- Organization / display
+  order_index    INTEGER DEFAULT 0,   -- ordering within a collection
+  tags           TEXT,                -- comma-separated or JSON tags
+
+  -- Multi-user support
+  email          TEXT,
+
+  -- Arbitrary extra fields (JSON)
+  metadata       TEXT,
+
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+
+  FOREIGN KEY (vision_id)    REFERENCES visions(id)     ON DELETE SET NULL,
+  FOREIGN KEY (core_idea_id) REFERENCES core_ideas(id)  ON DELETE SET NULL,
+
+  CHECK (length(collection) > 0),
+  CHECK (length(text) > 0)
+);
+
+-- Helpful indexes
+CREATE INDEX IF NOT EXISTS idx_thoughts_collection
+  ON thoughts(collection);
+
+CREATE INDEX IF NOT EXISTS idx_thoughts_email
+  ON thoughts(email);
+
+CREATE INDEX IF NOT EXISTS idx_thoughts_vision
+  ON thoughts(vision_id);
+
+CREATE INDEX IF NOT EXISTS idx_thoughts_core_idea
+  ON thoughts(core_idea_id);
+
+-- Optional de-duplication: avoid exact duplicate thoughts in same collection/user
+CREATE UNIQUE INDEX IF NOT EXISTS idx_thoughts_dedupe
+  ON thoughts(collection, text, IFNULL(email, ''));
+
+-- Timestamps: keep created_at / updated_at fresh
+CREATE TRIGGER IF NOT EXISTS trg_thoughts_insert_ts
+AFTER INSERT ON thoughts
+BEGIN
+  UPDATE thoughts
+  SET created_at = COALESCE(NEW.created_at, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updated_at = COALESCE(NEW.updated_at, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_thoughts_update_ts
+AFTER UPDATE ON thoughts
+BEGIN
+  UPDATE thoughts
+  SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  WHERE id = NEW.id;
+END;

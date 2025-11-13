@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Thought Collections</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --bg: #050509;
+      --bg-elevated: #111119;
+      --bg-soft: #181824;
+      --border-subtle: #2a2a3a;
+      --accent: #7c5cff;
+      --accent-soft: rgba(124, 92, 255, 0.12);
+      --accent-strong: rgba(124, 92, 255, 0.25);
+      --text: #f5f5ff;
+      --text-soft: #a3a3c2;
+      --danger: #ff4b6a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #151520 0, #050509 55%, #000 100%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .page {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      gap: 10px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: linear-gradient(120deg, rgba(124, 92, 255, 0.16), rgba(9, 9, 20, 0.8));
+      border: 1px solid var(--accent-strong);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    header .title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    header .subtitle {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    header .right-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--text-soft);
+    }
+
+    .pill strong { color: var(--accent); }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1.4fr) minmax(0, 1.3fr);
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: rgba(8, 8, 18, 0.95);
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .panel-header h2 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin: 0;
+    }
+
+    .panel-header .actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    button, .ghost-btn {
+      border-radius: 999px;
+      border: none;
+      font-size: 12px;
+      padding: 6px 12px;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 8px 20px rgba(124, 92, 255, 0.4);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+    }
+
+    button:active, .ghost-btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+    }
+
+    .ghost-btn {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-soft);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: none;
+    }
+
+    .ghost-btn.primary-soft {
+      border-color: var(--accent-soft);
+      background: rgba(124, 92, 255, 0.08);
+      color: var(--accent);
+    }
+
+    .input, textarea, select {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(6, 6, 16, 0.9);
+      color: var(--text);
+      font-size: 13px;
+      resize: vertical;
+    }
+
+    textarea {
+      min-height: 80px;
+      max-height: 240px;
+    }
+
+    .input:focus, textarea:focus, select:focus {
+      outline: 1px solid var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-soft);
+    }
+
+    .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-soft);
+      margin-bottom: 4px;
+    }
+
+    /* Collections panel */
+    #collections-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    #collections-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-bottom: 3px;
+      color: var(--text-soft);
+      border: 1px solid transparent;
+    }
+
+    #collections-list li.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent-strong);
+    }
+
+    #collections-list li span.count {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    .collection-form {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .collection-form input {
+      flex: 1;
+    }
+
+    /* Thought list panel */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .chip {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--text-soft);
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .chip strong { color: var(--accent); }
+
+    .thought-list-container {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      margin-top: 4px;
+      padding-right: 4px;
+    }
+
+    .thought-item {
+      border-radius: 10px;
+      padding: 7px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      margin-bottom: 5px;
+      cursor: pointer;
+      background: rgba(10, 10, 20, 0.85);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .thought-item:hover {
+      border-color: var(--accent-soft);
+      background: radial-gradient(circle at top left, rgba(124, 92, 255, 0.16), rgba(10, 10, 20, 0.9));
+    }
+
+    .thought-item.active {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(124, 92, 255, 0.25), rgba(8, 8, 18, 0.95));
+    }
+
+    .thought-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .thought-item-preview {
+      font-size: 12px;
+      color: var(--text-soft);
+      opacity: 0.9;
+    }
+
+    .thought-item-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-soft);
+      margin-top: 2px;
+    }
+
+    /* Detail / editor panel */
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+
+    .detail-header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .detail-collection {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-soft);
+    }
+
+    .detail-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .detail-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .row-inline {
+      display: flex;
+      gap: 6px;
+    }
+
+    .row-inline > div {
+      flex: 1;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .meta-row span {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .danger {
+      color: var(--danger);
+      border-color: rgba(255, 75, 106, 0.5) !important;
+    }
+
+    .detail-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-soft);
+      gap: 6px;
+    }
+
+    .detail-footer .right {
+      display: flex;
+      gap: 6px;
+    }
+
+    .status-pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-pill::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .status-pill.idle::before { background: #666; }
+
+    .status-pill.error::before { background: var(--danger); }
+
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
+      }
+      .panel.collections {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .panel.collections {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="title">
+      <h1>Thought Collections</h1>
+      <div class="subtitle">Capture, orbit, and recombine thoughts across domains.</div>
+    </div>
+    <div class="right-controls">
+      <div class="pill"><strong>Collection</strong>: <span id="header-current-collection">none selected</span></div>
+      <div class="pill" id="header-count-pill">0 thoughts</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: Collections -->
+    <section class="panel collections">
+      <div class="panel-header">
+        <h2>Collections</h2>
+      </div>
+
+      <ul id="collections-list"></ul>
+
+      <form class="collection-form" id="new-collection-form">
+        <input
+          class="input"
+          id="new-collection-input"
+          type="text"
+          placeholder="Add collection (e.g. money, beauty_depth)"
+          autocomplete="off"
+        />
+        <button type="submit" title="Create collection">+</button>
+      </form>
+    </section>
+
+    <!-- CENTER: Thought list -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Thoughts</h2>
+        <div class="actions">
+          <button type="button" class="ghost-btn primary-soft" id="btn-random">
+            🎲 Random in collection
+          </button>
+        </div>
+      </div>
+
+      <div class="chips">
+        <span class="chip">
+          <strong>Filter</strong>:
+          <select id="filter-length" class="input" style="width:auto;padding:2px 6px;font-size:11px;">
+            <option value="all">All lengths</option>
+            <option value="short">Short (≤ 140 chars)</option>
+            <option value="medium">Medium (≤ 500 chars)</option>
+            <option value="long">Long excerpts</option>
+          </select>
+        </span>
+        <span class="chip">
+          <strong>Search</strong>:
+          <input
+            id="search-input"
+            class="input"
+            type="text"
+            placeholder="grep this collection..."
+            style="width:150px;padding:2px 6px;font-size:11px;"
+          />
+        </span>
+      </div>
+
+      <div class="thought-list-container" id="thought-list"></div>
+    </section>
+
+    <!-- RIGHT: Detail / editor -->
+    <section class="panel">
+      <div class="detail-header">
+        <div class="detail-header-left">
+          <div class="detail-collection" id="detail-collection-label">No collection selected</div>
+          <div class="detail-title" id="detail-title-label">Start a new thought or select one.</div>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost-btn" id="btn-new-thought">New</button>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <div class="row">
+          <div class="label">Title (optional)</div>
+          <input id="detail-title" class="input" type="text" placeholder="e.g. Money as Flow">
+        </div>
+
+        <div class="row">
+          <div class="label">Thought</div>
+          <textarea
+            id="detail-text"
+            placeholder="Drop the raw thought here. It can be a single phrase or an entire excerpt."
+          ></textarea>
+        </div>
+
+        <div class="row-inline">
+          <div>
+            <div class="label">Collection</div>
+            <input id="detail-collection" class="input" type="text" placeholder="e.g. money">
+          </div>
+          <div>
+            <div class="label">Order index</div>
+            <input id="detail-order" class="input" type="number" step="1" placeholder="0">
+          </div>
+        </div>
+
+        <div class="row-inline">
+          <div>
+            <div class="label">Author / Source label</div>
+            <input id="detail-author" class="input" type="text" placeholder="Boris, Marshall, etc.">
+          </div>
+          <div>
+            <div class="label">Context / Citation</div>
+            <input id="detail-context" class="input" type="text" placeholder="Book, page, link, notes">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="label">Tags (comma-separated or JSON fragment)</div>
+          <input id="detail-tags" class="input" type="text" placeholder="fluid_dynamics, competition, money_field">
+        </div>
+
+        <div class="meta-row" id="detail-meta">
+          <span id="detail-id-pill">New thought (no id)</span>
+          <span id="detail-created-pill">created: —</span>
+          <span id="detail-updated-pill">updated: —</span>
+        </div>
+      </div>
+
+      <div class="detail-footer">
+        <div class="status-pill idle" id="status-pill">idle</div>
+        <div class="right">
+          <button type="button" class="ghost-btn danger" id="btn-delete" style="display:none;">
+            Delete
+          </button>
+          <button type="button" id="btn-save">
+            Save
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  // --- State ---
+  let collections = [];   // [{ name, count }]
+  let thoughts = [];      // current collection thoughts
+  let currentCollection = null;
+  let currentThought = null; // full object from DB
+  let statusTimer = null;
+
+  function setStatus(text, mode = "idle") {
+    const pill = document.getElementById("status-pill");
+    pill.textContent = text;
+    pill.className = "status-pill " + mode;
+    if (statusTimer) {
+      clearTimeout(statusTimer);
+      statusTimer = null;
+    }
+    if (mode !== "error" && mode !== "idle") {
+      statusTimer = setTimeout(() => {
+        pill.textContent = "idle";
+        pill.className = "status-pill idle";
+      }, 2000);
+    }
+  }
+
+  // --- Collections UI ---
+  function renderCollections() {
+    const ul = document.getElementById("collections-list");
+    ul.innerHTML = "";
+    collections.forEach(c => {
+      const li = document.createElement("li");
+      li.dataset.collection = c.name;
+      if (c.name === currentCollection) li.classList.add("active");
+      li.innerHTML = `
+        <span>${c.name}</span>
+        <span class="count">${c.count ?? 0}</span>
+      `;
+      li.addEventListener("click", () => selectCollection(c.name));
+      ul.appendChild(li);
+    });
+  }
+
+  function updateHeaderCounts() {
+    document.getElementById("header-current-collection").textContent =
+      currentCollection || "none selected";
+    document.getElementById("header-count-pill").textContent =
+      (thoughts.length || 0) + " thoughts";
+    document.getElementById("detail-collection-label").textContent =
+      currentCollection ? "Collection: " + currentCollection : "No collection selected";
+  }
+
+  async function loadCollections() {
+    try {
+      // Adjust URL to your backend
+      const res = await fetch("/api/thoughts/collections");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      // Expecting: [{ collection: "money", count: 12 }, ...]
+      collections = (data || []).map(row => ({
+        name: row.collection,
+        count: row.count
+      }));
+      renderCollections();
+    } catch (err) {
+      console.error("Failed to load collections", err);
+      setStatus("Error loading collections", "error");
+    }
+  }
+
+  async function selectCollection(name) {
+    currentCollection = name;
+    currentThought = null;
+    await loadThoughts(name);
+    renderThoughtList();
+    updateHeaderCounts();
+    clearDetailForm();
+  }
+
+  // --- Thoughts list UI ---
+  function lengthBucket(text) {
+    const len = (text || "").length;
+    if (len <= 140) return "short";
+    if (len <= 500) return "medium";
+    return "long";
+  }
+
+  function renderThoughtList() {
+    const container = document.getElementById("thought-list");
+    container.innerHTML = "";
+
+    const filter = document.getElementById("filter-length").value;
+    const query = document.getElementById("search-input").value.trim().toLowerCase();
+
+    let filtered = thoughts.slice();
+
+    if (filter !== "all") {
+      filtered = filtered.filter(t => lengthBucket(t.text) === filter);
+    }
+    if (query) {
+      filtered = filtered.filter(
+        t =>
+          (t.title || "").toLowerCase().includes(query) ||
+          (t.text || "").toLowerCase().includes(query)
+      );
+    }
+
+    filtered.forEach(t => {
+      const div = document.createElement("div");
+      div.className = "thought-item";
+      if (currentThought && t.id === currentThought.id) div.classList.add("active");
+
+      const preview =
+        (t.text || "").length > 160
+          ? (t.text || "").slice(0, 160) + "…"
+          : (t.text || "");
+
+      const createdShort = t.created_at
+        ? new Date(t.created_at).toLocaleDateString()
+        : "—";
+
+      div.innerHTML = `
+        <div class="thought-item-title">${t.title || "(untitled thought)"}</div>
+        <div class="thought-item-preview">${preview.replace(/\n/g, " ")}</div>
+        <div class="thought-item-meta">
+          <span>${createdShort}</span>
+          <span>${lengthBucket(t.text)} · ${t.collection}</span>
+        </div>
+      `;
+      div.addEventListener("click", () => {
+        currentThought = t;
+        fillDetailForm(t);
+        renderThoughtList(); // re-apply active class
+      });
+
+      container.appendChild(div);
+    });
+
+    updateHeaderCounts();
+  }
+
+  async function loadThoughts(collectionName) {
+    if (!collectionName) return;
+    try {
+      setStatus("Loading thoughts…", "busy");
+      const res = await fetch("/api/thoughts?collection=" + encodeURIComponent(collectionName));
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      // Expecting rows exactly matching your DB schema or a subset.
+      thoughts = data || [];
+      setStatus("Loaded " + thoughts.length + " thoughts", "success");
+    } catch (err) {
+      console.error("Failed to load thoughts", err);
+      setStatus("Error loading thoughts", "error");
+    }
+  }
+
+  // --- Detail / form ---
+  function clearDetailForm() {
+    currentThought = null;
+    document.getElementById("detail-title").value = "";
+    document.getElementById("detail-text").value = "";
+    document.getElementById("detail-collection").value = currentCollection || "";
+    document.getElementById("detail-order").value = "";
+    document.getElementById("detail-author").value = "";
+    document.getElementById("detail-context").value = "";
+    document.getElementById("detail-tags").value = "";
+    document.getElementById("detail-id-pill").textContent = "New thought (no id)";
+    document.getElementById("detail-created-pill").textContent = "created: —";
+    document.getElementById("detail-updated-pill").textContent = "updated: —";
+    document.getElementById("detail-title-label").textContent = "Start a new thought or select one.";
+    document.getElementById("btn-delete").style.display = "none";
+  }
+
+  function fillDetailForm(t) {
+    document.getElementById("detail-title").value = t.title || "";
+    document.getElementById("detail-text").value = t.text || "";
+    document.getElementById("detail-collection").value = t.collection || "";
+    document.getElementById("detail-order").value =
+      t.order_index !== null && t.order_index !== undefined ? t.order_index : "";
+    document.getElementById("detail-author").value = t.author || "";
+    document.getElementById("detail-context").value = t.context || "";
+    document.getElementById("detail-tags").value = t.tags || "";
+    document.getElementById("detail-title-label").textContent = t.title || "(untitled thought)";
+    document.getElementById("detail-id-pill").textContent = "id: " + t.id;
+
+    document.getElementById("detail-created-pill").textContent = t.created_at
+      ? "created: " + t.created_at
+      : "created: —";
+    document.getElementById("detail-updated-pill").textContent = t.updated_at
+      ? "updated: " + t.updated_at
+      : "updated: —";
+
+    document.getElementById("btn-delete").style.display = "inline-flex";
+  }
+
+  function readDetailForm() {
+    const payload = {
+      title: document.getElementById("detail-title").value.trim() || null,
+      text: document.getElementById("detail-text").value.trim(),
+      collection: document.getElementById("detail-collection").value.trim() || null,
+      order_index: document.getElementById("detail-order").value
+        ? parseInt(document.getElementById("detail-order").value, 10)
+        : null,
+      author: document.getElementById("detail-author").value.trim() || null,
+      context: document.getElementById("detail-context").value.trim() || null,
+      tags: document.getElementById("detail-tags").value.trim() || null
+    };
+    return payload;
+  }
+
+  async function saveThought() {
+    const payload = readDetailForm();
+    if (!payload.collection) {
+      alert("Collection is required.");
+      return;
+    }
+    if (!payload.text) {
+      alert("Thought text is required.");
+      return;
+    }
+
+    const isNew = !currentThought || !currentThought.id;
+    const url = isNew
+      ? "/api/thoughts"
+      : "/api/thoughts/" + encodeURIComponent(currentThought.id);
+    const method = isNew ? "POST" : "PUT";
+
+    try {
+      setStatus(isNew ? "Creating thought…" : "Saving changes…", "busy");
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const saved = await res.json(); // expecting full row back (id, timestamps, etc.)
+      currentThought = saved;
+
+      // Reload list for current collection
+      currentCollection = saved.collection;
+      await loadCollections();   // update counts
+      await loadThoughts(currentCollection);
+      renderCollections();
+      renderThoughtList();
+      fillDetailForm(saved);
+      setStatus("Saved", "success");
+    } catch (err) {
+      console.error("Failed to save thought", err);
+      setStatus("Error saving thought", "error");
+    }
+  }
+
+  async function deleteThought() {
+    if (!currentThought || !currentThought.id) return;
+    if (!confirm("Delete this thought permanently?")) return;
+    try {
+      setStatus("Deleting…", "busy");
+      const res = await fetch("/api/thoughts/" + encodeURIComponent(currentThought.id), {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      currentThought = null;
+      await loadCollections();
+      await loadThoughts(currentCollection);
+      renderCollections();
+      renderThoughtList();
+      clearDetailForm();
+      setStatus("Deleted", "success");
+    } catch (err) {
+      console.error("Failed to delete thought", err);
+      setStatus("Error deleting thought", "error");
+    }
+  }
+
+  async function randomThought() {
+    if (!currentCollection) {
+      alert("Select a collection first.");
+      return;
+    }
+    try {
+      setStatus("Sampling random thought…", "busy");
+      const res = await fetch(
+        "/api/thoughts/random?collection=" + encodeURIComponent(currentCollection)
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const t = await res.json();
+      if (!t || !t.id) {
+        setStatus("No thoughts in this collection", "idle");
+        return;
+      }
+      currentThought = t;
+      if (!thoughts.find(x => x.id === t.id)) {
+        thoughts.unshift(t);
+      }
+      renderThoughtList();
+      fillDetailForm(t);
+      setStatus("Random thought loaded", "success");
+    } catch (err) {
+      console.error("Failed to load random thought", err);
+      setStatus("Error loading random thought", "error");
+    }
+  }
+
+  // --- New collection form (optional) ---
+  async function createCollection(name) {
+    name = (name || "").trim();
+    if (!name) return;
+    // Option A: purely UI-side: just select it
+    if (!collections.find(c => c.name === name)) {
+      collections.push({ name, count: 0 });
+      renderCollections();
+    }
+    selectCollection(name);
+
+    // Option B (if you want an explicit endpoint), you can POST /api/thoughts/collections here.
+  }
+
+  // --- Wiring events ---
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadCollections();
+    renderCollections();
+    updateHeaderCounts();
+
+    document
+      .getElementById("new-collection-form")
+      .addEventListener("submit", e => {
+        e.preventDefault();
+        const input = document.getElementById("new-collection-input");
+        createCollection(input.value);
+        input.value = "";
+      });
+
+    document
+      .getElementById("filter-length")
+      .addEventListener("change", () => renderThoughtList());
+
+    document
+      .getElementById("search-input")
+      .addEventListener("input", () => renderThoughtList());
+
+    document
+      .getElementById("btn-new-thought")
+      .addEventListener("click", () => clearDetailForm());
+
+    document
+      .getElementById("btn-save")
+      .addEventListener("click", () => saveThought());
+
+    document
+      .getElementById("btn-delete")
+      .addEventListener("click", () => deleteThought());
+
+    document
+      .getElementById("btn-random")
+      .addEventListener("click", () => randomThought());
+  });
+</script>
+</body>
+</html>
