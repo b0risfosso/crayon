@@ -373,6 +373,7 @@
   let currentCollection = null;
   let currentThought = null; // full object from DB
   let statusTimer = null;
+  const API_BASE = "/scribble/api";
 
   function setStatus(text, mode = "idle") {
     const pill = document.getElementById("status-pill");
@@ -419,7 +420,7 @@
   async function loadCollections() {
     try {
       // Adjust URL to your backend
-      const res = await fetch("/api/thoughts/collections");
+      const res = await fetch(`${API_BASE}/thoughts/collections`);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       // Expecting: [{ collection: "money", count: 12 }, ...]
@@ -509,7 +510,9 @@
     if (!collectionName) return;
     try {
       setStatus("Loading thoughts…", "busy");
-      const res = await fetch("/api/thoughts?collection=" + encodeURIComponent(collectionName));
+      const res = await fetch(
+        `${API_BASE}/thoughts?collection=` + encodeURIComponent(collectionName)
+        );
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       // Expecting rows exactly matching your DB schema or a subset.
@@ -588,8 +591,8 @@
 
     const isNew = !currentThought || !currentThought.id;
     const url = isNew
-      ? "/api/thoughts"
-      : "/api/thoughts/" + encodeURIComponent(currentThought.id);
+        ? `${API_BASE}/thoughts`
+        : `${API_BASE}/thoughts/` + encodeURIComponent(currentThought.id);
     const method = isNew ? "POST" : "PUT";
 
     try {
@@ -622,9 +625,10 @@
     if (!confirm("Delete this thought permanently?")) return;
     try {
       setStatus("Deleting…", "busy");
-      const res = await fetch("/api/thoughts/" + encodeURIComponent(currentThought.id), {
-        method: "DELETE"
-      });
+      const res = await fetch(
+        `${API_BASE}/thoughts/` + encodeURIComponent(currentThought.id),
+        { method: "DELETE" }
+        );
       if (!res.ok) throw new Error("HTTP " + res.status);
       currentThought = null;
       await loadCollections();
@@ -647,8 +651,9 @@
     try {
       setStatus("Sampling random thought…", "busy");
       const res = await fetch(
-        "/api/thoughts/random?collection=" + encodeURIComponent(currentCollection)
-      );
+        `${API_BASE}/thoughts/` + encodeURIComponent(currentThought.id),
+        { method: "DELETE" }
+        );
       if (!res.ok) throw new Error("HTTP " + res.status);
       const t = await res.json();
       if (!t || !t.id) {
