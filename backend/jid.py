@@ -148,6 +148,67 @@ def _to_plain(obj):
 
     return obj
 
+def _generate_world_context_for_vision_sync(payload: dict) -> tuple[int, dict]:
+    """
+    Synchronous body for generating world context for a single vision.
+
+    INPUT payload:
+    {
+      "vision_id": 123,         # required
+      "model": "optional-model",# optional, defaults to DEFAULT_MODEL
+      "email": "optional@user"  # optional
+    }
+
+    Returns (http_status, body_dict).
+    """
+    vid = payload.get("vision_id")
+
+    # allow string/int, but enforce int semantics
+    try:
+        vid = int(vid)
+    except (TypeError, ValueError):
+        return 400, {"error": "vision_id (int) is required"}
+
+    model = (payload.get("model") or DEFAULT_MODEL).strip()
+    email = payload.get("email")
+
+    # Fetch vision + realization + linked core_idea text
+    vision_text, realization_text = fetch_vision_and_realization(vid)
+    core_idea_text = fetch_core_idea_text_for_vision(vid)
+
+    if not vision_text:
+        return 404, {"error": f"vision_id {vid} not found or has no text"}
+
+    try:
+        wc_resp, prompt_text = run_world_context_llm(
+            core_idea_text,
+            vision_text,
+            realization_text,
+            email=email,
+            model=model,
+            endpoint_name="/jid/generate_world_context_for_vision",
+        )
+
+        # Persist in DB
+        persist_world_context_output(
+            vid,
+            wc_resp.world_context,
+            email=email,
+            model=model,
+            prompt_text=prompt_text,
+        )
+
+        body = {
+            "vision_id": vid,
+            "world_context": wc_resp.world_context,
+        }
+        return 200, body
+
+    except Exception as e:
+        # you can log the exception here if you want
+        return 500, {"error": f"{e}"}
+
+
 
 def _generate_visions_from_core_idea_sync(payload: dict) -> tuple[int, dict]:
     """
@@ -544,12 +605,13 @@ class _QueuedTask:
 
 # Map job type -> sync handler
 # Now that all sync handlers are defined, wire up the job handlers.
-_JOB_HANDLERS.update({
+_JOB_HANDLERS: dict[str, callable] = {
     "core_pipeline": _core_ideas_visions_worlds_sync,
     "create_pictures": _create_pictures_sync,
     "core_ideas": _create_core_ideas_sync,
-    "visions_from_core_idea": _generate_visions_from_core_idea_sync,
-})
+    "world_context_for_vision": _generate_world_context_for_vision_sync,  # NEW
+}
+
 
 
 
@@ -1926,30 +1988,32 @@ def jid_generate_play_visions_from_core_idea():
     except Exception as e:
         return jsonify({"error": f"{e}"}), 500
 
+
 @app.route("/jid/generate_world_context_for_vision", methods=["POST"])
 def jid_generate_world_context_for_vision():
     """
-    Payload: { "vision_id": int, "email": "...", "model": "..." }
-    Uses 'visions.text' as Vision and first item of 'visions.focuses' as Realization.
-    Saves into visions.explanation and prompt_outputs.
+    Async submit-only:
+      - Accepts JSON payload:
+          { "vision_id": <int>, "model": "...", "email": "..." }
+      - Enqueues a single world_context_for_vision job.
+      - Returns { "task_id": "<uuid>" } with 202 Accepted.
     """
-    payload = request.get_json(force=True) or {}
-    vid = payload.get("vision_id")
-    email = (payload.get("email") or None)
-    model = payload.get("model") or DEFAULT_MODEL
-
-    if not isinstance(vid, int):
-        return jsonify({"error": "vision_id (int) is required"}), 400
-
-    vision_text, realization_text = fetch_vision_and_realization(vid)
-    core_idea_text = fetch_core_idea_text_for_vision(vid)
-    if not vision_text:
-        return jsonify({"error": f"vision_id {vid} not found or has no text"}), 404
-
     try:
-        (wc_resp, prompt_text) = run_world_context_llm(core_idea_text, vision_text, realization_text, email=email, model=model,
-                                                       endpoint_name="/jid/generate_world_context_for_vision")
-        persist_world_context_output(vid, wc_resp.world_context, email=email, model=model, prompt_text=prompt_text)
-        return jsonify({"vision_id": vid, "world_context": wc_resp.world_context})
-    except Exception as e:
-        return jsonify({"error": f"{e}"}), 500
+        payload = request.get_json(force=True, silent=False) or {}
+    except Exception:
+        return jsonify({"error": "invalid JSON"}), 400
+
+    # Basic pre-check, optional but nice for immediate feedback
+    if "vision_id" not in payload:
+        return jsonify({"error": "vision_id is required"}), 400
+
+    # Register task in in-memory state
+    state = _register_task(payload)
+
+    # Create a queued job
+    qtask = _QueuedTask(payload=payload, kind="world_context_for_vision")
+    qtask.task_id = state.task_id  # ensure worker + state share the same id
+    _TASK_Q.put(qtask)
+
+    return jsonify({"task_id": state.task_id}), 202
+
