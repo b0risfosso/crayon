@@ -521,7 +521,7 @@
       openBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         // Open this view-only page again with the thought id in URL
-        const url = `scribble_read.html?id=${encodeURIComponent(t.id)}`;
+        const url = `thought.html?id=${encodeURIComponent(t.id)}`;
         window.open(url, "_blank");
       });
 
