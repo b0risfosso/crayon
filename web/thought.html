@@ -323,8 +323,17 @@
 
         const textDiv = document.createElement("div");
         textDiv.className = "vision-item-text";
+        const vision = (v.text || "").trim();
         const realization = (v.realization || "").trim();
-        const body = realization || (v.text || "");
+
+        let body = "";
+        if (vision) {
+        body += "Vision:\n" + vision;
+        }
+        if (realization) {
+        body += "\n\nRealization:\n" + realization;
+        }
+
         textDiv.textContent = body || "(no text)";
 
         li.appendChild(titleDiv);
