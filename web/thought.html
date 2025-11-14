@@ -363,275 +363,274 @@
 </div>
 
 <script>
-  const API_BASE = "/scribble/api";
-
-  let collections = [];
-  let thoughts = [];
-  let currentCollection = null;
-  let currentThought = null;
-  let statusTimer = null;
-
-  function setStatus(text, mode = "idle") {
-    const pill = document.getElementById("status-pill");
-    pill.textContent = text;
-    pill.className = "status-pill " + mode;
-    if (statusTimer) {
-      clearTimeout(statusTimer);
-      statusTimer = null;
-    }
-    if (mode !== "error" && mode !== "idle") {
-      statusTimer = setTimeout(() => {
-        pill.textContent = "idle";
-        pill.className = "status-pill idle";
-      }, 2000);
-    }
-  }
-
-  function lengthBucket(text) {
-    const len = (text || "").length;
-    if (len <= 140) return "short";
-    if (len <= 500) return "medium";
-    return "long";
-  }
-
-  function updateHeaderCounts() {
-    document.getElementById("header-current-collection").textContent =
-      currentCollection || "none selected";
-    document.getElementById("header-count-pill").textContent =
-      (thoughts.length || 0) + " thoughts";
-    document.getElementById("detail-collection-label").textContent =
-      currentCollection ? "Collection: " + currentCollection : "No collection selected";
-  }
-
-  // --- Collections ---
-  async function loadCollections() {
-    try {
-      const res = await fetch(`${API_BASE}/thoughts/collections`);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      collections = (data || []).map(row => ({
-        name: row.collection,
-        count: row.count
-      }));
-      renderCollections();
-    } catch (err) {
-      console.error("Failed to load collections", err);
-      setStatus("Error loading collections", "error");
-    }
-  }
-
-  function renderCollections() {
-    const ul = document.getElementById("collections-list");
-    ul.innerHTML = "";
-    collections.forEach(c => {
-      const li = document.createElement("li");
-      li.dataset.collection = c.name;
-      if (c.name === currentCollection) li.classList.add("active");
-      li.innerHTML = `
-        <span>${c.name}</span>
-        <span class="count">${c.count ?? 0}</span>
-      `;
-      li.addEventListener("click", () => selectCollection(c.name));
-      ul.appendChild(li);
-    });
-  }
-
-  async function selectCollection(name) {
-    currentCollection = name;
-    currentThought = null;
-    await loadThoughts(name);
-    renderThoughtList();
-    updateHeaderCounts();
-    clearDetail();
-  }
-
-  // --- Thoughts list ---
-  async function loadThoughts(collectionName) {
-    if (!collectionName) return;
-    try {
-      setStatus("Loading thoughts…", "busy");
-      const res = await fetch(
-        `${API_BASE}/thoughts?collection=` + encodeURIComponent(collectionName)
-      );
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      thoughts = data || [];
-      setStatus("Loaded " + thoughts.length + " thoughts", "success");
-    } catch (err) {
-      console.error("Failed to load thoughts", err);
-      setStatus("Error loading thoughts", "error");
-    }
-  }
-
-  function renderThoughtList() {
-    const container = document.getElementById("thought-list");
-    container.innerHTML = "";
-
-    const filter = document.getElementById("filter-length").value;
-    const query = document.getElementById("search-input").value.trim().toLowerCase();
-
-    let filtered = thoughts.slice();
-
-    if (filter !== "all") {
-      filtered = filtered.filter(t => lengthBucket(t.text) === filter);
-    }
-    if (query) {
-      filtered = filtered.filter(
-        t =>
-          (t.title || "").toLowerCase().includes(query) ||
-          (t.text || "").toLowerCase().includes(query)
-      );
-    }
-
-    filtered.forEach(t => {
-      const div = document.createElement("div");
-      div.className = "thought-item";
-      if (currentThought && t.id === currentThought.id) div.classList.add("active");
-
-      const preview =
-        (t.text || "").length > 160
-          ? (t.text || "").slice(0, 160) + "…"
-          : (t.text || "");
-
-      const createdShort = t.created_at
-        ? new Date(t.created_at).toLocaleDateString()
-        : "—";
-
-      div.innerHTML = `
-        <div class="thought-item-title">${t.title || "(untitled thought)"}</div>
-        <div class="thought-item-preview">${(preview || "").replace(/\n/g, " ")}</div>
-        <div class="thought-item-meta">
-          <span>${createdShort}</span>
-          <span>${lengthBucket(t.text)} · ${t.collection}</span>
-          <div class="thought-item-actions">
-            <button type="button" class="ghost-btn primary-soft btn-open">Open</button>
-            <button type="button" class="ghost-btn btn-edit">Edit</button>
-          </div>
-        </div>
-      `;
-
-      // Default click: view in this panel
-      div.addEventListener("click", () => {
-        currentThought = t;
-        showDetail(t);
-        renderThoughtList();
-      });
-
-      const openBtn = div.querySelector(".btn-open");
-      openBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        // Open this view-only page again with the thought id in URL
-        const url = `thought.html?id=${encodeURIComponent(t.id)}`;
-        window.open(url, "_blank");
-      });
-
-      const editBtn = div.querySelector(".btn-edit");
-      editBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        // Jump to editor with this thought id as query param
-        const url = `scribble.html?id=${encodeURIComponent(t.id)}`;
-        window.open(url, "_blank");
-      });
-
-      container.appendChild(div);
-    });
-
-    updateHeaderCounts();
-  }
-
-  // --- Detail (read-only) ---
-  function clearDetail() {
-    document.getElementById("detail-title-label").textContent = "Select a thought to view.";
-    document.getElementById("detail-text").textContent = "";
-    document.getElementById("detail-id-pill").textContent = "id: —";
-    document.getElementById("detail-author-pill").textContent = "author: —";
-    document.getElementById("detail-context-pill").textContent = "context: —";
-    document.getElementById("detail-tags-pill").textContent = "tags: —";
-    document.getElementById("detail-created-pill").textContent = "created: —";
-    document.getElementById("detail-updated-pill").textContent = "updated: —";
-    document.getElementById("detail-edit-link").href = "scribble.html";
-  }
-
-  function showDetail(t) {
-    document.getElementById("detail-collection-label").textContent =
-      t.collection ? "Collection: " + t.collection : "Collection: —";
-    document.getElementById("detail-title-label").textContent =
-      t.title || "(untitled thought)";
-    document.getElementById("detail-text").textContent = t.text || "";
-
-    document.getElementById("detail-id-pill").textContent = "id: " + (t.id ?? "—");
-    document.getElementById("detail-author-pill").textContent =
-      "author: " + (t.author || "—");
-    document.getElementById("detail-context-pill").textContent =
-      "context: " + (t.context || "—");
-    document.getElementById("detail-tags-pill").textContent =
-      "tags: " + (t.tags || "—");
-    document.getElementById("detail-created-pill").textContent =
-      "created: " + (t.created_at || "—");
-    document.getElementById("detail-updated-pill").textContent =
-      "updated: " + (t.updated_at || "—");
-
-    const editLink = `scribble.html?id=${encodeURIComponent(t.id)}`;
-    document.getElementById("detail-edit-link").href = editLink;
-  }
-
-  function getQueryParam(name) {
-    const params = new URLSearchParams(window.location.search);
-    return params.get(name);
-  }
-
-  async function loadThoughtById(id) {
-    try {
-      setStatus("Loading thought…", "busy");
-      const res = await fetch(`${API_BASE}/thoughts/` + encodeURIComponent(id));
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const t = await res.json();
-      if (!t || !t.id) {
-        setStatus("Thought not found", "error");
-        return null;
+    const API_BASE = "/scribble/api";
+  
+    let collections = [];
+    let thoughts = [];
+    let currentCollection = null;
+    let currentThought = null;
+    let statusTimer = null;
+  
+    function setStatus(text, mode = "idle") {
+      const pill = document.getElementById("status-pill");
+      pill.textContent = text;
+      pill.className = "status-pill " + mode;
+      if (statusTimer) {
+        clearTimeout(statusTimer);
+        statusTimer = null;
       }
-      return t;
-    } catch (err) {
-      console.error("Failed to load thought by id", err);
-      setStatus("Error loading thought", "error");
-      return null;
+      if (mode !== "error" && mode !== "idle") {
+        statusTimer = setTimeout(() => {
+          pill.textContent = "idle";
+          pill.className = "status-pill idle";
+        }, 2000);
+      }
     }
-  }
-
-  document.addEventListener("DOMContentLoaded", async () => {
-    await loadCollections();
-    updateHeaderCounts();
-
-    // Wire filters
-    document
-      .getElementById("filter-length")
-      .addEventListener("change", () => renderThoughtList());
-    document
-      .getElementById("search-input")
-      .addEventListener("input", () => renderThoughtList());
-
-    // If an id is provided in URL, load that thought and its collection
-    const idParam = getQueryParam("id");
-    if (idParam) {
-      const t = await loadThoughtById(idParam);
-      if (t) {
-        currentCollection = t.collection || null;
-        currentThought = t;
-        // Load all thoughts in that collection so list is populated
-        if (currentCollection) {
-          await loadThoughts(currentCollection);
-        }
+  
+    function lengthBucket(text) {
+      const len = (text || "").length;
+      if (len <= 140) return "short";
+      if (len <= 500) return "medium";
+      return "long";
+    }
+  
+    function updateHeaderCounts() {
+      document.getElementById("header-current-collection").textContent =
+        currentCollection || "none selected";
+      document.getElementById("header-count-pill").textContent =
+        (thoughts.length || 0) + " thoughts";
+      document.getElementById("detail-collection-label").textContent =
+        currentCollection ? "Collection: " + currentCollection : "No collection selected";
+    }
+  
+    // --- Collections ---
+  
+    async function loadCollections() {
+      try {
+        const res = await fetch(`${API_BASE}/thoughts/collections`);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        collections = (data || []).map(row => ({
+          name: row.collection,
+          count: row.count
+        }));
+        renderCollections();
+      } catch (err) {
+        console.error("Failed to load collections", err);
+        setStatus("Error loading collections", "error");
+      }
+    }
+  
+    function renderCollections() {
+      const ul = document.getElementById("collections-list");
+      ul.innerHTML = "";
+      collections.forEach(c => {
+        const li = document.createElement("li");
+        li.dataset.collection = c.name;
+        if (c.name === currentCollection) li.classList.add("active");
+        li.innerHTML = `
+          <span>${c.name}</span>
+          <span class="count">${c.count ?? 0}</span>
+        `;
+        li.addEventListener("click", () => selectCollection(c.name));
+        ul.appendChild(li);
+      });
+    }
+  
+    async function selectCollection(name) {
+      currentCollection = name;
+      currentThought = null;
+      await loadThoughts(name);
+      renderThoughtList();
+      updateHeaderCounts();
+      clearDetail();
+    }
+  
+    // --- Thoughts list ---
+  
+    async function loadThoughts(collectionName) {
+      if (!collectionName) return;
+      try {
+        setStatus("Loading thoughts…", "busy");
+        const res = await fetch(
+          `${API_BASE}/thoughts?collection=` + encodeURIComponent(collectionName)
+        );
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        thoughts = data || [];
+        setStatus("Loaded " + thoughts.length + " thoughts", "success");
+      } catch (err) {
+        console.error("Failed to load thoughts", err);
+        setStatus("Error loading thoughts", "error");
+      }
+    }
+  
+    function renderThoughtList() {
+      const container = document.getElementById("thought-list");
+      container.innerHTML = "";
+  
+      const filter = document.getElementById("filter-length").value;
+      const query = document.getElementById("search-input").value.trim().toLowerCase();
+  
+      let filtered = thoughts.slice();
+  
+      if (filter !== "all") {
+        filtered = filtered.filter(t => lengthBucket(t.text) === filter);
+      }
+      if (query) {
+        filtered = filtered.filter(
+          t =>
+            (t.title || "").toLowerCase().includes(query) ||
+            (t.text || "").toLowerCase().includes(query)
+        );
+      }
+  
+      const pageName =
+        window.location.pathname.split("/").pop() || "thought.html";
+  
+      filtered.forEach(t => {
+        const div = document.createElement("div");
+        div.className = "thought-item";
+        if (currentThought && t.id === currentThought.id) div.classList.add("active");
+  
+        const preview =
+          (t.text || "").length > 160
+            ? (t.text || "").slice(0, 160) + "…"
+            : (t.text || "");
+  
+        const createdShort = t.created_at
+          ? new Date(t.created_at).toLocaleDateString()
+          : "—";
+  
+        div.innerHTML = `
+          <div class="thought-item-title">${t.title || "(untitled thought)"}</div>
+          <div class="thought-item-preview">${(preview || "").replace(/\n/g, " ")}</div>
+          <div class="thought-item-meta">
+            <span>${createdShort}</span>
+            <span>${lengthBucket(t.text)} · ${t.collection}</span>
+            <div class="thought-item-actions">
+              <button type="button" class="ghost-btn primary-soft btn-open">Open</button>
+              <button type="button" class="ghost-btn btn-edit">Edit</button>
+            </div>
+          </div>
+        `;
+  
+        // Click on the card: view in the right detail panel
+        div.addEventListener("click", () => {
+          currentThought = t;
+          showDetail(t);
+          renderThoughtList();
+        });
+  
+        const openBtn = div.querySelector(".btn-open");
+        openBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          // IMPORTANT: pass both collection and id; no /thoughts/<id> API call
+          const url =
+            `${pageName}?collection=${encodeURIComponent(t.collection || "")}` +
+            `&id=${encodeURIComponent(t.id)}`;
+          window.open(url, "_blank");
+        });
+  
+        const editBtn = div.querySelector(".btn-edit");
+        editBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          // Jump into the editor UI (scribble.html)
+          const url = `scribble.html?id=${encodeURIComponent(t.id)}`;
+          window.open(url, "_blank");
+        });
+  
+        container.appendChild(div);
+      });
+  
+      updateHeaderCounts();
+    }
+  
+    // --- Detail panel (read only) ---
+  
+    function clearDetail() {
+      document.getElementById("detail-title-label").textContent = "Select a thought to view.";
+      document.getElementById("detail-text").textContent = "";
+      document.getElementById("detail-id-pill").textContent = "id: —";
+      document.getElementById("detail-author-pill").textContent = "author: —";
+      document.getElementById("detail-context-pill").textContent = "context: —";
+      document.getElementById("detail-tags-pill").textContent = "tags: —";
+      document.getElementById("detail-created-pill").textContent = "created: —";
+      document.getElementById("detail-updated-pill").textContent = "updated: —";
+      document.getElementById("detail-edit-link").href = "scribble.html";
+    }
+  
+    function showDetail(t) {
+      document.getElementById("detail-collection-label").textContent =
+        t.collection ? "Collection: " + t.collection : "Collection: —";
+      document.getElementById("detail-title-label").textContent =
+        t.title || "(untitled thought)";
+      document.getElementById("detail-text").textContent = t.text || "";
+  
+      document.getElementById("detail-id-pill").textContent = "id: " + (t.id ?? "—");
+      document.getElementById("detail-author-pill").textContent =
+        "author: " + (t.author || "—");
+      document.getElementById("detail-context-pill").textContent =
+        "context: " + (t.context || "—");
+      document.getElementById("detail-tags-pill").textContent =
+        "tags: " + (t.tags || "—");
+      document.getElementById("detail-created-pill").textContent =
+        "created: " + (t.created_at || "—");
+      document.getElementById("detail-updated-pill").textContent =
+        "updated: " + (t.updated_at || "—");
+  
+      const editLink = `scribble.html?id=${encodeURIComponent(t.id)}`;
+      document.getElementById("detail-edit-link").href = editLink;
+    }
+  
+    // --- URL helpers & initial load ---
+  
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+  
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadCollections();
+      updateHeaderCounts();
+  
+      // Filters
+      document
+        .getElementById("filter-length")
+        .addEventListener("change", () => renderThoughtList());
+      document
+        .getElementById("search-input")
+        .addEventListener("input", () => renderThoughtList());
+  
+      const idParam = getQueryParam("id");
+      const collectionParam = getQueryParam("collection");
+  
+      if (collectionParam) {
+        currentCollection = collectionParam;
+        await loadThoughts(currentCollection);
         renderCollections();
         renderThoughtList();
-        showDetail(t);
+  
+        if (idParam) {
+          const t = thoughts.find(th => String(th.id) === String(idParam));
+          if (t) {
+            currentThought = t;
+            showDetail(t);
+            renderThoughtList();
+          } else {
+            setStatus("Thought not found in collection", "error");
+          }
+        }
+  
         updateHeaderCounts();
         return;
       }
-    }
-
-    // Fallback: no id, just show collections; user selects
-    renderCollections();
-  });
-</script>
+  
+      // No collection in URL → just show collections, wait for user click
+      renderCollections();
+      updateHeaderCounts();
+    });
+  </script>
+  
 </body>
 </html>
