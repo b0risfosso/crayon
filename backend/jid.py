@@ -149,6 +149,58 @@ def _to_plain(obj):
 
 
 
+def _create_core_ideas_sync(payload: dict) -> tuple[int, dict]:
+    """
+    Synchronous core-ideas-only handler to be used by the queue.
+
+    INPUT payload:
+    {
+      "text": "...",
+      "source": "some_tag_for_core_ideas.source",
+      "email": "optional@user",
+      "model": "optional-model"   # optional, defaults to DEFAULT_MODEL
+    }
+    """
+    text = (payload.get("text") or "").strip()
+    source = (payload.get("source") or "").strip()
+    email = payload.get("email")
+    model = (payload.get("model") or DEFAULT_MODEL).strip()
+
+    if not text:
+        return 400, {"error": "Missing 'text'"}
+    if not source:
+        return 400, {"error": "Missing 'source' (stored in core_ideas.source)"}
+
+    try:
+        # LLM call
+        result = run_text_to_core_ideas_llm(
+            text,
+            email=email,
+            model=model,
+            endpoint_name="/jid/create_core_ideas",  # for logging/telemetry
+        )
+
+        # Persist in DB
+        stats = persist_core_ideas_to_db(
+            result.ideas,
+            source=source,
+            email=email,
+            metadata={"origin": "jid"},
+            payload_origin="jid",
+        )
+
+        body = {"ideas": result.ideas, **stats}
+        return 200, body
+
+    except RuntimeError as e:
+        # e.g. token/usage limit
+        return 429, {"error": str(e)}
+
+    except Exception as e:
+        return 500, {"error": f"Unhandled error: {e}"}
+
+
+
 
 def _create_pictures_sync(payload: dict) -> tuple[int, dict]:
     """
@@ -1676,58 +1728,6 @@ def create_pictures_result():
 
     # No wrapper: behave like the original synchronous endpoint
     return jsonify(body_plain), http_status
-
-
-def _create_core_ideas_sync(payload: dict) -> tuple[int, dict]:
-    """
-    Synchronous core-ideas-only handler to be used by the queue.
-
-    INPUT payload:
-    {
-      "text": "...",
-      "source": "some_tag_for_core_ideas.source",
-      "email": "optional@user",
-      "model": "optional-model"   # optional, defaults to DEFAULT_MODEL
-    }
-    """
-    text = (payload.get("text") or "").strip()
-    source = (payload.get("source") or "").strip()
-    email = payload.get("email")
-    model = (payload.get("model") or DEFAULT_MODEL).strip()
-
-    if not text:
-        return 400, {"error": "Missing 'text'"}
-    if not source:
-        return 400, {"error": "Missing 'source' (stored in core_ideas.source)"}
-
-    try:
-        # LLM call
-        result = run_text_to_core_ideas_llm(
-            text,
-            email=email,
-            model=model,
-            endpoint_name="/jid/create_core_ideas",  # for logging/telemetry
-        )
-
-        # Persist in DB
-        stats = persist_core_ideas_to_db(
-            result.ideas,
-            source=source,
-            email=email,
-            metadata={"origin": "jid"},
-            payload_origin="jid",
-        )
-
-        body = {"ideas": result.ideas, **stats}
-        return 200, body
-
-    except RuntimeError as e:
-        # e.g. token/usage limit
-        return 429, {"error": str(e)}
-
-    except Exception as e:
-        return 500, {"error": f"Unhandled error: {e}"}
-
 
 
 @app.route("/jid/create_core_ideas", methods=["POST"])
