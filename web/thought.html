@@ -70,6 +70,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
     margin-bottom: 8px;
   }
 
@@ -123,6 +124,59 @@
     color: var(--text-soft);
     margin-top: 4px;
   }
+
+  /* New: layout and styles for visions per core idea */
+  .core-idea-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .core-idea-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .core-idea-actions button {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .visions-container {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .visions-status {
+    font-size: 11px;
+    color: var(--text-soft);
+    margin-bottom: 4px;
+  }
+
+  .visions-list {
+    list-style: none;
+    margin: 0;
+    padding-left: 0;
+  }
+
+  .vision-item {
+    margin-bottom: 6px;
+  }
+
+  .vision-item-title {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .vision-item-text {
+    font-size: 13px;
+    white-space: pre-wrap;
+    margin-top: 2px;
+  }
 </style>
 </head>
 
@@ -146,6 +200,10 @@
       <button type="button" id="btn-refresh-core-ideas">
         Refresh
       </button>
+      <!-- NEW: generate visions for all loaded core ideas -->
+      <button type="button" id="btn-generate-visions-for-core-ideas">
+        Generate visions
+      </button>
     </div>
     <div class="status" id="core-ideas-status"></div>
     <ul class="core-ideas-list" id="core-ideas-list"></ul>
@@ -164,6 +222,9 @@
   let coreIdeasTaskId = null;
   let coreIdeasPollTimer = null;
 
+  // track currently rendered core ideas so we can queue visions for them
+  let currentCoreIdeas = [];
+
   function getQueryParam(name) {
     const params = new URLSearchParams(window.location.search);
     return params.get(name);
@@ -179,7 +240,11 @@
 
   function setCoreIdeasButtonsDisabled(disabled) {
     document.getElementById("btn-generate-core-ideas").disabled = disabled;
-    document.getElementById("btn-refresh-core-ideas").disabled = disabled && !!coreIdeasTaskId;
+    document.getElementById("btn-refresh-core-ideas").disabled =
+      disabled && !!coreIdeasTaskId;
+
+    const visionsBtn = document.getElementById("btn-generate-visions-for-core-ideas");
+    if (visionsBtn) visionsBtn.disabled = disabled;
   }
 
   async function loadThought() {
@@ -218,13 +283,72 @@
     }
   }
 
+  // --- Visions loading per core idea --------------------------------------
+
+  async function loadVisionsForCoreIdea(coreIdeaId, listEl, statusEl) {
+    if (!coreIdeaId) {
+      statusEl.textContent = "No core_idea_id.";
+      return;
+    }
+
+    statusEl.textContent = "Loading visions…";
+    listEl.innerHTML = "";
+
+    try {
+      const url = `${READ_BASE}/visions_by_core_idea?core_idea_id=${encodeURIComponent(coreIdeaId)}&limit=50`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        statusEl.textContent = `Error loading visions (HTTP ${res.status}).`;
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      const items = data.items || [];
+
+      if (!items.length) {
+        statusEl.textContent = "No visions for this core idea yet.";
+        return;
+      }
+
+      statusEl.textContent = `Loaded ${items.length} vision(s).`;
+      listEl.innerHTML = "";
+
+      items.forEach(v => {
+        const li = document.createElement("li");
+        li.className = "vision-item";
+
+        const titleDiv = document.createElement("div");
+        titleDiv.className = "vision-item-title";
+        titleDiv.textContent = v.title || "(untitled vision)";
+
+        const textDiv = document.createElement("div");
+        textDiv.className = "vision-item-text";
+        const realization = (v.realization || "").trim();
+        const body = realization || (v.text || "");
+        textDiv.textContent = body || "(no text)";
+
+        li.appendChild(titleDiv);
+        li.appendChild(textDiv);
+        listEl.appendChild(li);
+      });
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Error loading visions: " + err.message;
+    }
+  }
+
+  // --- Core ideas rendering ------------------------------------------------
+
   function renderCoreIdeas(items) {
+    currentCoreIdeas = items || [];
+
     const list = document.getElementById("core-ideas-list");
     list.innerHTML = "";
 
     items.forEach(item => {
       const li = document.createElement("li");
       li.className = "core-idea-item";
+      li.dataset.coreIdeaId = item.id;
 
       const textDiv = document.createElement("div");
       textDiv.className = "core-idea-text";
@@ -237,8 +361,59 @@
         item.created_at || ""
       ].filter(Boolean).join(" · ");
 
-      li.appendChild(textDiv);
+      // visions container (hidden by default)
+      const visionsContainer = document.createElement("div");
+      visionsContainer.className = "visions-container";
+      visionsContainer.style.display = "none";
+
+      const visionsStatus = document.createElement("div");
+      visionsStatus.className = "visions-status";
+      visionsStatus.textContent = "";
+
+      const visionsList = document.createElement("ul");
+      visionsList.className = "visions-list";
+
+      visionsContainer.appendChild(visionsStatus);
+      visionsContainer.appendChild(visionsList);
+
+      // actions on the right: toggle + per-core "Gen visions"
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "core-idea-actions";
+
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.textContent = "Show visions";
+
+      toggleBtn.addEventListener("click", async () => {
+        if (visionsContainer.style.display === "none") {
+          visionsContainer.style.display = "block";
+          toggleBtn.textContent = "Hide visions";
+          await loadVisionsForCoreIdea(item.id, visionsList, visionsStatus);
+        } else {
+          visionsContainer.style.display = "none";
+          toggleBtn.textContent = "Show visions";
+        }
+      });
+
+      const genVisionsBtn = document.createElement("button");
+      genVisionsBtn.type = "button";
+      genVisionsBtn.textContent = "Gen visions";
+      genVisionsBtn.addEventListener("click", async () => {
+        await queueVisionForSingleCoreIdea(item.id);
+      });
+
+      actionsDiv.appendChild(toggleBtn);
+      actionsDiv.appendChild(genVisionsBtn);
+
+      const headerRow = document.createElement("div");
+      headerRow.className = "core-idea-header-row";
+      headerRow.appendChild(textDiv);
+      headerRow.appendChild(actionsDiv);
+
+      li.appendChild(headerRow);
       li.appendChild(metaDiv);
+      li.appendChild(visionsContainer);
+
       list.appendChild(li);
     });
   }
@@ -264,6 +439,83 @@
       setCoreIdeasStatus("Error loading core ideas.");
     }
   }
+
+  // --- Queueing visions generation ----------------------------------------
+
+  async function queueVisionForSingleCoreIdea(coreIdeaId) {
+    if (!coreIdeaId) {
+      setCoreIdeasStatus("Cannot queue visions: missing core_idea_id.");
+      return;
+    }
+
+    try {
+      const payload = {
+        core_idea_id: coreIdeaId,
+        email: ""   // optional, fill if you want tracing
+      };
+
+      const res = await fetch(`${JID_BASE}/generate_visions_from_core_idea`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const errBody = await res.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const body = await res.json().catch(() => ({}));
+      const taskId = body.task_id;
+      if (taskId) {
+        setCoreIdeasStatus(
+          `Queued visions job for core_idea_id=${coreIdeaId} (task_id=${taskId}).`
+        );
+      } else {
+        setCoreIdeasStatus(
+          `Queued visions job for core_idea_id=${coreIdeaId} (no task_id returned).`
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      setCoreIdeasStatus(
+        `Error queueing visions for core_idea_id=${coreIdeaId}: ` + err.message
+      );
+    }
+  }
+
+  async function queueVisionsForAllCoreIdeas() {
+    if (!currentCoreIdeas.length) {
+      setCoreIdeasStatus("No core ideas to generate visions for.");
+      return;
+    }
+
+    setCoreIdeasStatus("Queuing visions for all loaded core ideas…");
+
+    let success = 0;
+    let fails = 0;
+
+    // sequential is simplest; if you like you can use Promise.all
+    for (const item of currentCoreIdeas) {
+      if (!item.id) continue;
+      try {
+        await queueVisionForSingleCoreIdea(item.id);
+        success += 1;
+      } catch {
+        fails += 1;
+      }
+    }
+
+    let msg = `Queued visions for ${success} core idea(s).`;
+    if (fails) msg += ` ${fails} failed.`;
+    setCoreIdeasStatus(msg);
+  }
+
+  // --- Core ideas generation via queue (existing) --------------------------
 
   // Poll a queued job until it finishes.
   async function pollCoreIdeasTask(taskId, attempt = 0) {
@@ -403,6 +655,10 @@
     document
       .getElementById("btn-refresh-core-ideas")
       .addEventListener("click", loadCoreIdeasFromRead);
+
+    document
+      .getElementById("btn-generate-visions-for-core-ideas")
+      .addEventListener("click", queueVisionsForAllCoreIdeas);
 
     loadThought();
   });

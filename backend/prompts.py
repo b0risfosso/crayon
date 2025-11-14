@@ -1144,7 +1144,6 @@ OUTPUT (STRICT JSON ONLY):
 }}
 
 RULES:
-- Produce 3–12 ideas unless the text is extremely short or long; adjust as needed.
 - Each idea must stand alone: avoid pronouns without clear antecedents; repeat key nouns when needed.
 - No titles. No numbering. No markdown. No commentary.
 - Keep each idea ≤ 400 characters when possible.

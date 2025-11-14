@@ -93,6 +93,7 @@ init_usage_db()
 # new q
 
 
+_JOB_HANDLERS: dict[str, callable] = {}
 
 
 
@@ -146,6 +147,57 @@ def _to_plain(obj):
         pass
 
     return obj
+
+
+def _generate_visions_from_core_idea_sync(payload: dict) -> tuple[int, dict]:
+    """
+    Queue handler for generating visions from a single core_idea_id.
+
+    INPUT payload:
+    {
+      "core_idea_id": int,
+      "email": "...",          # optional
+      "model": "..."           # optional, defaults to DEFAULT_MODEL
+    }
+
+    RETURNS (http_status, body_dict)
+    """
+    cid = payload.get("core_idea_id")
+    email = (payload.get("email") or None)
+    model = (payload.get("model") or DEFAULT_MODEL)
+
+    if not isinstance(cid, int):
+        return 400, {"error": "core_idea_id (int) is required"}
+
+    core_text = fetch_core_idea_text(cid)
+    if not core_text:
+        return 404, {"error": f"core_idea_id {cid} not found"}
+
+    try:
+        result = run_core_idea_visions_llm(
+            core_text,
+            email=email,
+            model=model,
+            endpoint_name="/jid/generate_visions_from_core_idea",
+        )
+
+        visions_struct = list(result.visions or [])
+        stats = persist_visions_for_core_idea(
+            cid,
+            [v.dict() for v in visions_struct],
+            email=email,
+            origin="jid",
+        )
+
+        body = {
+            "core_idea_id": cid,
+            "visions": [v.dict() for v in visions_struct],
+            **stats,
+        }
+        return 200, body
+
+    except Exception as e:
+        return 500, {"error": f"{e}"}  # keep it simple for the worker
 
 
 
@@ -491,11 +543,14 @@ class _QueuedTask:
 
 
 # Map job type -> sync handler
-_JOB_HANDLERS: dict[str, callable] = {
+# Now that all sync handlers are defined, wire up the job handlers.
+_JOB_HANDLERS.update({
     "core_pipeline": _core_ideas_visions_worlds_sync,
     "create_pictures": _create_pictures_sync,
-    "core_ideas": _create_core_ideas_sync,   # NEW
-}
+    "core_ideas": _create_core_ideas_sync,
+    "visions_from_core_idea": _generate_visions_from_core_idea_sync,
+})
+
 
 
 
@@ -1819,28 +1874,32 @@ def create_core_ideas_result():
 @app.route("/jid/generate_visions_from_core_idea", methods=["POST"])
 def jid_generate_visions_from_core_idea():
     """
-    Payload: { "core_idea_id": int, "email": "...", "model": "..." }
-    Uses core_idea_id to fetch text, generates visions, saves them with visions.core_idea_id.
+    Async submit-only:
+      - Accepts: { "core_idea_id": int, "email": "...", "model": "..." }
+      - Enqueues a visions_from_core_idea job.
+      - Returns { "task_id": "<uuid>" } with 202 Accepted.
     """
-    payload = request.get_json(force=True) or {}
-    cid = payload.get("core_idea_id")
-    email = (payload.get("email") or None)
-    model = payload.get("model") or DEFAULT_MODEL
+    try:
+        payload = request.get_json(force=True, silent=False) or {}
+    except Exception:
+        return jsonify({"error": "invalid JSON"}), 400
 
+    # Basic front-door validation, same as old route
+    cid = payload.get("core_idea_id")
     if not isinstance(cid, int):
         return jsonify({"error": "core_idea_id (int) is required"}), 400
 
-    core_text = fetch_core_idea_text(cid)
-    if not core_text:
-        return jsonify({"error": f"core_idea_id {cid} not found"}), 404
+    # Register task in the in-memory task table
+    state = _register_task(payload)
 
-    try:
-        result = run_core_idea_visions_llm(core_text, email=email, model=model,
-                                           endpoint_name="/jid/generate_visions_from_core_idea")
-        stats = persist_visions_for_core_idea(cid, [v.dict() for v in result.visions], email=email, origin="jid")
-        return jsonify({"core_idea_id": cid, "visions": [v.dict() for v in result.visions], **stats})
-    except Exception as e:
-        return jsonify({"error": f"{e}"}), 500
+    # Enqueue job for the generic worker
+    qtask = _QueuedTask(payload=payload, kind="visions_from_core_idea")
+    qtask.task_id = state.task_id      # keep queue + state in sync
+    _TASK_Q.put(qtask)
+
+    return jsonify({"task_id": state.task_id}), 202
+
+
 
 @app.route("/jid/generate_play_visions_from_core_idea", methods=["POST"])
 def jid_generate_play_visions_from_core_idea():
