@@ -461,6 +461,53 @@ def delete_thought(thought_id: int):
         conn.close()
 
 
+@app.get("/api/thoughts/<int:thought_id>")
+def get_thought(thought_id: int):
+    """
+    Fetch a single thought by id.
+
+    Response:
+      {
+        "id": ...,
+        "collection": "...",
+        "title": "...",
+        "text": "...",
+        "vision_id": ...,
+        "core_idea_id": ...,
+        "source": "...",
+        "author": "...",
+        "context": "...",
+        "order_index": ...,
+        "tags": "...",
+        "email": "...",
+        "metadata": {...} | "raw" | null,
+        "created_at": "...",
+        "updated_at": "..."
+      }
+    """
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+      conn.row_factory = sqlite3.Row
+      cur = conn.cursor()
+      cur.execute(
+          f"SELECT {', '.join(THOUGHT_COLUMNS)} FROM thoughts WHERE id = ?",
+          (thought_id,),
+      )
+      row = cur.fetchone()
+      if not row:
+          return jsonify({"error": "not found"}), 404
+
+      d = _row_to_dict(row)
+      d["metadata"] = _parse_metadata_field(d.get("metadata"))
+      return jsonify(d), 200
+    except Exception as e:
+      return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+      conn.close()
+
+
+
 # ------------------------------------------------------------------------------
 # GET /api/thoughts/random?collection=name
 # ------------------------------------------------------------------------------
