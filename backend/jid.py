@@ -92,85 +92,9 @@ init_usage_db()
 
 # new q
 
-# ---- Core-Ideas → Visions → Worlds work queue (concurrency = 2) -------------
-_CORE_PIPEELINE_Q: "queue.Queue[_CorePipelineTask]" = queue.Queue()
-_CORE_PIPEELINE_WORKERS: list[threading.Thread] = []
-_CORE_PIPEELINE_WORKER_COUNT = 2  # fixed concurrency = 2
 
 
-class _CorePipelineTask:
-    __slots__ = ("task_id", "payload", "result", "error", "event")
 
-    def __init__(self, payload: dict):
-        self.task_id = str(uuid.uuid4())
-        self.payload = payload
-        self.result = None
-        self.error: Exception | None = None
-        self.event = threading.Event()
-
-
-def _core_pipeline_worker():
-    with app.app_context():
-        while True:
-            task = _CORE_PIPEELINE_Q.get()
-            state = None
-            try:
-                state = _get_task(task.task_id)
-                if state:
-                    state.status = "running"
-                    state.started_ts = time.time()
-
-                http_status, body = _core_ideas_visions_worlds_sync(task.payload)
-
-                body_plain = _to_plain(body)
-                task.result = body_plain
-
-                if state:
-                    state.status = "done"
-                    state.http_status = http_status
-                    state.result = body_plain
-                    state.finished_ts = time.time()
-            except Exception as e:
-                task.error = e
-                if state:
-                    state.status = "error"
-                    state.error = str(e)
-                    state.finished_ts = time.time()
-            finally:
-                task.event.set()
-                _CORE_PIPEELINE_Q.task_done()
-                _cleanup_tasks()
-
-
-def _start_core_pipeline_workers_once():
-    if _CORE_PIPEELINE_WORKERS:
-        return
-    for _ in range(_CORE_PIPEELINE_WORKER_COUNT):
-        t = threading.Thread(
-            target=_core_pipeline_worker,
-            name="core_pipeline_worker",
-            daemon=True,
-        )
-        t.start()
-        _CORE_PIPEELINE_WORKERS.append(t)
-
-
-_start_core_pipeline_workers_once()
-
-
-# ---- Create-Pictures work queue ---------------------------------------------
-_CREATE_PICTURES_Q: "queue.Queue[_CreatePicturesTask]" = queue.Queue()
-_CREATE_PICTURES_WORKERS = []
-_CREATE_PICTURES_WORKER_COUNT = int(os.getenv("CREATE_PICTURES_WORKERS", "2"))
-
-class _CreatePicturesTask:
-    __slots__ = ("task_id", "payload", "result", "error", "event")
-    def __init__(self, payload: dict):
-        self.task_id = str(uuid.uuid4())
-        self.payload = payload
-        self.result = None
-        self.error = None
-        self.event = threading.Event()
 
 
 import json as _json
@@ -224,11 +148,43 @@ def _to_plain(obj):
     return obj
 
 
+# ---- Unified job queue ------------------------------------------------------
+_TASK_Q: "queue.Queue[_QueuedTask]" = queue.Queue()
+_TASK_WORKERS: list[threading.Thread] = []
+_TASK_WORKER_COUNT = int(os.getenv("TASK_WORKERS", "2"))  # total concurrency
 
-def _create_pictures_worker():
+class _QueuedTask:
+    """
+    Generic queued job.
+
+    kind:
+      - "core_pipeline"   -> _core_ideas_visions_worlds_sync
+      - "create_pictures" -> _create_pictures_sync
+    """
+    __slots__ = ("task_id", "payload", "kind", "result", "error", "event")
+
+    def __init__(self, payload: dict, kind: str):
+        self.task_id = str(uuid.uuid4())
+        self.payload = payload
+        self.kind = kind
+        self.result = None
+        self.error: Exception | None = None
+        self.event = threading.Event()
+
+
+# Map job type -> sync handler
+_JOB_HANDLERS: dict[str, callable] = {
+    "core_pipeline": _core_ideas_visions_worlds_sync,
+    "create_pictures": _create_pictures_sync,
+    "core_ideas": _create_core_ideas_sync,   # NEW
+}
+
+
+
+def _task_worker():
     with app.app_context():
         while True:
-            task = _CREATE_PICTURES_Q.get()
+            task = _TASK_Q.get()
             state = None
             try:
                 state = _get_task(task.task_id)
@@ -236,16 +192,18 @@ def _create_pictures_worker():
                     state.status = "running"
                     state.started_ts = time.time()
 
-                status_code, body = _create_pictures_sync(task.payload)
+                handler = _JOB_HANDLERS.get(task.kind)
+                if handler is None:
+                    raise RuntimeError(f"Unknown task kind: {task.kind!r}")
 
-                # ⬇️ Ensure result is plain JSON-serializable data
+                http_status, body = handler(task.payload)
+
                 body_plain = _to_plain(body)
-
-                task.result = (status_code, body_plain)
+                task.result = body_plain
 
                 if state:
                     state.status = "done"
-                    state.http_status = status_code
+                    state.http_status = http_status
                     state.result = body_plain
                     state.finished_ts = time.time()
             except Exception as e:
@@ -256,22 +214,24 @@ def _create_pictures_worker():
                     state.finished_ts = time.time()
             finally:
                 task.event.set()
-                _CREATE_PICTURES_Q.task_done()
+                _TASK_Q.task_done()
                 _cleanup_tasks()
 
 
-
-def _start_create_pictures_workers_once():
-    # idempotent start
-    if _CREATE_PICTURES_WORKERS:
+def _start_task_workers_once():
+    if _TASK_WORKERS:
         return
-    for _ in range(_CREATE_PICTURES_WORKER_COUNT):
-        t = threading.Thread(target=_create_pictures_worker, name="create_pictures_worker", daemon=True)
+    for _ in range(_TASK_WORKER_COUNT):
+        t = threading.Thread(
+            target=_task_worker,
+            name="jid_worker",
+            daemon=True,
+        )
         t.start()
-        _CREATE_PICTURES_WORKERS.append(t)
+        _TASK_WORKERS.append(t)
 
-# Call once during startup (e.g., right after app = Flask(__name__))
-_start_create_pictures_workers_once()
+
+_start_task_workers_once()
 
 
 
@@ -1471,13 +1431,16 @@ def _core_pipeline_worker():
 def jid_create_core_ideas_visions_worlds_submit():
     payload = request.get_json(force=True, silent=False) or {}
 
+    # register in DB as before
     state = _register_task(payload)
 
-    qtask = _CorePipelineTask(payload=payload)
-    qtask.task_id = state.task_id
-    _CORE_PIPEELINE_Q.put(qtask)
+    # enqueue unified task
+    qtask = _QueuedTask(payload=payload, kind="core_pipeline")
+    qtask.task_id = state.task_id           # ensure DB + queue share the same id
+    _TASK_Q.put(qtask)
 
     return jsonify({"task_id": state.task_id}), 202
+
 
 
 @app.route("/jid/create_pictures", methods=["POST"])
@@ -1507,11 +1470,12 @@ def create_pictures_submit():
 
     task_ids = []
     for payload in items:
-        # make a registry state and a queue task that points to it
         state = _register_task(payload)
-        qtask = _CreatePicturesTask(payload=payload)
-        qtask.task_id = state.task_id   # ensure worker looks up the same id
-        _CREATE_PICTURES_Q.put(qtask)
+
+        qtask = _QueuedTask(payload=payload, kind="create_pictures")
+        qtask.task_id = state.task_id
+        _TASK_Q.put(qtask)
+
         task_ids.append(state.task_id)
 
     return jsonify({"task_ids": task_ids}), 202
@@ -1716,26 +1680,142 @@ def create_pictures_result():
     return jsonify(body_plain), http_status
 
 
-@app.route("/jid/create_core_ideas", methods=["POST"])
-def jid_create_core_ideas():
-    payload = request.get_json(force=True) or {}
+def _create_core_ideas_sync(payload: dict) -> tuple[int, dict]:
+    """
+    Synchronous core-ideas-only handler to be used by the queue.
+
+    INPUT payload:
+    {
+      "text": "...",
+      "source": "some_tag_for_core_ideas.source",
+      "email": "optional@user",
+      "model": "optional-model"   # optional, defaults to DEFAULT_MODEL
+    }
+    """
     text = (payload.get("text") or "").strip()
     source = (payload.get("source") or "").strip()
     email = payload.get("email")
+    model = (payload.get("model") or DEFAULT_MODEL).strip()
 
     if not text:
-        return jsonify({"error": "Missing 'text'"}), 400
+        return 400, {"error": "Missing 'text'"}
     if not source:
-        return jsonify({"error": "Missing 'source' (to store in core_ideas.source)"}), 400
+        return 400, {"error": "Missing 'source' (stored in core_ideas.source)"}
 
     try:
-        result = run_text_to_core_ideas_llm(text, email=email)
-        stats = persist_core_ideas_to_db(result.ideas, source=source, email=email, metadata={"origin": "jid"}, payload_origin="jid")
-        return jsonify({"ideas": result.ideas, **stats}), 200
+        # LLM call
+        result = run_text_to_core_ideas_llm(
+            text,
+            email=email,
+            model=model,
+            endpoint_name="/jid/create_core_ideas",  # for logging/telemetry
+        )
+
+        # Persist in DB
+        stats = persist_core_ideas_to_db(
+            result.ideas,
+            source=source,
+            email=email,
+            metadata={"origin": "jid"},
+            payload_origin="jid",
+        )
+
+        body = {"ideas": result.ideas, **stats}
+        return 200, body
+
     except RuntimeError as e:
-        return jsonify({"error": str(e)}), 429
+        # e.g. token/usage limit
+        return 429, {"error": str(e)}
+
     except Exception as e:
-        return jsonify({"error": f"Unhandled error: {e}"}), 500
+        return 500, {"error": f"Unhandled error: {e}"}
+
+
+
+@app.route("/jid/create_core_ideas", methods=["POST"])
+def jid_create_core_ideas():
+    """
+    Async submit-only:
+      - Accepts a JSON object with fields:
+          { "text": "...", "source": "...", "email": "...", "model": "..."? }
+      - Enqueues a single core_ideas job.
+      - Returns { "task_id": "<uuid>" } with 202 Accepted.
+    """
+    try:
+        payload = request.get_json(force=True, silent=False) or {}
+    except Exception:
+        return jsonify({"error": "invalid JSON"}), 400
+
+    # Register task in the in-memory task table
+    state = _register_task(payload)
+
+    # Create queued job
+    qtask = _QueuedTask(payload=payload, kind="core_ideas")
+    qtask.task_id = state.task_id  # ensure worker + state share the same id
+    _TASK_Q.put(qtask)
+
+    return jsonify({"task_id": state.task_id}), 202
+
+@app.route("/jid/create_core_ideas/result", methods=["GET"])
+def create_core_ideas_result():
+    """
+    Fetch the final result for a single create_pictures task.
+
+    Query params:
+      - task_id=<uuid>    (required)
+      - wrapper=true|false (default false)
+          false -> return the original body exactly (status code = stored http_status or 200)
+          true  -> return a wrapper with metadata + result
+
+    Responses:
+      400 if task_id missing
+      404 if unknown task_id
+      202 while queued/running
+      500 if task errored (includes error string)
+      200 (or stored http_status) with final JSON body when done
+    """
+    tid = request.args.get("task_id", "").strip()
+    if not tid:
+        return jsonify({"error": "task_id required"}), 400
+
+    wrapper = (request.args.get("wrapper", "false").lower() == "true")
+
+    state = _get_task(tid)
+    if state is None:
+        return jsonify({"error": "unknown task_id", "task_id": tid}), 404
+
+    # Not ready yet
+    if state.status in ("queued", "running"):
+        return jsonify({
+            "task_id": state.task_id,
+            "status": state.status
+        }), 202
+
+    # Error case
+    if state.status == "error":
+        if wrapper:
+            return jsonify({
+                "task_id": state.task_id,
+                "status": "error",
+                "error": state.error
+            }), 500
+        else:
+            return jsonify({"error": state.error or "task failed", "task_id": state.task_id}), 500
+
+    # Done: return the original body with its stored HTTP status (default 200)
+    body_plain = _to_plain(state.result)
+    http_status = state.http_status or 200
+
+    if wrapper:
+        return jsonify({
+            "task_id": state.task_id,
+            "status": "done",
+            "http_status": http_status,
+            "result": body_plain
+        }), 200
+
+    # No wrapper: behave like the original synchronous endpoint
+    return jsonify(body_plain), http_status
 
 
 @app.route("/jid/generate_visions_from_core_idea", methods=["POST"])

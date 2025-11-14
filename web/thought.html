@@ -94,6 +94,11 @@
     border-color: var(--accent);
   }
 
+  button[disabled] {
+    opacity: 0.6;
+    cursor: default;
+  }
+
   ul.core-ideas-list {
     list-style: none;
     margin: 8px 0 0 0;
@@ -155,6 +160,10 @@
   let currentThought = null;   // full thought row from /scribble/api/thoughts/<id>
   let currentId = null;
 
+  // track polling for the core-ideas queue
+  let coreIdeasTaskId = null;
+  let coreIdeasPollTimer = null;
+
   function getQueryParam(name) {
     const params = new URLSearchParams(window.location.search);
     return params.get(name);
@@ -166,6 +175,11 @@
 
   function setCoreIdeasStatus(text) {
     document.getElementById("core-ideas-status").textContent = text || "";
+  }
+
+  function setCoreIdeasButtonsDisabled(disabled) {
+    document.getElementById("btn-generate-core-ideas").disabled = disabled;
+    document.getElementById("btn-refresh-core-ideas").disabled = disabled && !!coreIdeasTaskId;
   }
 
   async function loadThought() {
@@ -251,20 +265,98 @@
     }
   }
 
+  // Poll a queued job until it finishes.
+  async function pollCoreIdeasTask(taskId, attempt = 0) {
+    coreIdeasTaskId = taskId;
+
+    const maxAttempts = 120;       // fail-safe (~3 minutes if 1.5s interval)
+    const delayMs = 1500;
+
+    try {
+      const url = `${JID_BASE}/create_pictures/result` +
+                  `?task_id=${encodeURIComponent(taskId)}&wrapper=true`;
+      const res = await fetch(url);
+
+      // Task not finished yet
+      if (res.status === 202) {
+        const body = await res.json().catch(() => ({}));
+        const status = body.status || "queued/running";
+        setCoreIdeasStatus(`Core-ideas task ${status}… (task_id=${taskId})`);
+
+        if (attempt >= maxAttempts) {
+          setCoreIdeasStatus("Core-ideas task timed out.");
+          setCoreIdeasButtonsDisabled(false);
+          coreIdeasTaskId = null;
+          return;
+        }
+
+        coreIdeasPollTimer = setTimeout(
+          () => pollCoreIdeasTask(taskId, attempt + 1),
+          delayMs
+        );
+        return;
+      }
+
+      // Hard error (404 or others)
+      if (!res.ok && res.status !== 500) {
+        let msg = `Queue error (HTTP ${res.status})`;
+        try {
+          const errBody = await res.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        setCoreIdeasStatus(msg);
+        setCoreIdeasButtonsDisabled(false);
+        coreIdeasTaskId = null;
+        return;
+      }
+
+      const body = await res.json().catch(() => ({}));
+
+      // If wrapper+error
+      if (body.status === "error") {
+        const msg = body.error || "Core-ideas task failed.";
+        setCoreIdeasStatus(msg);
+        setCoreIdeasButtonsDisabled(false);
+        coreIdeasTaskId = null;
+        return;
+      }
+
+      // Done
+      setCoreIdeasStatus("Core ideas generated. Reloading from DB…");
+      await loadCoreIdeasFromRead();
+      setCoreIdeasStatus("Core ideas generated and loaded.");
+      setCoreIdeasButtonsDisabled(false);
+      coreIdeasTaskId = null;
+    } catch (err) {
+      console.error(err);
+      setCoreIdeasStatus("Error polling core-ideas task: " + err.message);
+      setCoreIdeasButtonsDisabled(false);
+      coreIdeasTaskId = null;
+    }
+  }
+
   async function generateCoreIdeas() {
     if (!currentThought || !currentThought.text) {
       setCoreIdeasStatus("No thought text to send.");
       return;
     }
 
+    // Clear any previous polling
+    if (coreIdeasPollTimer) {
+      clearTimeout(coreIdeasPollTimer);
+      coreIdeasPollTimer = null;
+    }
+    coreIdeasTaskId = null;
+
     try {
-      setCoreIdeasStatus("Generating core ideas via /jid/create_core_ideas…");
+      setCoreIdeasButtonsDisabled(true);
+      setCoreIdeasStatus("Submitting core-ideas job to queue…");
 
       const payload = {
         text: currentThought.text,
-        // This ties core_ideas to this specific thought so /read/core_ideas can find them
+        // tie core_ideas to this specific thought so /read/core_ideas can find them
         source: `thought:${currentThought.id}`,
-        // you can fill this if you want per-user tracing
+        // optional email for tracing
         email: ""
       };
 
@@ -283,13 +375,23 @@
         throw new Error(msg);
       }
 
-      // We don't strictly need the response body to show core ideas, since they are
-      // persisted; we re-read them through read.py so the UI always reflects the DB.
-      await loadCoreIdeasFromRead();
-      setCoreIdeasStatus("Core ideas generated and loaded.");
+      const body = await res.json().catch(() => ({}));
+      const taskId = body.task_id;
+      if (!taskId) {
+        setCoreIdeasButtonsDisabled(false);
+        throw new Error("Queue did not return task_id.");
+      }
+
+      setCoreIdeasStatus(
+        `Core-ideas job queued (task_id=${taskId}). Waiting for completion…`
+      );
+
+      // Start polling queue for completion
+      pollCoreIdeasTask(taskId, 0);
     } catch (err) {
       console.error(err);
       setCoreIdeasStatus("Error generating core ideas: " + err.message);
+      setCoreIdeasButtonsDisabled(false);
     }
   }
 
