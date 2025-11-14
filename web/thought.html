@@ -13,6 +13,7 @@
     --bg: #ffffff;
     --bg-elevated: #f7f7f9;
     --border: #dddddd;
+    --accent: #6a4dff;
   }
 
   body {
@@ -58,6 +59,65 @@
     font-size: 12px;
     color: var(--text-soft);
   }
+
+  .core-ideas-section {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .core-ideas-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .core-ideas-header h2 {
+    margin: 0;
+    font-size: 16px;
+    flex: 1;
+  }
+
+  button {
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    background: #ffffff;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  button.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  ul.core-ideas-list {
+    list-style: none;
+    margin: 8px 0 0 0;
+    padding: 0;
+  }
+
+  .core-idea-item {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    margin-bottom: 6px;
+  }
+
+  .core-idea-text {
+    font-size: 14px;
+    white-space: pre-wrap;
+  }
+
+  .core-idea-meta {
+    font-size: 11px;
+    color: var(--text-soft);
+    margin-top: 4px;
+  }
 </style>
 </head>
 
@@ -70,29 +130,59 @@
   </div>
 
   <div class="text" id="text"></div>
-
   <div class="status" id="status"></div>
+
+  <div class="core-ideas-section">
+    <div class="core-ideas-header">
+      <h2>Core ideas for this thought</h2>
+      <button type="button" class="primary" id="btn-generate-core-ideas">
+        Generate core ideas
+      </button>
+      <button type="button" id="btn-refresh-core-ideas">
+        Refresh
+      </button>
+    </div>
+    <div class="status" id="core-ideas-status"></div>
+    <ul class="core-ideas-list" id="core-ideas-list"></ul>
+  </div>
 </div>
 
 <script>
-  const API_BASE = "/scribble/api";
+  const API_BASE  = "/scribble/api";   // scribble.py
+  const JID_BASE  = "/jid";            // jid.py
+  const READ_BASE = "/read";           // read.py
+
+  let currentThought = null;   // full thought row from /scribble/api/thoughts/<id>
+  let currentId = null;
 
   function getQueryParam(name) {
     const params = new URLSearchParams(window.location.search);
     return params.get(name);
   }
 
+  function setStatus(text) {
+    document.getElementById("status").textContent = text || "";
+  }
+
+  function setCoreIdeasStatus(text) {
+    document.getElementById("core-ideas-status").textContent = text || "";
+  }
+
   async function loadThought() {
     const id = getQueryParam("id");
     if (!id) {
-      document.getElementById("status").textContent = "No thought id provided.";
+      setStatus("No thought id provided.");
       return;
     }
 
     try {
+      setStatus("Loading thought…");
       const res = await fetch(`${API_BASE}/thoughts/${id}`);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const t = await res.json();
+
+      currentThought = t;
+      currentId = t.id;
 
       document.getElementById("title").textContent =
         t.title || "(untitled thought)";
@@ -104,16 +194,116 @@
         t.created_at ? ` · ${t.created_at}` : "";
 
       document.getElementById("text").textContent = t.text || "";
-      document.getElementById("status").textContent = "";
+      setStatus("");
+
+      // After loading the thought, load any existing core ideas for it
+      await loadCoreIdeasFromRead();
     } catch (err) {
-      document.getElementById("status").textContent =
-        "Error loading thought.";
       console.error(err);
+      setStatus("Error loading thought.");
     }
   }
 
-  loadThought();
+  function renderCoreIdeas(items) {
+    const list = document.getElementById("core-ideas-list");
+    list.innerHTML = "";
+
+    items.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "core-idea-item";
+
+      const textDiv = document.createElement("div");
+      textDiv.className = "core-idea-text";
+      textDiv.textContent = item.core_idea || "";
+
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "core-idea-meta";
+      metaDiv.textContent = [
+        item.id != null ? `id: ${item.id}` : "",
+        item.created_at || ""
+      ].filter(Boolean).join(" · ");
+
+      li.appendChild(textDiv);
+      li.appendChild(metaDiv);
+      list.appendChild(li);
+    });
+  }
+
+  async function loadCoreIdeasFromRead() {
+    if (!currentId) return;
+
+    try {
+      setCoreIdeasStatus("Loading core ideas…");
+      const src = encodeURIComponent(`thought:${currentId}`);
+      const res = await fetch(
+        `${READ_BASE}/core_ideas?source_like=${src}&limit=50`
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const items = data.items || [];
+      renderCoreIdeas(items);
+      setCoreIdeasStatus(
+        items.length ? `Loaded ${items.length} core idea(s).` : "No core ideas yet."
+      );
+    } catch (err) {
+      console.error(err);
+      setCoreIdeasStatus("Error loading core ideas.");
+    }
+  }
+
+  async function generateCoreIdeas() {
+    if (!currentThought || !currentThought.text) {
+      setCoreIdeasStatus("No thought text to send.");
+      return;
+    }
+
+    try {
+      setCoreIdeasStatus("Generating core ideas via /jid/create_core_ideas…");
+
+      const payload = {
+        text: currentThought.text,
+        // This ties core_ideas to this specific thought so /read/core_ideas can find them
+        source: `thought:${currentThought.id}`,
+        // you can fill this if you want per-user tracing
+        email: ""
+      };
+
+      const res = await fetch(`${JID_BASE}/create_core_ideas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const errBody = await res.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      // We don't strictly need the response body to show core ideas, since they are
+      // persisted; we re-read them through read.py so the UI always reflects the DB.
+      await loadCoreIdeasFromRead();
+      setCoreIdeasStatus("Core ideas generated and loaded.");
+    } catch (err) {
+      console.error(err);
+      setCoreIdeasStatus("Error generating core ideas: " + err.message);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document
+      .getElementById("btn-generate-core-ideas")
+      .addEventListener("click", generateCoreIdeas);
+
+    document
+      .getElementById("btn-refresh-core-ideas")
+      .addEventListener("click", loadCoreIdeasFromRead);
+
+    loadThought();
+  });
 </script>
 </body>
 </html>
-
