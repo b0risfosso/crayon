@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Thought Collections (Read Only)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+
+      /* Light theme (same palette as scribble.html) */
+      --bg: #ffffff;
+      --bg-elevated: #f7f7f9;
+      --bg-soft: #fafafa;
+      --border-subtle: #dddddd;
+
+      --accent: #6a4dff;
+      --accent-soft: rgba(106, 77, 255, 0.12);
+      --accent-strong: rgba(106, 77, 255, 0.28);
+
+      --text: #111111;
+      --text-soft: #666666;
+
+      --danger: #d93650;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #ffffff 0, #f5f5f7 55%, #e9e9ef 100%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .page {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      gap: 10px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: linear-gradient(120deg, rgba(106, 77, 255, 0.16), rgba(255, 255, 255, 0.8));
+      border: 1px solid var(--accent-strong);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+    }
+
+    header .subtitle {
+      color: var(--text-soft);
+    }
+
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      color: var(--text-soft);
+    }
+
+    .pill strong { color: var(--accent); }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1.3fr) minmax(0, 1.5fr);
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--bg-elevated);
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.07);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .panel-header h2 {
+      color: var(--text-soft);
+      margin: 0 0 4px 0;
+      font-size: 14px;
+    }
+
+    .chip {
+      border: 1px solid #ddd;
+      color: var(--text-soft);
+      background: #f4f4f7;
+      border-radius: 999px;
+      padding: 2px 6px;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-right: 6px;
+    }
+
+    .input, select {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid #cccccc;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .input:focus, select:focus {
+      outline: 1px solid var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-soft);
+    }
+
+    /* Collections list */
+    #collections-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-bottom: 3px;
+      color: var(--text-soft);
+      border: 1px solid transparent;
+    }
+
+    #collections-list li.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent-strong);
+    }
+
+    /* Thought list items */
+    .thought-item {
+      border-radius: 10px;
+      padding: 7px 9px;
+      border: 1px solid #e6e6e6;
+      margin-bottom: 5px;
+      cursor: pointer;
+      background: #ffffff;
+    }
+
+    .thought-item:hover {
+      border-color: var(--accent-soft);
+      background: linear-gradient(135deg, rgba(106, 77, 255, 0.05), #ffffff);
+    }
+
+    .thought-item.active {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(106, 77, 255, 0.18), #ffffff);
+    }
+
+    .thought-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .thought-item-preview {
+      color: var(--text-soft);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .thought-item-meta {
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .thought-item-actions {
+      margin-left: auto;
+      display: inline-flex;
+      gap: 4px;
+    }
+
+    .ghost-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      font-size: 10px;
+      padding: 2px 6px;
+      cursor: pointer;
+      background: rgba(0, 0, 0, 0.02);
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .ghost-btn.primary-soft {
+      border-color: var(--accent-soft);
+      background: rgba(106, 77, 255, 0.08);
+      color: var(--accent);
+    }
+
+    .chips {
+      margin-bottom: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    /* Detail panel (read only) */
+    .detail-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .detail-collection {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-soft);
+    }
+
+    .detail-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .detail-meta {
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .detail-body {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid #e3e3e8;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .status-pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      font-size: 11px;
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-pill::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #bbbbbb;
+    }
+
+    .status-pill.busy::before { background: var(--accent); }
+    .status-pill.success::before { background: #4caf50; }
+    .status-pill.error::before { background: var(--danger); }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1 style="margin:0;">Thought Collections (Read Only)</h1>
+      <div class="subtitle">Browse and open thoughts without editing.</div>
+    </div>
+    <div class="right-controls">
+      <div class="pill"><strong>Collection</strong>: <span id="header-current-collection">none selected</span></div>
+      <div class="pill" id="header-count-pill">0 thoughts</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: Collections -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Collections</h2>
+      </div>
+      <ul id="collections-list"></ul>
+    </section>
+
+    <!-- CENTER: Thought list (read-only) -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Thoughts</h2>
+      </div>
+
+      <div class="chips">
+        <span class="chip">
+          <strong>Filter</strong>:
+          <select id="filter-length" class="input" style="width:auto;padding:2px 6px;font-size:11px;">
+            <option value="all">All lengths</option>
+            <option value="short">Short (≤ 140 chars)</option>
+            <option value="medium">Medium (≤ 500 chars)</option>
+            <option value="long">Long excerpts</option>
+          </select>
+        </span>
+        <span class="chip">
+          <strong>Search</strong>:
+          <input
+            id="search-input"
+            class="input"
+            type="text"
+            placeholder="grep this collection..."
+            style="width:150px;padding:2px 6px;font-size:11px;"
+          />
+        </span>
+      </div>
+
+      <div class="thought-list-container" id="thought-list"></div>
+    </section>
+
+    <!-- RIGHT: Detail (pure read-only) -->
+    <section class="panel">
+      <div class="detail-header">
+        <div class="detail-collection" id="detail-collection-label">No collection selected</div>
+        <div class="detail-title" id="detail-title-label">Select a thought to view.</div>
+        <div class="detail-meta" id="detail-meta-row">
+          <span id="detail-id-pill">id: —</span>
+          <span id="detail-author-pill">author: —</span>
+          <span id="detail-context-pill">context: —</span>
+          <span id="detail-tags-pill">tags: —</span>
+          <span id="detail-created-pill">created: —</span>
+          <span id="detail-updated-pill">updated: —</span>
+        </div>
+      </div>
+      <div class="detail-body" id="detail-text"></div>
+      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div class="status-pill idle" id="status-pill">idle</div>
+        <a id="detail-edit-link" href="scribble.html" class="ghost-btn primary-soft" style="text-decoration:none;">
+          Edit in editor
+        </a>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  const API_BASE = "/scribble/api";
+
+  let collections = [];
+  let thoughts = [];
+  let currentCollection = null;
+  let currentThought = null;
+  let statusTimer = null;
+
+  function setStatus(text, mode = "idle") {
+    const pill = document.getElementById("status-pill");
+    pill.textContent = text;
+    pill.className = "status-pill " + mode;
+    if (statusTimer) {
+      clearTimeout(statusTimer);
+      statusTimer = null;
+    }
+    if (mode !== "error" && mode !== "idle") {
+      statusTimer = setTimeout(() => {
+        pill.textContent = "idle";
+        pill.className = "status-pill idle";
+      }, 2000);
+    }
+  }
+
+  function lengthBucket(text) {
+    const len = (text || "").length;
+    if (len <= 140) return "short";
+    if (len <= 500) return "medium";
+    return "long";
+  }
+
+  function updateHeaderCounts() {
+    document.getElementById("header-current-collection").textContent =
+      currentCollection || "none selected";
+    document.getElementById("header-count-pill").textContent =
+      (thoughts.length || 0) + " thoughts";
+    document.getElementById("detail-collection-label").textContent =
+      currentCollection ? "Collection: " + currentCollection : "No collection selected";
+  }
+
+  // --- Collections ---
+  async function loadCollections() {
+    try {
+      const res = await fetch(`${API_BASE}/thoughts/collections`);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      collections = (data || []).map(row => ({
+        name: row.collection,
+        count: row.count
+      }));
+      renderCollections();
+    } catch (err) {
+      console.error("Failed to load collections", err);
+      setStatus("Error loading collections", "error");
+    }
+  }
+
+  function renderCollections() {
+    const ul = document.getElementById("collections-list");
+    ul.innerHTML = "";
+    collections.forEach(c => {
+      const li = document.createElement("li");
+      li.dataset.collection = c.name;
+      if (c.name === currentCollection) li.classList.add("active");
+      li.innerHTML = `
+        <span>${c.name}</span>
+        <span class="count">${c.count ?? 0}</span>
+      `;
+      li.addEventListener("click", () => selectCollection(c.name));
+      ul.appendChild(li);
+    });
+  }
+
+  async function selectCollection(name) {
+    currentCollection = name;
+    currentThought = null;
+    await loadThoughts(name);
+    renderThoughtList();
+    updateHeaderCounts();
+    clearDetail();
+  }
+
+  // --- Thoughts list ---
+  async function loadThoughts(collectionName) {
+    if (!collectionName) return;
+    try {
+      setStatus("Loading thoughts…", "busy");
+      const res = await fetch(
+        `${API_BASE}/thoughts?collection=` + encodeURIComponent(collectionName)
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      thoughts = data || [];
+      setStatus("Loaded " + thoughts.length + " thoughts", "success");
+    } catch (err) {
+      console.error("Failed to load thoughts", err);
+      setStatus("Error loading thoughts", "error");
+    }
+  }
+
+  function renderThoughtList() {
+    const container = document.getElementById("thought-list");
+    container.innerHTML = "";
+
+    const filter = document.getElementById("filter-length").value;
+    const query = document.getElementById("search-input").value.trim().toLowerCase();
+
+    let filtered = thoughts.slice();
+
+    if (filter !== "all") {
+      filtered = filtered.filter(t => lengthBucket(t.text) === filter);
+    }
+    if (query) {
+      filtered = filtered.filter(
+        t =>
+          (t.title || "").toLowerCase().includes(query) ||
+          (t.text || "").toLowerCase().includes(query)
+      );
+    }
+
+    filtered.forEach(t => {
+      const div = document.createElement("div");
+      div.className = "thought-item";
+      if (currentThought && t.id === currentThought.id) div.classList.add("active");
+
+      const preview =
+        (t.text || "").length > 160
+          ? (t.text || "").slice(0, 160) + "…"
+          : (t.text || "");
+
+      const createdShort = t.created_at
+        ? new Date(t.created_at).toLocaleDateString()
+        : "—";
+
+      div.innerHTML = `
+        <div class="thought-item-title">${t.title || "(untitled thought)"}</div>
+        <div class="thought-item-preview">${(preview || "").replace(/\n/g, " ")}</div>
+        <div class="thought-item-meta">
+          <span>${createdShort}</span>
+          <span>${lengthBucket(t.text)} · ${t.collection}</span>
+          <div class="thought-item-actions">
+            <button type="button" class="ghost-btn primary-soft btn-open">Open</button>
+            <button type="button" class="ghost-btn btn-edit">Edit</button>
+          </div>
+        </div>
+      `;
+
+      // Default click: view in this panel
+      div.addEventListener("click", () => {
+        currentThought = t;
+        showDetail(t);
+        renderThoughtList();
+      });
+
+      const openBtn = div.querySelector(".btn-open");
+      openBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        // Open this view-only page again with the thought id in URL
+        const url = `scribble_read.html?id=${encodeURIComponent(t.id)}`;
+        window.open(url, "_blank");
+      });
+
+      const editBtn = div.querySelector(".btn-edit");
+      editBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        // Jump to editor with this thought id as query param
+        const url = `scribble.html?id=${encodeURIComponent(t.id)}`;
+        window.open(url, "_blank");
+      });
+
+      container.appendChild(div);
+    });
+
+    updateHeaderCounts();
+  }
+
+  // --- Detail (read-only) ---
+  function clearDetail() {
+    document.getElementById("detail-title-label").textContent = "Select a thought to view.";
+    document.getElementById("detail-text").textContent = "";
+    document.getElementById("detail-id-pill").textContent = "id: —";
+    document.getElementById("detail-author-pill").textContent = "author: —";
+    document.getElementById("detail-context-pill").textContent = "context: —";
+    document.getElementById("detail-tags-pill").textContent = "tags: —";
+    document.getElementById("detail-created-pill").textContent = "created: —";
+    document.getElementById("detail-updated-pill").textContent = "updated: —";
+    document.getElementById("detail-edit-link").href = "scribble.html";
+  }
+
+  function showDetail(t) {
+    document.getElementById("detail-collection-label").textContent =
+      t.collection ? "Collection: " + t.collection : "Collection: —";
+    document.getElementById("detail-title-label").textContent =
+      t.title || "(untitled thought)";
+    document.getElementById("detail-text").textContent = t.text || "";
+
+    document.getElementById("detail-id-pill").textContent = "id: " + (t.id ?? "—");
+    document.getElementById("detail-author-pill").textContent =
+      "author: " + (t.author || "—");
+    document.getElementById("detail-context-pill").textContent =
+      "context: " + (t.context || "—");
+    document.getElementById("detail-tags-pill").textContent =
+      "tags: " + (t.tags || "—");
+    document.getElementById("detail-created-pill").textContent =
+      "created: " + (t.created_at || "—");
+    document.getElementById("detail-updated-pill").textContent =
+      "updated: " + (t.updated_at || "—");
+
+    const editLink = `scribble.html?id=${encodeURIComponent(t.id)}`;
+    document.getElementById("detail-edit-link").href = editLink;
+  }
+
+  function getQueryParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+  }
+
+  async function loadThoughtById(id) {
+    try {
+      setStatus("Loading thought…", "busy");
+      const res = await fetch(`${API_BASE}/thoughts/` + encodeURIComponent(id));
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const t = await res.json();
+      if (!t || !t.id) {
+        setStatus("Thought not found", "error");
+        return null;
+      }
+      return t;
+    } catch (err) {
+      console.error("Failed to load thought by id", err);
+      setStatus("Error loading thought", "error");
+      return null;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadCollections();
+    updateHeaderCounts();
+
+    // Wire filters
+    document
+      .getElementById("filter-length")
+      .addEventListener("change", () => renderThoughtList());
+    document
+      .getElementById("search-input")
+      .addEventListener("input", () => renderThoughtList());
+
+    // If an id is provided in URL, load that thought and its collection
+    const idParam = getQueryParam("id");
+    if (idParam) {
+      const t = await loadThoughtById(idParam);
+      if (t) {
+        currentCollection = t.collection || null;
+        currentThought = t;
+        // Load all thoughts in that collection so list is populated
+        if (currentCollection) {
+          await loadThoughts(currentCollection);
+        }
+        renderCollections();
+        renderThoughtList();
+        showDetail(t);
+        updateHeaderCounts();
+        return;
+      }
+    }
+
+    // Fallback: no id, just show collections; user selects
+    renderCollections();
+  });
+</script>
+</body>
+</html>

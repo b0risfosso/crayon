@@ -90,6 +90,74 @@ client = OpenAI()
 init_picture_db()
 init_usage_db()
 
+# new q
+
+# ---- Core-Ideas → Visions → Worlds work queue (concurrency = 2) -------------
+_CORE_PIPEELINE_Q: "queue.Queue[_CorePipelineTask]" = queue.Queue()
+_CORE_PIPEELINE_WORKERS: list[threading.Thread] = []
+_CORE_PIPEELINE_WORKER_COUNT = 2  # fixed concurrency = 2
+
+
+class _CorePipelineTask:
+    __slots__ = ("task_id", "payload", "result", "error", "event")
+
+    def __init__(self, payload: dict):
+        self.task_id = str(uuid.uuid4())
+        self.payload = payload
+        self.result = None
+        self.error: Exception | None = None
+        self.event = threading.Event()
+
+
+def _core_pipeline_worker():
+    with app.app_context():
+        while True:
+            task = _CORE_PIPEELINE_Q.get()
+            state = None
+            try:
+                state = _get_task(task.task_id)
+                if state:
+                    state.status = "running"
+                    state.started_ts = time.time()
+
+                http_status, body = _core_ideas_visions_worlds_sync(task.payload)
+
+                body_plain = _to_plain(body)
+                task.result = body_plain
+
+                if state:
+                    state.status = "done"
+                    state.http_status = http_status
+                    state.result = body_plain
+                    state.finished_ts = time.time()
+            except Exception as e:
+                task.error = e
+                if state:
+                    state.status = "error"
+                    state.error = str(e)
+                    state.finished_ts = time.time()
+            finally:
+                task.event.set()
+                _CORE_PIPEELINE_Q.task_done()
+                _cleanup_tasks()
+
+
+def _start_core_pipeline_workers_once():
+    if _CORE_PIPEELINE_WORKERS:
+        return
+    for _ in range(_CORE_PIPEELINE_WORKER_COUNT):
+        t = threading.Thread(
+            target=_core_pipeline_worker,
+            name="core_pipeline_worker",
+            daemon=True,
+        )
+        t.start()
+        _CORE_PIPEELINE_WORKERS.append(t)
+
+
+_start_core_pipeline_workers_once()
+
+
 # ---- Create-Pictures work queue ---------------------------------------------
 _CREATE_PICTURES_Q: "queue.Queue[_CreatePicturesTask]" = queue.Queue()
 _CREATE_PICTURES_WORKERS = []
@@ -322,6 +390,70 @@ def _extract_title_from_picture_text(picture_text: str) -> str:
         if sep in raw:
             return raw.split(sep, 1)[0].strip()
     return (raw[:64] + ("…" if len(raw) > 64 else "")).strip()
+
+
+import uuid
+
+def _select_core_ideas_by_batch(*, source: str, email: str | None, batch_id: str) -> list[dict]:
+    """
+    Return core_ideas for this pipeline batch:
+    rows: [{ "id": int, "core_idea": str }]
+    """
+    like_pattern = f'%\"batch\":\"{batch_id}\"%'
+    conn = connect(PICTURE_DB)
+    try:
+        cur = conn.cursor()
+        if email is None:
+            cur.execute(
+                """
+                SELECT id, core_idea
+                FROM core_ideas
+                WHERE source = ?
+                  AND email IS NULL
+                  AND metadata LIKE ?
+                ORDER BY id
+                """,
+                (source, like_pattern),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, core_idea
+                FROM core_ideas
+                WHERE source = ?
+                  AND email = ?
+                  AND metadata LIKE ?
+                ORDER BY id
+                """,
+                (source, email, like_pattern),
+            )
+        return [{"id": r[0], "core_idea": r[1]} for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def _select_visions_by_batch(*, core_idea_id: int, batch_tag: str) -> list[dict]:
+    """
+    Return visions inserted for (core_idea_id, batch_tag):
+    rows: [{ "id": int, "title": str | None, "text": str }]
+    """
+    like_pattern = f'%\"batch\":\"{batch_tag}\"%'
+    conn = connect(PICTURE_DB)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, title, text
+            FROM visions
+            WHERE core_idea_id = ?
+              AND metadata LIKE ?
+            ORDER BY id
+            """,
+            (core_idea_id, like_pattern),
+        )
+        return [{"id": r[0], "title": r[1], "text": r[2]} for r in cur.fetchall()]
+    finally:
+        conn.close()
 
 # ------------------------------------------------------------------------------
 # LLM call
@@ -1108,6 +1240,244 @@ def _create_pictures_sync(payload: dict) -> tuple[int, dict]:
     except Exception as e:
         return {"error": f"Unhandled error: {e}"}, 500
 
+
+def _core_ideas_visions_worlds_sync(payload: dict) -> tuple[int, dict]:
+    """
+    Synchronous pipeline:
+
+    INPUT payload:
+    {
+      "text": "raw input for core ideas",
+      "source": "money",
+      "email": "optional@user",
+      "model": "optional-model"   # defaults to DEFAULT_MODEL
+    }
+
+    Returns (http_status, body_dict).
+    """
+    text_in = (payload.get("text") or "").strip()
+    source = (payload.get("source") or "").strip()
+    email = payload.get("email") or None
+    model = payload.get("model") or DEFAULT_MODEL
+
+    if not text_in:
+        return 400, {"error": "Missing 'text'"}
+    if not source:
+        return 400, {"error": "Missing 'source' (stored in core_ideas.source)"}
+
+    # Unique batch tag for this entire pipeline run
+    core_batch_id = uuid.uuid4().hex
+
+    # --- 1) TEXT → CORE IDEAS (LLM) ---
+    try:
+        core_result = run_text_to_core_ideas_llm(
+            text_in,
+            email=email,
+            model=model,
+            endpoint_name="/jid/create_core_ideas_visions_worlds/core_ideas",
+        )
+    except Exception as e:
+        return 500, {"error": f"core_ideas LLM failed: {e}"}
+
+    # LLM gives you a list of idea strings
+    ideas: list[str] = list(core_result.ideas or [])
+    if not ideas:
+        return 500, {"error": "LLM returned no core ideas"}
+
+    # Persist them with a batch tag in metadata so we can find their IDs
+    core_meta = {
+        "origin": "jid",
+        "pipeline": "create_core_ideas_visions_worlds",
+        "batch": core_batch_id,
+    }
+    try:
+        _ = persist_core_ideas_to_db(
+            ideas,
+            source=source,
+            email=email,
+            metadata=core_meta,
+            payload_origin="jid",
+        )
+    except Exception as e:
+        return 500, {"error": f"persist_core_ideas_to_db failed: {e}"}
+
+    # Recover IDs of just-inserted core_ideas via the batch metadata
+    core_rows = _select_core_ideas_by_batch(source=source, email=email, batch_id=core_batch_id)
+    if len(core_rows) != len(ideas):
+        print(
+            f"[WARN] core_ideas batch mismatch: LLM gave {len(ideas)} ideas, "
+            f"DB returned {len(core_rows)} rows for batch={core_batch_id}"
+        )
+
+    # Pair each in-memory idea with its DB row (assume insertion order)
+    core_pairs = []
+    for i, row in enumerate(core_rows):
+        idea_text = ideas[i] if i < len(ideas) else row["core_idea"]
+        core_pairs.append((row["id"], idea_text))
+
+    # --- 2) CORE IDEAS → VISIONS (LLM) ---
+    response_core_ideas: list[dict] = []
+    total_visions = 0
+    total_world_contexts = 0
+
+    for core_idea_id, core_text in core_pairs:
+        # LLM: generate visions from this core idea text
+        try:
+            v_result = run_core_idea_visions_llm(
+                core_text,
+                email=email,
+                model=model,
+                endpoint_name="/jid/create_core_ideas_visions_worlds/visions",
+            )
+        except Exception as e:
+            return 500, {"error": f"visions LLM failed for core_idea_id {core_idea_id}: {e}"}
+
+        visions_struct = list(v_result.visions or [])
+        if not visions_struct:
+            response_core_ideas.append({
+                "id": core_idea_id,
+                "core_idea": core_text,
+                "visions_inserted": 0,
+                "visions": [],
+            })
+            continue
+
+        # Convert to dicts and tag each with a per-core-idea batch
+        batch_tag = f"{core_batch_id}:{core_idea_id}"
+        vision_items: list[dict] = []
+        for v in visions_struct:
+            d = v.dict()
+            # batch tag lives inside the structured blob that goes into metadata
+            d["batch"] = batch_tag
+            vision_items.append(d)
+
+        # Persist visions for this core idea (this will build the big text block + metadata)
+        try:
+            stats = persist_visions_for_core_idea(
+                core_idea_id,
+                vision_items,
+                email=email,
+                origin="jid",
+            )
+        except Exception as e:
+            return 500, {"error": f"persist_visions_for_core_idea failed for core_idea_id {core_idea_id}: {e}"}
+
+        inserted = int(stats.get("inserted", 0))
+        total_visions += inserted
+
+        # Recover the DB rows (with IDs) for these visions using the batch tag
+        v_rows = _select_visions_by_batch(core_idea_id=core_idea_id, batch_tag=batch_tag)
+        if len(v_rows) != len(vision_items):
+            print(
+                f"[WARN] visions batch mismatch for core_idea_id {core_idea_id}: "
+                f"LLM produced {len(vision_items)}, DB gave {len(v_rows)}"
+            )
+
+        # --- 3) VISIONS → WORLD CONTEXTS (LLM) ---
+        vision_outputs: list[dict] = []
+        for v_row, v_item in zip(v_rows, vision_items):
+            vid = v_row["id"]
+
+            vision_text = (v_item.get("vision") or "").strip()
+            realization_text = (v_item.get("realization") or "").strip() or None
+
+            if not vision_text:
+                print(f"[WARN] Empty vision_text for vision_id {vid}, skipping world context.")
+                continue
+
+            world_context: str | None = None
+            try:
+                wc_resp, prompt_text = run_world_context_llm(
+                    core_text,
+                    vision_text,
+                    realization_text,
+                    email=email,
+                    model=model,
+                    endpoint_name="/jid/create_core_ideas_visions_worlds/world_context",
+                )
+                world_context = wc_resp.world_context
+                persist_world_context_output(
+                    vid,
+                    world_context,
+                    email=email,
+                    model=model,
+                    prompt_text=prompt_text,
+                )
+                total_world_contexts += 1
+            except Exception as e:
+                print(f"[WARN] world_context LLM failed for vision_id {vid}: {e}")
+
+            vision_outputs.append({
+                "id": vid,
+                "title": v_row["title"],
+                "text": v_row["text"],           # DB text block (Vision + Realization)
+                "world_context": world_context,  # may be None if it failed
+            })
+
+        response_core_ideas.append({
+            "id": core_idea_id,
+            "core_idea": core_text,
+            "visions_inserted": inserted,
+            "visions": vision_outputs,
+        })
+
+    body = {
+        "text": text_in,
+        "source": source,
+        "core_ideas": response_core_ideas,
+        "stats": {
+            "core_ideas_created": len(response_core_ideas),
+            "visions_total": total_visions,
+            "world_contexts_total": total_world_contexts,
+        },
+    }
+    return 200, body
+
+def _core_pipeline_worker():
+    with app.app_context():
+        while True:
+            task = _CORE_PIPEELINE_Q.get()
+            state = None
+            try:
+                state = _get_task(task.task_id)
+                if state:
+                    state.status = "running"
+                    state.started_ts = time.time()
+
+                http_status, body = _core_ideas_visions_worlds_sync(task.payload)
+
+                body_plain = _to_plain(body)
+                task.result = body_plain
+
+                if state:
+                    state.status = "done"
+                    state.http_status = http_status
+                    state.result = body_plain
+                    state.finished_ts = time.time()
+            except Exception as e:
+                task.error = e
+                if state:
+                    state.status = "error"
+                    state.error = str(e)
+                    state.finished_ts = time.time()
+            finally:
+                task.event.set()
+                _CORE_PIPEELINE_Q.task_done()
+                _cleanup_tasks()
+
+
+
+@app.route("/jid/create_core_ideas_visions_worlds", methods=["POST"])
+def jid_create_core_ideas_visions_worlds_submit():
+    payload = request.get_json(force=True, silent=False) or {}
+
+    state = _register_task(payload)
+
+    qtask = _CorePipelineTask(payload=payload)
+    qtask.task_id = state.task_id
+    _CORE_PIPEELINE_Q.put(qtask)
+
+    return jsonify({"task_id": state.task_id}), 202
 
 
 @app.route("/jid/create_pictures", methods=["POST"])

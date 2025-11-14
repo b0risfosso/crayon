@@ -217,6 +217,27 @@
   
     .status-pill.idle::before { background: #bbbbbb; }
     .status-pill.error::before { background: var(--danger); }
+
+    .thought-item-meta {
+        font-size: 11px;
+        color: var(--text-soft);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        }
+
+        .thought-item-actions {
+        display: inline-flex;
+        gap: 4px;
+        }
+
+        .ghost-btn.tiny {
+        font-size: 10px;
+        padding: 2px 6px;
+        box-shadow: none;
+        }
+
   
   </style>
   
@@ -462,49 +483,71 @@
     let filtered = thoughts.slice();
 
     if (filter !== "all") {
-      filtered = filtered.filter(t => lengthBucket(t.text) === filter);
+        filtered = filtered.filter(t => lengthBucket(t.text) === filter);
     }
     if (query) {
-      filtered = filtered.filter(
+        filtered = filtered.filter(
         t =>
-          (t.title || "").toLowerCase().includes(query) ||
-          (t.text || "").toLowerCase().includes(query)
-      );
+            (t.title || "").toLowerCase().includes(query) ||
+            (t.text || "").toLowerCase().includes(query)
+        );
     }
 
     filtered.forEach(t => {
-      const div = document.createElement("div");
-      div.className = "thought-item";
-      if (currentThought && t.id === currentThought.id) div.classList.add("active");
+        const div = document.createElement("div");
+        div.className = "thought-item";
+        if (currentThought && t.id === currentThought.id) div.classList.add("active");
 
-      const preview =
+        const preview =
         (t.text || "").length > 160
-          ? (t.text || "").slice(0, 160) + "…"
-          : (t.text || "");
+            ? (t.text || "").slice(0, 160) + "…"
+            : (t.text || "");
 
-      const createdShort = t.created_at
+        const createdShort = t.created_at
         ? new Date(t.created_at).toLocaleDateString()
         : "—";
 
-      div.innerHTML = `
+        div.innerHTML = `
         <div class="thought-item-title">${t.title || "(untitled thought)"}</div>
-        <div class="thought-item-preview">${preview.replace(/\n/g, " ")}</div>
+        <div class="thought-item-preview">${(preview || "").replace(/\n/g, " ")}</div>
         <div class="thought-item-meta">
-          <span>${createdShort}</span>
-          <span>${lengthBucket(t.text)} · ${t.collection}</span>
+            <span>${createdShort}</span>
+            <span>${lengthBucket(t.text)} · ${t.collection}</span>
+            <div class="thought-item-actions">
+            <button type="button" class="ghost-btn tiny primary-soft btn-open">Open</button>
+            <button type="button" class="ghost-btn tiny btn-edit">Edit</button>
+            </div>
         </div>
-      `;
-      div.addEventListener("click", () => {
+        `;
+
+        // Default: clicking the card edits in the right-hand panel
+        div.addEventListener("click", () => {
         currentThought = t;
         fillDetailForm(t);
         renderThoughtList(); // re-apply active class
-      });
+        });
 
-      container.appendChild(div);
+        const openBtn = div.querySelector(".btn-open");
+        openBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const url = `thought.html?id=${encodeURIComponent(t.id)}`;
+        window.open(url, "_blank");
+        });
+
+        const editBtn = div.querySelector(".btn-edit");
+        editBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        currentThought = t;
+        fillDetailForm(t);
+        renderThoughtList();
+        });
+
+        container.appendChild(div);
     });
 
     updateHeaderCounts();
   }
+
 
   async function loadThoughts(collectionName) {
     if (!collectionName) return;
