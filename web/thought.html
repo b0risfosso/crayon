@@ -251,6 +251,33 @@
     padding: 6px 10px;
   }
 
+
+  .core-idea-item.editing .core-idea-text {
+    display: none;
+  }
+
+  .core-idea-edit-input {
+    width: 100%;
+    margin-top: 4px;
+    font-size: 13px;
+    padding: 4px 6px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    resize: vertical;
+  }
+
+  .core-idea-edit-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .core-idea-edit-actions button {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+
 </style>
 </head>
 
@@ -389,6 +416,173 @@
       setCoreIdeasStatus("Error adding core idea: " + err.message);
     }
   }
+
+  async function apiUpdateCoreIdea(coreIdeaId, newText) {
+    const payload = { core_idea: newText };
+
+    const res = await fetch(
+      `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      let msg = "HTTP " + res.status;
+      try {
+        const errBody = await res.json();
+        if (errBody && errBody.error) msg = errBody.error;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+
+    return res.json().catch(() => ({}));
+  }
+
+  async function apiDeleteCoreIdea(coreIdeaId) {
+    const res = await fetch(
+      `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (!res.ok) {
+      let msg = "HTTP " + res.status;
+      try {
+        const errBody = await res.json();
+        if (errBody && errBody.error) msg = errBody.error;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+
+    return res.json().catch(() => ({}));
+  }
+
+  function enterEditModeForCoreIdea(li, item) {
+    if (li.classList.contains("editing")) return;
+    li.classList.add("editing");
+
+    const textDiv = li.querySelector(".core-idea-text");
+    const actionsDiv = li.querySelector(".core-idea-actions");
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "core-idea-edit-input";
+    textarea.value = item.core_idea || "";
+    textarea.rows = Math.min(5, Math.max(2, (textarea.value.split("\n").length || 1)));
+
+    // Insert textarea after the text div
+    textDiv.insertAdjacentElement("afterend", textarea);
+
+    // Hide original action buttons while editing
+    const originalButtons = Array.from(actionsDiv.children);
+    originalButtons.forEach((btn) => {
+      btn.dataset._origDisplay = btn.style.display || "";
+      btn.style.display = "none";
+    });
+
+    const editActions = document.createElement("div");
+    editActions.className = "core-idea-edit-actions";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.textContent = "Save";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+
+    editActions.appendChild(saveBtn);
+    editActions.appendChild(cancelBtn);
+    actionsDiv.appendChild(editActions);
+
+    function exitEditMode() {
+      li.classList.remove("editing");
+      textarea.remove();
+      editActions.remove();
+      originalButtons.forEach((btn) => {
+        btn.style.display = btn.dataset._origDisplay || "";
+        delete btn.dataset._origDisplay;
+      });
+    }
+
+    saveBtn.addEventListener("click", async () => {
+      const newText = (textarea.value || "").trim();
+      if (!newText) {
+        alert("Core idea cannot be empty.");
+        return;
+      }
+
+      try {
+        setCoreIdeasStatus("Updating core idea…");
+        const updated = await apiUpdateCoreIdea(item.id, newText);
+        // Update local representation + DOM
+        item.core_idea = updated.core_idea || newText;
+        textDiv.textContent = item.core_idea;
+        // Also update currentCoreIdeas array
+        currentCoreIdeas = currentCoreIdeas.map((ci) =>
+          ci.id === item.id ? { ...ci, core_idea: item.core_idea } : ci
+        );
+        setCoreIdeasStatus("Core idea updated.");
+        exitEditMode();
+      } catch (err) {
+        console.error(err);
+        setCoreIdeasStatus("Error updating core idea: " + err.message);
+      }
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      exitEditMode();
+      setCoreIdeasStatus("");
+    });
+
+    textarea.focus();
+    textarea.select();
+  }
+
+  async function deleteCoreIdeaFromUI(coreIdeaId) {
+    const li = document.querySelector(
+      `.core-ideas-list li.core-idea-item[data-core-idea-id="${coreIdeaId}"]`
+    );
+    if (!li) {
+      // still attempt delete in case DOM and state drifted
+      if (!confirm("Delete this core idea from the database?")) return;
+    } else {
+      const text =
+        li.querySelector(".core-idea-text")?.textContent?.trim() || "this core idea";
+      if (!confirm(`Delete "${text}"?\n\nThis cannot be undone.`)) {
+        return;
+      }
+    }
+
+    try {
+      setCoreIdeasStatus("Deleting core idea…");
+      const result = await apiDeleteCoreIdea(coreIdeaId);
+      if (!result.deleted) {
+        throw new Error(result.error || "Delete failed");
+      }
+
+      // Remove from DOM
+      if (li && li.parentElement) {
+        li.parentElement.removeChild(li);
+      }
+
+      // Update local array
+      currentCoreIdeas = currentCoreIdeas.filter((ci) => ci.id !== coreIdeaId);
+
+      setCoreIdeasStatus(
+        currentCoreIdeas.length
+          ? `Loaded ${currentCoreIdeas.length} core idea(s).`
+          : "No core ideas yet."
+      );
+    } catch (err) {
+      console.error(err);
+      setCoreIdeasStatus("Error deleting core idea: " + err.message);
+    }
+  }
+
 
 
   async function loadThought() {
@@ -662,19 +856,15 @@
 
       const metaDiv = document.createElement("div");
       metaDiv.className = "core-idea-meta";
-      metaDiv.textContent = [
-        item.id != null ? `id: ${item.id}` : "",
-        item.created_at || ""
-      ].filter(Boolean).join(" · ");
+      metaDiv.textContent = `source=${item.source || "(unknown)"}
+        • created=${item.created_at || "?"}`;
 
-      // visions container (hidden by default)
       const visionsContainer = document.createElement("div");
       visionsContainer.className = "visions-container";
       visionsContainer.style.display = "none";
 
       const visionsStatus = document.createElement("div");
       visionsStatus.className = "visions-status";
-      visionsStatus.textContent = "";
 
       const visionsList = document.createElement("ul");
       visionsList.className = "visions-list";
@@ -682,7 +872,7 @@
       visionsContainer.appendChild(visionsStatus);
       visionsContainer.appendChild(visionsList);
 
-      // actions on the right: toggle + per-core "Gen visions"
+      // actions on the right: toggle + per-core "Gen visions" + Edit/Delete
       const actionsDiv = document.createElement("div");
       actionsDiv.className = "core-idea-actions";
 
@@ -708,21 +898,43 @@
         await queueVisionForSingleCoreIdea(item.id);
       });
 
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => {
+        enterEditModeForCoreIdea(li, item);
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", () => {
+        deleteCoreIdeaFromUI(item.id);
+      });
+
       actionsDiv.appendChild(toggleBtn);
       actionsDiv.appendChild(genVisionsBtn);
+      actionsDiv.appendChild(editBtn);
+      actionsDiv.appendChild(deleteBtn);
 
-      const headerRow = document.createElement("div");
-      headerRow.className = "core-idea-header-row";
-      headerRow.appendChild(textDiv);
-      headerRow.appendChild(actionsDiv);
+      const row = document.createElement("div");
+      row.className = "core-idea-row";
 
-      li.appendChild(headerRow);
-      li.appendChild(metaDiv);
-      li.appendChild(visionsContainer);
+      const left = document.createElement("div");
+      left.className = "core-idea-left";
 
+      left.appendChild(textDiv);
+      left.appendChild(metaDiv);
+      left.appendChild(visionsContainer);
+
+      row.appendChild(left);
+      row.appendChild(actionsDiv);
+
+      li.appendChild(row);
       list.appendChild(li);
     });
   }
+
 
   async function loadCoreIdeasFromRead() {
     if (!currentId) return;

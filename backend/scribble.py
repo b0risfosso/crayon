@@ -668,6 +668,142 @@ def create_core_idea_for_thought(thought_id: int):
         conn.close()
 
 
+# ------------------------------------------------------------------------------
+# PUT /api/core_ideas/<core_id>
+# Edit a core idea (typically text, optionally email/origin/metadata).
+# ------------------------------------------------------------------------------
+
+@app.put("/api/core_ideas/<int:core_id>")
+def update_core_idea(core_id: int):
+    """
+    Update a core idea.
+
+    JSON payload:
+      {
+        "core_idea": "new text",            # required
+        "email": "optional@email",          # optional
+        "origin": "manual|jid|crayon",      # optional
+        "metadata": {...} or "raw string"   # optional
+      }
+
+    Response:
+      {
+        "id": ...,
+        "source": "thought:<id>" | "...",
+        "core_idea": "...",
+        "email": "...",
+        "origin": "...",
+        "metadata": {...}|"...",
+        "created_at": "...",
+        "updated_at": "..."
+      }
+    """
+    try:
+        payload = request.get_json(force=True, silent=False) or {}
+    except Exception:
+        return jsonify({"error": "invalid JSON"}), 400
+
+    core_text = (payload.get("core_idea") or "").strip()
+    if not core_text:
+        return jsonify({"error": "core_idea is required"}), 400
+
+    email = payload.get("email", None)
+    origin = payload.get("origin", None)
+    metadata = payload.get("metadata", None)
+
+    # Normalize optional fields
+    email_val = (email or "").strip() or None if email is not None else None
+    origin_val = (origin or "").strip() or None if origin is not None else None
+
+    if isinstance(metadata, (dict, list)):
+        metadata_str = json.dumps(metadata, separators=(",", ":"))
+    elif metadata is None:
+        metadata_str = None
+    else:
+        metadata_str = metadata if isinstance(metadata, str) else str(metadata)
+
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        # Build dynamic UPDATE set clause
+        fields = ["core_idea = ?"]
+        params = [core_text]
+
+        if email is not None:
+            fields.append("email = ?")
+            params.append(email_val)
+
+        if origin is not None:
+            fields.append("origin = ?")
+            params.append(origin_val)
+
+        if metadata is not None:
+            fields.append("metadata = ?")
+            params.append(metadata_str)
+
+        params.append(core_id)
+
+        sql = f"UPDATE core_ideas SET {', '.join(fields)} WHERE id = ?"
+        cur.execute(sql, params)
+
+        if cur.rowcount == 0:
+            return jsonify({"error": "Core idea not found"}), 404
+
+        # Trigger trg_core_ideas_update_ts will update updated_at
+        cur.execute(
+            """
+            SELECT id, source, core_idea, email, origin, metadata,
+                   created_at, updated_at
+            FROM core_ideas
+            WHERE id = ?
+            """,
+            (core_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Core idea not found after update"}), 404
+
+        d = _row_to_dict(row)
+        d["metadata"] = _parse_metadata_field(d.get("metadata"))
+        return jsonify(d), 200
+
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
+# ------------------------------------------------------------------------------
+# DELETE /api/core_ideas/<core_id>
+# Delete a core idea.
+# ------------------------------------------------------------------------------
+
+@app.delete("/api/core_ideas/<int:core_id>")
+def delete_core_idea(core_id: int):
+    """
+    Delete a core idea.
+
+    Notes:
+      - thoughts.core_idea_id has
+        FOREIGN KEY (core_idea_id) REFERENCES core_ideas(id) ON DELETE SET NULL
+        so deleting a core idea will nullify any dependent thoughts' core_idea_id.
+    """
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM core_ideas WHERE id = ?", (core_id,))
+        if cur.rowcount == 0:
+            return jsonify({"deleted": False, "error": "Core idea not found"}), 404
+        return jsonify({"deleted": True}), 200
+    except Exception as e:
+        return jsonify({"deleted": False, "error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
 
 # Optional: local dev
 if __name__ == "__main__":
