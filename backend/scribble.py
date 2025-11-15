@@ -567,6 +567,98 @@ def random_thought():
         conn.close()
 
 
+# ------------------------------------------------------------------------------
+# POST /api/thoughts/<thought_id>/core_ideas
+# Attach a manual core idea to a specific thought.
+# ------------------------------------------------------------------------------
+
+@app.post("/api/thoughts/<int:thought_id>/core_ideas")
+def create_core_idea_for_thought(thought_id: int):
+    """
+    Attach a manual core idea to an existing thought.
+
+    JSON payload:
+      {
+        "core_idea": "short distilled sentence",   # required
+        "email": "me@example.com",                 # optional
+        "origin": "manual",                        # optional (defaults to 'manual')
+        "metadata": {...}                          # optional, JSON-serializable
+      }
+
+    Response (201):
+      {
+        "id": ...,
+        "source": "thought:<thought_id>",
+        "core_idea": "...",
+        "email": "...",
+        "origin": "manual",
+        "metadata": {...} | "raw" | null,
+        "created_at": "...",
+        "updated_at": "..."
+      }
+    """
+    payload = request.get_json(silent=True) or {}
+
+    core_text = (payload.get("core_idea") or "").strip()
+    if not core_text:
+        return jsonify({"error": "core_idea is required"}), 400
+
+    email = (payload.get("email") or "").strip() or None
+    origin = (payload.get("origin") or "").strip() or "manual"
+    metadata = payload.get("metadata")
+
+    if isinstance(metadata, (dict, list)):
+        metadata_str = json.dumps(metadata, separators=(",", ":"))
+    else:
+        metadata_str = metadata if metadata is None or isinstance(metadata, str) else str(metadata)
+
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        # Ensure the thought exists so we don't attach to nothing.
+        cur.execute("SELECT 1 FROM thoughts WHERE id = ?", (thought_id,))
+        if cur.fetchone() is None:
+            return jsonify({"error": f"Thought id {thought_id} not found"}), 404
+
+        source = f"thought:{thought_id}"
+
+        # created_at/updated_at will be filled by triggers if omitted
+        cur.execute(
+            """
+            INSERT INTO core_ideas (source, core_idea, email, origin, metadata)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (source, core_text, email, origin, metadata_str),
+        )
+        new_id = cur.lastrowid
+
+        cur.execute(
+            """
+            SELECT id, source, core_idea, email, origin, metadata,
+                   created_at, updated_at
+            FROM core_ideas
+            WHERE id = ?
+            """,
+            (new_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Failed to re-read newly created core_idea"}), 500
+
+        d = _row_to_dict(row)
+        d["metadata"] = _parse_metadata_field(d.get("metadata"))
+        return jsonify(d), 201
+
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
+
 # Optional: local dev
 if __name__ == "__main__":
     port = int(os.getenv("SCRIBBLE_PORT", "8083"))

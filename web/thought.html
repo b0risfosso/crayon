@@ -227,6 +227,30 @@
     white-space: pre-wrap;
     margin-top: 2px;
   }
+
+  .manual-core-idea {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .manual-core-idea textarea {
+    flex: 1;
+    min-height: 42px;
+    font-size: 13px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    resize: vertical;
+  }
+
+  .manual-core-idea button {
+    align-self: stretch;
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
 </style>
 </head>
 
@@ -255,9 +279,22 @@
         Generate visions
       </button>
     </div>
+  
+    <!-- NEW: manual core idea input -->
+    <div class="manual-core-idea">
+      <textarea
+        id="manual-core-idea-input"
+        placeholder="Type a core idea you want to attach to this thought…"
+      ></textarea>
+      <button type="button" id="btn-add-core-idea">
+        Add
+      </button>
+    </div>
+  
     <div class="status" id="core-ideas-status"></div>
     <ul class="core-ideas-list" id="core-ideas-list"></ul>
   </div>
+  
 </div>
 
 <script>
@@ -296,6 +333,63 @@
     const visionsBtn = document.getElementById("btn-generate-visions-for-core-ideas");
     if (visionsBtn) visionsBtn.disabled = disabled;
   }
+
+  async function addManualCoreIdea() {
+    if (!currentId) {
+      setCoreIdeasStatus("No thought loaded.");
+      return;
+    }
+
+    const input = document.getElementById("manual-core-idea-input");
+    const coreText = (input.value || "").trim();
+    if (!coreText) {
+      alert("Please enter a core idea first.");
+      return;
+    }
+
+    try {
+      setCoreIdeasStatus("Saving core idea…");
+
+      const payload = {
+        core_idea: coreText,
+        // optional email if you want per-user scoping; empty string is fine
+        email: ""
+      };
+
+      const res = await fetch(
+        `${API_BASE}/thoughts/${encodeURIComponent(currentId)}/core_ideas`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const errBody = await res.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const saved = await res.json().catch(() => ({}));
+
+      input.value = "";
+      // reload the list so the new core idea appears with proper metadata
+      await loadCoreIdeasFromRead();
+      setCoreIdeasStatus(
+        saved && saved.id
+          ? `Core idea added (id=${saved.id}).`
+          : "Core idea added."
+      );
+    } catch (err) {
+      console.error(err);
+      setCoreIdeasStatus("Error adding core idea: " + err.message);
+    }
+  }
+
 
   async function loadThought() {
     const id = getQueryParam("id");
@@ -872,8 +966,14 @@
       .getElementById("btn-generate-visions-for-core-ideas")
       .addEventListener("click", queueVisionsForAllCoreIdeas);
 
+    // NEW: manual core idea submit
+    document
+      .getElementById("btn-add-core-idea")
+      .addEventListener("click", addManualCoreIdea);
+
     loadThought();
   });
+
 </script>
 </body>
 </html>
