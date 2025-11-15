@@ -445,3 +445,84 @@ def read_visions_by_core_idea():
         return jsonify({"error": f"DB error: {e}"}), 500
     finally:
         conn.close()
+
+
+@app.get("/read/world_contexts_by_vision")
+def read_world_contexts_by_vision():
+    """
+    Return world-context prompt outputs for a given vision.
+
+    Query params:
+      - vision_id: int (required)
+      - email: exact match filter (optional)
+      - include_body: 0|1 (default 1) -> include the world-context text
+      - limit: int (default 50, max 500)
+
+    Response:
+      {
+        "items": [
+          {
+            "id": int,
+            "vision_id": int,
+            "collection": "world_context",
+            "prompt_key": "world_context_v1",
+            "created_at": str,
+            "model": str | null,
+            "email": str | null,
+            "text": str | null   # world context text if include_body=1
+          },
+          ...
+        ],
+        "count": <number of items>
+      }
+    """
+    vis_id = request.args.get("vision_id", type=int)
+    if not vis_id:
+        return jsonify({"error": "vision_id is required"}), 400
+
+    email = (request.args.get("email") or "").strip().lower()
+    include_body = bool(int(request.args.get("include_body", "1")))
+    try:
+        limit = int(request.args.get("limit", "50"))
+    except Exception:
+        limit = 50
+    limit = max(1, min(500, limit))
+
+    db_path = _safe_get_picture_db_path()
+
+    # Ensure prompt_outputs table exists (no-op if already created)
+    try:
+        _ensure_prompt_outputs_table(db_path)
+    except Exception:
+        # If the table isn't there for some reason, just return empty
+        return jsonify({"items": [], "count": 0})
+
+    # Build SELECT columns; expose output_text as "text" for convenience.
+    cols = "id, vision_id, collection, prompt_key, created_at, model, email"
+    if include_body:
+        cols += ", output_text AS text"
+
+    sql = f"""
+        SELECT {cols}
+        FROM prompt_outputs
+        WHERE vision_id = ?
+          AND collection = ?
+    """
+    params = [vis_id, "world_context"]
+
+    if email:
+        sql += " AND LOWER(IFNULL(email,'')) = ?"
+        params.append(email)
+
+    sql += " ORDER BY datetime(created_at) DESC, id DESC LIMIT ?"
+    params.append(limit)
+
+    items = []
+    with _maybe_connect(db_path) as conn:
+        cur = conn.execute(sql, tuple(params))
+        colnames = [d[0] for d in cur.description]
+        for row in cur.fetchall():
+            rec = {k: v for k, v in zip(colnames, row)}
+            items.append(rec)
+
+    return jsonify({"items": items, "count": len(items)})

@@ -164,7 +164,11 @@
   }
 
   .vision-item {
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fafafa;
   }
 
   .vision-item-title {
@@ -174,6 +178,52 @@
 
   .vision-item-text {
     font-size: 13px;
+    white-space: pre-wrap;
+    margin-top: 2px;
+  }
+
+  /* NEW: actions + world-context styles for visions */
+  .vision-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .vision-actions button {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .world-container {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .world-status {
+    font-size: 11px;
+    color: var(--text-soft);
+    margin-bottom: 4px;
+  }
+
+  .world-list {
+    list-style: none;
+    margin: 0;
+    padding-left: 0;
+  }
+
+  .world-item {
+    margin-bottom: 6px;
+  }
+
+  .world-item-title {
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .world-item-text {
+    font-size: 12px;
     white-space: pre-wrap;
     margin-top: 2px;
   }
@@ -200,7 +250,7 @@
       <button type="button" id="btn-refresh-core-ideas">
         Refresh
       </button>
-      <!-- NEW: generate visions for all loaded core ideas -->
+      <!-- generate visions for all loaded core ideas -->
       <button type="button" id="btn-generate-visions-for-core-ideas">
         Generate visions
       </button>
@@ -283,6 +333,109 @@
     }
   }
 
+  // --- World contexts loading per vision ----------------------------------
+
+  async function loadWorldContextsForVision(visionId, listEl, statusEl) {
+    if (!visionId) {
+      statusEl.textContent = "No vision_id.";
+      return;
+    }
+
+    statusEl.textContent = "Loading worlds…";
+    listEl.innerHTML = "";
+
+    try {
+      const url = `${READ_BASE}/world_contexts_by_vision?vision_id=${encodeURIComponent(
+        visionId
+      )}&limit=50`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        statusEl.textContent = `Error loading worlds (HTTP ${res.status}).`;
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      const items = data.items || [];
+
+      if (!items.length) {
+        statusEl.textContent = "No world contexts for this vision yet.";
+        return;
+      }
+
+      statusEl.textContent = `Loaded ${items.length} world context(s).`;
+
+      items.forEach(w => {
+        const li = document.createElement("li");
+        li.className = "world-item";
+
+        const titleDiv = document.createElement("div");
+        titleDiv.className = "world-item-title";
+        titleDiv.textContent = w.title || "(untitled world)";
+
+        const textDiv = document.createElement("div");
+        textDiv.className = "world-item-text";
+        const text = (w.text || "").trim();
+        textDiv.textContent = text || "(no text)";
+
+        li.appendChild(titleDiv);
+        li.appendChild(textDiv);
+        listEl.appendChild(li);
+      });
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Error loading worlds: " + err.message;
+    }
+  }
+
+  async function queueWorldContextForVision(visionId, statusEl) {
+    if (!visionId) {
+      if (statusEl) statusEl.textContent = "Cannot queue world: missing vision_id.";
+      return;
+    }
+
+    try {
+      if (statusEl) statusEl.textContent = "Queuing world-context job…";
+
+      const payload = {
+        vision_id: visionId,
+        email: "" // optional, fill for tracing if desired
+      };
+
+      const res = await fetch(`${JID_BASE}/generate_world_context_for_vision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const errBody = await res.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const body = await res.json().catch(() => ({}));
+      const taskId = body.task_id;
+      if (statusEl) {
+        if (taskId) {
+          statusEl.textContent =
+            `World-context job queued for vision_id=${visionId} (task_id=${taskId}).`;
+        } else {
+          statusEl.textContent =
+            `World-context job queued for vision_id=${visionId} (no task_id returned).`;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      if (statusEl) {
+        statusEl.textContent =
+          "Error queueing world-context job: " + err.message;
+      }
+    }
+  }
+
   // --- Visions loading per core idea --------------------------------------
 
   async function loadVisionsForCoreIdea(coreIdeaId, listEl, statusEl) {
@@ -295,7 +448,9 @@
     listEl.innerHTML = "";
 
     try {
-      const url = `${READ_BASE}/visions_by_core_idea?core_idea_id=${encodeURIComponent(coreIdeaId)}&limit=50`;
+      const url = `${READ_BASE}/visions_by_core_idea?core_idea_id=${encodeURIComponent(
+        coreIdeaId
+      )}&limit=50`;
       const res = await fetch(url);
       if (!res.ok) {
         statusEl.textContent = `Error loading visions (HTTP ${res.status}).`;
@@ -328,16 +483,64 @@
 
         let body = "";
         if (vision) {
-        body += "Vision:\n" + vision;
+          body += "Vision:\n" + vision;
         }
         if (realization) {
-        body += "\n\nRealization:\n" + realization;
+          body += "\n\nRealization:\n" + realization;
         }
 
         textDiv.textContent = body || "(no text)";
 
+        // Actions: generate world + toggle worlds
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "vision-actions";
+
+        const genWorldBtn = document.createElement("button");
+        genWorldBtn.type = "button";
+        genWorldBtn.textContent = "Generate world";
+
+        const toggleWorldsBtn = document.createElement("button");
+        toggleWorldsBtn.type = "button";
+        toggleWorldsBtn.textContent = "Show worlds";
+
+        // World container (hidden by default)
+        const worldContainer = document.createElement("div");
+        worldContainer.className = "world-container";
+        worldContainer.style.display = "none";
+
+        const worldStatus = document.createElement("div");
+        worldStatus.className = "world-status";
+        worldStatus.textContent = "";
+
+        const worldList = document.createElement("ul");
+        worldList.className = "world-list";
+
+        worldContainer.appendChild(worldStatus);
+        worldContainer.appendChild(worldList);
+
+        genWorldBtn.addEventListener("click", async () => {
+          await queueWorldContextForVision(v.id, worldStatus);
+        });
+
+        toggleWorldsBtn.addEventListener("click", async () => {
+          if (worldContainer.style.display === "none") {
+            worldContainer.style.display = "block";
+            toggleWorldsBtn.textContent = "Hide worlds";
+            await loadWorldContextsForVision(v.id, worldList, worldStatus);
+          } else {
+            worldContainer.style.display = "none";
+            toggleWorldsBtn.textContent = "Show worlds";
+          }
+        });
+
+        actionsDiv.appendChild(genWorldBtn);
+        actionsDiv.appendChild(toggleWorldsBtn);
+
         li.appendChild(titleDiv);
         li.appendChild(textDiv);
+        li.appendChild(actionsDiv);
+        li.appendChild(worldContainer);
+
         listEl.appendChild(li);
       });
     } catch (err) {
