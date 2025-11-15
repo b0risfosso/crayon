@@ -13,6 +13,7 @@ from db_shared import (
     PICTURE_DB,
     init_picture_db,
     _email_match_clause,   # reuse existing email semantics
+    _iso_now,
 )
 
 # ------------------------------------------------------------------------------
@@ -626,12 +627,21 @@ def create_core_idea_for_thought(thought_id: int):
         source = f"thought:{thought_id}"
 
         # created_at/updated_at will be filled by triggers if omitted
+        ts = _iso_now()
         cur.execute(
             """
-            INSERT INTO core_ideas (source, core_idea, email, origin, metadata)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO core_ideas (
+                source,
+                core_idea,
+                email,
+                origin,
+                metadata,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (source, core_text, email, origin, metadata_str),
+            (source, core_text, email, origin, metadata_str, ts, ts),
         )
         new_id = cur.lastrowid
 
