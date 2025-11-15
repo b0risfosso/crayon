@@ -609,8 +609,10 @@ _JOB_HANDLERS: dict[str, callable] = {
     "core_pipeline": _core_ideas_visions_worlds_sync,
     "create_pictures": _create_pictures_sync,
     "core_ideas": _create_core_ideas_sync,
-    "world_context_for_vision": _generate_world_context_for_vision_sync,  # NEW
+    "visions_from_core_idea": _generate_visions_from_core_idea_sync,  # <-- ADD THIS
+    "world_context_for_vision": _generate_world_context_for_vision_sync,
 }
+
 
 
 
