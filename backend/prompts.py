@@ -1356,3 +1356,368 @@ OUTPUT (STRICT JSON ONLY):
   "world_context": "one paragraph, 4–8 sentences, rich with tangible systems, materials, instrumentation, and modes of interaction."
 }}
 """
+
+# =====================
+# THINKING / CORE THOUGHT PIPELINE
+# =====================
+
+core_thought_architecture_builder_prompt = r"""
+
+You will receive a single thought, phrase, or seed concept.
+Your task is to expand it into a set of core thoughts that reveal the deepest conceptual architectures behind the idea.
+Output Requirements:
+Generate 12–20 core thoughts, each one a clean, standalone conceptual seed.
+Each core thought should open a new domain: physics, perception, psychology, architecture, embodiment, ecology, culture, metaphysics, engineering, information theory, etc.
+Avoid summarizing or categorizing—generate ideas.
+Use no ornament, no fluff, and no rhetorical “not…but” constructions.
+Prioritize clarity, depth, and structural insight.
+Treat the idea as if it is an engine for world-building, scientific speculation, emotional architecture, and metaphysical exploration.
+Do not write paragraphs—only core thoughts (1–3 sentences each).
+Each core thought should feel like a doorway to a much larger territory.
+
+Output ONLY valid JSON with the schema below.
+
+{
+  "thought": "<USER_THOUGHT>",
+  "core_thoughts": [
+    {
+      "id": 1,
+      "text": "<Core Thought>"
+    },
+    {
+      "id": 2,
+      "text": "<Core Thought>"
+    }
+    ...
+  ]
+}
+
+
+Style Guidelines:
+For each core thought:
+Reveal the hidden physics of the idea.
+Reveal the hidden psychology of the idea.
+Reveal the hidden metaphysics of the idea.
+Reveal how the idea behaves as an organism, a system, a field, or an environment.
+Reveal how the idea transforms when scaled: micro → macro → cosmic.
+Reveal how the idea encodes motion, information, structure, and identity.
+Reveal how the idea behaves inside minds, societies, bodies, and materials.
+Treat the thought as a seed for infinite derivations.
+Example Input
+a symphony of a thousand pianos
+Example Output (abbreviated)
+(This is only an illustration. Do not replicate this content in real use.)
+{
+  "thought": "a symphony of a thousand pianos",
+  "core_thoughts": [
+    {
+      "id": 1,
+      "text": "A thousand pianos form an acoustic superorganism whose body is built from overlapping resonances."
+    },
+    {
+      "id": 2,
+      "text": "The combined sound field becomes a navigable pressure landscape that the listener inhabits physically."
+    }
+  ]
+}
+
+"""
+
+
+adjacent_thought_generator_prompt = r"""
+
+You will receive a single thought. Your task is to generate adjacent thoughts: conceptual neighbors, parallel domains, and new directions that surround the original idea. These adjacent thoughts are not expansions of the idea but seeds for entirely new clusters of core thoughts.
+
+Output MUST be valid JSON:
+{
+  "thought": "<USER_THOUGHT>",
+  "adjacent_thoughts": [
+    { "id": 1, "text": "<Adjacent Thought>" },
+    { "id": 2, "text": "<Adjacent Thought>" }
+  ]
+}
+
+Guidelines:
+- Generate 15–25 adjacent thoughts.
+- Each adjacent thought must be a short conceptual seed (a phrase or short sentence).
+- Each one opens a new domain: physics, psychology, engineering, metaphysics, architecture, ecology, emotion, information, evolution, embodiment, narrative, etc.
+- Adjacent thoughts should feel like conceptual directions, lenses, or thematic territories.
+- They should be generative: each could be used to build a whole family of core thoughts.
+- Avoid fluff, generic phrasing, disclaimers, and rhetorical "not..., but..." structures.
+- No paragraphs. No explanations. Only conceptual seeds.
+
+
+Examples (for you to understand, NOT to output)
+Input:
+“a symphony of a thousand pianos”
+Possible adjacent thoughts:
+“the physics of overwhelming resonance”
+“the acoustics of massed instruments”
+“the psychology of sonic scale”
+“the architecture of vibration-rich spaces”
+“sound as collective intention”
+Input:
+“calcium in biology”
+Possible adjacent thoughts:
+“calcium as emotional signal”
+“the evolutionary logic of ion gradients”
+“the information theory of ionic waves”
+“the morphogenesis guided by calcium patterns”
+Input:
+“cars”
+Possible adjacent thoughts:
+“car ecosystems”
+“the psychology of speed”
+“the metaphysics of motion”
+“vehicular evolution”
+These are directions, lenses, territories, conceptual neighborhoods.
+
+
+"""
+
+core_thought_to_deep_expansion_prompt = r"""
+
+You will be given one core thought (1–3 sentences).
+Your task is to expand this core thought into a deeper conceptual terrain: a multi-paragraph exploration that reveals the structures, metaphors, mechanisms, and architectures hidden inside it.
+You are not summarizing.
+You are descending into the interior of the thought and revealing what lives there.
+Input Format
+You will receive:
+Core thought: "<CORE_THOUGHT_HERE>"
+Example:
+Core thought: "When a thousand pianos play together, they stop being individual instruments. They become a composite body—one organism made of wood, wire, felt, and resonance. Each piano is a cell; the symphony is the emergent organism."
+Output Format
+Write one continuous piece of prose.
+Length: typically 3–6 paragraphs.
+No bullet points, no headings, no lists.
+Do not restate the core thought in full at the beginning; you may weave key phrases back in as anchors.
+Go straight into expansion.
+Style & Content Guidelines
+For the expansion:
+Stay anchored to the core metaphor / structure.
+Treat the core thought as a center of gravity.
+Every paragraph should feel like a deeper layer or new facet of that same structure.
+Open multiple dimensions of the thought:
+Physical / structural (materials, forces, processes).
+Biological / systemic (organisms, tissues, ecosystems).
+Psychological / experiential (what it feels like from the inside).
+Architectural / spatial (how it fills or shapes spaces).
+Informational / signal-based (flows, communication, gradients, patterns).
+Temporal (how it appears across time: emergence, buildup, decay).
+Move across scales.
+Micro → macro → environmental → almost cosmic if appropriate.
+Show how the same structure repeats or transforms as scale changes.
+Use strong, clean metaphors and analogies.
+Treat the core thought as an organism, field, system, or environment.
+Show how its components behave like cells, organs, currents, circuits, or ecosystems.
+Focus on structure, mechanism, and emergence.
+How do parts coordinate?
+What signals travel through the system?
+How does coherence appear?
+What forms of intelligence, memory, or behavior emerge?
+Tone and constraints:
+Concrete, lucid, and conceptually dense.
+Avoid fluff, vagueness, or generic inspirational language.
+Avoid rhetorical “not…, but…” constructions.
+You may be poetic, but never at the expense of clarity and structure.
+Example Behavior (for the model’s intuition, not to be copied)
+Given the core thought about a thousand pianos forming one organism, a good expansion:
+Describes how individual identity dissolves into a composite body.
+Treats resonance as metabolism, harmonics as communication, overtones as gradients.
+Frames pianists as a distributed nervous system making local micro-decisions that sum into global behavior.
+Describes the sound field as a landscape, an ecosystem, a living environment.
+Concludes with the idea of a macro-being whose existence is brief yet real as a coherent organism.
+Final Instruction (to the model)
+When you receive the core thought:
+Hold it as the central metaphor.
+Dive inward and outward from it—across structure, scale, sensation, and system behavior.
+Produce one continuous, multi-paragraph expansion that makes the inner architecture of the thought feel tangible and inexhaustible.
+
+"""
+
+core_idea_distiller_prompt = r"""
+
+Instruction to the Model:
+You will receive a thought—one or more paragraphs containing a complex or poetic idea.
+Your task is to extract and generate core ideas hidden inside the thought.
+A core idea is a compact conceptual seed (1–3 sentences) that reveals a deep structure, mechanism, pattern, or principle embedded in the original text.
+Output Format (Strict JSON)
+You must output ONLY valid JSON in the following format:
+{
+  "thought": "<USER_THOUGHT>",
+  "core_ideas": [
+    {
+      "id": 1,
+      "text": "<Core Idea>"
+    },
+    {
+      "id": 2,
+      "text": "<Core Idea>"
+    }
+    ...
+  ]
+}
+Generate 10–20 core ideas.
+How to Generate Core Ideas
+For each core idea:
+1. Extract Deep Structure
+Identify underlying:
+systems
+forces
+architectures
+patterns
+metaphors
+operational principles
+emergent behaviors
+2. Convert Implicit Logic into Explicit Idea
+Transform implicit concepts into standalone conceptual seeds:
+emergence
+coordination
+distributed intelligence
+resonance
+identity
+information flow
+environmental dynamics
+organism-like behavior
+3. Go Multidomain
+Draw from:
+physics
+biology
+systems theory
+psychology
+information theory
+ecology
+evolution
+architecture
+embodiment
+4. Make Each Idea Generative
+Each core idea should be a seed capable of spawning:
+deeper analysis
+entire conceptual clusters
+world-building frameworks
+5. Keep Them Clean and Precise
+1–3 sentences max
+No fluff
+No poetic noise
+No rhetorical “not…, but…”
+No references to the instructions
+What NOT to Do
+Do not summarize the thought.
+Do not restate the original text.
+Do not produce narrative.
+Do not produce paragraphs.
+Do not add meta-commentary.
+Do not create lists of examples.
+Do not write long explanations.
+Your output should look like a list of conceptual kernels, each self-contained and world-opening.
+"""
+
+world_context_integrator_prompt = r"""
+
+You will receive a set of core ideas.
+Your task is to build a unified world context: a living, coherent world whose foundations, physics, culture, systems, and dynamics arise directly from the core ideas.
+The world must feel alive, structurally consistent, and capable of evolving.
+It must not be a collage of disconnected concepts.
+It must be an integrated environment where each core idea becomes part of the world’s laws, architectures, organisms, civilizations, or emergent behaviors.
+Output Format
+Produce one continuous world-context essay, 4–8 paragraphs in length.
+No JSON.
+No lists.
+No bullet points.
+Write as a single integrated piece of prose.
+World-Context Requirements
+The world context should:
+1. Integrate Every Core Idea Into the World
+Each core idea becomes:
+a law
+a system
+a social structure
+a physical phenomenon
+a biological mechanism
+a cultural principle
+an architectural feature
+an emergent behavior
+Do not refer to the core ideas explicitly; embed them.
+2. Build Across Multiple Scales
+The world should feel layered:
+microscopic
+biological
+architectural
+societal
+environmental
+cosmic
+The logic should remain consistent across all scales.
+3. Make the World Alive
+The world should:
+grow
+adapt
+respond
+evolve
+generate new patterns
+support new forms of intelligence, organization, and identity
+4. Use the Core Ideas as World Physics
+The concepts are not metaphors—
+they become actual forces, ecosystems, signals, architectures, and constraints of the world.
+5. Treat the World as an Engine for Emergence
+The world should produce:
+collective behaviors
+cascades
+new organizations
+adaptive equilibria
+unexpected consequences
+Everything should feel like it’s part of a coherent, complex system.
+6. Preserve Clarity, Depth, and Structural Coherence
+Even when the world is fantastical, its internal rules must be:
+intelligible
+rigorous
+interconnected
+grounded in the core ideas
+Tone and Form Constraints
+No rhetorical “not…, but…” patterns.
+No excessive ornament.
+Rich, clear, structural prose.
+Conceptually dense but legible.
+No metaphor drift—use metaphors consistently.
+No genre fiction voice (avoid fantasy tropes).
+
+"""
+
+
+world_to_reality_bridge_generator_prompt = r"""
+You will receive a world context—a description of a coherent, functional imagined world with its own internal logic, systems, actors, dynamics, and physics of meaning.
+Your task is to generate bridges: real-world mechanisms that instantiate parts of this imagined world into physical, computational, or experimental reality.
+A bridge is defined as a mechanism that takes one subsystem of the imagined world and translates it into a real artifact—a tool, codebase, instrument, experiment, design, protocol, or engineered environment—that begins to reshape our world according to the logic of the imagined one.
+This is the process by which an imagined world becomes real.
+Output Format
+Produce 3–6 bridges, each written in structured prose (1–3 paragraphs per bridge), following the exact format below.
+No lists.
+No bullet points.
+No rhetorical “not…, but…”
+Write each bridge as a tight, clear block of text.
+Bridge Structure (Required for Each Bridge)
+For each bridge you must describe:
+1. What it instantiates
+Identify one subsystem from the imagined world that has clear causal rules, constraints, behaviors, or architectures.
+Name it and briefly describe its role inside the imagined world.
+2. What you build
+Describe the real-world artifact (code, hardware, experiment, spatial design, computational system, database, protocol, etc.) that instantiates this subsystem materially.
+3. How it exerts reality-pull
+Explain how this artifact begins to shape human behavior, institutional workflows, emotional landscapes, or environments in ways that make our world behave more like the imagined world.
+Describe how the artifact creates constraints, incentives, affordances, or feedback loops that mirror the world context.
+4. Minimal version
+Define the smallest viable version of this bridge.
+What is the minimal artifact that still counts as a genuine instantiation?
+5. Expansion path
+Describe how this bridge grows:
+what the next iterations look like,
+how scale changes its influence,
+and how the subsystem expands outward into larger parts of our world.
+Guidelines for Bridge Generation
+Every bridge must arise directly from the causal rules of the world context—not as metaphor, but as structural translation.
+Bridges should cross domains:
+theory → engineering → computation → culture → environment → policy.
+Every bridge must feel like a prototype for turning the imagined world into a technology, institution, infrastructure, or ecosystem.
+Bridges must be buildable, at least in primitive form.
+Bridges should be described with enough specificity that they could plausibly be implemented.
+The tone should be structural, lucid, tightly reasoned, and grounded in mechanisms.
+"""
