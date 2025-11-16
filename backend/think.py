@@ -16,6 +16,97 @@ from prompts import (
     world_to_reality_bridge_generator_prompt,
 )
 
+import os
+import re
+import json
+from datetime import datetime, timezone
+
+from openai import OpenAI
+from db_shared import init_usage_db, log_usage, connect, USAGE_DB
+
+
+# -----------------------------
+# Model + limits (mirrors jid)
+# -----------------------------
+
+DEFAULT_MODEL = os.getenv("THINK_LLM_MODEL") or os.getenv("JID_LLM_MODEL", "gpt-5")
+DAILY_MAX_TOKENS_LIMIT = int(os.getenv("DAILY_MAX_TOKENS_LIMIT", "10000000"))
+
+# Optional tokenizer
+try:
+    import tiktoken  # type: ignore
+    _HAS_TIKTOKEN = True
+except Exception:
+    _HAS_TIKTOKEN = False
+
+client = OpenAI()
+init_usage_db()  # make sure llm_usage.db and tables exist
+
+
+# -----------------------------
+# Token + usage utilities
+# -----------------------------
+
+def _iso_today() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def estimate_tokens(text: str, model: str = DEFAULT_MODEL) -> int:
+    """
+    Rough token estimate. If tiktoken is available, use it. Otherwise, heuristic.
+    """
+    if _HAS_TIKTOKEN:
+        try:
+            enc = tiktoken.get_encoding("cl100k_base")
+            return len(enc.encode(text))
+        except Exception:
+            pass
+    # Heuristic: ~4 chars per token
+    return max(1, int(len(text) / 4))
+
+
+def get_today_model_tokens(model: str) -> int:
+    """
+    Reads totals_daily for today+model from llm_usage.db (same as jid).
+    """
+    day = _iso_today()
+    conn = connect(USAGE_DB)
+    try:
+        row = conn.execute(
+            "SELECT total_tokens FROM totals_daily WHERE day=? AND model=?",
+            (day, model),
+        ).fetchone()
+        return int(row[0]) if row else 0
+    finally:
+        conn.close()
+
+
+def _usage_from_resp(resp) -> dict:
+    """
+    Mirrors jid/crayon: accept both {prompt,input}_tokens and {completion,output}_tokens.
+    Returns {'input': int, 'output': int, 'total': int}
+    """
+    u = getattr(resp, "usage", None)
+
+    def get(k: str):
+        if u is None:
+            return None
+        if isinstance(u, dict):
+            return u.get(k)
+        return getattr(u, k, None)
+
+    inp = get("prompt_tokens") or get("input_tokens") or 0
+    outp = get("completion_tokens") or get("output_tokens") or 0
+    tot = get("total_tokens") or (int(inp) + int(outp))
+    return {"input": int(inp), "output": int(outp), "total": int(tot)}
+
+
+# System message for JSON strictness (same spirit as jid)
+SYSTEM_MSG_JSON = (
+    "You are a precise JSON generator. Always return STRICT JSON with the exact keys requested. "
+    "Do NOT include Markdown or explanations."
+)
+
 # =====================
 # FLASK APP
 # =====================
@@ -75,44 +166,217 @@ def init_think_db():
 # LLM CALL SHIMS
 # =====================
 
-def run_json_prompt(prompt_template: str, user_thought: str) -> dict:
+def run_json_prompt(
+    prompt_template: str,
+    user_thought: str,
+    *,
+    model: str | None = None,
+    endpoint_name: str = "/think/json_prompt",
+    email: str | None = None,
+) -> dict:
     """
-    TODO: Wire this into your existing LLM helper.
-
-    Expected behavior:
-    - Take `prompt_template` and the `user_thought`
-    - Call your model so that it outputs JSON
-    - Parse JSON to Python dict and return it
-
-    Example (pseudo):
-
-    from your_llm_helper import call_model_json
-
-    return call_model_json(prompt_template, {"thought": user_thought})
+    Take a prompt template and a user thought, call the model expecting JSON, and
+    return a Python dict. Mirrors jid-style token accounting + logging.
     """
-    raise NotImplementedError("Implement run_json_prompt using your LLM stack.")
+    model = (model or DEFAULT_MODEL).strip()
+
+    # 1) Daily limit pre-check
+    today_tokens = get_today_model_tokens(model)
+    if today_tokens >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model}: {today_tokens} / {DAILY_MAX_TOKENS_LIMIT}"
+        )
+
+    # 2) Build user message
+    # The template describes the task + JSON schema; we append the actual thought.
+    user_msg = prompt_template.rstrip() + "\n\nThought:\n" + user_thought.strip()
+
+    # 3) Estimate tokens-in before call (for early cut-off)
+    est_in = estimate_tokens(user_msg, model=model)
+    if today_tokens + est_in >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model} (estimate): "
+            f"{today_tokens + est_in} / {DAILY_MAX_TOKENS_LIMIT}"
+        )
+
+    usage_in = 0
+    usage_out = 0
+    request_id = None
+
+    try:
+        # 4) LLM call
+        resp = client.responses.create(
+            model=model,
+            input=[
+                {"role": "system", "content": SYSTEM_MSG_JSON},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+
+        # 5) Usage extraction
+        u = _usage_from_resp(resp)
+        usage_in = u.get("input", est_in)
+        usage_out = u.get("output", 0)
+
+        # 6) Extract raw text and parse JSON
+        raw_text = (
+            getattr(resp, "output_text", None)
+            or getattr(resp, "text", None)
+            or ""
+        )
+        if not raw_text:
+            # Fallback to responses-style output structure
+            try:
+                out0 = resp.output[0].content[0]
+                raw_text = getattr(out0, "text", None) or getattr(out0, "content", None) or ""
+            except Exception:
+                raw_text = ""
+
+        # Strip ```json fences if present
+        m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.S)
+        raw_json = m.group(1) if m else raw_text
+
+        parsed = json.loads(raw_json)
+        if not isinstance(parsed, dict):
+            raise ValueError("JSON root is not an object; got: " + type(parsed).__name__)
+
+        # 7) Log and return
+        log_usage(
+            app="think",
+            model=model,
+            tokens_in=usage_in,
+            tokens_out=usage_out,
+            endpoint=endpoint_name,
+            email=email,
+            request_id=request_id,
+            duration_ms=0,
+            cost_usd=0.0,
+            meta={"purpose": "json_prompt"},
+        )
+        return parsed
+
+    except Exception:
+        # Still log what we know
+        try:
+            log_usage(
+                app="think",
+                model=model,
+                tokens_in=usage_in or est_in,
+                tokens_out=usage_out,
+                endpoint=endpoint_name,
+                email=email,
+                request_id=request_id,
+                duration_ms=0,
+                cost_usd=0.0,
+                meta={"purpose": "json_prompt_error"},
+            )
+        except Exception:
+            pass
+        raise
 
 
-def run_text_prompt(prompt_text: str, context_text: str) -> str:
+
+def run_text_prompt(
+    prompt_text: str,
+    context_text: str = "",
+    *,
+    model: str | None = None,
+    endpoint_name: str = "/think/text_prompt",
+    email: str | None = None,
+    meta_purpose: str = "text_prompt",
+) -> str:
     """
-    TODO: Wire this into your existing LLM helper.
-
-    Expected behavior:
-    - `prompt_text` is a completed instruction (already contains the core thought, etc.)
-    - `context_text` is just for logging/tracing if you like
-    - Return the model's text output as a string
+    Call the model with a completed instruction string and return text.
+    Token counting + logging follow jid's pattern.
+    `context_text` is only used for logging/meta if you want to track origin.
     """
-    raise NotImplementedError("Implement run_text_prompt using your LLM stack.")
+    model = (model or DEFAULT_MODEL).strip()
+
+    # 1) Daily limit pre-check
+    today_tokens = get_today_model_tokens(model)
+    if today_tokens >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model}: {today_tokens}/{DAILY_MAX_TOKENS_LIMIT}"
+        )
+
+    # 2) Estimate tokens-in before call
+    est_in = estimate_tokens(prompt_text, model=model)
+
+    if today_tokens + est_in >= DAILY_MAX_TOKENS_LIMIT:
+        raise RuntimeError(
+            f"Daily token limit reached for {model} (estimate): "
+            f"{today_tokens + est_in}/{DAILY_MAX_TOKENS_LIMIT}"
+        )
+
+    usage_in = 0
+    usage_out = 0
+    request_id = None
+
+    try:
+        # 3) LLM call (plain text)
+        resp = client.responses.create(
+            model=model,
+            input=prompt_text,
+        )
+
+        # 4) Usage extraction
+        u = _usage_from_resp(resp)
+        usage_in = u.get("input", est_in)
+        usage_out = u.get("output", 0)
+
+        # 5) Extract text
+        raw_text = (
+            getattr(resp, "output_text", None)
+            or getattr(resp, "text", None)
+            or ""
+        )
+        if not raw_text:
+            try:
+                out0 = resp.output[0].content[0]
+                raw_text = getattr(out0, "text", None) or getattr(out0, "content", None) or ""
+            except Exception:
+                raw_text = ""
+
+        # 6) Log and return
+        log_usage(
+            app="think",
+            model=model,
+            tokens_in=usage_in,
+            tokens_out=usage_out,
+            endpoint=endpoint_name,
+            email=email,
+            request_id=request_id,
+            duration_ms=0,
+            cost_usd=0.0,
+            meta={"purpose": meta_purpose, "context_preview": context_text[:200]},
+        )
+
+        return raw_text
+
+    except Exception:
+        # Log approximate usage even on failure
+        try:
+            log_usage(
+                app="think",
+                model=model,
+                tokens_in=usage_in or est_in,
+                tokens_out=usage_out,
+                endpoint=endpoint_name,
+                email=email,
+                request_id=request_id,
+                duration_ms=0,
+                cost_usd=0.0,
+                meta={"purpose": meta_purpose + "_error", "context_preview": context_text[:200]},
+            )
+        except Exception:
+            pass
+        raise
+
 
 
 # =====================
 # ROUTES
 # =====================
-
-@app.route("/")
-def index():
-    # Assumes templates/think.html
-    return render_template("think.html")
 
 
 @app.route("/think/adjacent", methods=["POST"])
