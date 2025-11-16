@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>World for Core Idea</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      font-family: system-ui, sans-serif;
+      --text: #111;
+      --text-soft: #666;
+      --bg: #ffffff;
+      --bg-elevated: #f7f7f9;
+      --border: #dddddd;
+      --accent: #6a4dff;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
+      padding: 18px 20px 20px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .core-idea-summary {
+      font-size: 13px;
+      color: var(--text-soft);
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: var(--bg-elevated);
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+    }
+
+    .section {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    button {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    button:hover {
+      filter: brightness(0.97);
+    }
+
+    .status {
+      font-size: 11px;
+      color: var(--text-soft);
+      margin-bottom: 4px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .input-row textarea {
+      flex: 1;
+      min-height: 60px;
+      font-size: 13px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      resize: vertical;
+    }
+
+    .input-row button {
+      align-self: stretch;
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+
+    .input-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .input-col input {
+      font-size: 13px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+    }
+
+    ul.item-list {
+      list-style: none;
+      margin: 0;
+      padding-left: 0;
+    }
+
+    .item {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: var(--bg-elevated);
+      margin-bottom: 8px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .item-main {
+      flex: 1;
+    }
+
+    .item-text {
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .item-meta {
+      font-size: 11px;
+      color: var(--text-soft);
+      margin-top: 4px;
+    }
+
+    .item-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .item-actions button {
+      font-size: 11px;
+      padding: 3px 8px;
+    }
+
+    .item.editing .item-text {
+      display: none;
+    }
+
+    .item-edit-textarea,
+    .item-edit-title {
+      width: 100%;
+      font-size: 13px;
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-top: 4px;
+      box-sizing: border-box;
+    }
+
+    .item-edit-title {
+      font-weight: 500;
+    }
+
+    .item-edit-actions {
+      margin-top: 4px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .back-link {
+      font-size: 11px;
+      margin-bottom: 6px;
+      color: var(--text-soft);
+      cursor: pointer;
+      text-decoration: underline;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="back-link" id="back-link">← Back to thought</div>
+  <h1>World for core idea</h1>
+  <div class="core-idea-summary" id="core-idea-summary"></div>
+
+  <div class="section" id="world-section">
+    <div class="section-header">
+      <h2>World contexts</h2>
+    </div>
+    <div class="status" id="world-status"></div>
+    <div class="input-row">
+      <textarea id="world-input" placeholder="Describe the world context for this core idea…"></textarea>
+      <button type="button" class="primary" id="btn-add-world">Add</button>
+    </div>
+    <ul class="item-list" id="world-list"></ul>
+  </div>
+
+  <div class="section" id="bridges-section">
+    <div class="section-header">
+      <h2>Bridges</h2>
+    </div>
+    <div class="status" id="bridges-status"></div>
+    <div class="input-row">
+      <div class="input-col">
+        <input id="bridge-title-input" placeholder="Bridge title (optional)">
+        <textarea id="bridge-text-input" placeholder="Describe the bridge…"></textarea>
+      </div>
+      <button type="button" class="primary" id="btn-add-bridge">Add</button>
+    </div>
+    <ul class="item-list" id="bridges-list"></ul>
+  </div>
+</div>
+
+<script>
+  const API_BASE  = "/scribble/api";
+  const READ_BASE = "/read";
+
+  let coreIdeaId = null;
+  let coreIdeaText = "";
+  let thoughtId = null;
+
+  function getQueryParams() {
+    const params = new URLSearchParams(window.location.search);
+    coreIdeaId = parseInt(params.get("core_idea_id") || "", 10);
+    coreIdeaText = decodeURIComponent(params.get("core_idea") || "");
+    thoughtId = params.get("thought_id") || null;
+  }
+
+  function setWorldStatus(msg) {
+    document.getElementById("world-status").textContent = msg || "";
+  }
+
+  function setBridgesStatus(msg) {
+    document.getElementById("bridges-status").textContent = msg || "";
+  }
+
+  // ----- World contexts -----
+
+  async function loadWorldContexts() {
+    if (!coreIdeaId) return;
+    setWorldStatus("Loading world contexts…");
+
+    try {
+      const res = await fetch(
+        `${READ_BASE}/world_contexts_by_core_idea?core_idea_id=${encodeURIComponent(coreIdeaId)}&limit=100`
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const data = await res.json();
+      renderWorldContexts(data.items || []);
+      setWorldStatus(
+        data.items && data.items.length
+          ? `Loaded ${data.items.length} world context(s).`
+          : "No world contexts yet."
+      );
+    } catch (err) {
+      console.error(err);
+      setWorldStatus("Error loading world contexts: " + err.message);
+    }
+  }
+
+  function renderWorldContexts(items) {
+    const list = document.getElementById("world-list");
+    list.innerHTML = "";
+
+    items.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "item";
+      li.dataset.id = item.id;
+
+      const main = document.createElement("div");
+      main.className = "item-main";
+
+      const textDiv = document.createElement("div");
+      textDiv.className = "item-text";
+      textDiv.textContent = item.text || "";
+
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "item-meta";
+      metaDiv.textContent = [
+        item.id != null ? `id: ${item.id}` : "",
+        item.created_at || ""
+      ].filter(Boolean).join(" · ");
+
+      main.appendChild(textDiv);
+      main.appendChild(metaDiv);
+
+      const actions = document.createElement("div");
+      actions.className = "item-actions";
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => {
+        enterEditWorldContext(li, item);
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", () => {
+        deleteWorldContext(item.id);
+      });
+
+      actions.appendChild(editBtn);
+      actions.appendChild(deleteBtn);
+
+      li.appendChild(main);
+      li.appendChild(actions);
+      list.appendChild(li);
+    });
+  }
+
+  function enterEditWorldContext(li, item) {
+    if (li.classList.contains("editing")) return;
+    li.classList.add("editing");
+
+    const main = li.querySelector(".item-main");
+    const textDiv = main.querySelector(".item-text");
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "item-edit-textarea";
+    textarea.value = item.text || "";
+    textarea.rows = Math.min(6, Math.max(3, (textarea.value.split("\n").length || 1)));
+
+    textDiv.insertAdjacentElement("afterend", textarea);
+
+    const metaDiv = main.querySelector(".item-meta");
+
+    const actions = li.querySelector(".item-actions");
+    const originalButtons = Array.from(actions.children);
+    originalButtons.forEach((btn) => {
+      btn.dataset._origDisplay = btn.style.display || "";
+      btn.style.display = "none";
+    });
+
+    const editActions = document.createElement("div");
+    editActions.className = "item-edit-actions";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.textContent = "Save";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+
+    editActions.appendChild(saveBtn);
+    editActions.appendChild(cancelBtn);
+    actions.appendChild(editActions);
+
+    function exit() {
+      li.classList.remove("editing");
+      textarea.remove();
+      editActions.remove();
+      originalButtons.forEach((btn) => {
+        btn.style.display = btn.dataset._origDisplay || "";
+        delete btn.dataset._origDisplay;
+      });
+    }
+
+    saveBtn.addEventListener("click", async () => {
+      const newText = (textarea.value || "").trim();
+      if (!newText) {
+        alert("World context cannot be empty.");
+        return;
+      }
+
+      try {
+        setWorldStatus("Updating world context…");
+        const res = await fetch(
+          `${API_BASE}/world_contexts/${encodeURIComponent(item.id)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: newText })
+          }
+        );
+        if (!res.ok) {
+          let msg = "HTTP " + res.status;
+          try {
+            const body = await res.json();
+            if (body && body.error) msg = body.error;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+        const updated = await res.json().catch(() => ({}));
+        item.text = updated.text || newText;
+        textDiv.textContent = item.text;
+        setWorldStatus("World context updated.");
+        exit();
+      } catch (err) {
+        console.error(err);
+        setWorldStatus("Error updating world context: " + err.message);
+      }
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      exit();
+      setWorldStatus("");
+    });
+
+    textarea.focus();
+    textarea.select();
+  }
+
+  async function deleteWorldContext(id) {
+    if (!confirm("Delete this world context? This cannot be undone.")) return;
+
+    try {
+      setWorldStatus("Deleting world context…");
+      const res = await fetch(
+        `${API_BASE}/world_contexts/${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const body = await res.json();
+          if (body && body.error) msg = body.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+      const li = document.querySelector(`#world-list .item[data-id="${id}"]`);
+      if (li && li.parentElement) li.parentElement.removeChild(li);
+      setWorldStatus("World context deleted.");
+    } catch (err) {
+      console.error(err);
+      setWorldStatus("Error deleting world context: " + err.message);
+    }
+  }
+
+  async function addWorldContext() {
+    if (!coreIdeaId) return;
+    const textarea = document.getElementById("world-input");
+    const textVal = (textarea.value || "").trim();
+    if (!textVal) {
+      alert("Please enter a world context first.");
+      return;
+    }
+
+    try {
+      setWorldStatus("Saving world context…");
+      const res = await fetch(
+        `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}/world_contexts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: textVal, email: "" })
+        }
+      );
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const body = await res.json();
+          if (body && body.error) msg = body.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      textarea.value = "";
+      await loadWorldContexts();
+      setWorldStatus("World context added.");
+    } catch (err) {
+      console.error(err);
+      setWorldStatus("Error adding world context: " + err.message);
+    }
+  }
+
+  // ----- Bridges -----
+
+  async function loadBridges() {
+    if (!coreIdeaId) return;
+    setBridgesStatus("Loading bridges…");
+
+    try {
+      const res = await fetch(
+        `${READ_BASE}/bridges_by_core_idea?core_idea_id=${encodeURIComponent(coreIdeaId)}&limit=100`
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const data = await res.json();
+      renderBridges(data.items || []);
+      setBridgesStatus(
+        data.items && data.items.length
+          ? `Loaded ${data.items.length} bridge(s).`
+          : "No bridges yet."
+      );
+    } catch (err) {
+      console.error(err);
+      setBridgesStatus("Error loading bridges: " + err.message);
+    }
+  }
+
+  function renderBridges(items) {
+    const list = document.getElementById("bridges-list");
+    list.innerHTML = "";
+
+    items.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "item";
+      li.dataset.id = item.id;
+
+      const main = document.createElement("div");
+      main.className = "item-main";
+
+      const titleDiv = document.createElement("div");
+      titleDiv.className = "item-title";
+      titleDiv.style.fontWeight = "600";
+      titleDiv.style.fontSize = "13px";
+      titleDiv.textContent = item.title || "(untitled bridge)";
+
+      const textDiv = document.createElement("div");
+      textDiv.className = "item-text";
+      textDiv.textContent = item.text || "";
+
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "item-meta";
+      metaDiv.textContent = [
+        item.id != null ? `id: ${item.id}` : "",
+        item.created_at || ""
+      ].filter(Boolean).join(" · ");
+
+      main.appendChild(titleDiv);
+      main.appendChild(textDiv);
+      main.appendChild(metaDiv);
+
+      const actions = document.createElement("div");
+      actions.className = "item-actions";
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => {
+        enterEditBridge(li, item);
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", () => {
+        deleteBridge(item.id);
+      });
+
+      actions.appendChild(editBtn);
+      actions.appendChild(deleteBtn);
+
+      li.appendChild(main);
+      li.appendChild(actions);
+      list.appendChild(li);
+    });
+  }
+
+  function enterEditBridge(li, item) {
+    if (li.classList.contains("editing")) return;
+    li.classList.add("editing");
+
+    const main = li.querySelector(".item-main");
+    const titleDiv = main.querySelector(".item-title");
+    const textDiv = main.querySelector(".item-text");
+
+    const titleInput = document.createElement("input");
+    titleInput.className = "item-edit-title";
+    titleInput.value = item.title || "";
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "item-edit-textarea";
+    textarea.value = item.text || "";
+    textarea.rows = Math.min(6, Math.max(3, (textarea.value.split("\n").length || 1)));
+
+    titleDiv.insertAdjacentElement("afterend", titleInput);
+    textDiv.insertAdjacentElement("afterend", textarea);
+
+    const actions = li.querySelector(".item-actions");
+    const originalButtons = Array.from(actions.children);
+    originalButtons.forEach((btn) => {
+      btn.dataset._origDisplay = btn.style.display || "";
+      btn.style.display = "none";
+    });
+
+    const editActions = document.createElement("div");
+    editActions.className = "item-edit-actions";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.textContent = "Save";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+
+    editActions.appendChild(saveBtn);
+    editActions.appendChild(cancelBtn);
+    actions.appendChild(editActions);
+
+    function exit() {
+      li.classList.remove("editing");
+      titleInput.remove();
+      textarea.remove();
+      editActions.remove();
+      originalButtons.forEach((btn) => {
+        btn.style.display = btn.dataset._origDisplay || "";
+        delete btn.dataset._origDisplay;
+      });
+    }
+
+    saveBtn.addEventListener("click", async () => {
+      const newTitle = (titleInput.value || "").trim();
+      const newText = (textarea.value || "").trim();
+      if (!newText) {
+        alert("Bridge text cannot be empty.");
+        return;
+      }
+
+      try {
+        setBridgesStatus("Updating bridge…");
+        const res = await fetch(
+          `${API_BASE}/bridges/${encodeURIComponent(item.id)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: newTitle, text: newText })
+          }
+        );
+        if (!res.ok) {
+          let msg = "HTTP " + res.status;
+          try {
+            const body = await res.json();
+            if (body && body.error) msg = body.error;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+        const updated = await res.json().catch(() => ({}));
+        item.title = updated.title || newTitle;
+        item.text = updated.text || newText;
+        titleDiv.textContent = item.title || "(untitled bridge)";
+        textDiv.textContent = item.text;
+        setBridgesStatus("Bridge updated.");
+        exit();
+      } catch (err) {
+        console.error(err);
+        setBridgesStatus("Error updating bridge: " + err.message);
+      }
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      exit();
+      setBridgesStatus("");
+    });
+
+    titleInput.focus();
+  }
+
+  async function deleteBridge(id) {
+    if (!confirm("Delete this bridge? This cannot be undone.")) return;
+
+    try {
+      setBridgesStatus("Deleting bridge…");
+      const res = await fetch(
+        `${API_BASE}/bridges/${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const body = await res.json();
+          if (body && body.error) msg = body.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+      const li = document.querySelector(`#bridges-list .item[data-id="${id}"]`);
+      if (li && li.parentElement) li.parentElement.removeChild(li);
+      setBridgesStatus("Bridge deleted.");
+    } catch (err) {
+      console.error(err);
+      setBridgesStatus("Error deleting bridge: " + err.message);
+    }
+  }
+
+  async function addBridge() {
+    if (!coreIdeaId) return;
+
+    const titleInput = document.getElementById("bridge-title-input");
+    const textInput = document.getElementById("bridge-text-input");
+
+    const titleVal = (titleInput.value || "").trim();
+    const textVal = (textInput.value || "").trim();
+
+    if (!textVal) {
+      alert("Please enter bridge text first.");
+      return;
+    }
+
+    try {
+      setBridgesStatus("Saving bridge…");
+      const res = await fetch(
+        `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}/bridges`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: titleVal, text: textVal, email: "" })
+        }
+      );
+      if (!res.ok) {
+        let msg = "HTTP " + res.status;
+        try {
+          const body = await res.json();
+          if (body && body.error) msg = body.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      titleInput.value = "";
+      textInput.value = "";
+      await loadBridges();
+      setBridgesStatus("Bridge added.");
+    } catch (err) {
+      console.error(err);
+      setBridgesStatus("Error adding bridge: " + err.message);
+    }
+  }
+
+  // ----- Boot -----
+
+  document.addEventListener("DOMContentLoaded", () => {
+    getQueryParams();
+
+    const summary = document.getElementById("core-idea-summary");
+    summary.textContent = coreIdeaText || "(no core idea text provided)";
+
+    const back = document.getElementById("back-link");
+    back.addEventListener("click", () => {
+      if (thoughtId) {
+        window.location.href = `/thought.html?id=${encodeURIComponent(thoughtId)}`;
+      } else {
+        window.history.back();
+      }
+    });
+
+    document
+      .getElementById("btn-add-world")
+      .addEventListener("click", addWorldContext);
+
+    document
+      .getElementById("btn-add-bridge")
+      .addEventListener("click", addBridge);
+
+    loadWorldContexts();
+    loadBridges();
+  });
+</script>
+</body>
+</html>

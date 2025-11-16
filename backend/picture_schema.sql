@@ -237,3 +237,61 @@ BEGIN
   SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
   WHERE id = NEW.id;
 END;
+
+
+-- ---------------------------------------------------------------------------
+-- World contexts attached to core_ideas
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS world_contexts (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  core_idea_id  INTEGER NOT NULL,
+  text          TEXT NOT NULL,
+  email         TEXT,
+  metadata      TEXT,    -- JSON or free-form
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  FOREIGN KEY (core_idea_id) REFERENCES core_ideas(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_world_contexts_core_idea
+  ON world_contexts(core_idea_id);
+
+CREATE INDEX IF NOT EXISTS idx_world_contexts_email
+  ON world_contexts(email);
+
+CREATE TRIGGER IF NOT EXISTS trg_world_contexts_update_ts
+AFTER UPDATE ON world_contexts
+BEGIN
+  UPDATE world_contexts
+  SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  WHERE id = NEW.id;
+END;
+
+-- ---------------------------------------------------------------------------
+-- Bridges attached to core_ideas
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bridges (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  core_idea_id  INTEGER NOT NULL,
+  title         TEXT,
+  text          TEXT NOT NULL,
+  email         TEXT,
+  metadata      TEXT,    -- JSON or free-form
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  FOREIGN KEY (core_idea_id) REFERENCES core_ideas(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_bridges_core_idea
+  ON bridges(core_idea_id);
+
+CREATE INDEX IF NOT EXISTS idx_bridges_email
+  ON bridges(email);
+
+CREATE TRIGGER IF NOT EXISTS trg_bridges_update_ts
+AFTER UPDATE ON bridges
+BEGIN
+  UPDATE bridges
+  SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  WHERE id = NEW.id;
+END;

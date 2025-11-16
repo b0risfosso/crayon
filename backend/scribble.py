@@ -804,6 +804,346 @@ def delete_core_idea(core_id: int):
     finally:
         conn.close()
 
+# ------------------------------------------------------------------------------
+# World contexts attached to core_ideas
+# ------------------------------------------------------------------------------
+
+@app.post("/api/core_ideas/<int:core_idea_id>/world_contexts")
+def create_world_context(core_idea_id: int):
+    """
+    Create a world context for a given core_idea.
+
+    JSON payload:
+      {
+        "text": "world description...",   # required
+        "email": "optional@email",
+        "metadata": {...} or "raw"
+      }
+    """
+    payload = request.get_json(silent=True) or {}
+    text_val = (payload.get("text") or "").strip()
+    if not text_val:
+        return jsonify({"error": "text is required"}), 400
+
+    email = (payload.get("email") or "").strip() or None
+    metadata = payload.get("metadata")
+    if isinstance(metadata, (dict, list)):
+        metadata_str = json.dumps(metadata, separators=(",", ":"))
+    elif metadata is None:
+        metadata_str = None
+    else:
+        metadata_str = metadata if isinstance(metadata, str) else str(metadata)
+
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        # Ensure core_idea exists
+        cur.execute("SELECT 1 FROM core_ideas WHERE id = ?", (core_idea_id,))
+        if cur.fetchone() is None:
+            return jsonify({"error": f"core_idea id {core_idea_id} not found"}), 404
+
+        cur.execute(
+            """
+            INSERT INTO world_contexts (core_idea_id, text, email, metadata)
+            VALUES (?, ?, ?, ?)
+            """,
+            (core_idea_id, text_val, email, metadata_str),
+        )
+        new_id = cur.lastrowid
+
+        cur.execute(
+            """
+            SELECT id, core_idea_id, text, email, metadata,
+                   created_at, updated_at
+            FROM world_contexts
+            WHERE id = ?
+            """,
+            (new_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Failed to re-read created world_context"}), 500
+
+        d = _row_to_dict(row)
+        d["metadata"] = _parse_metadata_field(d.get("metadata"))
+        return jsonify(d), 201
+
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
+@app.put("/api/world_contexts/<int:wc_id>")
+def update_world_context(wc_id: int):
+    """
+    Update an existing world context.
+
+    JSON payload (at least 'text' required):
+      {
+        "text": "new text",              # required
+        "email": "optional@email",      # optional
+        "metadata": {...} or "raw"      # optional
+      }
+    """
+    payload = request.get_json(silent=True) or {}
+
+    text_val = (payload.get("text") or "").strip()
+    if not text_val:
+        return jsonify({"error": "text is required"}), 400
+
+    email = payload.get("email", None)
+    metadata = payload.get("metadata", None)
+
+    email_val = (email or "").strip() or None if email is not None else None
+
+    if isinstance(metadata, (dict, list)):
+        metadata_str = json.dumps(metadata, separators=(",", ":"))
+    elif metadata is None:
+        metadata_str = None
+    else:
+        metadata_str = metadata if isinstance(metadata, str) else str(metadata)
+
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        fields = ["text = ?"]
+        params = [text_val]
+
+        if email is not None:
+            fields.append("email = ?")
+            params.append(email_val)
+        if metadata is not None:
+            fields.append("metadata = ?")
+            params.append(metadata_str)
+
+        params.append(wc_id)
+
+        sql = f"UPDATE world_contexts SET {', '.join(fields)} WHERE id = ?"
+        cur.execute(sql, params)
+        if cur.rowcount == 0:
+            return jsonify({"error": "world_context not found"}), 404
+
+        cur.execute(
+            """
+            SELECT id, core_idea_id, text, email, metadata,
+                   created_at, updated_at
+            FROM world_contexts
+            WHERE id = ?
+            """,
+            (wc_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "world_context not found after update"}), 404
+
+        d = _row_to_dict(row)
+        d["metadata"] = _parse_metadata_field(d.get("metadata"))
+        return jsonify(d), 200
+
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
+@app.delete("/api/world_contexts/<int:wc_id>")
+def delete_world_context(wc_id: int):
+    """
+    Delete a world context row.
+    """
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM world_contexts WHERE id = ?", (wc_id,))
+        if cur.rowcount == 0:
+            return jsonify({"deleted": False, "error": "world_context not found"}), 404
+        return jsonify({"deleted": True}), 200
+    except Exception as e:
+        return jsonify({"deleted": False, "error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
+# ------------------------------------------------------------------------------
+# Bridges attached to core_ideas
+# ------------------------------------------------------------------------------
+
+@app.post("/api/core_ideas/<int:core_idea_id>/bridges")
+def create_bridge(core_idea_id: int):
+    """
+    Create a bridge attached to a core_idea.
+
+    JSON payload:
+      {
+        "title": "optional title",
+        "text": "bridge body",        # required
+        "email": "optional@email",
+        "metadata": {...} or "raw"
+      }
+    """
+    payload = request.get_json(silent=True) or {}
+    text_val = (payload.get("text") or "").strip()
+    if not text_val:
+        return jsonify({"error": "text is required"}), 400
+
+    title = (payload.get("title") or "").strip() or None
+    email = (payload.get("email") or "").strip() or None
+    metadata = payload.get("metadata")
+    if isinstance(metadata, (dict, list)):
+        metadata_str = json.dumps(metadata, separators=(",", ":"))
+    elif metadata is None:
+        metadata_str = None
+    else:
+        metadata_str = metadata if isinstance(metadata, str) else str(metadata)
+
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        # Ensure core_idea exists
+        cur.execute("SELECT 1 FROM core_ideas WHERE id = ?", (core_idea_id,))
+        if cur.fetchone() is None:
+            return jsonify({"error": f"core_idea id {core_idea_id} not found"}), 404
+
+        cur.execute(
+            """
+            INSERT INTO bridges (core_idea_id, title, text, email, metadata)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (core_idea_id, title, text_val, email, metadata_str),
+        )
+        new_id = cur.lastrowid
+
+        cur.execute(
+            """
+            SELECT id, core_idea_id, title, text, email, metadata,
+                   created_at, updated_at
+            FROM bridges
+            WHERE id = ?
+            """,
+            (new_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Failed to re-read created bridge"}), 500
+
+        d = _row_to_dict(row)
+        d["metadata"] = _parse_metadata_field(d.get("metadata"))
+        return jsonify(d), 201
+
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
+@app.put("/api/bridges/<int:bridge_id>")
+def update_bridge(bridge_id: int):
+    """
+    Update a bridge (title/text/email/metadata).
+    """
+    payload = request.get_json(silent=True) or {}
+
+    text_val = (payload.get("text") or "").trim() if isinstance(payload.get("text"), str) else payload.get("text")
+    if text_val is not None:
+        text_val = text_val.strip()
+        if not text_val:
+            return jsonify({"error": "text cannot be empty"}), 400
+
+    title = payload.get("title", None)
+    email = payload.get("email", None)
+    metadata = payload.get("metadata", None)
+
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        fields = []
+        params = []
+
+        if title is not None:
+            fields.append("title = ?")
+            params.append((title or "").strip() or None)
+        if text_val is not None:
+            fields.append("text = ?")
+            params.append(text_val)
+        if email is not None:
+            fields.append("email = ?")
+            params.append((email or "").strip() or None)
+        if metadata is not None:
+            if isinstance(metadata, (dict, list)):
+                metadata_str = json.dumps(metadata, separators=(",", ":"))
+            elif metadata is None:
+                metadata_str = None
+            else:
+                metadata_str = metadata if isinstance(metadata, str) else str(metadata)
+            fields.append("metadata = ?")
+            params.append(metadata_str)
+
+        if not fields:
+            return jsonify({"error": "no fields to update"}), 400
+
+        params.append(bridge_id)
+
+        sql = f"UPDATE bridges SET {', '.join(fields)} WHERE id = ?"
+        cur.execute(sql, params)
+        if cur.rowcount == 0:
+            return jsonify({"error": "bridge not found"}), 404
+
+        cur.execute(
+            """
+            SELECT id, core_idea_id, title, text, email, metadata,
+                   created_at, updated_at
+            FROM bridges
+            WHERE id = ?
+            """,
+            (bridge_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "bridge not found after update"}), 404
+
+        d = _row_to_dict(row)
+        d["metadata"] = _parse_metadata_field(d.get("metadata"))
+        return jsonify(d), 200
+
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
+@app.delete("/api/bridges/<int:bridge_id>")
+def delete_bridge(bridge_id: int):
+    """
+    Delete a bridge row.
+    """
+    db_path = _get_db_path()
+    conn = connect(db_path)
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM bridges WHERE id = ?", (bridge_id,))
+        if cur.rowcount == 0:
+            return jsonify({"deleted": False, "error": "bridge not found"}), 404
+        return jsonify({"deleted": True}), 200
+    except Exception as e:
+        return jsonify({"deleted": False, "error": f"DB error: {e}"}), 500
+    finally:
+        conn.close()
+
+
 
 # Optional: local dev
 if __name__ == "__main__":

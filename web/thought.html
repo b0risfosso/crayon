@@ -379,7 +379,6 @@
 
       const payload = {
         core_idea: coreText,
-        // optional email if you want per-user scoping; empty string is fine
         email: ""
       };
 
@@ -401,16 +400,11 @@
         throw new Error(msg);
       }
 
-      const saved = await res.json().catch(() => ({}));
+      await res.json().catch(() => ({}));
 
       input.value = "";
-      // reload the list so the new core idea appears with proper metadata
       await loadCoreIdeasFromRead();
-      setCoreIdeasStatus(
-        saved && saved.id
-          ? `Core idea added (id=${saved.id}).`
-          : "Core idea added."
-      );
+      setCoreIdeasStatus("Core idea added.");
     } catch (err) {
       console.error(err);
       setCoreIdeasStatus("Error adding core idea: " + err.message);
@@ -444,9 +438,7 @@
   async function apiDeleteCoreIdea(coreIdeaId) {
     const res = await fetch(
       `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}`,
-      {
-        method: "DELETE",
-      }
+      { method: "DELETE" }
     );
 
     if (!res.ok) {
@@ -473,10 +465,8 @@
     textarea.value = item.core_idea || "";
     textarea.rows = Math.min(5, Math.max(2, (textarea.value.split("\n").length || 1)));
 
-    // Insert textarea after the text div
     textDiv.insertAdjacentElement("afterend", textarea);
 
-    // Hide original action buttons while editing
     const originalButtons = Array.from(actionsDiv.children);
     originalButtons.forEach((btn) => {
       btn.dataset._origDisplay = btn.style.display || "";
@@ -518,10 +508,8 @@
       try {
         setCoreIdeasStatus("Updating core idea…");
         const updated = await apiUpdateCoreIdea(item.id, newText);
-        // Update local representation + DOM
         item.core_idea = updated.core_idea || newText;
         textDiv.textContent = item.core_idea;
-        // Also update currentCoreIdeas array
         currentCoreIdeas = currentCoreIdeas.map((ci) =>
           ci.id === item.id ? { ...ci, core_idea: item.core_idea } : ci
         );
@@ -546,15 +534,12 @@
     const li = document.querySelector(
       `.core-ideas-list li.core-idea-item[data-core-idea-id="${coreIdeaId}"]`
     );
-    if (!li) {
-      // still attempt delete in case DOM and state drifted
-      if (!confirm("Delete this core idea from the database?")) return;
-    } else {
-      const text =
-        li.querySelector(".core-idea-text")?.textContent?.trim() || "this core idea";
-      if (!confirm(`Delete "${text}"?\n\nThis cannot be undone.`)) {
-        return;
-      }
+
+    const text =
+      li?.querySelector(".core-idea-text")?.textContent?.trim() || "this core idea";
+
+    if (!confirm(`Delete "${text}"?\n\nThis cannot be undone.`)) {
+      return;
     }
 
     try {
@@ -564,12 +549,10 @@
         throw new Error(result.error || "Delete failed");
       }
 
-      // Remove from DOM
       if (li && li.parentElement) {
         li.parentElement.removeChild(li);
       }
 
-      // Update local array
       currentCoreIdeas = currentCoreIdeas.filter((ci) => ci.id !== coreIdeaId);
 
       setCoreIdeasStatus(
@@ -856,46 +839,22 @@
 
       const metaDiv = document.createElement("div");
       metaDiv.className = "core-idea-meta";
-      metaDiv.textContent = `source=${item.source || "(unknown)"}
-        • created=${item.created_at || "?"}`;
+      metaDiv.textContent = [
+        item.id != null ? `id: ${item.id}` : "",
+        item.created_at || ""
+      ].filter(Boolean).join(" · ");
 
-      const visionsContainer = document.createElement("div");
-      visionsContainer.className = "visions-container";
-      visionsContainer.style.display = "none";
-
-      const visionsStatus = document.createElement("div");
-      visionsStatus.className = "visions-status";
-
-      const visionsList = document.createElement("ul");
-      visionsList.className = "visions-list";
-
-      visionsContainer.appendChild(visionsStatus);
-      visionsContainer.appendChild(visionsList);
-
-      // actions on the right: toggle + per-core "Gen visions" + Edit/Delete
       const actionsDiv = document.createElement("div");
       actionsDiv.className = "core-idea-actions";
 
-      const toggleBtn = document.createElement("button");
-      toggleBtn.type = "button";
-      toggleBtn.textContent = "Show visions";
-
-      toggleBtn.addEventListener("click", async () => {
-        if (visionsContainer.style.display === "none") {
-          visionsContainer.style.display = "block";
-          toggleBtn.textContent = "Hide visions";
-          await loadVisionsForCoreIdea(item.id, visionsList, visionsStatus);
-        } else {
-          visionsContainer.style.display = "none";
-          toggleBtn.textContent = "Show visions";
-        }
-      });
-
-      const genVisionsBtn = document.createElement("button");
-      genVisionsBtn.type = "button";
-      genVisionsBtn.textContent = "Gen visions";
-      genVisionsBtn.addEventListener("click", async () => {
-        await queueVisionForSingleCoreIdea(item.id);
+      const openWorldBtn = document.createElement("button");
+      openWorldBtn.type = "button";
+      openWorldBtn.textContent = "Open world";
+      openWorldBtn.addEventListener("click", () => {
+        const url = `/world.html?core_idea_id=${encodeURIComponent(
+          item.id
+        )}&core_idea=${encodeURIComponent(item.core_idea || "")}`;
+        window.location.href = url;
       });
 
       const editBtn = document.createElement("button");
@@ -912,25 +871,18 @@
         deleteCoreIdeaFromUI(item.id);
       });
 
-      actionsDiv.appendChild(toggleBtn);
-      actionsDiv.appendChild(genVisionsBtn);
+      actionsDiv.appendChild(openWorldBtn);
       actionsDiv.appendChild(editBtn);
       actionsDiv.appendChild(deleteBtn);
 
-      const row = document.createElement("div");
-      row.className = "core-idea-row";
+      const headerRow = document.createElement("div");
+      headerRow.className = "core-idea-header-row";
+      headerRow.appendChild(textDiv);
+      headerRow.appendChild(actionsDiv);
 
-      const left = document.createElement("div");
-      left.className = "core-idea-left";
+      li.appendChild(headerRow);
+      li.appendChild(metaDiv);
 
-      left.appendChild(textDiv);
-      left.appendChild(metaDiv);
-      left.appendChild(visionsContainer);
-
-      row.appendChild(left);
-      row.appendChild(actionsDiv);
-
-      li.appendChild(row);
       list.appendChild(li);
     });
   }
@@ -1175,16 +1127,12 @@
       .addEventListener("click", loadCoreIdeasFromRead);
 
     document
-      .getElementById("btn-generate-visions-for-core-ideas")
-      .addEventListener("click", queueVisionsForAllCoreIdeas);
-
-    // NEW: manual core idea submit
-    document
       .getElementById("btn-add-core-idea")
       .addEventListener("click", addManualCoreIdea);
 
     loadThought();
   });
+
 
 </script>
 </body>

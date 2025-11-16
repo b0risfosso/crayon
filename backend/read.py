@@ -526,3 +526,145 @@ def read_world_contexts_by_vision():
             items.append(rec)
 
     return jsonify({"items": items, "count": len(items)})
+
+
+@app.get("/read/world_contexts_by_core_idea")
+def read_world_contexts_by_core_idea():
+    """
+    Return world_contexts attached to a core_idea.
+
+    Query params:
+      - core_idea_id: int (required)
+      - email: exact match filter (optional)
+      - limit: int (default 50, max 500)
+
+    Response:
+      {
+        "items": [
+          {
+            "id": int,
+            "core_idea_id": int,
+            "text": str,
+            "email": str | null,
+            "metadata": str | null,
+            "created_at": str,
+            "updated_at": str
+          },
+          ...
+        ],
+        "count": <number of items>
+      }
+    """
+    core_id = request.args.get("core_idea_id", type=int)
+    if not core_id:
+        return jsonify({"error": "core_idea_id is required"}), 400
+
+    email = (request.args.get("email") or "").strip().lower()
+    try:
+        limit = int(request.args.get("limit", "50"))
+    except Exception:
+        limit = 50
+    limit = max(1, min(500, limit))
+
+    db_path = _safe_get_picture_db_path()
+    sql = """
+      SELECT id, core_idea_id, text, email, metadata,
+             created_at, updated_at
+      FROM world_contexts
+      WHERE core_idea_id = ?
+    """
+    params = [core_id]
+
+    if email:
+        sql += " AND LOWER(IFNULL(email,'')) = ?"
+        params.append(email)
+
+    sql += " ORDER BY datetime(created_at) DESC, id DESC LIMIT ?"
+    params.append(limit)
+
+    items = []
+    try:
+        with _maybe_connect(db_path) as conn:
+            cur = conn.execute(sql, tuple(params))
+            colnames = [d[0] for d in cur.description]
+            for row in cur.fetchall():
+                rec = {k: v for k, v in zip(colnames, row)}
+                items.append(rec)
+    except sqlite3.OperationalError as e:
+        # If the table doesn't exist yet, just return empty
+        if "no such table" in str(e):
+            return jsonify({"items": [], "count": 0})
+        raise
+
+    return jsonify({"items": items, "count": len(items)})
+
+
+@app.get("/read/bridges_by_core_idea")
+def read_bridges_by_core_idea():
+    """
+    Return bridges attached to a core_idea.
+
+    Query params:
+      - core_idea_id: int (required)
+      - email: exact match filter (optional)
+      - limit: int (default 50, max 500)
+
+    Response:
+      {
+        "items": [
+          {
+            "id": int,
+            "core_idea_id": int,
+            "title": str | null,
+            "text": str,
+            "email": str | null,
+            "metadata": str | null,
+            "created_at": str,
+            "updated_at": str
+          },
+          ...
+        ],
+        "count": <number of items>
+      }
+    """
+    core_id = request.args.get("core_idea_id", type=int)
+    if not core_id:
+        return jsonify({"error": "core_idea_id is required"}), 400
+
+    email = (request.args.get("email") or "").strip().lower()
+    try:
+        limit = int(request.args.get("limit", "50"))
+    except Exception:
+        limit = 50
+    limit = max(1, min(500, limit))
+
+    db_path = _safe_get_picture_db_path()
+    sql = """
+      SELECT id, core_idea_id, title, text, email, metadata,
+             created_at, updated_at
+      FROM bridges
+      WHERE core_idea_id = ?
+    """
+    params = [core_id]
+
+    if email:
+        sql += " AND LOWER(IFNULL(email,'')) = ?"
+        params.append(email)
+
+    sql += " ORDER BY datetime(created_at) DESC, id DESC LIMIT ?"
+    params.append(limit)
+
+    items = []
+    try:
+        with _maybe_connect(db_path) as conn:
+            cur = conn.execute(sql, tuple(params))
+            colnames = [d[0] for d in cur.description]
+            for row in cur.fetchall():
+                rec = {k: v for k, v in zip(colnames, row)}
+                items.append(rec)
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            return jsonify({"items": [], "count": 0})
+        raise
+
+    return jsonify({"items": items, "count": len(items)})
