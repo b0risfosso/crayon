@@ -125,7 +125,6 @@
     margin-top: 4px;
   }
 
-  /* New: layout and styles for visions per core idea */
   .core-idea-header-row {
     display: flex;
     align-items: flex-start;
@@ -182,7 +181,6 @@
     margin-top: 2px;
   }
 
-  /* NEW: actions + world-context styles for visions */
   .vision-actions {
     display: flex;
     gap: 6px;
@@ -251,7 +249,6 @@
     padding: 6px 10px;
   }
 
-
   .core-idea-item.editing .core-idea-text {
     display: none;
   }
@@ -276,8 +273,6 @@
     font-size: 11px;
     padding: 3px 8px;
   }
-
-
 </style>
 </head>
 
@@ -296,18 +291,16 @@
     <div class="core-ideas-header">
       <h2>Core ideas for this thought</h2>
       <button type="button" class="primary" id="btn-generate-core-ideas">
-        Generate core ideas
+        Generate core ideas (THINK)
       </button>
       <button type="button" id="btn-refresh-core-ideas">
         Refresh
       </button>
-      <!-- generate visions for all loaded core ideas -->
       <button type="button" id="btn-generate-visions-for-core-ideas">
         Generate visions
       </button>
     </div>
   
-    <!-- NEW: manual core idea input -->
     <div class="manual-core-idea">
       <textarea
         id="manual-core-idea-input"
@@ -321,22 +314,17 @@
     <div class="status" id="core-ideas-status"></div>
     <ul class="core-ideas-list" id="core-ideas-list"></ul>
   </div>
-  
 </div>
 
 <script>
   const API_BASE  = "/scribble/api";   // scribble.py
   const JID_BASE  = "/jid";            // jid.py
   const READ_BASE = "/read";           // read.py
+  const THINK_BASE = "/think";         // think.py
 
-  let currentThought = null;   // full thought row from /scribble/api/thoughts/<id>
+  let currentThought = null;
   let currentId = null;
 
-  // track polling for the core-ideas queue
-  let coreIdeasTaskId = null;
-  let coreIdeasPollTimer = null;
-
-  // track currently rendered core ideas so we can queue visions for them
   let currentCoreIdeas = [];
 
   function getQueryParam(name) {
@@ -354,9 +342,7 @@
 
   function setCoreIdeasButtonsDisabled(disabled) {
     document.getElementById("btn-generate-core-ideas").disabled = disabled;
-    document.getElementById("btn-refresh-core-ideas").disabled =
-      disabled && !!coreIdeasTaskId;
-
+    document.getElementById("btn-refresh-core-ideas").disabled = disabled;
     const visionsBtn = document.getElementById("btn-generate-visions-for-core-ideas");
     if (visionsBtn) visionsBtn.disabled = disabled;
   }
@@ -379,7 +365,7 @@
 
       const payload = {
         core_idea: coreText,
-        email: ""
+        email: "",
       };
 
       const res = await fetch(
@@ -387,7 +373,7 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         }
       );
 
@@ -566,8 +552,6 @@
     }
   }
 
-
-
   async function loadThought() {
     const id = getQueryParam("id");
     if (!id) {
@@ -596,15 +580,12 @@
       document.getElementById("text").textContent = t.text || "";
       setStatus("");
 
-      // After loading the thought, load any existing core ideas for it
       await loadCoreIdeasFromRead();
     } catch (err) {
       console.error(err);
       setStatus("Error loading thought.");
     }
   }
-
-  // --- World contexts loading per vision ----------------------------------
 
   async function loadWorldContextsForVision(visionId, listEl, statusEl) {
     if (!visionId) {
@@ -669,7 +650,7 @@
 
       const payload = {
         vision_id: visionId,
-        email: "" // optional, fill for tracing if desired
+        email: ""
       };
 
       const res = await fetch(`${JID_BASE}/generate_world_context_for_vision`, {
@@ -706,8 +687,6 @@
       }
     }
   }
-
-  // --- Visions loading per core idea --------------------------------------
 
   async function loadVisionsForCoreIdea(coreIdeaId, listEl, statusEl) {
     if (!coreIdeaId) {
@@ -762,7 +741,6 @@
 
         textDiv.textContent = body || "(no text)";
 
-        // Actions: generate world + toggle worlds
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "vision-actions";
 
@@ -774,7 +752,6 @@
         toggleWorldsBtn.type = "button";
         toggleWorldsBtn.textContent = "Show worlds";
 
-        // World container (hidden by default)
         const worldContainer = document.createElement("div");
         worldContainer.className = "world-container";
         worldContainer.style.display = "none";
@@ -820,8 +797,6 @@
     }
   }
 
-  // --- Core ideas rendering ------------------------------------------------
-
   function renderCoreIdeas(items) {
     currentCoreIdeas = items || [];
 
@@ -853,7 +828,7 @@
       openWorldBtn.addEventListener("click", () => {
         const url = `/world.html?core_idea_id=${encodeURIComponent(
           item.id
-        )}&core_idea=${encodeURIComponent(item.core_idea || "")}`;
+        )}&core_idea=${encodeURIComponent(item.core_idea || "")}&thought_id=${encodeURIComponent(currentId)}`;
         window.location.href = url;
       });
 
@@ -887,7 +862,6 @@
     });
   }
 
-
   async function loadCoreIdeasFromRead() {
     if (!currentId) return;
 
@@ -910,8 +884,6 @@
     }
   }
 
-  // --- Queueing visions generation ----------------------------------------
-
   async function queueVisionForSingleCoreIdea(coreIdeaId) {
     if (!coreIdeaId) {
       setCoreIdeasStatus("Cannot queue visions: missing core_idea_id.");
@@ -921,7 +893,7 @@
     try {
       const payload = {
         core_idea_id: coreIdeaId,
-        email: ""   // optional, fill if you want tracing
+        email: ""
       };
 
       const res = await fetch(`${JID_BASE}/generate_visions_from_core_idea`, {
@@ -969,7 +941,6 @@
     let success = 0;
     let fails = 0;
 
-    // sequential is simplest; if you like you can use Promise.all
     for (const item of currentCoreIdeas) {
       if (!item.id) continue;
       try {
@@ -985,134 +956,105 @@
     setCoreIdeasStatus(msg);
   }
 
-  // --- Core ideas generation via queue (existing) --------------------------
-
-  // Poll a queued job until it finishes.
-  async function pollCoreIdeasTask(taskId, attempt = 0) {
-    coreIdeasTaskId = taskId;
-
-    const maxAttempts = 120;       // fail-safe (~3 minutes if 1.5s interval)
-    const delayMs = 1500;
-
-    try {
-      const url = `${JID_BASE}/create_pictures/result` +
-                  `?task_id=${encodeURIComponent(taskId)}&wrapper=true`;
-      const res = await fetch(url);
-
-      // Task not finished yet
-      if (res.status === 202) {
-        const body = await res.json().catch(() => ({}));
-        const status = body.status || "queued/running";
-        setCoreIdeasStatus(`Core-ideas task ${status}… (task_id=${taskId})`);
-
-        if (attempt >= maxAttempts) {
-          setCoreIdeasStatus("Core-ideas task timed out.");
-          setCoreIdeasButtonsDisabled(false);
-          coreIdeasTaskId = null;
-          return;
-        }
-
-        coreIdeasPollTimer = setTimeout(
-          () => pollCoreIdeasTask(taskId, attempt + 1),
-          delayMs
-        );
-        return;
-      }
-
-      // Hard error (404 or others)
-      if (!res.ok && res.status !== 500) {
-        let msg = `Queue error (HTTP ${res.status})`;
-        try {
-          const errBody = await res.json();
-          if (errBody && errBody.error) msg = errBody.error;
-        } catch (_) {}
-        setCoreIdeasStatus(msg);
-        setCoreIdeasButtonsDisabled(false);
-        coreIdeasTaskId = null;
-        return;
-      }
-
-      const body = await res.json().catch(() => ({}));
-
-      // If wrapper+error
-      if (body.status === "error") {
-        const msg = body.error || "Core-ideas task failed.";
-        setCoreIdeasStatus(msg);
-        setCoreIdeasButtonsDisabled(false);
-        coreIdeasTaskId = null;
-        return;
-      }
-
-      // Done
-      setCoreIdeasStatus("Core ideas generated. Reloading from DB…");
-      await loadCoreIdeasFromRead();
-      setCoreIdeasStatus("Core ideas generated and loaded.");
-      setCoreIdeasButtonsDisabled(false);
-      coreIdeasTaskId = null;
-    } catch (err) {
-      console.error(err);
-      setCoreIdeasStatus("Error polling core-ideas task: " + err.message);
-      setCoreIdeasButtonsDisabled(false);
-      coreIdeasTaskId = null;
-    }
-  }
+  // --- NEW: core ideas generation via /think/core_ideas --------------------
 
   async function generateCoreIdeas() {
     if (!currentThought || !currentThought.text) {
       setCoreIdeasStatus("No thought text to send.");
       return;
     }
-
-    // Clear any previous polling
-    if (coreIdeasPollTimer) {
-      clearTimeout(coreIdeasPollTimer);
-      coreIdeasPollTimer = null;
+    if (!currentId) {
+      setCoreIdeasStatus("No thought loaded.");
+      return;
     }
-    coreIdeasTaskId = null;
 
     try {
       setCoreIdeasButtonsDisabled(true);
-      setCoreIdeasStatus("Submitting core-ideas job to queue…");
+      setCoreIdeasStatus("Calling THINK to generate core ideas…");
 
-      const payload = {
-        text: currentThought.text,
-        // tie core_ideas to this specific thought so /read/core_ideas can find them
-        source: `thought:${currentThought.id}`,
-        // optional email for tracing
-        email: ""
-      };
-
-      const res = await fetch(`${JID_BASE}/create_core_ideas`, {
+      // 1) Call /think/core_ideas
+      const thinkRes = await fetch(`${THINK_BASE}/core_ideas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ thought: currentThought.text })
       });
 
-      if (!res.ok) {
-        let msg = "HTTP " + res.status;
+      if (!thinkRes.ok) {
+        let msg = "HTTP " + thinkRes.status;
         try {
-          const errBody = await res.json();
+          const errBody = await thinkRes.json();
           if (errBody && errBody.error) msg = errBody.error;
         } catch (_) {}
         throw new Error(msg);
       }
 
-      const body = await res.json().catch(() => ({}));
-      const taskId = body.task_id;
-      if (!taskId) {
+      const thinkData = await thinkRes.json().catch(() => ({}));
+      const seeds = Array.isArray(thinkData.core_ideas)
+        ? thinkData.core_ideas
+        : [];
+
+      if (!seeds.length) {
+        setCoreIdeasStatus("THINK returned no core ideas.");
         setCoreIdeasButtonsDisabled(false);
-        throw new Error("Queue did not return task_id.");
+        return;
       }
 
       setCoreIdeasStatus(
-        `Core-ideas job queued (task_id=${taskId}). Waiting for completion…`
+        `Received ${seeds.length} core idea(s) from THINK. Saving to picture.db…`
       );
 
-      // Start polling queue for completion
-      pollCoreIdeasTask(taskId, 0);
+      // 2) Save each core idea via scribble API so it lands in picture.db
+      let saved = 0;
+      for (const seed of seeds) {
+        const text = (seed.text || "").trim();
+        if (!text) continue;
+
+        const payload = {
+          core_idea: text,
+          email: "",
+          origin: "think"
+        };
+
+        const res = await fetch(
+          `${API_BASE}/thoughts/${encodeURIComponent(currentId)}/core_ideas`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }
+        );
+
+        if (!res.ok) {
+          // log but continue
+          let msg = "HTTP " + res.status;
+          try {
+            const errBody = await res.json();
+            if (errBody && errBody.error) msg = errBody.error;
+          } catch (_) {}
+          console.error("Error saving core idea:", msg);
+          continue;
+        }
+
+        await res.json().catch(() => ({}));
+        saved += 1;
+      }
+
+      setCoreIdeasStatus(
+        `Saved ${saved} core idea(s) to picture.db. Reloading from /read/core_ideas…`
+      );
+
+      // 3) Reload from /read
+      await loadCoreIdeasFromRead();
+
+      setCoreIdeasStatus(
+        currentCoreIdeas.length
+          ? `Loaded ${currentCoreIdeas.length} core idea(s).`
+          : "No core ideas yet."
+      );
     } catch (err) {
       console.error(err);
       setCoreIdeasStatus("Error generating core ideas: " + err.message);
+    } finally {
       setCoreIdeasButtonsDisabled(false);
     }
   }
@@ -1130,10 +1072,12 @@
       .getElementById("btn-add-core-idea")
       .addEventListener("click", addManualCoreIdea);
 
+    document
+      .getElementById("btn-generate-visions-for-core-ideas")
+      .addEventListener("click", queueVisionsForAllCoreIdeas);
+
     loadThought();
   });
-
-
 </script>
 </body>
 </html>

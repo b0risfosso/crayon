@@ -61,6 +61,7 @@
       justify-content: space-between;
       margin-bottom: 8px;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .section-header h2 {
@@ -216,6 +217,9 @@
   <div class="section" id="world-section">
     <div class="section-header">
       <h2>World contexts</h2>
+      <button type="button" id="btn-generate-world-think" class="primary">
+        Generate from THINK
+      </button>
     </div>
     <div class="status" id="world-status"></div>
     <div class="input-row">
@@ -228,6 +232,9 @@
   <div class="section" id="bridges-section">
     <div class="section-header">
       <h2>Bridges</h2>
+      <button type="button" id="btn-generate-bridges-think" class="primary">
+        Generate bridges (THINK)
+      </button>
     </div>
     <div class="status" id="bridges-status"></div>
     <div class="input-row">
@@ -244,6 +251,7 @@
 <script>
   const API_BASE  = "/scribble/api";
   const READ_BASE = "/read";
+  const THINK_BASE = "/think";
 
   let coreIdeaId = null;
   let coreIdeaText = "";
@@ -354,8 +362,6 @@
     textarea.rows = Math.min(6, Math.max(3, (textarea.value.split("\n").length || 1)));
 
     textDiv.insertAdjacentElement("afterend", textarea);
-
-    const metaDiv = main.querySelector(".item-meta");
 
     const actions = li.querySelector(".item-actions");
     const originalButtons = Array.from(actions.children);
@@ -750,6 +756,196 @@
     }
   }
 
+  // ----- NEW: THINK integration for world + bridges ------------------------
+
+  async function generateWorldFromThink() {
+    if (!coreIdeaId) {
+      setWorldStatus("Missing core_idea_id.");
+      return;
+    }
+    const text = (coreIdeaText || "").trim();
+    if (!text) {
+      setWorldStatus("No core idea text available.");
+      return;
+    }
+
+    try {
+      setWorldStatus("Calling THINK for world context…");
+
+      const payload = {
+        core_ideas: [
+          { id: coreIdeaId, text: text }
+        ]
+      };
+
+      const resThink = await fetch(`${THINK_BASE}/world_context`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!resThink.ok) {
+        let msg = "HTTP " + resThink.status;
+        try {
+          const errBody = await resThink.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const data = await resThink.json().catch(() => ({}));
+      const worldText = (data.world_context || "").trim();
+      if (!worldText) {
+        setWorldStatus("THINK returned empty world context.");
+        return;
+      }
+
+      setWorldStatus("Saving world context to picture.db…");
+
+      const resSave = await fetch(
+        `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}/world_contexts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: worldText, email: "" })
+        }
+      );
+
+      if (!resSave.ok) {
+        let msg = "HTTP " + resSave.status;
+        try {
+          const errBody = await resSave.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      await resSave.json().catch(() => ({}));
+      await loadWorldContexts();
+      setWorldStatus("World context generated and saved.");
+    } catch (err) {
+      console.error(err);
+      setWorldStatus("Error generating world context: " + err.message);
+    }
+  }
+
+  async function generateBridgesFromThink() {
+    if (!coreIdeaId) {
+      setBridgesStatus("Missing core_idea_id.");
+      return;
+    }
+    const text = (coreIdeaText || "").trim();
+    if (!text) {
+      setBridgesStatus("No core idea text available.");
+      return;
+    }
+
+    try {
+      setBridgesStatus("Calling THINK for world context…");
+
+      const payloadWC = {
+        core_ideas: [
+          { id: coreIdeaId, text: text }
+        ]
+      };
+
+      const resWC = await fetch(`${THINK_BASE}/world_context`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payloadWC)
+      });
+
+      if (!resWC.ok) {
+        let msg = "HTTP " + resWC.status;
+        try {
+          const errBody = await resWC.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const wcData = await resWC.json().catch(() => ({}));
+      const worldText = (wcData.world_context || "").trim();
+      if (!worldText) {
+        setBridgesStatus("THINK returned empty world context.");
+        return;
+      }
+
+      // Optionally store this world context as well (nice for consistency)
+      try {
+        const resSaveWorld = await fetch(
+          `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}/world_contexts`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: worldText, email: "" })
+          }
+        );
+        if (resSaveWorld.ok) {
+          await resSaveWorld.json().catch(() => ({}));
+          await loadWorldContexts();
+        }
+      } catch (e) {
+        console.error("Error saving world context while generating bridges:", e);
+      }
+
+      setBridgesStatus("Calling THINK for bridges…");
+
+      const resBr = await fetch(`${THINK_BASE}/bridges`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ world_context: worldText })
+      });
+
+      if (!resBr.ok) {
+        let msg = "HTTP " + resBr.status;
+        try {
+          const errBody = await resBr.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const brData = await resBr.json().catch(() => ({}));
+      const bridgesText = (brData.bridges || "").trim();
+      if (!bridgesText) {
+        setBridgesStatus("THINK returned empty bridges text.");
+        return;
+      }
+
+      setBridgesStatus("Saving bridges to picture.db…");
+
+      const resSaveBr = await fetch(
+        `${API_BASE}/core_ideas/${encodeURIComponent(coreIdeaId)}/bridges`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "Generated bridges (THINK)",
+            text: bridgesText,
+            email: ""
+          })
+        }
+      );
+
+      if (!resSaveBr.ok) {
+        let msg = "HTTP " + resSaveBr.status;
+        try {
+          const errBody = await resSaveBr.json();
+          if (errBody && errBody.error) msg = errBody.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      await resSaveBr.json().catch(() => ({}));
+      await loadBridges();
+      setBridgesStatus("Bridges generated and saved.");
+    } catch (err) {
+      console.error(err);
+      setBridgesStatus("Error generating bridges: " + err.message);
+    }
+  }
+
   // ----- Boot -----
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -774,6 +970,14 @@
     document
       .getElementById("btn-add-bridge")
       .addEventListener("click", addBridge);
+
+    document
+      .getElementById("btn-generate-world-think")
+      .addEventListener("click", generateWorldFromThink);
+
+    document
+      .getElementById("btn-generate-bridges-think")
+      .addEventListener("click", generateBridgesFromThink);
 
     loadWorldContexts();
     loadBridges();
