@@ -422,11 +422,23 @@ def expand_core_thought():
 def distill_core_ideas():
     data = request.get_json(force=True)
     thought_text = (data.get("thought") or "").strip()
+    
     if not thought_text:
         return jsonify({"error": "Missing 'thought'"}), 400
 
-    result = run_json_prompt(core_idea_distiller_prompt, thought_text)
-    return jsonify(result)
+    prompt_text = core_idea_distiller_prompt.rstrip() + "\n\nThought:\n" + thought_text
+
+    core_ideas_text = run_text_prompt(
+        prompt_text,
+        context_text=thought_text,
+        endpoint_name="/think/core_ideas",
+        meta_purpose="core_idea_distiller",
+    )
+
+    return jsonify({
+        "thought": thought_text,
+        "core_ideas_text": core_ideas_text,
+    })
 
 
 @app.route("/think/world_context", methods=["POST"])

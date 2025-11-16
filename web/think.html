@@ -379,28 +379,32 @@
     }
 
     async function runCoreIdeas() {
-      const sourceText = lastExpansion || expansionOutput.textContent;
-      if (!sourceText) {
-        setStatus("No expansion text available. Expand a core thought first.", true);
-        return;
-      }
-      setStatus("Distilling core ideas...");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/core_ideas", { thought: sourceText });
-        lastCoreIdeas = data;
-        if (data.core_ideas) {
-          const lines = data.core_ideas.map(t => `${t.id}. ${t.text}`);
-          coreIdeasOutput.textContent = lines.join("\n");
-        } else {
-          coreIdeasOutput.textContent = JSON.stringify(data, null, 2);
+        const sourceText = lastExpansion || expansionOutput.textContent;
+        if (!sourceText) {
+            setStatus("No expansion text available. Expand a core thought first.", true);
+            return;
         }
-        setStatus("Core ideas distilled.");
-      } catch (e) {
-        setStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
+        setStatus("Distilling core ideas (THINK text block)…");
+        disableAllButtons(true);
+        try {
+            const data = await callEndpoint("/think/core_ideas", { thought: sourceText });
+            // New API: { thought, core_ideas_text }
+            const block = (data.core_ideas_text || "").trim();
+
+            lastCoreIdeas = { core_ideas_text: block };
+
+            if (block) {
+            coreIdeasOutput.textContent = block;
+            } else {
+            coreIdeasOutput.textContent = "(empty core ideas text)";
+            }
+
+            setStatus("Core ideas distilled as a single text block.");
+        } catch (e) {
+            setStatus(e.message, true);
+        } finally {
+            disableAllButtons(false);
+        }
     }
 
     async function runWorldContext() {

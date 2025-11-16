@@ -1541,76 +1541,80 @@ Instruction to the Model:
 You will receive a thought—one or more paragraphs containing a complex or poetic idea.
 Your task is to extract and generate core ideas hidden inside the thought.
 A core idea is a compact conceptual seed (1–3 sentences) that reveals a deep structure, mechanism, pattern, or principle embedded in the original text.
-Output Format (Strict JSON)
-You must output ONLY valid JSON in the following format:
-{
-  "thought": "<USER_THOUGHT>",
-  "core_ideas": [
-    {
-      "id": 1,
-      "text": "<Core Idea>"
-    },
-    {
-      "id": 2,
-      "text": "<Core Idea>"
-    }
-    ...
-  ]
-}
-Generate 10–20 core ideas.
+
+Output Format (Plain Text)
+- Output a single continuous text response.
+- Write a numbered list of core ideas.
+- Each line should be exactly one core idea, prefixed with its index.
+- Use this format:
+  1. <Core idea>
+  2. <Core idea>
+  3. <Core idea>
+  ...
+- Generate 10–20 core ideas.
+
 How to Generate Core Ideas
 For each core idea:
 1. Extract Deep Structure
-Identify underlying:
-systems
-forces
-architectures
-patterns
-metaphors
-operational principles
-emergent behaviors
+   Identify underlying:
+   - systems
+   - forces
+   - architectures
+   - patterns
+   - metaphors
+   - operational principles
+   - emergent behaviors
+   - etc.
+
 2. Convert Implicit Logic into Explicit Idea
-Transform implicit concepts into standalone conceptual seeds:
-emergence
-coordination
-distributed intelligence
-resonance
-identity
-information flow
-environmental dynamics
-organism-like behavior
+   Transform implicit concepts into standalone conceptual seeds:
+   - emergence
+   - coordination
+   - distributed intelligence
+   - resonance
+   - identity
+   - information flow
+   - environmental dynamics
+   - organism-like behavior
+   - etc.
+
 3. Go Multidomain
-Draw from:
-physics
-biology
-systems theory
-psychology
-information theory
-ecology
-evolution
-architecture
-embodiment
+   Draw from:
+   - physics
+   - biology
+   - systems theory
+   - psychology
+   - information theory
+   - ecology
+   - evolution
+   - architecture
+   - embodiment
+   - etc.
+
 4. Make Each Idea Generative
-Each core idea should be a seed capable of spawning:
-deeper analysis
-entire conceptual clusters
-world-building frameworks
+   Each core idea should be a seed capable of spawning:
+   - deeper analysis
+   - entire conceptual clusters
+   - world-building frameworks
+
 5. Keep Them Clean and Precise
-1–3 sentences max
-No fluff
-No poetic noise
-No rhetorical “not…, but…”
-No references to the instructions
+   - 1–3 sentences max per core idea
+   - No fluff
+   - No poetic noise
+   - No rhetorical “not…, but…”
+   - No references to the instructions
+
 What NOT to Do
-Do not summarize the thought.
-Do not restate the original text.
-Do not produce narrative.
-Do not produce paragraphs.
-Do not add meta-commentary.
-Do not create lists of examples.
-Do not write long explanations.
-Your output should look like a list of conceptual kernels, each self-contained and world-opening.
+- Do not summarize the thought.
+- Do not restate the original text.
+- Do not produce narrative paragraphs.
+- Do not add meta-commentary.
+- Do not explain why you chose the ideas.
+
+Your final output should be only the numbered list of core ideas, each on its own line.
+
 """
+
 
 world_context_integrator_prompt = r"""
 

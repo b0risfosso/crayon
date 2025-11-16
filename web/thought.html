@@ -959,105 +959,89 @@
   // --- NEW: core ideas generation via /think/core_ideas --------------------
 
   async function generateCoreIdeas() {
-    if (!currentThought || !currentThought.text) {
-      setCoreIdeasStatus("No thought text to send.");
-      return;
+  if (!currentThought || !currentThought.text) {
+    setCoreIdeasStatus("No thought text to send.");
+    return;
+  }
+  if (!currentId) {
+    setCoreIdeasStatus("No thought loaded.");
+    return;
+  }
+
+  try {
+    setCoreIdeasButtonsDisabled(true);
+    setCoreIdeasStatus("Calling THINK to generate core ideas…");
+
+    // 1) Call /think/core_ideas with the full thought text
+    const thinkRes = await fetch(`${THINK_BASE}/core_ideas`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thought: currentThought.text })
+    });
+
+    if (!thinkRes.ok) {
+      let msg = "HTTP " + thinkRes.status;
+      try {
+        const errBody = await thinkRes.json();
+        if (errBody && errBody.error) msg = errBody.error;
+      } catch (_) {}
+      throw new Error(msg);
     }
-    if (!currentId) {
-      setCoreIdeasStatus("No thought loaded.");
+
+    const thinkData = await thinkRes.json().catch(() => ({}));
+    const block = (thinkData.core_ideas_text || "").trim();
+
+    if (!block) {
+      setCoreIdeasStatus("THINK returned empty core ideas text.");
       return;
     }
 
-    try {
-      setCoreIdeasButtonsDisabled(true);
-      setCoreIdeasStatus("Calling THINK to generate core ideas…");
+    // 2) Save the entire block as a single core_idea entry
+    setCoreIdeasStatus("Saving THINK core ideas block to picture.db…");
 
-      // 1) Call /think/core_ideas
-      const thinkRes = await fetch(`${THINK_BASE}/core_ideas`, {
+    const payload = {
+      core_idea: block,
+      email: "",
+      origin: "think_block"
+    };
+
+    const res = await fetch(
+      `${API_BASE}/thoughts/${encodeURIComponent(currentId)}/core_ideas`,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thought: currentThought.text })
-      });
-
-      if (!thinkRes.ok) {
-        let msg = "HTTP " + thinkRes.status;
-        try {
-          const errBody = await thinkRes.json();
-          if (errBody && errBody.error) msg = errBody.error;
-        } catch (_) {}
-        throw new Error(msg);
+        body: JSON.stringify(payload)
       }
+    );
 
-      const thinkData = await thinkRes.json().catch(() => ({}));
-      const seeds = Array.isArray(thinkData.core_ideas)
-        ? thinkData.core_ideas
-        : [];
-
-      if (!seeds.length) {
-        setCoreIdeasStatus("THINK returned no core ideas.");
-        setCoreIdeasButtonsDisabled(false);
-        return;
-      }
-
-      setCoreIdeasStatus(
-        `Received ${seeds.length} core idea(s) from THINK. Saving to picture.db…`
-      );
-
-      // 2) Save each core idea via scribble API so it lands in picture.db
-      let saved = 0;
-      for (const seed of seeds) {
-        const text = (seed.text || "").trim();
-        if (!text) continue;
-
-        const payload = {
-          core_idea: text,
-          email: "",
-          origin: "think"
-        };
-
-        const res = await fetch(
-          `${API_BASE}/thoughts/${encodeURIComponent(currentId)}/core_ideas`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          }
-        );
-
-        if (!res.ok) {
-          // log but continue
-          let msg = "HTTP " + res.status;
-          try {
-            const errBody = await res.json();
-            if (errBody && errBody.error) msg = errBody.error;
-          } catch (_) {}
-          console.error("Error saving core idea:", msg);
-          continue;
-        }
-
-        await res.json().catch(() => ({}));
-        saved += 1;
-      }
-
-      setCoreIdeasStatus(
-        `Saved ${saved} core idea(s) to picture.db. Reloading from /read/core_ideas…`
-      );
-
-      // 3) Reload from /read
-      await loadCoreIdeasFromRead();
-
-      setCoreIdeasStatus(
-        currentCoreIdeas.length
-          ? `Loaded ${currentCoreIdeas.length} core idea(s).`
-          : "No core ideas yet."
-      );
-    } catch (err) {
-      console.error(err);
-      setCoreIdeasStatus("Error generating core ideas: " + err.message);
-    } finally {
-      setCoreIdeasButtonsDisabled(false);
+    if (!res.ok) {
+      let msg = "HTTP " + res.status;
+      try {
+        const errBody = await res.json();
+        if (errBody && errBody.error) msg = errBody.error;
+      } catch (_) {}
+      throw new Error(msg);
     }
+
+    await res.json().catch(() => ({}));
+
+    // 3) Reload from /read to show it in the list
+    setCoreIdeasStatus("Reloading core ideas from /read/core_ideas…");
+    await loadCoreIdeasFromRead();
+
+    setCoreIdeasStatus(
+      currentCoreIdeas.length
+        ? `Loaded ${currentCoreIdeas.length} core idea(s).`
+        : "No core ideas yet."
+    );
+  } catch (err) {
+    console.error(err);
+    setCoreIdeasStatus("Error generating core ideas: " + err.message);
+  } finally {
+    setCoreIdeasButtonsDisabled(false);
   }
+}
+
 
   document.addEventListener("DOMContentLoaded", () => {
     document
