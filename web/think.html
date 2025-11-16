@@ -328,30 +328,28 @@
     }
 
     async function runCoreThoughts() {
-      const thought = (lastThought || document.getElementById("thought-input").value.trim());
-      if (!thought) {
-        setStatus("Enter a seed thought first.", true);
-        return;
-      }
-      lastThought = thought;
-      setStatus("Generating core thoughts...");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/core_thoughts", { thought });
-        lastCoreThoughts = data;
-        if (data.core_thoughts) {
-          const lines = data.core_thoughts.map(t => `${t.id}. ${t.text}`);
-          coreThoughtsOutput.textContent = lines.join("\n");
-        } else {
-          coreThoughtsOutput.textContent = JSON.stringify(data, null, 2);
+        const thought = (lastThought || document.getElementById("thought-input").value.trim());
+        if (!thought) {
+            setStatus("Enter a seed thought first.", true);
+            return;
         }
-        setStatus("Core thoughts generated.");
-      } catch (e) {
-        setStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
-    }
+        lastThought = thought;
+        setStatus("Generating core thoughts (THINK text block)…");
+        disableAllButtons(true);
+        try {
+            const data = await callEndpoint("/think/core_thoughts", { thought });
+            const block = (data.core_thoughts_text || "").trim();
+            lastCoreThoughts = { core_thoughts_text: block };
+
+            coreThoughtsOutput.textContent = block || "(empty core thoughts text)";
+            setStatus("Core thoughts generated as a single text block.");
+        } catch (e) {
+            setStatus(e.message, true);
+        } finally {
+            disableAllButtons(false);
+        }
+        }
+
 
     async function runExpansion() {
       setStatus("Expanding core thought...");
@@ -379,27 +377,26 @@
     }
 
     async function runCoreIdeas() {
-        const sourceText = lastExpansion || expansionOutput.textContent;
-        if (!sourceText) {
-            setStatus("No expansion text available. Expand a core thought first.", true);
+        // Use the core thoughts text block as input
+        const block =
+            (lastCoreThoughts && lastCoreThoughts.core_thoughts_text) ||
+            coreThoughtsOutput.textContent.trim();
+
+        if (!block) {
+            setStatus("No core thoughts available. Generate core thoughts first.", true);
             return;
         }
-        setStatus("Distilling core ideas (THINK text block)…");
+
+        setStatus("Distilling core ideas from core thoughts block…");
         disableAllButtons(true);
         try {
-            const data = await callEndpoint("/think/core_ideas", { thought: sourceText });
-            // New API: { thought, core_ideas_text }
-            const block = (data.core_ideas_text || "").trim();
+            const data = await callEndpoint("/think/core_ideas", { thought: block });
+            const text = (data.core_ideas_text || "").trim();
 
-            lastCoreIdeas = { core_ideas_text: block };
+            lastCoreIdeas = { core_ideas_text: text };
+            coreIdeasOutput.textContent = text || "(empty core ideas text)";
 
-            if (block) {
-            coreIdeasOutput.textContent = block;
-            } else {
-            coreIdeasOutput.textContent = "(empty core ideas text)";
-            }
-
-            setStatus("Core ideas distilled as a single text block.");
+            setStatus("Core ideas distilled as a text block.");
         } catch (e) {
             setStatus(e.message, true);
         } finally {
@@ -407,24 +404,36 @@
         }
     }
 
+
     async function runWorldContext() {
-      if (!lastCoreIdeas || !lastCoreIdeas.core_ideas || lastCoreIdeas.core_ideas.length === 0) {
-        setStatus("No core ideas available. Distill core ideas first.", true);
-        return;
-      }
-      setStatus("Generating world context...");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/world_context", { core_ideas: lastCoreIdeas.core_ideas });
-        lastWorldContext = data.world_context || "";
-        worldContextOutput.textContent = lastWorldContext;
-        setStatus("World context generated.");
-      } catch (e) {
-        setStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
+        const block =
+            (lastCoreIdeas && lastCoreIdeas.core_ideas_text) ||
+            coreIdeasOutput.textContent.trim();
+
+        if (!block) {
+            setStatus("No core ideas available. Distill core ideas first.", true);
+            return;
+        }
+
+        setStatus("Generating world context from core ideas text block…");
+        disableAllButtons(true);
+        try {
+            const data = await callEndpoint("/think/world_context", {
+            core_ideas_text: block
+            });
+            const wc = (data.world_context || "").trim();
+
+            lastWorldContext = wc;
+            worldContextOutput.textContent = wc || "(empty world context)";
+
+            setStatus("World context generated from core ideas block.");
+        } catch (e) {
+            setStatus(e.message, true);
+        } finally {
+            disableAllButtons(false);
+        }
     }
+
 
     async function runBridges() {
       const ctx = lastWorldContext || worldContextOutput.textContent;
@@ -446,64 +455,61 @@
     }
 
     async function runPipeline() {
-      const thought = document.getElementById("thought-input").value.trim();
-      if (!thought) {
-        setStatus("Enter a seed thought first.", true);
-        return;
-      }
-      lastThought = thought;
-      setStatus("Running full pipeline...");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/pipeline", { thought });
-
-        // Persist state objects for further manual calls
-        lastAdjacent = data.adjacent;
-        lastCoreThoughts = data.core_thoughts;
-        lastCoreThoughtExpanded = data.core_thought_expanded;
-        lastExpansion = data.core_thought_expanded?.expansion || "";
-        lastCoreIdeas = data.core_ideas;
-        lastWorldContext = data.world_context || "";
-
-        // Fill UI
-        if (data.adjacent && data.adjacent.adjacent_thoughts) {
-          const lines = data.adjacent.adjacent_thoughts.map(t => `${t.id}. ${t.text}`);
-          adjacentOutput.textContent = lines.join("\n");
+        const thought = document.getElementById("thought-input").value.trim();
+        if (!thought) {
+            setStatus("Enter a seed thought first.", true);
+            return;
         }
+        lastThought = thought;
+        setStatus("Running full pipeline (no expansion step)…");
+        disableAllButtons(true);
+        try {
+            const data = await callEndpoint("/think/pipeline", { thought });
 
-        if (data.core_thoughts && data.core_thoughts.core_thoughts) {
-          const lines = data.core_thoughts.core_thoughts.map(t => `${t.id}. ${t.text}`);
-          coreThoughtsOutput.textContent = lines.join("\n");
+            // Save state for manual follow-ups
+            lastAdjacent = data.adjacent || null;
+            lastCoreThoughts = { core_thoughts_text: data.core_thoughts_text || "" };
+            lastCoreIdeas = { core_ideas_text: data.core_ideas_text || "" };
+            lastWorldContext = data.world_context || "";
+
+            // Adjacent
+            if (data.adjacent && data.adjacent.adjacent_thoughts) {
+            const lines = data.adjacent.adjacent_thoughts.map(t => `${t.id}. ${t.text}`);
+            adjacentOutput.textContent = lines.join("\n");
+            } else if (data.adjacent) {
+            adjacentOutput.textContent = JSON.stringify(data.adjacent, null, 2);
+            } else {
+            adjacentOutput.textContent = "(no adjacent thoughts)";
+            }
+
+            // Core thoughts
+            coreThoughtsOutput.textContent =
+            data.core_thoughts_text || "(no core thoughts text)";
+
+            // Expansion section is now explicitly skipped
+            expansionOutput.textContent =
+            "(expansion step skipped in pipeline; use the Expand control manually if you still want to experiment with expansions.)";
+
+            // Core ideas
+            coreIdeasOutput.textContent =
+            data.core_ideas_text || "(no core ideas text)";
+
+            // World context
+            worldContextOutput.textContent =
+            data.world_context || "(no world context)";
+
+            // Bridges
+            bridgesOutput.textContent =
+            data.bridges || "(no bridges)";
+
+            setStatus("Full pipeline complete (thought → adjacent → core thoughts → core ideas → world context → bridges). Stored with id " + data.id + ".");
+        } catch (e) {
+            setStatus(e.message, true);
+        } finally {
+            disableAllButtons(false);
         }
-
-        if (data.core_thought_expanded) {
-          expansionOutput.textContent =
-            "Core thought:\n" +
-            data.core_thought_expanded.core_thought +
-            "\n\nExpansion:\n" +
-            data.core_thought_expanded.expansion;
-        }
-
-        if (data.core_ideas && data.core_ideas.core_ideas) {
-          const lines = data.core_ideas.core_ideas.map(t => `${t.id}. ${t.text}`);
-          coreIdeasOutput.textContent = lines.join("\n");
-        }
-
-        if (data.world_context) {
-          worldContextOutput.textContent = data.world_context;
-        }
-
-        if (data.bridges) {
-          bridgesOutput.textContent = data.bridges;
-        }
-
-        setStatus("Full pipeline complete. Stored with id " + data.id + ".");
-      } catch (e) {
-        setStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
     }
+
 
     adjacentBtn.addEventListener("click", runAdjacent);
     coreThoughtsBtn.addEventListener("click", runCoreThoughts);

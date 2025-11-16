@@ -397,8 +397,21 @@ def generate_core_thoughts():
     if not thought:
         return jsonify({"error": "Missing 'thought'"}), 400
 
-    result = run_json_prompt(core_thought_architecture_builder_prompt, thought)
-    return jsonify(result)
+    # Build the full prompt: instructions + the actual thought
+    prompt_text = core_thought_architecture_builder_prompt.rstrip() + "\n\nThought:\n" + thought
+
+    core_thoughts_text = run_text_prompt(
+        prompt_text,
+        context_text=thought,
+        endpoint_name="/think/core_thoughts",
+        meta_purpose="core_thought_architecture",
+    )
+
+    # Return a simple wrapper so front-ends can display it
+    return jsonify({
+        "thought": thought,
+        "core_thoughts_text": core_thoughts_text,
+    })
 
 
 @app.route("/think/expand_core_thought", methods=["POST"])
@@ -421,46 +434,60 @@ def expand_core_thought():
 @app.route("/think/core_ideas", methods=["POST"])
 def distill_core_ideas():
     data = request.get_json(force=True)
-    thought_text = (data.get("thought") or "").strip()
-    
-    if not thought_text:
+    source_text = (data.get("thought") or "").strip()  # can be original thought OR core-thought block
+    if not source_text:
         return jsonify({"error": "Missing 'thought'"}), 400
 
-    prompt_text = core_idea_distiller_prompt.rstrip() + "\n\nThought:\n" + thought_text
+    prompt_text = core_idea_distiller_prompt.rstrip() + "\n\nThought:\n" + source_text
 
     core_ideas_text = run_text_prompt(
         prompt_text,
-        context_text=thought_text,
+        context_text=source_text,
         endpoint_name="/think/core_ideas",
         meta_purpose="core_idea_distiller",
     )
 
     return jsonify({
-        "thought": thought_text,
+        "thought": source_text,
         "core_ideas_text": core_ideas_text,
     })
 
 
 @app.route("/think/world_context", methods=["POST"])
-def generate_world_context():
+def build_world_context():
     data = request.get_json(force=True)
-    core_ideas = data.get("core_ideas", [])
-    if not isinstance(core_ideas, list) or not core_ideas:
-        return jsonify({"error": "Missing 'core_ideas' list"}), 400
 
-    core_ideas_text = "\n".join(
-        f"- {ci.get('text', '')}"
-        for ci in core_ideas
-        if ci.get("text")
+    # Preferred: a single text block
+    core_ideas_text = (data.get("core_ideas_text") or "").strip()
+
+    # Backward-compatible: list of core_ideas with "text"
+    if not core_ideas_text and isinstance(data.get("core_ideas"), list):
+        lines = []
+        for idx, item in enumerate(data["core_ideas"], start=1):
+            t = (item.get("text") or "").strip()
+            if t:
+                lines.append(f"{idx}. {t}")
+        core_ideas_text = "\n".join(lines).strip()
+
+    if not core_ideas_text:
+        return jsonify({
+            "error": "Missing 'core_ideas_text' or non-empty 'core_ideas' array"
+        }), 400
+
+    prompt_text = world_context_integrator_prompt + "\n\nCore ideas (text block):\n" + core_ideas_text
+
+    world_context = run_text_prompt(
+        prompt_text,
+        context_text=core_ideas_text,
+        endpoint_name="/think/world_context",
+        meta_purpose="world_context_from_block",
     )
 
-    prompt_text = world_context_integrator_prompt + "\n\nCore ideas:\n" + core_ideas_text
-    world_context = run_text_prompt(prompt_text, core_ideas_text)
-
     return jsonify({
-        "core_ideas": core_ideas,
+        "core_ideas_text": core_ideas_text,
         "world_context": world_context,
     })
+
 
 
 @app.route("/think/bridges", methods=["POST"])
@@ -481,53 +508,56 @@ def generate_bridges():
 
 @app.route("/think/pipeline", methods=["POST"])
 def run_full_pipeline():
-    """
-    Full pipeline:
-    thought
-      -> adjacent thoughts
-      -> core thoughts
-      -> expand first core thought
-      -> core ideas (from expansion)
-      -> world context
-      -> bridges
-
-    This endpoint also stores the pipeline in SQLite.
-    """
     data = request.get_json(force=True)
     thought = (data.get("thought") or "").strip()
     if not thought:
         return jsonify({"error": "Missing 'thought'"}), 400
 
-    # 1. Adjacent thoughts
-    adjacent = run_json_prompt(adjacent_thought_generator_prompt, thought)
-
-    # 2. Core thought architecture
-    core_thoughts = run_json_prompt(core_thought_architecture_builder_prompt, thought)
-    core_thought_list = core_thoughts.get("core_thoughts", [])
-    core_to_expand = core_thought_list[0]["text"] if core_thought_list else thought
-
-    # 3. Deep expansion
-    prompt_text_expansion = core_thought_to_deep_expansion_prompt.replace("<CORE_THOUGHT_HERE>", core_to_expand)
-    expansion = run_text_prompt(prompt_text_expansion, core_to_expand)
-
-    # 4. Core ideas from expansion
-    core_ideas = run_json_prompt(core_idea_distiller_prompt, expansion)
-    core_ideas_list = core_ideas.get("core_ideas", [])
-
-    # 5. World context from core ideas
-    core_ideas_text = "\n".join(
-        f"- {ci.get('text', '')}"
-        for ci in core_ideas_list
-        if ci.get("text")
+    # 1. Adjacent thoughts (JSON)
+    adjacent = run_json_prompt(
+        adjacent_thought_generator_prompt,
+        thought,
+        endpoint_name="/think/adjacent",
+        email=None,
     )
-    prompt_text_world = world_context_integrator_prompt + "\n\nCore ideas:\n" + core_ideas_text
-    world_context = run_text_prompt(prompt_text_world, core_ideas_text)
 
-    # 6. Bridges from world context
+    # 2. Core thoughts (TEXT BLOCK)
+    prompt_text_core = core_thought_architecture_builder_prompt.rstrip() + "\n\nThought:\n" + thought
+    core_thoughts_text = run_text_prompt(
+        prompt_text_core,
+        context_text=thought,
+        endpoint_name="/think/core_thoughts",
+        meta_purpose="core_thought_architecture",
+    )
+
+    # 3. Core ideas (TEXT BLOCK) — fed directly from core_thoughts_text
+    prompt_text_core_ideas = core_idea_distiller_prompt.rstrip() + "\n\nThought:\n" + core_thoughts_text
+    core_ideas_text = run_text_prompt(
+        prompt_text_core_ideas,
+        context_text=core_thoughts_text,
+        endpoint_name="/think/core_ideas",
+        meta_purpose="core_idea_distiller",
+    )
+
+    # 4. World context from core_ideas_text
+    prompt_text_world = world_context_integrator_prompt + "\n\nCore ideas (text block):\n" + core_ideas_text
+    world_context = run_text_prompt(
+        prompt_text_world,
+        context_text=core_ideas_text,
+        endpoint_name="/think/world_context",
+        meta_purpose="world_context_from_block",
+    )
+
+    # 5. Bridges from world context
     prompt_text_bridges = world_to_reality_bridge_generator_prompt + "\n\nWorld context:\n" + world_context
-    bridges_text = run_text_prompt(prompt_text_bridges, world_context)
+    bridges_text = run_text_prompt(
+        prompt_text_bridges,
+        context_text=world_context,
+        endpoint_name="/think/bridges",
+        meta_purpose="bridges_from_world_context",
+    )
 
-    # Store pipeline
+    # Persist pipeline; keep expanded_text column but store empty string / None
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -540,9 +570,9 @@ def run_full_pipeline():
         (
             thought,
             json.dumps(adjacent),
-            json.dumps(core_thoughts),
-            expansion,
-            json.dumps(core_ideas),
+            core_thoughts_text,   # text block
+            "",                   # expanded_text no longer used
+            core_ideas_text,      # text block
             world_context,
             bridges_text,
             datetime.utcnow().isoformat(),
@@ -556,15 +586,12 @@ def run_full_pipeline():
         "id": pipeline_id,
         "thought": thought,
         "adjacent": adjacent,
-        "core_thoughts": core_thoughts,
-        "core_thought_expanded": {
-            "core_thought": core_to_expand,
-            "expansion": expansion,
-        },
-        "core_ideas": core_ideas,
+        "core_thoughts_text": core_thoughts_text,
+        "core_ideas_text": core_ideas_text,
         "world_context": world_context,
         "bridges": bridges_text,
     })
+
 
 
 # =====================

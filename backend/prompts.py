@@ -1365,61 +1365,43 @@ core_thought_architecture_builder_prompt = r"""
 
 You will receive a single thought, phrase, or seed concept.
 Your task is to expand it into a set of core thoughts that reveal the deepest conceptual architectures behind the idea.
+
 Output Requirements:
-Generate 12–20 core thoughts, each one a clean, standalone conceptual seed.
-Each core thought should open a new domain: physics, perception, psychology, architecture, embodiment, ecology, culture, metaphysics, engineering, information theory, etc.
-Avoid summarizing or categorizing—generate ideas.
-Use no ornament, no fluff, and no rhetorical “not…but” constructions.
-Prioritize clarity, depth, and structural insight.
-Treat the idea as if it is an engine for world-building, scientific speculation, emotional architecture, and metaphysical exploration.
-Do not write paragraphs—only core thoughts (1–3 sentences each).
-Each core thought should feel like a doorway to a much larger territory.
+- Generate 12–20 core thoughts.
+- Each core thought should be a clean, standalone conceptual seed (1–3 sentences).
+- Each core thought should open a new domain: physics, perception, psychology, architecture, embodiment, ecology, culture, metaphysics, engineering, information theory, etc.
+- Avoid summarizing or categorizing—generate ideas.
+- Use no ornament, no fluff, and no rhetorical “not…but” constructions.
+- Prioritize clarity, depth, and structural insight.
+- Treat the idea as an engine for world-building, scientific speculation, emotional architecture, and metaphysical exploration.
+- Do not write paragraphs—only individual core thoughts.
+- Each core thought should feel like a doorway to a much larger territory.
 
-Output ONLY valid JSON with the schema below.
-
-{
-  "thought": "<USER_THOUGHT>",
-  "core_thoughts": [
-    {
-      "id": 1,
-      "text": "<Core Thought>"
-    },
-    {
-      "id": 2,
-      "text": "<Core Thought>"
-    }
-    ...
-  ]
-}
-
+Output Format (Plain Text):
+- Output a single continuous text response.
+- Write a numbered list of core thoughts, one per line.
+- Use this format:
+  1. <Core thought>
+  2. <Core thought>
+  3. <Core thought>
+  ...
+- Do not include any explanation, commentary, or JSON.
 
 Style Guidelines:
 For each core thought:
-Reveal the hidden physics of the idea.
-Reveal the hidden psychology of the idea.
-Reveal the hidden metaphysics of the idea.
-Reveal how the idea behaves as an organism, a system, a field, or an environment.
-Reveal how the idea transforms when scaled: micro → macro → cosmic.
-Reveal how the idea encodes motion, information, structure, and identity.
-Reveal how the idea behaves inside minds, societies, bodies, and materials.
-Treat the thought as a seed for infinite derivations.
-Example Input
+- Reveal the hidden physics of the idea.
+- Reveal the hidden psychology of the idea.
+- Reveal the hidden metaphysics of the idea.
+- Reveal how the idea behaves as an organism, a system, a field, or an environment.
+- Reveal how the idea transforms when scaled: micro → macro → cosmic.
+- Reveal how the idea encodes motion, information, structure, and identity.
+- Reveal how the idea behaves inside minds, societies, bodies, and materials.
+- Treat the thought as a seed for infinite derivations.
+
+Example Input (for intuition only, do not echo):
 a symphony of a thousand pianos
-Example Output (abbreviated)
-(This is only an illustration. Do not replicate this content in real use.)
-{
-  "thought": "a symphony of a thousand pianos",
-  "core_thoughts": [
-    {
-      "id": 1,
-      "text": "A thousand pianos form an acoustic superorganism whose body is built from overlapping resonances."
-    },
-    {
-      "id": 2,
-      "text": "The combined sound field becomes a navigable pressure landscape that the listener inhabits physically."
-    }
-  ]
-}
+
+Your final output must be only the numbered list of core thoughts, each on its own line.
 
 """
 
