@@ -1692,10 +1692,10 @@ No genre fiction voice (avoid fantasy tropes).
 
 
 world_to_reality_bridge_generator_prompt = r"""
-You will receive a world context—a description of a coherent, functional imagined world with its own internal logic, systems, actors, dynamics, and physics of meaning.
-Your task is to generate bridges: real-world mechanisms that instantiate parts of this imagined world into physical, computational, or experimental reality.
-A bridge is defined as a mechanism that takes one subsystem of the imagined world and translates it into a real artifact—a tool, codebase, instrument, experiment, design, protocol, or engineered environment—that begins to reshape our world according to the logic of the imagined one.
-This is the process by which an imagined world becomes real.
+You will receive a world context—a description of a coherent, functional thought-world with its own internal logic, systems, actors, dynamics, and physics of meaning.
+Your task is to generate bridges: real-world mechanisms that instantiate parts of this thought-world into physical, computational, or experimental reality.
+A bridge is defined as a mechanism that takes one subsystem of the thought-world and translates it into a real artifact—a tool, codebase, instrument, experiment, design, protocol, or engineered environment—that begins to reshape our world according to the logic of the thought one.
+This is the process by which an thought-world becomes real.
 Output Format
 Produce 3–6 bridges, each written in structured prose (1–3 paragraphs per bridge), following the exact format below.
 No lists.
@@ -1705,12 +1705,12 @@ Write each bridge as a tight, clear block of text.
 Bridge Structure (Required for Each Bridge)
 For each bridge you must describe:
 1. What it instantiates
-Identify one subsystem from the imagined world that has clear causal rules, constraints, behaviors, or architectures.
-Name it and briefly describe its role inside the imagined world.
+Identify one subsystem from the thought-world that has clear causal rules, constraints, behaviors, or architectures.
+Name it and briefly describe its role inside the thought-world.
 2. What you build
 Describe the real-world artifact (code, hardware, experiment, spatial design, computational system, database, protocol, etc.) that instantiates this subsystem materially.
 3. How it exerts reality-pull
-Explain how this artifact begins to shape human behavior, institutional workflows, emotional landscapes, or environments in ways that make our world behave more like the imagined world.
+Explain how this artifact begins to shape human behavior, institutional workflows, emotional landscapes, or environments in ways that make our world behave more like the thought-world.
 Describe how the artifact creates constraints, incentives, affordances, or feedback loops that mirror the world context.
 4. Minimal version
 Define the smallest viable version of this bridge.
@@ -1724,7 +1724,7 @@ Guidelines for Bridge Generation
 Every bridge must arise directly from the causal rules of the world context—not as metaphor, but as structural translation.
 Bridges should cross domains:
 theory → engineering → computation → culture → environment → policy.
-Every bridge must feel like a prototype for turning the imagined world into a technology, institution, infrastructure, or ecosystem.
+Every bridge must feel like a prototype for turning the thought-world into a technology, institution, infrastructure, or ecosystem.
 Bridges must be buildable, at least in primitive form.
 Bridges should be described with enough specificity that they could plausibly be implemented.
 The tone should be structural, lucid, tightly reasoned, and grounded in mechanisms.
