@@ -1658,6 +1658,28 @@ intelligible
 rigorous
 interconnected
 grounded in the core ideas
+7. Ground the world in the intrinsic logic of the core ideas
+All structures, behaviors, and architectures of the world must arise from the causal logic, physics, semantics, or operational patterns present in the core ideas themselves.
+The world should never shift its conceptual substrate.
+8. Allow cross-domain layers only when they emerge from internal mechanisms
+Microscopic → biological → social → architectural → cosmic layers may appear, but only when they follow naturally and causally from the lower-level mechanisms of the world.
+Do not import concepts from unrelated domains.
+9. No external analogies or transplanted metaphors
+Do not use external scaffold metaphors such as cities, governments, corporations, kingdoms, factories, markets, ecosystems, or cosmologies unless the world itself—based on the core ideas—would generate such structures independently.
+Every structure must belong to the world’s ontology, not the author’s metaphor.
+10. No domain translation unless evolutionarily or mechanistically justified
+Do not convert biological constraints into human civic infrastructure, or social mechanisms into molecular machinery, or emotional patterns into physical forces unless the world’s internal laws explicitly support such cross-domain equivalence.
+Cross-domain translation must reflect the world’s physics, not external analogy.
+11. Maintain mechanistic clarity across all scales
+Every expansion from micro to macro must be:
+mechanistically justified
+structurally consistent
+driven by internal rules
+continuous with the world’s physics or computational grammar
+No poetic drift.
+No analogy substitution.
+No “x mapped onto y” unless the mapping is produced by the world’s own causal engine.
+
 Tone and Form Constraints
 No rhetorical “not…, but…” patterns.
 No excessive ornament.
