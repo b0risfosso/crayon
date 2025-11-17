@@ -163,6 +163,16 @@
       color: var(--accent);
       border-color: var(--accent-strong);
     }
+
+    #collections-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      margin: 6px 0 8px;
+      padding: 0;
+      list-style: none;
+      padding-right: 4px; /* small gutter so scrollbar doesn't overlay text */
+    }
   
     .chip {
       border: 1px solid #ddd;
@@ -237,8 +247,44 @@
         padding: 2px 6px;
         box-shadow: none;
         }
+    section.panel.collections {
+      display: flex;
+      flex-direction: column;
+      min-height: 0; /* important for flex children to shrink */
+    }
 
-  
+    /* Keep the new collection form pinned to the bottom */
+    .collection-form {
+      margin-top: auto;
+      display: flex;
+      gap: 6px;
+    }
+
+    .collection-form .input {
+      flex: 1;
+    }
+
+    .collection-form button {
+      flex: 0 0 auto;
+      padding-inline: 10px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    /* Thought list fills remaining panel height and scrolls */
+    .thought-list-container {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      margin-top: 4px;
+      padding-right: 4px;
+    }
+
   </style>
   
 </head>
@@ -444,17 +490,33 @@
       const res = await fetch(`${API_BASE}/thoughts/collections`);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
-      // Expecting: [{ collection: "money", count: 12 }, ...]
+      // Expecting now (if available):
+      // [{ collection: "money", count: 12, last_created_at: "...", last_updated_at: "..." }, ...]
       collections = (data || []).map(row => ({
         name: row.collection,
-        count: row.count
+        count: row.count,
+        // use whatever timestamp fields your API exposes; fallback to null
+        last_ts: row.last_created_at || row.last_updated_at || null
       }));
+
+      // Sort: most recently touched collection first.
+      collections.sort((a, b) => {
+        if (a.last_ts && b.last_ts) {
+          return new Date(b.last_ts) - new Date(a.last_ts);
+        }
+        if (a.last_ts) return -1;
+        if (b.last_ts) return 1;
+        // fallback: alphabetical by name
+        return a.name.localeCompare(b.name);
+      });
+
       renderCollections();
     } catch (err) {
       console.error("Failed to load collections", err);
       setStatus("Error loading collections", "error");
     }
   }
+
 
   async function selectCollection(name) {
     currentCollection = name;
