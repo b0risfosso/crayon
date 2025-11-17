@@ -2,394 +2,672 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Conductivity Sensor Playground</title>
+  <title>Nitrogen Environment · Null State</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    :root {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-        "Segoe UI", sans-serif;
-      line-height: 1.4;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
     body {
-      margin: 0;
-      padding: 2rem;
-      background: #0b1020;
-      color: #f5f5f7;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        sans-serif;
+      background: radial-gradient(circle at top, #121624 0%, #05070c 55%, #020308 100%);
+      color: #f3f4f6;
+      height: 100vh;
+      overflow: hidden;
     }
 
-    .card {
-      background: radial-gradient(circle at top left, #20263b, #080b14);
+    .app {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Left: scene */
+    .scene {
+      flex: 1.6;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 24px 18px 24px;
+      gap: 10px;
+    }
+
+    .panel {
       border-radius: 18px;
-      padding: 1.75rem 2rem;
-      max-width: 560px;
-      width: 100%;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: linear-gradient(
+        145deg,
+        rgba(15, 23, 42, 0.96),
+        rgba(15, 23, 42, 0.82)
+      );
+      box-shadow:
+        0 22px 40px rgba(15, 23, 42, 0.65),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+      overflow: hidden;
     }
 
-    .card-header {
+    .layers-panel {
+      flex: 1;
+      position: relative;
       display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 10px 12px 10px;
+    }
+
+    .layer {
+      position: relative;
+      flex: 1;
+      border-radius: 14px;
+      overflow: hidden;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
+      isolation: isolate;
     }
 
-    .card-title {
-      font-size: 1.3rem;
-      font-weight: 600;
-      letter-spacing: 0.03em;
+    .layer-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      z-index: 2;
     }
 
-    .chip {
-      font-size: 0.75rem;
+    .layer-title-pill {
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      padding: 0.25rem 0.6rem;
+      padding: 3px 10px;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.75);
+      color: #e5e7eb;
+    }
+
+    .layer-subtitle {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .layer-caption {
+      font-size: 11px;
+      color: #9ca3af;
+      z-index: 2;
+    }
+
+    .layer.air {
+      background: radial-gradient(circle at top left, #1e293b 0%, #020617 60%);
+      border: 1px solid rgba(94, 234, 212, 0.35);
+    }
+
+    .layer.water {
+      background: radial-gradient(circle at bottom right, #0b1220 0%, #020617 65%);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+    }
+
+    .layer::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(
+        circle at 20% 20%,
+        rgba(56, 189, 248, 0.12),
+        transparent 55%
+      );
+      opacity: 0.55;
+    }
+
+    .layer.water::before {
+      background: radial-gradient(
+        circle at 80% 80%,
+        rgba(96, 165, 250, 0.16),
+        transparent 55%
+      );
+    }
+
+    /* Particles */
+    .particle-layer {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .particle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateX(-10vw);
+      backdrop-filter: blur(4px);
+    }
+
+    .particle.air {
+      border: 1px solid rgba(45, 212, 191, 0.9);
+      color: rgba(167, 243, 208, 0.95);
+      background: radial-gradient(circle at 30% 20%, rgba(45, 212, 191, 0.16), transparent 60%);
+      animation-name: driftAir;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    .particle.water {
+      border: 1px solid rgba(96, 165, 250, 0.9);
+      color: rgba(191, 219, 254, 0.95);
+      background: radial-gradient(circle at 30% 20%, rgba(96, 165, 250, 0.18), transparent 60%);
+      animation-name: driftWater;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    @keyframes driftAir {
+      0% {
+        transform: translateX(-12vw);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      80% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateX(115vw);
+        opacity: 0;
+      }
+    }
+
+    @keyframes driftWater {
+      0% {
+        transform: translateX(-10vw);
+        opacity: 0;
+      }
+      12% {
+        opacity: 1;
+      }
+      85% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateX(105vw);
+        opacity: 0;
+      }
+    }
+
+    /* Timeline */
+    .timeline-panel {
+      height: 86px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .timeline-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .timeline-title {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 10px;
+      color: #cbd5f5;
+    }
+
+    .timeline-stream {
+      position: relative;
+      flex: 1;
+      margin-top: 4px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 50%, #020617 0%, #020617 60%);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    .timeline-ticks {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(
+        to right,
+        rgba(148, 163, 184, 0.16) 1px,
+        transparent 1px
+      );
+      background-size: 18px 100%;
+      opacity: 0.6;
+      animation: ticksScroll 7s linear infinite;
+    }
+
+    @keyframes ticksScroll {
+      0% {
+        transform: translateX(0);
+      }
+      100% {
+        transform: translateX(-18px);
+      }
+    }
+
+    .timeline-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to right,
+        rgba(15, 23, 42, 0.75),
+        rgba(15, 23, 42, 0.35),
+        rgba(15, 23, 42, 0.75)
+      );
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .timeline-labels {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      font-size: 10px;
+      color: #9ca3af;
+      pointer-events: none;
+    }
+
+    .timeline-labels span {
+      background: rgba(15, 23, 42, 0.88);
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    .null-caption {
+      font-size: 10px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    /* Right: sidebar */
+    .sidebar {
+      flex: 1;
+      padding: 24px 24px 18px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .sidebar-panel {
+      padding: 16px 16px 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: radial-gradient(circle at top, #020617 0%, #020617 65%);
+      box-shadow:
+        0 18px 36px rgba(15, 23, 42, 0.7),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+    }
+
+    .sidebar-header {
+      margin-bottom: 10px;
+    }
+
+    .sidebar-title-pill {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #9ca3af;
+      margin-bottom: 6px;
+    }
+
+    .sidebar-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e5e7eb;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .sidebar-title span.highlight {
+      color: #38bdf8;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .sidebar-subtitle {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .metrics {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .metric {
+      padding: 8px 8px 7px 8px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+
+    .metric-tag {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6b7280;
+    }
+
+    .metric-bar {
+      position: relative;
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(31, 41, 55, 0.96);
+      overflow: hidden;
+    }
+
+    .metric-fill {
+      position: absolute;
+      inset: 0;
+      width: 65%;
+      border-radius: inherit;
+      background: linear-gradient(
+        90deg,
+        rgba(45, 212, 191, 0.9),
+        rgba(16, 185, 129, 0.7)
+      );
+      opacity: 0.7;
+      transform-origin: left;
+      animation: metricPulse 4s ease-in-out infinite;
+    }
+
+    .metric-fill.water {
+      width: 55%;
+      background: linear-gradient(
+        90deg,
+        rgba(59, 130, 246, 0.9),
+        rgba(56, 189, 248, 0.7)
+      );
+    }
+
+    .metric-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+
+    @keyframes metricPulse {
+      0%,
+      100% {
+        transform: scaleX(0.96);
+        opacity: 0.7;
+      }
+      50% {
+        transform: scaleX(1);
+        opacity: 0.95;
+      }
+    }
+
+    .metric-number {
+      font-size: 22px;
+      font-weight: 500;
+      color: #f9fafb;
+    }
+
+    .metric-unit {
+      font-size: 10px;
+      color: #6b7280;
+    }
+
+    .note {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 6px;
+      border-top: 1px dashed rgba(55, 65, 81, 0.9);
+      padding-top: 6px;
+    }
+
+    .null-state-tag {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #9ca3af;
       opacity: 0.9;
     }
 
-    .description {
-      font-size: 0.85rem;
-      color: #c2c6dd;
-      margin-bottom: 1.5rem;
+    .null-state-text {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 4px;
+      line-height: 1.5;
     }
 
-    .section-title {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: #8b90ad;
-      margin-bottom: 0.4rem;
+    .null-state-text span {
+      color: #fde68a;
     }
 
-    .control-group {
-      margin-bottom: 1.25rem;
-    }
-
-    label {
-      font-size: 0.85rem;
-      display: block;
-      margin-bottom: 0.25rem;
-    }
-
-    .slider-row {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    input[type="range"] {
-      width: 100%;
-    }
-
-    .value-pill {
-      min-width: 90px;
-      text-align: right;
-      font-size: 0.8rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.06);
-    }
-
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-    }
-
-    .readout-grid {
-      display: grid;
-      grid-template-columns: 1.3fr 1.3fr;
-      gap: 0.75rem;
-      margin-top: 0.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .readout-card {
-      border-radius: 14px;
-      padding: 0.75rem 0.9rem;
-      background: linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.04),
-        rgba(255, 255, 255, 0.02)
-      );
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .readout-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: #9ca0bf;
-      margin-bottom: 0.4rem;
-    }
-
-    .readout-value {
-      font-size: 1.1rem;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .readout-units {
-      font-size: 0.7rem;
-      color: #9ca0bf;
-      margin-left: 0.2rem;
-    }
-
-    .status-bar {
-      font-size: 0.78rem;
-      color: #9ca0bf;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.75rem;
-      margin-top: 0.75rem;
-      padding-top: 0.75rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: #20e3b2;
-      box-shadow: 0 0 10px rgba(32, 227, 178, 0.6);
-      margin-right: 0.4rem;
-    }
-
-    .status-left {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
-    button {
-      background: #1d9bf0;
-      color: white;
-      border: none;
-      border-radius: 999px;
-      padding: 0.4rem 0.9rem;
-      font-size: 0.8rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    button:hover {
-      background: #1583ce;
-    }
-
-    button:active {
-      transform: translateY(1px);
-    }
-
-    .mini-badge {
-      font-size: 0.65rem;
-      padding: 0.12rem 0.4rem;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+    @media (max-width: 900px) {
+      .app {
+        flex-direction: column;
+      }
+      .scene {
+        height: 55vh;
+        padding-right: 24px;
+      }
+      .sidebar {
+        padding-top: 4px;
+        padding-left: 24px;
+      }
+      .sidebar-title {
+        font-size: 16px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">Conductivity Sensor</div>
-      <div class="chip">Component · Minimal Version</div>
-    </div>
+  <div class="app">
+    <!-- Left: visual environment -->
+    <div class="scene">
+      <div class="panel layers-panel">
+        <!-- Air layer -->
+        <div class="layer air">
+          <div class="layer-heading">
+            <div class="layer-title-pill">Air layer</div>
+            <div class="layer-subtitle">Diffuse indoor / barn air carrying NH₃</div>
+          </div>
 
-    <div class="description">
-      This component represents a conductivity probe sitting in the acid
-      reservoir. You control the underlying ammonium concentration; the
-      sensor converts ionic strength into a noisy conductivity reading.
-    </div>
+          <div class="particle-layer" id="airParticles"></div>
 
-    <div class="control-group">
-      <div class="section-title">Reservoir State (Driving the Sensor)</div>
-      <label for="concentrationSlider">Ammonium-N concentration (arbitrary units)</label>
-      <div class="slider-row">
-        <input
-          id="concentrationSlider"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value="20"
-        />
-        <div class="value-pill">
-          <span id="concentrationValue">20</span>
-          <span style="font-size: 0.7rem; color: #9ca0bf;">units</span>
+          <div class="layer-caption">
+            Nitrogen drifts with the airflow and leaves the domain. No membranes, no sinks.
+          </div>
+        </div>
+
+        <!-- Water layer -->
+        <div class="layer water">
+          <div class="layer-heading">
+            <div class="layer-title-pill">Water / sewer layer</div>
+            <div class="layer-subtitle">Greywater, seepage, sewer lateral trickle</div>
+          </div>
+
+          <div class="particle-layer" id="waterParticles"></div>
+
+          <div class="layer-caption">
+            Dissolved ammonium glides through thin channels. No boundary captures it.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel timeline-panel">
+        <div class="timeline-header">
+          <div>
+            <div class="timeline-title">Time & loss</div>
+            <div class="null-caption">World clock ticks. Nitrogen just passes through.</div>
+          </div>
+          <div>
+            <span style="font-size: 11px; color: #e5e7eb;">
+              t = <span id="timeMinutes">0</span> min
+            </span>
+          </div>
+        </div>
+
+        <div class="timeline-stream">
+          <div class="timeline-ticks"></div>
+          <div class="timeline-overlay"></div>
+          <div class="timeline-labels">
+            <span>Flows in</span>
+            <span>Flows out</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="control-group">
-      <div class="section-title">Sensor Settings</div>
-      <div class="toggle-row">
-        <input id="noiseToggle" type="checkbox" checked />
-        <label for="noiseToggle" style="margin: 0;">Measurement noise enabled</label>
-      </div>
-    </div>
-
-    <div class="section-title">Sensor Readout</div>
-    <div class="readout-grid">
-      <div class="readout-card">
-        <div class="readout-label">True Conductivity</div>
-        <div class="readout-value">
-          <span id="trueConductivity">0.00</span>
-          <span class="readout-units">mS/cm (sim)</span>
+    <!-- Right: indicators -->
+    <div class="sidebar">
+      <div class="sidebar-panel">
+        <div class="sidebar-header">
+          <div class="sidebar-title-pill">Environment · Null state</div>
+          <div class="sidebar-title">
+            Nitrogen field
+            <span class="highlight">before organs</span>
+          </div>
+          <div class="sidebar-subtitle">
+            Air and water carry nitrogen. The world has flow but no control. No device is
+            instantiated; nothing catches anything.
+          </div>
         </div>
-      </div>
-      <div class="readout-card">
-        <div class="readout-label">Measured Conductivity</div>
-        <div class="readout-value">
-          <span id="measuredConductivity">0.00</span>
-          <span class="readout-units">mS/cm</span>
-        </div>
-      </div>
-    </div>
 
-    <div class="status-bar">
-      <div class="status-left">
-        <div class="status-dot"></div>
-        <span id="statusText">Sampling at 5 Hz</span>
-      </div>
-      <div>
-        <button id="sampleOnceBtn">
-          Sample once
-          <span class="mini-badge">Δt = instant</span>
-        </button>
+        <div class="metrics">
+          <!-- Air metric -->
+          <div class="metric">
+            <div class="metric-header">
+              <div class="metric-label">Air NH₃</div>
+              <div class="metric-tag">Diffuse · Uncaptured</div>
+            </div>
+            <div class="metric-bar">
+              <div class="metric-fill"></div>
+            </div>
+            <div class="metric-footer">
+              <span>Moderate, steady background level</span>
+              <span>Ventilation only</span>
+            </div>
+          </div>
+
+          <!-- Water metric -->
+          <div class="metric">
+            <div class="metric-header">
+              <div class="metric-label">Water / ammonium-N</div>
+              <div class="metric-tag">Passing through</div>
+            </div>
+            <div class="metric-bar">
+              <div class="metric-fill water"></div>
+            </div>
+            <div class="metric-footer">
+              <span>Low but continuous trickle</span>
+              <span>No local sink</span>
+            </div>
+          </div>
+
+          <!-- Captured N -->
+          <div class="metric">
+            <div class="metric-header">
+              <div class="metric-label">Captured N</div>
+              <div class="metric-tag">Sink not installed</div>
+            </div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <div class="metric-number" id="capturedN">0.0</div>
+              <div class="metric-unit">units (ammonium-N)</div>
+            </div>
+            <div class="metric-footer">
+              <span>All nitrogen exits the scene.</span>
+              <span>Nothing accumulates.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          <div class="null-state-tag">Foundational null state</div>
+          <div class="null-state-text">
+            This is the base world: nitrogen flows in, drifts, and disappears
+            <span>without a sink</span>. Components, membranes, and control organs
+            can be layered onto this field later.
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    // --- Single domain class: ConductivitySensor ----------------------
+    // Simple digital "life": drifting particles + time progression.
+    document.addEventListener("DOMContentLoaded", () => {
+      const airContainer = document.getElementById("airParticles");
+      const waterContainer = document.getElementById("waterParticles");
 
-    class ConductivitySensor {
-      /**
-       * Represents a conductivity probe immersed in an electrolyte.
-       *
-       * Real-world analog:
-       * - cellConstant: geometry of the probe (cm^-1)
-       * - noiseStd: measurement noise magnitude (mS/cm)
-       * - baseConductivity: background conductivity of acid (mS/cm)
-       * - sensitivity: how strongly conductivity rises with ammonium concentration
-       */
-      constructor({
-        cellConstant = 1.0,
-        noiseStd = 0.05,
-        baseConductivity = 0.5,
-        sensitivity = 0.03,
-      } = {}) {
-        this.cellConstant = cellConstant;
-        this.noiseStd = noiseStd;
-        this.baseConductivity = baseConductivity;
-        this.sensitivity = sensitivity;
+      function createParticles(container, count, type) {
+        const height = container.clientHeight || 120;
+        for (let i = 0; i < count; i++) {
+          const p = document.createElement("div");
+          p.classList.add("particle", type);
+          p.textContent = type === "air" ? "N" : "N";
+          const top = Math.random() * (height - 14);
+          const delay = Math.random() * 14;
+          const duration = 12 + Math.random() * 12;
+          p.style.top = `${top}px`;
+          p.style.left = "-16px";
+          p.style.animationDuration = `${duration}s`;
+          p.style.animationDelay = `${delay}s`;
+          container.appendChild(p);
+        }
       }
 
-      /**
-       * Given a "true" ammonium concentration (arbitrary units),
-       * compute the true conductivity in mS/cm that the solution would have.
-       *
-       * Here we use a simple linear model:
-       *   σ_true = base + sensitivity * [NH4+]
-       * In a more detailed model, you'd sum contributions from all ions.
-       */
-      computeTrueConductivity(ammoniumUnits) {
-        const sigma =
-          this.baseConductivity + this.sensitivity * Number(ammoniumUnits);
-        return Math.max(sigma, 0);
-      }
+      createParticles(airContainer, 28, "air");
+      createParticles(waterContainer, 20, "water");
 
-      /**
-       * Given the true conductivity, return a measured value
-       * with optional noise, representing electronics + probe variation.
-       */
-      measure(trueConductivity, withNoise = true) {
-        if (!withNoise) return trueConductivity;
+      // Time progression (minutes), just for the "ticks" label.
+      let seconds = 0;
+      const timeEl = document.getElementById("timeMinutes");
 
-        // Simple Gaussian noise using Box–Muller
-        const u1 = Math.random();
-        const u2 = Math.random();
-        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-        const noisy = trueConductivity + z * this.noiseStd;
-
-        return Math.max(noisy, 0);
-      }
-    }
-
-    // --- UI Wiring for the Playground --------------------------------
-
-    const concentrationSlider = document.getElementById("concentrationSlider");
-    const concentrationValue = document.getElementById("concentrationValue");
-    const trueConductivityEl = document.getElementById("trueConductivity");
-    const measuredConductivityEl =
-      document.getElementById("measuredConductivity");
-    const noiseToggle = document.getElementById("noiseToggle");
-    const statusText = document.getElementById("statusText");
-    const sampleOnceBtn = document.getElementById("sampleOnceBtn");
-
-    const sensor = new ConductivitySensor({
-      cellConstant: 1.0,
-      noiseStd: 0.08,
-      baseConductivity: 0.6,
-      sensitivity: 0.035,
+      setInterval(() => {
+        seconds++;
+        const minutes = (seconds / 60).toFixed(1);
+        timeEl.textContent = minutes;
+        // Captured N remains 0.0 in this null state.
+      }, 1000);
     });
-
-    let lastMeasurementTime = performance.now();
-
-    function updateSensorReading(sampleOnce = false) {
-      const conc = Number(concentrationSlider.value);
-      concentrationValue.textContent = conc.toFixed(0);
-
-      const sigmaTrue = sensor.computeTrueConductivity(conc);
-      const sigmaMeas = sensor.measure(
-        sigmaTrue,
-        noiseToggle.checked
-      );
-
-      trueConductivityEl.textContent = sigmaTrue.toFixed(2);
-      measuredConductivityEl.textContent = sigmaMeas.toFixed(2);
-
-      if (!sampleOnce) {
-        const now = performance.now();
-        const dt = (now - lastMeasurementTime) / 1000;
-        lastMeasurementTime = now;
-        statusText.textContent = `Sampling at ~${(1 / dt).toFixed(
-          1
-        )} Hz`;
-      }
-    }
-
-    // Continuous sampling loop (approx. 5 Hz)
-    setInterval(() => {
-      updateSensorReading(false);
-    }, 200);
-
-    // One-shot measurement button
-    sampleOnceBtn.addEventListener("click", () => {
-      updateSensorReading(true);
-      statusText.textContent = "Single sample taken";
-      setTimeout(() => {
-        statusText.textContent = "Sampling at 5 Hz";
-      }, 1200);
-    });
-
-    // React immediately when user moves slider or toggles noise
-    concentrationSlider.addEventListener("input", () =>
-      updateSensorReading(true)
-    );
-    noiseToggle.addEventListener("change", () => updateSensorReading(true));
-
-    // Initial draw
-    updateSensorReading(true);
   </script>
 </body>
 </html>
