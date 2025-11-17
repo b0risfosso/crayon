@@ -3,9 +3,12 @@
 import json
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
+import threading
+import time
 
 from flask import Flask, request, jsonify, render_template, current_app
+
 
 from prompts import (
     core_thought_architecture_builder_prompt,
@@ -16,10 +19,7 @@ from prompts import (
     world_to_reality_bridge_generator_prompt,
 )
 
-import os
 import re
-import json
-from datetime import datetime, timezone
 
 from openai import OpenAI
 from db_shared import init_usage_db, log_usage, connect, USAGE_DB, PICTURE_DB, _iso_now
