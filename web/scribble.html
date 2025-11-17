@@ -424,11 +424,15 @@
           <button type="button" class="ghost-btn danger" id="btn-delete" style="display:none;">
             Delete
           </button>
+          <button type="button" class="ghost-btn primary-soft" id="btn-save-world">
+            Save + world
+          </button>
           <button type="button" id="btn-save">
             Save
           </button>
         </div>
       </div>
+
     </section>
   </main>
 </div>
@@ -441,6 +445,7 @@
   let currentThought = null; // full object from DB
   let statusTimer = null;
   const API_BASE = "/scribble/api";
+  const THINK_BASE = "/think";
 
   function setStatus(text, mode = "idle") {
     const pill = document.getElementById("status-pill");
@@ -748,6 +753,87 @@
     }
   }
 
+  async function saveThoughtAndGenerateWorld() {
+    const payload = readDetailForm();
+    if (!payload.collection) {
+      alert("Collection is required.");
+      return;
+    }
+    if (!payload.text) {
+      alert("Thought text is required.");
+      return;
+    }
+
+    // 1) Save the thought (create or update)
+    const isNew = !currentThought || !currentThought.id;
+    const url = isNew
+      ? `${API_BASE}/thoughts`
+      : `${API_BASE}/thoughts/` + encodeURIComponent(currentThought.id);
+    const method = isNew ? "POST" : "PUT";
+
+    try {
+      setStatus("Saving thought…", "busy");
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Failed to save thought:", text);
+        setStatus("Error saving thought", "error");
+        return;
+      }
+      const saved = await res.json();
+      currentThought = saved;
+      currentCollection = saved.collection;
+
+      // Refresh lists + detail panel
+      await loadCollections();
+      await loadThoughts(currentCollection);
+      renderCollections();
+      renderThoughtList();
+      fillDetailForm(saved);
+
+      // 2) Call THINK queue endpoint for core ideas + world
+      setStatus("Generating core ideas + world…", "busy");
+
+      const thinkPayload = {
+        thought_id: saved.id,
+        thought: saved.text,
+        email: saved.email || null,
+      };
+
+      const resThink = await fetch(`${THINK_BASE}/queue_core_world`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(thinkPayload),
+      });
+
+      if (!resThink.ok) {
+        const txt = await resThink.text();
+        console.error("THINK /queue_core_world error:", txt);
+        setStatus("Error generating world", "error");
+        return;
+      }
+
+      const job = await resThink.json();
+      if (job.status === "error") {
+        console.error("THINK job failed:", job.error);
+        setStatus("Error generating world", "error");
+        return;
+      }
+
+      // At this point core_ideas and world_context have been written into picture.db.
+      // You could optionally surface job.core_idea_id / job.world_context_id.
+      setStatus("Core ideas + world generated", "success");
+    } catch (err) {
+      console.error("saveThoughtAndGenerateWorld failed", err);
+      setStatus("Error generating world", "error");
+    }
+  }
+
+
   async function randomThought() {
     if (!currentCollection) {
       alert("Select a collection first.");
@@ -822,6 +908,10 @@
     document
       .getElementById("btn-save")
       .addEventListener("click", () => saveThought());
+
+    document
+      .getElementById("btn-save-world")
+      .addEventListener("click", () => saveThoughtAndGenerateWorld());
 
     document
       .getElementById("btn-delete")
