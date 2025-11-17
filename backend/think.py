@@ -150,6 +150,59 @@ def get_picture_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+def init_think_db():
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Existing pipeline table
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS thought_pipelines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thought TEXT NOT NULL,
+            adjacent_thoughts_json TEXT,
+            core_thoughts_json TEXT,
+            expanded_text TEXT,
+            core_ideas_json TEXT,
+            world_context_text TEXT,
+            bridges_text TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+    # New queue table for "core ideas + world" jobs
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS core_world_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thought_id INTEGER,
+            thought_text TEXT NOT NULL,
+            email TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',  -- pending | running | completed | error
+            error TEXT,
+            core_idea_id INTEGER,
+            world_context_id INTEGER,
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT
+        )
+        """
+    )
+
+    # On restart, re-queue any jobs that were "running"
+    cur.execute(
+        """
+        UPDATE core_world_queue
+        SET status='pending', started_at=NULL
+        WHERE status = 'running'
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
 
 
 # =====================
@@ -669,7 +722,7 @@ def start_core_world_workers() -> None:
 
 app = Flask(__name__)
 
-init_think_db()
+init_db()
 start_core_world_workers()
 
 # =====================
