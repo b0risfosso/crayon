@@ -2,725 +2,394 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Nitrogen Sink Playground</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Chart.js for plotting -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Conductivity Sensor Playground</title>
   <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      line-height: 1.4;
+    }
+
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 0;
-      padding: 1.5rem;
+      padding: 2rem;
       background: #0b1020;
-      color: #f5f5f5;
-    }
-
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    h2 {
-      font-size: 1.1rem;
-      margin-top: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-      gap: 1.5rem;
+      color: #f5f5f7;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
     }
 
     .card {
-      background: #141b33;
-      border-radius: 0.9rem;
-      padding: 1rem 1.1rem;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: radial-gradient(circle at top left, #20263b, #080b14);
+      border-radius: 18px;
+      padding: 1.75rem 2rem;
+      max-width: 560px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .chip {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      opacity: 0.9;
+    }
+
+    .description {
+      font-size: 0.85rem;
+      color: #c2c6dd;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #8b90ad;
       margin-bottom: 0.4rem;
     }
 
-    .badge {
-      font-size: 0.65rem;
-      padding: 0.15rem 0.45rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+    .control-group {
+      margin-bottom: 1.25rem;
     }
 
     label {
-      display: block;
-      font-size: 0.8rem;
-      margin-top: 0.75rem;
-      margin-bottom: 0.2rem;
-      opacity: 0.85;
-    }
-
-    select,
-    input[type="number"] {
-      width: 100%;
-      padding: 0.35rem 0.5rem;
-      border-radius: 0.5rem;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: #0d1424;
-      color: #f5f5f5;
       font-size: 0.85rem;
-      outline: none;
+      display: block;
+      margin-bottom: 0.25rem;
     }
 
-    select:focus,
-    input[type="number"]:focus {
-      border-color: #7f5af0;
-      box-shadow: 0 0 0 1px rgba(127, 90, 240, 0.4);
-    }
-
-    .controls-row {
+    .slider-row {
       display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .value-pill {
+      min-width: 90px;
+      text-align: right;
+      font-size: 0.8rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
       gap: 0.5rem;
-      margin-top: 0.7rem;
+      font-size: 0.85rem;
+    }
+
+    .readout-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1.3fr;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .readout-card {
+      border-radius: 14px;
+      padding: 0.75rem 0.9rem;
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.04),
+        rgba(255, 255, 255, 0.02)
+      );
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .readout-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #9ca0bf;
+      margin-bottom: 0.4rem;
+    }
+
+    .readout-value {
+      font-size: 1.1rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .readout-units {
+      font-size: 0.7rem;
+      color: #9ca0bf;
+      margin-left: 0.2rem;
+    }
+
+    .status-bar {
+      font-size: 0.78rem;
+      color: #9ca0bf;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #20e3b2;
+      box-shadow: 0 0 10px rgba(32, 227, 178, 0.6);
+      margin-right: 0.4rem;
+    }
+
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
     }
 
     button {
-      flex: 1;
-      padding: 0.4rem 0.6rem;
-      border-radius: 999px;
+      background: #1d9bf0;
+      color: white;
       border: none;
-      cursor: pointer;
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
       font-size: 0.8rem;
-      font-weight: 500;
-      background: #7f5af0;
-      color: #f5f5f5;
-      transition: transform 0.05s ease-out, box-shadow 0.1s ease-out, background 0.1s;
-      box-shadow: 0 6px 18px rgba(127, 90, 240, 0.4);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
     }
 
-    button.secondary {
-      background: #1f2937;
-      box-shadow: none;
+    button:hover {
+      background: #1583ce;
     }
 
     button:active {
       transform: translateY(1px);
-      box-shadow: 0 3px 10px rgba(127, 90, 240, 0.4);
     }
 
-    button[disabled] {
-      opacity: 0.4;
-      cursor: default;
-      transform: none;
-      box-shadow: none;
-    }
-
-    .status-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.4rem 0.8rem;
-      margin-top: 0.6rem;
-      font-size: 0.8rem;
-    }
-
-    .status-label {
-      opacity: 0.7;
-    }
-
-    .status-value {
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-    }
-
-    canvas {
-      width: 100% !important;
-      height: 320px !important;
-    }
-
-    .legend {
-      font-size: 0.75rem;
-      opacity: 0.8;
-      margin-top: 0.4rem;
-    }
-
-    .legend span {
-      display: inline-flex;
-      align-items: center;
-      margin-right: 0.8rem;
-    }
-
-    .legend-dot {
-      width: 9px;
-      height: 9px;
+    .mini-badge {
+      font-size: 0.65rem;
+      padding: 0.12rem 0.4rem;
       border-radius: 999px;
-      margin-right: 0.25rem;
-    }
-
-    .small {
-      font-size: 0.7rem;
-      opacity: 0.75;
-      margin-top: 0.4rem;
-      line-height: 1.3;
-    }
-
-    @media (max-width: 800px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
   </style>
 </head>
 <body>
-  <h1>Nitrogen Sink Playground</h1>
-  <p class="small">
-    A minimal digital twin of the bench-top electrochemical nitrogen sink:
-    air with NH₃ → membrane contactor → acid loop with conductivity sensor → single manual switch.
-  </p>
-
-  <div class="layout">
-    <!-- Controls + Status -->
-    <div class="card">
-      <div class="card-header">
-        <h2 style="margin: 0;">Control & State</h2>
-        <span class="badge">Minimal Prototype</span>
-      </div>
-
-      <label for="switchPosition">Manual switch position</label>
-      <select id="switchPosition">
-        <option value="OFF">OFF</option>
-        <option value="LOW">LOW</option>
-        <option value="HIGH" selected>HIGH</option>
-      </select>
-
-      <label for="initialNH3">Initial NH₃ concentration (ppm)</label>
-      <input id="initialNH3" type="number" min="0" max="200" value="50" step="1" />
-
-      <label for="simSpeed">Simulation speed (× real time)</label>
-      <select id="simSpeed">
-        <option value="1">1×</option>
-        <option value="5">5×</option>
-        <option value="20" selected>20×</option>
-        <option value="60">60×</option>
-      </select>
-
-      <div class="controls-row">
-        <button id="startBtn">Start</button>
-        <button id="pauseBtn" class="secondary" disabled>Pause</button>
-        <button id="resetBtn" class="secondary">Reset</button>
-      </div>
-
-      <h2>Current State</h2>
-      <div class="status-grid" id="statusGrid">
-        <div class="status-label">Time (s)</div>
-        <div class="status-value" id="statTime">0.0</div>
-
-        <div class="status-label">Air NH₃ (ppm)</div>
-        <div class="status-value" id="statNH3">0.0</div>
-
-        <div class="status-label">NH₄⁺ (mol/L)</div>
-        <div class="status-value" id="statNH4">0.0000</div>
-
-        <div class="status-label">Conductivity (arb.)</div>
-        <div class="status-value" id="statCond">0.000</div>
-
-        <div class="status-label">Current (A)</div>
-        <div class="status-value" id="statCurrent">0.000</div>
-
-        <div class="status-label">Air flow (m³/s)</div>
-        <div class="status-value" id="statFlow">0.000</div>
-
-        <div class="status-label">N captured (mmol)</div>
-        <div class="status-value" id="statCaptured">0.000</div>
-      </div>
-
-      <p class="small">
-        In this playground, the acid loop is a single, well-mixed reservoir.
-        Conductivity is a rough proxy for ionic strength and rises as NH₄⁺ accumulates.
-      </p>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Conductivity Sensor</div>
+      <div class="chip">Component · Minimal Version</div>
     </div>
 
-    <!-- Plot -->
-    <div class="card">
-      <div class="card-header">
-        <h2 style="margin: 0;">Time Evolution</h2>
-        <span class="badge">Simulation</span>
+    <div class="description">
+      This component represents a conductivity probe sitting in the acid
+      reservoir. You control the underlying ammonium concentration; the
+      sensor converts ionic strength into a noisy conductivity reading.
+    </div>
+
+    <div class="control-group">
+      <div class="section-title">Reservoir State (Driving the Sensor)</div>
+      <label for="concentrationSlider">Ammonium-N concentration (arbitrary units)</label>
+      <div class="slider-row">
+        <input
+          id="concentrationSlider"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value="20"
+        />
+        <div class="value-pill">
+          <span id="concentrationValue">20</span>
+          <span style="font-size: 0.7rem; color: #9ca0bf;">units</span>
+        </div>
       </div>
-      <canvas id="playgroundChart"></canvas>
-      <div class="legend">
-        <span><span class="legend-dot" style="background:#22c55e;"></span>Air NH₃ (ppm)</span>
-        <span><span class="legend-dot" style="background:#3b82f6;"></span>NH₄⁺ (mol/L)</span>
-        <span><span class="legend-dot" style="background:#f97316;"></span>Conductivity (arb.)</span>
+    </div>
+
+    <div class="control-group">
+      <div class="section-title">Sensor Settings</div>
+      <div class="toggle-row">
+        <input id="noiseToggle" type="checkbox" checked />
+        <label for="noiseToggle" style="margin: 0;">Measurement noise enabled</label>
       </div>
-      <p class="small">
-        Switch between OFF / LOW / HIGH and watch how NH₃ drops and NH₄⁺ + conductivity rise.
-        This is the minimal bridge: one membrane, one acid loop, one gauge, one human switch.
-      </p>
+    </div>
+
+    <div class="section-title">Sensor Readout</div>
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-label">True Conductivity</div>
+        <div class="readout-value">
+          <span id="trueConductivity">0.00</span>
+          <span class="readout-units">mS/cm (sim)</span>
+        </div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-label">Measured Conductivity</div>
+        <div class="readout-value">
+          <span id="measuredConductivity">0.00</span>
+          <span class="readout-units">mS/cm</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-left">
+        <div class="status-dot"></div>
+        <span id="statusText">Sampling at 5 Hz</span>
+      </div>
+      <div>
+        <button id="sampleOnceBtn">
+          Sample once
+          <span class="mini-badge">Δt = instant</span>
+        </button>
+      </div>
     </div>
   </div>
 
   <script>
-    // --- Simple physics helpers (mirroring the Python logic, but coarser) ---
-
-    const P_PA = 101325;
-    const R_J = 8.314;
-    const T_K = 298.15;
-    const F_C = 96485.3329;
-
-    // Helper to compute moles of NH3 in a gas segment from ppm
-    function nh3MolesFromPPM(ppm, volume_m3) {
-      const nTotal = (P_PA * volume_m3) / (R_J * T_K);
-      const x = ppm * 1e-6;
-      return nTotal * x;
-    }
-
-    function ppmFromNH3Moles(moles, volume_m3) {
-      const nTotal = (P_PA * volume_m3) / (R_J * T_K);
-      if (nTotal <= 0) return 0;
-      const x = moles / nTotal;
-      return Math.max(x * 1e6, 0);
-    }
-
-    // --- Classes in JS ---
-
-    class AirStream {
-      constructor(flowRate, nh3ppm, volumeSegment) {
-        this.flowRate_m3_s = flowRate;
-        this.nh3_ppm = nh3ppm;
-        this.volume_m3 = volumeSegment;
-      }
-
-      updateFlowRate(q) {
-        this.flowRate_m3_s = Math.max(q, 0);
-      }
-
-      getNH3Moles() {
-        return nh3MolesFromPPM(this.nh3_ppm, this.volume_m3);
-      }
-
-      setNH3FromMoles(moles) {
-        this.nh3_ppm = ppmFromNH3Moles(moles, this.volume_m3);
-      }
-
-      removeNH3(molesPerS, dt) {
-        const mSegment = this.getNH3Moles();
-        const removed = Math.min(molesPerS * dt, mSegment);
-        this.setNH3FromMoles(mSegment - removed);
-        return removed;
-      }
-    }
-
-    class Fan {
-      constructor(maxFlow, resistance) {
-        this.maxFlow = maxFlow;
-        this.resistance = resistance;
-        this.speed = 0;
-        this.on = false;
-      }
-
-      setSpeed(s) {
-        this.speed = Math.min(Math.max(s, 0), 1);
-        this.on = this.speed > 0;
-      }
-
-      computeFlowRate() {
-        if (!this.on) return 0;
-        return (this.maxFlow * this.speed) / (1 + this.resistance);
-      }
-    }
-
-    class AcidReservoir {
-      constructor(volumeL) {
-        this.volumeL = volumeL;
-        this.NH4_mol = 0;
-        this.SO4_mol = 0.1; // fixed background
-      }
-
-      addAmmonium(moles) {
-        this.NH4_mol += Math.max(moles, 0);
-      }
-
-      getNH4Concentration() {
-        if (this.volumeL <= 0) return 0;
-        return this.NH4_mol / this.volumeL;
-      }
-
-      getConductivity() {
-        // crude: k * (|z| * c) sum
-        const k = 0.02;
-        const cNH4 = this.getNH4Concentration();
-        const cSO4 = this.SO4_mol / this.volumeL;
-        return k * (1 * cNH4 + 2 * cSO4);
-      }
-    }
-
-    class Membrane {
-      constructor(area, thickness, conductivity, tNH4) {
-        this.area = area;
-        this.thickness = thickness;
-        this.conductivity = conductivity;
-        this.tNH4 = tNH4;
-        this.feedPoolMol = 0;
-      }
-
-      resistance() {
-        if (this.conductivity <= 0 || this.area <= 0) return Infinity;
-        return this.thickness / (this.conductivity * this.area);
-      }
-
-      nh4Flux(currentA) {
-        if (currentA <= 0 || this.tNH4 <= 0) return 0;
-        return (this.tNH4 * currentA) / F_C;
-      }
-
-      step(dt, currentA, acid) {
-        const flux = this.nh4Flux(currentA);
-        const moles = flux * dt;
-        const moved = Math.min(moles, this.feedPoolMol);
-        this.feedPoolMol -= moved;
-        acid.addAmmonium(moved);
-        return moved;
-      }
-    }
-
-    class ElectrochemicalCell {
-      constructor(membrane, acid, extraOhmic) {
-        this.membrane = membrane;
-        this.acid = acid;
-        this.extraOhmic = extraOhmic;
-      }
-
-      totalResistance() {
-        return this.membrane.resistance() + this.extraOhmic;
-      }
-
-      step(dt, currentA) {
-        return this.membrane.step(dt, currentA, this.acid);
-      }
-    }
+    // --- Single domain class: ConductivitySensor ----------------------
 
     class ConductivitySensor {
-      constructor(acid, noiseStd = 0) {
-        this.acid = acid;
+      /**
+       * Represents a conductivity probe immersed in an electrolyte.
+       *
+       * Real-world analog:
+       * - cellConstant: geometry of the probe (cm^-1)
+       * - noiseStd: measurement noise magnitude (mS/cm)
+       * - baseConductivity: background conductivity of acid (mS/cm)
+       * - sensitivity: how strongly conductivity rises with ammonium concentration
+       */
+      constructor({
+        cellConstant = 1.0,
+        noiseStd = 0.05,
+        baseConductivity = 0.5,
+        sensitivity = 0.03,
+      } = {}) {
+        this.cellConstant = cellConstant;
         this.noiseStd = noiseStd;
+        this.baseConductivity = baseConductivity;
+        this.sensitivity = sensitivity;
       }
 
-      measure() {
-        const trueSigma = this.acid.getConductivity();
-        if (this.noiseStd <= 0) return trueSigma;
-        const noise = this.noiseStd * (Math.random() * 2 - 1);
-        return Math.max(trueSigma + noise, 0);
-      }
-    }
-
-    class ManualSwitch {
-      constructor() {
-        this.position = "OFF";
-      }
-
-      setPosition(pos) {
-        this.position = pos;
+      /**
+       * Given a "true" ammonium concentration (arbitrary units),
+       * compute the true conductivity in mS/cm that the solution would have.
+       *
+       * Here we use a simple linear model:
+       *   σ_true = base + sensitivity * [NH4+]
+       * In a more detailed model, you'd sum contributions from all ions.
+       */
+      computeTrueConductivity(ammoniumUnits) {
+        const sigma =
+          this.baseConductivity + this.sensitivity * Number(ammoniumUnits);
+        return Math.max(sigma, 0);
       }
 
-      getSetpoints() {
-        if (this.position === "OFF") return { currentA: 0, fanSpeed: 0 };
-        if (this.position === "LOW") return { currentA: 0.05, fanSpeed: 0.5 };
-        if (this.position === "HIGH") return { currentA: 0.2, fanSpeed: 1.0 };
-        return { currentA: 0, fanSpeed: 0 };
-      }
-    }
+      /**
+       * Given the true conductivity, return a measured value
+       * with optional noise, representing electronics + probe variation.
+       */
+      measure(trueConductivity, withNoise = true) {
+        if (!withNoise) return trueConductivity;
 
-    class PowerSupply {
-      constructor(mode = "constant_current", setpoint = 0.1, maxCurrent = 0.2) {
-        this.mode = mode;
-        this.setpoint = setpoint;
-        this.maxCurrent = maxCurrent;
-        this.on = true;
-      }
+        // Simple Gaussian noise using Box–Muller
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        const noisy = trueConductivity + z * this.noiseStd;
 
-      setMode(mode, setpoint) {
-        this.mode = mode;
-        this.setpoint = setpoint;
-      }
-
-      computeCurrent(resistance) {
-        if (!this.on) return 0;
-        if (this.mode === "constant_current") {
-          return Math.min(this.setpoint, this.maxCurrent);
-        }
-        if (!isFinite(resistance) || resistance <= 0) return 0;
-        const current = this.setpoint / resistance;
-        return Math.min(current, this.maxCurrent);
+        return Math.max(noisy, 0);
       }
     }
 
-    class AirChannel {
-      constructor(air, membrane, area, kL) {
-        this.air = air;
-        this.membrane = membrane;
-        this.area = area;
-        this.kL = kL;
-      }
+    // --- UI Wiring for the Playground --------------------------------
 
-      nh3Flux() {
-        const xNH3 = this.air.nh3_ppm * 1e-6;
-        const Ctot = P_PA / (R_J * T_K);
-        const Cnh3 = Ctot * xNH3;
-        return this.kL * this.area * Cnh3;
-      }
+    const concentrationSlider = document.getElementById("concentrationSlider");
+    const concentrationValue = document.getElementById("concentrationValue");
+    const trueConductivityEl = document.getElementById("trueConductivity");
+    const measuredConductivityEl =
+      document.getElementById("measuredConductivity");
+    const noiseToggle = document.getElementById("noiseToggle");
+    const statusText = document.getElementById("statusText");
+    const sampleOnceBtn = document.getElementById("sampleOnceBtn");
 
-      step(dt) {
-        const flux = this.nh3Flux();
-        const removed = this.air.removeNH3(flux, dt);
-        this.membrane.feedPoolMol += removed;
-        return removed;
-      }
-    }
-
-    class NitrogenSinkSystem {
-      constructor(air, fan, channel, cell, psu, sensor, manualSwitch) {
-        this.air = air;
-        this.fan = fan;
-        this.channel = channel;
-        this.cell = cell;
-        this.psu = psu;
-        this.sensor = sensor;
-        this.manualSwitch = manualSwitch;
-        this.time = 0;
-        this.capturedN = 0;
-      }
-
-      step(dt) {
-        const sp = this.manualSwitch.getSetpoints();
-        this.fan.setSpeed(sp.fanSpeed);
-        this.psu.setMode("constant_current", sp.currentA);
-
-        const flow = this.fan.computeFlowRate();
-        this.air.updateFlowRate(flow);
-
-        const removedFromAir = this.channel.step(dt);
-
-        const Rcell = this.cell.totalResistance();
-        const current = this.psu.computeCurrent(Rcell);
-        const movedToAcid = this.cell.step(dt, current);
-
-        this.capturedN += movedToAcid;
-        this.time += dt;
-
-        const nh4Conc = this.cell.acid.getNH4Concentration();
-        const cond = this.sensor.measure();
-
-        return {
-          time: this.time,
-          airNH3ppm: this.air.nh3_ppm,
-          nh4Conc: nh4Conc,
-          conductivity: cond,
-          current: current,
-          flow: flow,
-          removedFromAir,
-          movedToAcid,
-          capturedN: this.capturedN,
-        };
-      }
-    }
-
-    // --- Wiring the simulation + UI ---
-
-    const switchSelect = document.getElementById("switchPosition");
-    const initialNH3Input = document.getElementById("initialNH3");
-    const simSpeedSelect = document.getElementById("simSpeed");
-    const startBtn = document.getElementById("startBtn");
-    const pauseBtn = document.getElementById("pauseBtn");
-    const resetBtn = document.getElementById("resetBtn");
-
-    const statTime = document.getElementById("statTime");
-    const statNH3 = document.getElementById("statNH3");
-    const statNH4 = document.getElementById("statNH4");
-    const statCond = document.getElementById("statCond");
-    const statCurrent = document.getElementById("statCurrent");
-    const statFlow = document.getElementById("statFlow");
-    const statCaptured = document.getElementById("statCaptured");
-
-    const ctx = document.getElementById("playgroundChart").getContext("2d");
-    const chartData = {
-      labels: [],
-      datasets: [
-        {
-          label: "Air NH3 (ppm)",
-          data: [],
-          borderColor: "#22c55e",
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.2,
-        },
-        {
-          label: "NH4+ (mol/L)",
-          data: [],
-          borderColor: "#3b82f6",
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.2,
-          yAxisID: "y1",
-        },
-        {
-          label: "Conductivity (arb.)",
-          data: [],
-          borderColor: "#f97316",
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.2,
-          yAxisID: "y1",
-        },
-      ],
-    };
-
-    const playgroundChart = new Chart(ctx, {
-      type: "line",
-      data: chartData,
-      options: {
-        responsive: true,
-        animation: false,
-        scales: {
-          x: {
-            title: { display: true, text: "Time (s)" },
-            grid: { color: "rgba(148, 163, 184, 0.2)" },
-            ticks: { color: "#e5e7eb", maxTicksLimit: 8 },
-          },
-          y: {
-            type: "linear",
-            position: "left",
-            title: { display: true, text: "Air NH3 (ppm)" },
-            grid: { color: "rgba(148, 163, 184, 0.15)" },
-            ticks: { color: "#e5e7eb" },
-          },
-          y1: {
-            type: "linear",
-            position: "right",
-            title: { display: true, text: "NH4+ / Cond." },
-            grid: { drawOnChartArea: false },
-            ticks: { color: "#e5e7eb" },
-          },
-        },
-        plugins: {
-          legend: {
-            display: false,
-          },
-        },
-      },
+    const sensor = new ConductivitySensor({
+      cellConstant: 1.0,
+      noiseStd: 0.08,
+      baseConductivity: 0.6,
+      sensitivity: 0.035,
     });
 
-    let system = null;
-    let simTimer = null;
-    const dt = 1.0; // simulation timestep in seconds
+    let lastMeasurementTime = performance.now();
 
-    function buildSystem(initialNH3ppm) {
-      const air = new AirStream(0.01, initialNH3ppm, 0.01);
-      const fan = new Fan(0.05, 1.0);
+    function updateSensorReading(sampleOnce = false) {
+      const conc = Number(concentrationSlider.value);
+      concentrationValue.textContent = conc.toFixed(0);
 
-      const acid = new AcidReservoir(0.5);
-      const membrane = new Membrane(0.01, 1e-4, 5.0, 0.5);
-      const cell = new ElectrochemicalCell(membrane, acid, 5.0);
-      const sensor = new ConductivitySensor(acid, 0.0);
-      const manualSwitch = new ManualSwitch();
-      manualSwitch.setPosition(switchSelect.value);
+      const sigmaTrue = sensor.computeTrueConductivity(conc);
+      const sigmaMeas = sensor.measure(
+        sigmaTrue,
+        noiseToggle.checked
+      );
 
-      const psu = new PowerSupply("constant_current", 0.1, 0.2);
-      const channel = new AirChannel(air, membrane, 0.01, 1e-4);
+      trueConductivityEl.textContent = sigmaTrue.toFixed(2);
+      measuredConductivityEl.textContent = sigmaMeas.toFixed(2);
 
-      return new NitrogenSinkSystem(air, fan, channel, cell, psu, sensor, manualSwitch);
-    }
-
-    function resetSimulation() {
-      const initialNH3 = parseFloat(initialNH3Input.value) || 50;
-      system = buildSystem(initialNH3);
-
-      chartData.labels = [];
-      chartData.datasets.forEach(ds => ds.data = []);
-      playgroundChart.update();
-
-      updateStatus({
-        time: 0,
-        airNH3ppm: system.air.nh3_ppm,
-        nh4Conc: system.cell.acid.getNH4Concentration(),
-        conductivity: system.sensor.measure(),
-        current: 0,
-        flow: 0,
-        capturedN: 0,
-      });
-    }
-
-    function updateStatus(state) {
-      statTime.textContent = state.time.toFixed(1);
-      statNH3.textContent = state.airNH3ppm.toFixed(2);
-      statNH4.textContent = state.nh4Conc.toExponential(3);
-      statCond.textContent = state.conductivity.toFixed(3);
-      statCurrent.textContent = state.current.toFixed(3);
-      statFlow.textContent = state.flow.toFixed(4);
-      statCaptured.textContent = (state.capturedN * 1e3).toFixed(3); // mmol
-    }
-
-    function stepSimulation() {
-      if (!system) return;
-      // update switch
-      system.manualSwitch.setPosition(switchSelect.value);
-      const state = system.step(dt);
-
-      chartData.labels.push(state.time);
-      chartData.datasets[0].data.push(state.airNH3ppm);
-      chartData.datasets[1].data.push(state.nh4Conc);
-      chartData.datasets[2].data.push(state.conductivity);
-
-      // Keep last 300 points visible
-      if (chartData.labels.length > 300) {
-        chartData.labels.shift();
-        chartData.datasets.forEach(ds => ds.data.shift());
+      if (!sampleOnce) {
+        const now = performance.now();
+        const dt = (now - lastMeasurementTime) / 1000;
+        lastMeasurementTime = now;
+        statusText.textContent = `Sampling at ~${(1 / dt).toFixed(
+          1
+        )} Hz`;
       }
-
-      playgroundChart.update();
-      updateStatus(state);
     }
 
-    function startSimulation() {
-      if (simTimer) return;
-      const speed = parseFloat(simSpeedSelect.value) || 1;
-      const intervalMs = 1000 / speed;
-      simTimer = setInterval(stepSimulation, intervalMs);
-      startBtn.disabled = true;
-      pauseBtn.disabled = false;
-    }
+    // Continuous sampling loop (approx. 5 Hz)
+    setInterval(() => {
+      updateSensorReading(false);
+    }, 200);
 
-    function pauseSimulation() {
-      if (simTimer) {
-        clearInterval(simTimer);
-        simTimer = null;
-      }
-      startBtn.disabled = false;
-      pauseBtn.disabled = true;
-    }
-
-    // --- UI wiring ---
-
-    startBtn.addEventListener("click", startSimulation);
-    pauseBtn.addEventListener("click", pauseSimulation);
-    resetBtn.addEventListener("click", () => {
-      pauseSimulation();
-      resetSimulation();
-      startBtn.disabled = false;
-      pauseBtn.disabled = true;
+    // One-shot measurement button
+    sampleOnceBtn.addEventListener("click", () => {
+      updateSensorReading(true);
+      statusText.textContent = "Single sample taken";
+      setTimeout(() => {
+        statusText.textContent = "Sampling at 5 Hz";
+      }, 1200);
     });
 
-    simSpeedSelect.addEventListener("change", () => {
-      if (simTimer) {
-        pauseSimulation();
-        startSimulation();
-      }
-    });
+    // React immediately when user moves slider or toggles noise
+    concentrationSlider.addEventListener("input", () =>
+      updateSensorReading(true)
+    );
+    noiseToggle.addEventListener("change", () => updateSensorReading(true));
 
-    // Initial state
-    resetSimulation();
+    // Initial draw
+    updateSensorReading(true);
   </script>
 </body>
 </html>
