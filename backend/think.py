@@ -722,7 +722,7 @@ def start_core_world_workers() -> None:
 
 app = Flask(__name__)
 
-init_db()
+init_think_db()
 start_core_world_workers()
 
 # =====================
