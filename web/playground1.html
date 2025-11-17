@@ -2,672 +2,813 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Nitrogen Environment · Null State</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Null Environment – Nitrogen World Playground</title>
   <style>
     * {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
     }
 
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-        sans-serif;
-      background: radial-gradient(circle at top, #121624 0%, #05070c 55%, #020308 100%);
-      color: #f3f4f6;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    .app {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
-    }
-
-    /* Left: scene */
-    .scene {
-      flex: 1.6;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      padding: 24px 24px 18px 24px;
-      gap: 10px;
-    }
-
-    .panel {
-      border-radius: 18px;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      background: linear-gradient(
-        145deg,
-        rgba(15, 23, 42, 0.96),
-        rgba(15, 23, 42, 0.82)
-      );
-      box-shadow:
-        0 22px 40px rgba(15, 23, 42, 0.65),
-        0 0 0 1px rgba(15, 23, 42, 0.9);
-      overflow: hidden;
-    }
-
-    .layers-panel {
-      flex: 1;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 10px 10px 12px 10px;
-    }
-
-    .layer {
-      position: relative;
-      flex: 1;
-      border-radius: 14px;
-      overflow: hidden;
-      padding: 10px 14px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      isolation: isolate;
-    }
-
-    .layer-heading {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      z-index: 2;
-    }
-
-    .layer-title-pill {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      padding: 3px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-      background: rgba(15, 23, 42, 0.75);
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at top, #101827, #020617);
       color: #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
     }
 
-    .layer-subtitle {
-      font-size: 11px;
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 16px;
+      backdrop-filter: blur(16px);
+      background: linear-gradient(to right, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.7));
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      margin: 0;
+      letter-spacing: 0.03em;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 0.85rem;
       color: #9ca3af;
     }
 
-    .layer-caption {
-      font-size: 11px;
-      color: #9ca3af;
-      z-index: 2;
+    main {
+      flex: 1;
+      padding: 16px 24px 24px;
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
+      gap: 18px;
     }
 
-    .layer.air {
-      background: radial-gradient(circle at top left, #1e293b 0%, #020617 60%);
-      border: 1px solid rgba(94, 234, 212, 0.35);
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
     }
 
-    .layer.water {
-      background: radial-gradient(circle at bottom right, #0b1220 0%, #020617 65%);
-      border: 1px solid rgba(59, 130, 246, 0.35);
+    .card {
+      background: radial-gradient(circle at top left, rgba(30, 64, 175, 0.3), rgba(15, 23, 42, 0.96));
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      padding: 14px 16px;
+      box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.7),
+        0 0 0 1px rgba(15, 23, 42, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
     }
 
-    .layer::before {
+    .card::before {
       content: "";
       position: absolute;
-      inset: 0;
+      inset: -40%;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(56, 189, 248, 0.08), transparent 50%),
+        radial-gradient(circle at 100% 0%, rgba(129, 140, 248, 0.06), transparent 55%);
+      opacity: 0.9;
       pointer-events: none;
-      background: radial-gradient(
-        circle at 20% 20%,
-        rgba(56, 189, 248, 0.12),
-        transparent 55%
-      );
-      opacity: 0.55;
+      z-index: -1;
     }
 
-    .layer.water::before {
-      background: radial-gradient(
-        circle at 80% 80%,
-        rgba(96, 165, 250, 0.16),
-        transparent 55%
-      );
-    }
-
-    /* Particles */
-    .particle-layer {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      z-index: 1;
-    }
-
-    .particle {
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      border-radius: 999px;
-      font-size: 9px;
+    .card-header {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      opacity: 0;
-      transform: translateX(-10vw);
-      backdrop-filter: blur(4px);
-    }
-
-    .particle.air {
-      border: 1px solid rgba(45, 212, 191, 0.9);
-      color: rgba(167, 243, 208, 0.95);
-      background: radial-gradient(circle at 30% 20%, rgba(45, 212, 191, 0.16), transparent 60%);
-      animation-name: driftAir;
-      animation-timing-function: linear;
-      animation-iteration-count: infinite;
-    }
-
-    .particle.water {
-      border: 1px solid rgba(96, 165, 250, 0.9);
-      color: rgba(191, 219, 254, 0.95);
-      background: radial-gradient(circle at 30% 20%, rgba(96, 165, 250, 0.18), transparent 60%);
-      animation-name: driftWater;
-      animation-timing-function: linear;
-      animation-iteration-count: infinite;
-    }
-
-    @keyframes driftAir {
-      0% {
-        transform: translateX(-12vw);
-        opacity: 0;
-      }
-      10% {
-        opacity: 1;
-      }
-      80% {
-        opacity: 1;
-      }
-      100% {
-        transform: translateX(115vw);
-        opacity: 0;
-      }
-    }
-
-    @keyframes driftWater {
-      0% {
-        transform: translateX(-10vw);
-        opacity: 0;
-      }
-      12% {
-        opacity: 1;
-      }
-      85% {
-        opacity: 1;
-      }
-      100% {
-        transform: translateX(105vw);
-        opacity: 0;
-      }
-    }
-
-    /* Timeline */
-    .timeline-panel {
-      height: 86px;
-      padding: 10px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .timeline-header {
-      display: flex;
-      align-items: baseline;
       justify-content: space-between;
-      font-size: 11px;
-      color: #9ca3af;
-    }
-
-    .timeline-title {
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      font-size: 10px;
-      color: #cbd5f5;
-    }
-
-    .timeline-stream {
-      position: relative;
-      flex: 1;
-      margin-top: 4px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: radial-gradient(circle at 50% 50%, #020617 0%, #020617 60%);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-    }
-
-    .timeline-ticks {
-      position: absolute;
-      inset: 0;
-      background-image: linear-gradient(
-        to right,
-        rgba(148, 163, 184, 0.16) 1px,
-        transparent 1px
-      );
-      background-size: 18px 100%;
-      opacity: 0.6;
-      animation: ticksScroll 7s linear infinite;
-    }
-
-    @keyframes ticksScroll {
-      0% {
-        transform: translateX(0);
-      }
-      100% {
-        transform: translateX(-18px);
-      }
-    }
-
-    .timeline-overlay {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        to right,
-        rgba(15, 23, 42, 0.75),
-        rgba(15, 23, 42, 0.35),
-        rgba(15, 23, 42, 0.75)
-      );
-      mix-blend-mode: screen;
-      pointer-events: none;
-    }
-
-    .timeline-labels {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 10px;
-      font-size: 10px;
-      color: #9ca3af;
-      pointer-events: none;
-    }
-
-    .timeline-labels span {
-      background: rgba(15, 23, 42, 0.88);
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-    }
-
-    .null-caption {
-      font-size: 10px;
-      color: #6b7280;
-      margin-top: 2px;
-    }
-
-    /* Right: sidebar */
-    .sidebar {
-      flex: 1;
-      padding: 24px 24px 18px 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .sidebar-panel {
-      padding: 16px 16px 14px 16px;
-      border-radius: 18px;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-      background: radial-gradient(circle at top, #020617 0%, #020617 65%);
-      box-shadow:
-        0 18px 36px rgba(15, 23, 42, 0.7),
-        0 0 0 1px rgba(15, 23, 42, 0.9);
-    }
-
-    .sidebar-header {
-      margin-bottom: 10px;
-    }
-
-    .sidebar-title-pill {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: #9ca3af;
-      margin-bottom: 6px;
-    }
-
-    .sidebar-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #e5e7eb;
-      display: flex;
       align-items: baseline;
-      gap: 6px;
+      gap: 8px;
     }
 
-    .sidebar-title span.highlight {
-      color: #38bdf8;
-      font-weight: 500;
-      font-size: 14px;
+    .card-title {
+      font-size: 0.9rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a5b4fc;
     }
 
-    .sidebar-subtitle {
-      font-size: 11px;
+    .card-subtitle {
+      font-size: 0.75rem;
       color: #9ca3af;
-      margin-top: 4px;
-      line-height: 1.4;
     }
 
-    .metrics {
-      display: flex;
-      flex-direction: column;
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
-      margin-top: 8px;
     }
 
-    .metric {
-      padding: 8px 8px 7px 8px;
-      border-radius: 12px;
+    @media (max-width: 700px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .metric-tile {
       background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 14px;
+      padding: 8px 10px;
+      border: 1px solid rgba(75, 85, 99, 0.9);
       display: flex;
       flex-direction: column;
-      gap: 4px;
-    }
-
-    .metric-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
+      gap: 2px;
     }
 
     .metric-label {
-      font-size: 11px;
-      color: #e5e7eb;
-    }
-
-    .metric-tag {
-      font-size: 9px;
+      font-size: 0.7rem;
       text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #6b7280;
-    }
-
-    .metric-bar {
-      position: relative;
-      width: 100%;
-      height: 5px;
-      border-radius: 999px;
-      background: rgba(31, 41, 55, 0.96);
-      overflow: hidden;
-    }
-
-    .metric-fill {
-      position: absolute;
-      inset: 0;
-      width: 65%;
-      border-radius: inherit;
-      background: linear-gradient(
-        90deg,
-        rgba(45, 212, 191, 0.9),
-        rgba(16, 185, 129, 0.7)
-      );
-      opacity: 0.7;
-      transform-origin: left;
-      animation: metricPulse 4s ease-in-out infinite;
-    }
-
-    .metric-fill.water {
-      width: 55%;
-      background: linear-gradient(
-        90deg,
-        rgba(59, 130, 246, 0.9),
-        rgba(56, 189, 248, 0.7)
-      );
-    }
-
-    .metric-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: 10px;
+      letter-spacing: 0.06em;
       color: #9ca3af;
-      margin-top: 2px;
     }
 
-    @keyframes metricPulse {
-      0%,
-      100% {
-        transform: scaleX(0.96);
-        opacity: 0.7;
-      }
-      50% {
-        transform: scaleX(1);
-        opacity: 0.95;
-      }
-    }
-
-    .metric-number {
-      font-size: 22px;
-      font-weight: 500;
-      color: #f9fafb;
+    .metric-value {
+      font-size: 1.05rem;
+      font-variant-numeric: tabular-nums;
     }
 
     .metric-unit {
-      font-size: 10px;
+      font-size: 0.7rem;
       color: #6b7280;
+      margin-left: 4px;
     }
 
-    .note {
-      font-size: 10px;
-      color: #9ca3af;
-      margin-top: 6px;
-      border-top: 1px dashed rgba(55, 65, 81, 0.9);
-      padding-top: 6px;
+    .metric-trend {
+      font-size: 0.7rem;
+      color: #6ee7b7;
     }
 
-    .null-state-tag {
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
+    .metric-trend.down {
+      color: #fb7185;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr) minmax(0, 0.9fr);
+      gap: 8px;
+      align-items: center;
+    }
+
+    @media (max-width: 700px) {
+      .control-row {
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr);
+        grid-template-rows: auto auto;
+      }
+    }
+
+    .control-label {
+      font-size: 0.75rem;
+      color: #e5e7eb;
+    }
+
+    .control-label span {
+      display: block;
+      font-size: 0.65rem;
       color: #9ca3af;
+    }
+
+    .control-input {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .control-input input[type="range"] {
+      width: 100%;
+    }
+
+    .control-value {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      text-align: right;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      background: rgba(15, 23, 42, 0.9);
+      font-size: 0.7rem;
+      color: #e5e7eb;
+    }
+
+    .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+
+    .pill-dot.idle {
+      background: #f97316;
+      box-shadow: 0 0 8px #f97316;
+    }
+
+    .pill-dot.offline {
+      background: #6b7280;
+      box-shadow: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 220px;
+      border-radius: 14px;
+      background: radial-gradient(circle at top, #020617, #020617);
+      border: 1px solid rgba(31, 41, 55, 0.9);
+    }
+
+    footer {
+      padding: 10px 24px 16px;
+      font-size: 0.7rem;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-size: 0.7rem;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(75, 85, 99, 0.8);
+    }
+
+    .legend-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #e5e7eb;
       opacity: 0.9;
-    }
-
-    .null-state-text {
-      font-size: 10px;
-      color: #9ca3af;
-      margin-top: 4px;
-      line-height: 1.5;
-    }
-
-    .null-state-text span {
-      color: #fde68a;
-    }
-
-    @media (max-width: 900px) {
-      .app {
-        flex-direction: column;
-      }
-      .scene {
-        height: 55vh;
-        padding-right: 24px;
-      }
-      .sidebar {
-        padding-top: 4px;
-        padding-left: 24px;
-      }
-      .sidebar-title {
-        font-size: 16px;
-      }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <!-- Left: visual environment -->
-    <div class="scene">
-      <div class="panel layers-panel">
-        <!-- Air layer -->
-        <div class="layer air">
-          <div class="layer-heading">
-            <div class="layer-title-pill">Air layer</div>
-            <div class="layer-subtitle">Diffuse indoor / barn air carrying NH₃</div>
-          </div>
-
-          <div class="particle-layer" id="airParticles"></div>
-
-          <div class="layer-caption">
-            Nitrogen drifts with the airflow and leaves the domain. No membranes, no sinks.
-          </div>
-        </div>
-
-        <!-- Water layer -->
-        <div class="layer water">
-          <div class="layer-heading">
-            <div class="layer-title-pill">Water / sewer layer</div>
-            <div class="layer-subtitle">Greywater, seepage, sewer lateral trickle</div>
-          </div>
-
-          <div class="particle-layer" id="waterParticles"></div>
-
-          <div class="layer-caption">
-            Dissolved ammonium glides through thin channels. No boundary captures it.
-          </div>
-        </div>
-      </div>
-
-      <div class="panel timeline-panel">
-        <div class="timeline-header">
-          <div>
-            <div class="timeline-title">Time & loss</div>
-            <div class="null-caption">World clock ticks. Nitrogen just passes through.</div>
-          </div>
-          <div>
-            <span style="font-size: 11px; color: #e5e7eb;">
-              t = <span id="timeMinutes">0</span> min
-            </span>
-          </div>
-        </div>
-
-        <div class="timeline-stream">
-          <div class="timeline-ticks"></div>
-          <div class="timeline-overlay"></div>
-          <div class="timeline-labels">
-            <span>Flows in</span>
-            <span>Flows out</span>
-          </div>
-        </div>
-      </div>
+  <header>
+    <div>
+      <h1>Null Environment • Nitrogen World</h1>
+      <p>Ambient ammonia, air, and time evolving with no capture system installed.</p>
     </div>
+    <div class="pill">
+      <div id="sim-status-dot" class="pill-dot"></div>
+      <span id="sim-status-text">Environment evolving</span>
+    </div>
+  </header>
 
-    <!-- Right: indicators -->
-    <div class="sidebar">
-      <div class="sidebar-panel">
-        <div class="sidebar-header">
-          <div class="sidebar-title-pill">Environment · Null state</div>
-          <div class="sidebar-title">
-            Nitrogen field
-            <span class="highlight">before organs</span>
+  <main>
+    <!-- Left: World state & graph -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">World State</div>
+          <div class="card-subtitle">How the room behaves when you do nothing.</div>
+        </div>
+        <div class="card-subtitle" id="time-display">t = 0.0 min</div>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-tile">
+          <div class="metric-label">Ambient NH₃</div>
+          <div>
+            <span class="metric-value" id="metric-nh3">0.00</span>
+            <span class="metric-unit">ppm</span>
           </div>
-          <div class="sidebar-subtitle">
-            Air and water carry nitrogen. The world has flow but no control. No device is
-            instantiated; nothing catches anything.
+          <div class="metric-trend" id="metric-nh3-trend">steady</div>
+        </div>
+
+        <div class="metric-tile">
+          <div class="metric-label">Total N in Room</div>
+          <div>
+            <span class="metric-value" id="metric-total-n">0.00</span>
+            <span class="metric-unit">mmol</span>
+          </div>
+          <div class="metric-trend" id="metric-total-n-trend">no sink yet</div>
+        </div>
+
+        <div class="metric-tile">
+          <div class="metric-label">Room Volume</div>
+          <div>
+            <span class="metric-value" id="metric-volume">50</span>
+            <span class="metric-unit">m³</span>
+          </div>
+          <div class="metric-trend">fixed boundary</div>
+        </div>
+
+        <div class="metric-tile">
+          <div class="metric-label">Temperature</div>
+          <div>
+            <span class="metric-value" id="metric-temp">22.0</span>
+            <span class="metric-unit">°C</span>
+          </div>
+          <div class="metric-trend" id="metric-temp-trend">diurnal drift</div>
+        </div>
+
+        <div class="metric-tile">
+          <div class="metric-label">Relative Humidity</div>
+          <div>
+            <span class="metric-value" id="metric-humidity">50</span>
+            <span class="metric-unit">%</span>
+          </div>
+          <div class="metric-trend" id="metric-humidity-trend">breathing & weather</div>
+        </div>
+
+        <div class="metric-tile">
+          <div class="metric-label">Ventilation Loss</div>
+          <div>
+            <span class="metric-value" id="metric-vent-rate">0.50</span>
+            <span class="metric-unit">ACH</span>
+          </div>
+          <div class="metric-trend" id="metric-vent-trend">diffuse nitrogen leak</div>
+        </div>
+      </div>
+
+      <canvas id="world-chart"></canvas>
+    </section>
+
+    <!-- Right: Controls and description -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Environment Controls</div>
+          <div class="card-subtitle">Tune how hostile or gentle the null world is.</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="control-row">
+          <div class="control-label">
+            Baseline NH₃ load
+            <span>Typical ambient level before spikes.</span>
+          </div>
+          <div class="control-input">
+            <input id="slider-baseline-nh3" type="range" min="0" max="10" step="0.1" value="2" />
+          </div>
+          <div class="control-value">
+            <span id="val-baseline-nh3">2.0</span> ppm
           </div>
         </div>
 
-        <div class="metrics">
-          <!-- Air metric -->
-          <div class="metric">
-            <div class="metric-header">
-              <div class="metric-label">Air NH₃</div>
-              <div class="metric-tag">Diffuse · Uncaptured</div>
-            </div>
-            <div class="metric-bar">
-              <div class="metric-fill"></div>
-            </div>
-            <div class="metric-footer">
-              <span>Moderate, steady background level</span>
-              <span>Ventilation only</span>
-            </div>
+        <div class="control-row">
+          <div class="control-label">
+            Emission volatility
+            <span>How spiky the room’s sources are.</span>
           </div>
-
-          <!-- Water metric -->
-          <div class="metric">
-            <div class="metric-header">
-              <div class="metric-label">Water / ammonium-N</div>
-              <div class="metric-tag">Passing through</div>
-            </div>
-            <div class="metric-bar">
-              <div class="metric-fill water"></div>
-            </div>
-            <div class="metric-footer">
-              <span>Low but continuous trickle</span>
-              <span>No local sink</span>
-            </div>
+          <div class="control-input">
+            <input id="slider-emission-noise" type="range" min="0" max="1" step="0.05" value="0.4" />
           </div>
-
-          <!-- Captured N -->
-          <div class="metric">
-            <div class="metric-header">
-              <div class="metric-label">Captured N</div>
-              <div class="metric-tag">Sink not installed</div>
-            </div>
-            <div style="display: flex; align-items: baseline; gap: 6px;">
-              <div class="metric-number" id="capturedN">0.0</div>
-              <div class="metric-unit">units (ammonium-N)</div>
-            </div>
-            <div class="metric-footer">
-              <span>All nitrogen exits the scene.</span>
-              <span>Nothing accumulates.</span>
-            </div>
+          <div class="control-value">
+            <span id="val-emission-noise">0.40</span>
           </div>
         </div>
 
-        <div class="note">
-          <div class="null-state-tag">Foundational null state</div>
-          <div class="null-state-text">
-            This is the base world: nitrogen flows in, drifts, and disappears
-            <span>without a sink</span>. Components, membranes, and control organs
-            can be layered onto this field later.
+        <div class="control-row">
+          <div class="control-label">
+            Room volume
+            <span>How big the environment is.</span>
+          </div>
+          <div class="control-input">
+            <input id="slider-volume" type="range" min="10" max="300" step="10" value="50" />
+          </div>
+          <div class="control-value">
+            <span id="val-volume">50</span> m³
+          </div>
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            Ventilation rate
+            <span>Air changes per hour to outdoors.</span>
+          </div>
+          <div class="control-input">
+            <input id="slider-ventilation" type="range" min="0" max="6" step="0.1" value="0.5" />
+          </div>
+          <div class="control-value">
+            <span id="val-ventilation">0.5</span> ACH
+          </div>
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            Mean temperature
+            <span>Center of the diurnal temperature swing.</span>
+          </div>
+          <div class="control-input">
+            <input id="slider-temp-mean" type="range" min="5" max="35" step="0.5" value="22" />
+          </div>
+          <div class="control-value">
+            <span id="val-temp-mean">22.0</span> °C
+          </div>
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            Mean humidity
+            <span>Baseline relative humidity.</span>
+          </div>
+          <div class="control-input">
+            <input id="slider-humidity-mean" type="range" min="10" max="90" step="1" value="50" />
+          </div>
+          <div class="control-value">
+            <span id="val-humidity-mean">50</span> %
           </div>
         </div>
       </div>
+
+      <div style="margin-top:10px;font-size:0.75rem;color:#9ca3af;">
+        This is the world with no membranes, no reservoirs, no power supply—just a room breathing,
+        leaking nitrogen to the outside, and drifting through temperature and humidity cycles. Later,
+        the electrochemical sink will enter this landscape and change these curves.
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="legend">
+      <span>Live signals:</span>
+      <span class="legend-item"><span class="legend-swatch"></span> NH₃ (ppm)</span>
+      <span class="legend-item"><span class="legend-swatch"></span> Temp (°C)</span>
+      <span class="legend-item"><span class="legend-swatch"></span> Humidity (%)</span>
     </div>
-  </div>
+    <div>
+      Null state • No active control, only passive flux and emission noise.
+    </div>
+  </footer>
 
   <script>
-    // Simple digital "life": drifting particles + time progression.
-    document.addEventListener("DOMContentLoaded", () => {
-      const airContainer = document.getElementById("airParticles");
-      const waterContainer = document.getElementById("waterParticles");
+    // --------- Environment model (null state) ---------
 
-      function createParticles(container, count, type) {
-        const height = container.clientHeight || 120;
-        for (let i = 0; i < count; i++) {
-          const p = document.createElement("div");
-          p.classList.add("particle", type);
-          p.textContent = type === "air" ? "N" : "N";
-          const top = Math.random() * (height - 14);
-          const delay = Math.random() * 14;
-          const duration = 12 + Math.random() * 12;
-          p.style.top = `${top}px`;
-          p.style.left = "-16px";
-          p.style.animationDuration = `${duration}s`;
-          p.style.animationDelay = `${delay}s`;
-          container.appendChild(p);
-        }
+    const env = {
+      time_s: 0,
+      dt_s: 0.25, // simulation step
+      // state
+      nh3_ppm: 2.0,
+      total_n_mmol: 0,
+      temp_C: 22.0,
+      humidity_pct: 50,
+
+      // parameters
+      baseline_nh3_ppm: 2.0,
+      emission_noise_strength: 0.4,
+      room_volume_m3: 50,
+      ventilation_ach: 0.5,
+      temp_mean_C: 22,
+      temp_amp_C: 5,
+      humidity_mean_pct: 50,
+      humidity_amp_pct: 10
+    };
+
+    // simple history buffer for plotting
+    const history = {
+      maxPoints: 600,
+      t: [],
+      nh3: [],
+      temp: [],
+      humidity: []
+    };
+
+    function pushHistory(t, nh3, temp, hum) {
+      history.t.push(t);
+      history.nh3.push(nh3);
+      history.temp.push(temp);
+      history.humidity.push(hum);
+
+      if (history.t.length > history.maxPoints) {
+        history.t.shift();
+        history.nh3.shift();
+        history.temp.shift();
+        history.humidity.shift();
+      }
+    }
+
+    function randn() {
+      // Box-Muller
+      const u1 = Math.random();
+      const u2 = Math.random();
+      const r = Math.sqrt(-2.0 * Math.log(u1));
+      const theta = 2.0 * Math.PI * u2;
+      return r * Math.cos(theta);
+    }
+
+    function stepEnvironment() {
+      const dt = env.dt_s;
+      env.time_s += dt;
+
+      // time in hours for diurnal patterns
+      const t_hours = env.time_s / 3600.0;
+      const day_phase = (2 * Math.PI * t_hours) / 24.0;
+
+      // temperature drift: mean + sin + small noise
+      env.temp_C =
+        env.temp_mean_C +
+        env.temp_amp_C * Math.sin(day_phase) +
+        0.3 * randn();
+
+      // humidity drift, constrained 0–100
+      env.humidity_pct =
+        env.humidity_mean_pct +
+        env.humidity_amp_pct * Math.sin(day_phase + Math.PI / 3) +
+        2.0 * randn();
+
+      env.humidity_pct = Math.max(5, Math.min(95, env.humidity_pct));
+
+      // NH3 dynamics:
+      // baseline source + noisy spikes, minus ventilation losses
+      const baseline = env.baseline_nh3_ppm;
+
+      // emission fluctuation: occasional spikes
+      const spike_trigger = Math.random();
+      let spike = 0;
+      if (spike_trigger < env.emission_noise_strength * dt) {
+        spike = 5 + 15 * Math.random(); // random strong burst
       }
 
-      createParticles(airContainer, 28, "air");
-      createParticles(waterContainer, 20, "water");
+      // approximate emission term
+      const emission_ppm = 0.02 * (baseline - env.nh3_ppm) + spike;
 
-      // Time progression (minutes), just for the "ticks" label.
-      let seconds = 0;
-      const timeEl = document.getElementById("timeMinutes");
+      // ventilation as first-order loss (ACH)
+      const lambda_h = env.ventilation_ach; // per hour
+      const lambda_s = lambda_h / 3600.0; // per second
+      const loss_ppm = lambda_s * env.nh3_ppm;
 
-      setInterval(() => {
-        seconds++;
-        const minutes = (seconds / 60).toFixed(1);
-        timeEl.textContent = minutes;
-        // Captured N remains 0.0 in this null state.
-      }, 1000);
+      env.nh3_ppm += (emission_ppm - loss_ppm) * dt;
+      if (env.nh3_ppm < 0) env.nh3_ppm = 0;
+
+      // total N in room (rough back-of-envelope):
+      // 1 ppm NH3 in air ~ 0.7 mg/m3 (approx), convert to mmol
+      const mg_per_m3_per_ppm = 0.7; // crude
+      const mg_total = env.nh3_ppm * mg_per_m3_per_ppm * env.room_volume_m3;
+      const mmol = mg_total / 17.0; // NH3 molar mass ~17 g/mol
+      env.total_n_mmol = mmol;
+
+      pushHistory(env.time_s, env.nh3_ppm, env.temp_C, env.humidity_pct);
+    }
+
+    // --------- UI wiring ---------
+    const elTime = document.getElementById("time-display");
+    const elNH3 = document.getElementById("metric-nh3");
+    const elNH3Trend = document.getElementById("metric-nh3-trend");
+    const elTotalN = document.getElementById("metric-total-n");
+    const elTotalNTrend = document.getElementById("metric-total-n-trend");
+    const elVolume = document.getElementById("metric-volume");
+    const elTemp = document.getElementById("metric-temp");
+    const elTempTrend = document.getElementById("metric-temp-trend");
+    const elHumidity = document.getElementById("metric-humidity");
+    const elHumidityTrend = document.getElementById("metric-humidity-trend");
+    const elVentRate = document.getElementById("metric-vent-rate");
+    const elVentTrend = document.getElementById("metric-vent-trend");
+
+    const sliderBaselineNH3 = document.getElementById("slider-baseline-nh3");
+    const valBaselineNH3 = document.getElementById("val-baseline-nh3");
+
+    const sliderEmissionNoise = document.getElementById("slider-emission-noise");
+    const valEmissionNoise = document.getElementById("val-emission-noise");
+
+    const sliderVolume = document.getElementById("slider-volume");
+    const valVolume = document.getElementById("val-volume");
+
+    const sliderVent = document.getElementById("slider-ventilation");
+    const valVent = document.getElementById("val-ventilation");
+
+    const sliderTempMean = document.getElementById("slider-temp-mean");
+    const valTempMean = document.getElementById("val-temp-mean");
+
+    const sliderHumidityMean = document.getElementById("slider-humidity-mean");
+    const valHumidityMean = document.getElementById("val-humidity-mean");
+
+    // status pill
+    const statusDot = document.getElementById("sim-status-dot");
+    const statusText = document.getElementById("sim-status-text");
+
+    sliderBaselineNH3.addEventListener("input", () => {
+      env.baseline_nh3_ppm = parseFloat(sliderBaselineNH3.value);
+      valBaselineNH3.textContent = env.baseline_nh3_ppm.toFixed(1);
     });
+
+    sliderEmissionNoise.addEventListener("input", () => {
+      env.emission_noise_strength = parseFloat(sliderEmissionNoise.value);
+      valEmissionNoise.textContent = env.emission_noise_strength.toFixed(2);
+    });
+
+    sliderVolume.addEventListener("input", () => {
+      env.room_volume_m3 = parseFloat(sliderVolume.value);
+      valVolume.textContent = env.room_volume_m3.toFixed(0);
+    });
+
+    sliderVent.addEventListener("input", () => {
+      env.ventilation_ach = parseFloat(sliderVent.value);
+      valVent.textContent = env.ventilation_ach.toFixed(1);
+    });
+
+    sliderTempMean.addEventListener("input", () => {
+      env.temp_mean_C = parseFloat(sliderTempMean.value);
+      valTempMean.textContent = env.temp_mean_C.toFixed(1);
+    });
+
+    sliderHumidityMean.addEventListener("input", () => {
+      env.humidity_mean_pct = parseFloat(sliderHumidityMean.value);
+      valHumidityMean.textContent = env.humidity_mean_pct.toFixed(0);
+    });
+
+    // --------- Chart drawing ---------
+    const canvas = document.getElementById("world-chart");
+    const ctx = canvas.getContext("2d");
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    function drawChart() {
+      const w = canvas.width / window.devicePixelRatio;
+      const h = canvas.height / window.devicePixelRatio;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // background grid
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = "rgba(55,65,81,0.7)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const y = (i / 6) * h;
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+
+      if (history.t.length < 2) return;
+
+      const tMin = history.t[0];
+      const tMax = history.t[history.t.length - 1];
+
+      const nh3Min = Math.min(...history.nh3);
+      const nh3Max = Math.max(...history.nh3);
+      const tempMin = Math.min(...history.temp);
+      const tempMax = Math.max(...history.temp);
+      const humMin = Math.min(...history.humidity);
+      const humMax = Math.max(...history.humidity);
+
+      function norm(val, min, max) {
+        if (max === min) return 0.5;
+        return (val - min) / (max - min);
+      }
+
+      function xFromTime(t) {
+        if (tMax === tMin) return w;
+        return ((t - tMin) / (tMax - tMin)) * w;
+      }
+
+      // NH3 line
+      ctx.lineWidth = 1.7;
+
+      ctx.strokeStyle = "rgba(129, 140, 248, 0.9)";
+      ctx.beginPath();
+      history.t.forEach((t, i) => {
+        const x = xFromTime(t);
+        const y = h - norm(history.nh3[i], nh3Min, nh3Max) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // Temperature line
+      ctx.strokeStyle = "rgba(248, 250, 252, 0.9)";
+      ctx.beginPath();
+      history.t.forEach((t, i) => {
+        const x = xFromTime(t);
+        const y = h - norm(history.temp[i], tempMin, tempMax) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // Humidity line
+      ctx.strokeStyle = "rgba(45, 212, 191, 0.9)";
+      ctx.beginPath();
+      history.t.forEach((t, i) => {
+        const x = xFromTime(t);
+        const y = h - norm(history.humidity[i], humMin, humMax) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    // --------- UI update ---------
+    function updateMetrics() {
+      const minutes = env.time_s / 60.0;
+      elTime.textContent = `t = ${minutes.toFixed(1)} min`;
+
+      const nh3 = env.nh3_ppm;
+      elNH3.textContent = nh3.toFixed(2);
+
+      const len = history.nh3.length;
+      let trendText = "steady";
+      let trendClass = "";
+      if (len > 4) {
+        const dh = history.nh3[len - 1] - history.nh3[len - 4];
+        if (dh > 0.2) {
+          trendText = "rising";
+          trendClass = "";
+        } else if (dh < -0.2) {
+          trendText = "falling";
+          trendClass = "down";
+        }
+      }
+      elNH3Trend.textContent = trendText;
+      elNH3Trend.className = "metric-trend " + trendClass;
+
+      elTotalN.textContent = env.total_n_mmol.toFixed(2);
+      elTotalNTrend.textContent = "leaks to outdoors only";
+
+      elVolume.textContent = env.room_volume_m3.toFixed(0);
+
+      elTemp.textContent = env.temp_C.toFixed(1);
+      elHumidity.textContent = env.humidity_pct.toFixed(0);
+
+      // qualitative trends for temp and humidity
+      const lt = history.temp.length;
+      if (lt > 4) {
+        const dT = history.temp[lt - 1] - history.temp[lt - 4];
+        elTempTrend.textContent = dT > 0.1 ? "warming" : dT < -0.1 ? "cooling" : "stable";
+      }
+
+      const lh = history.humidity.length;
+      if (lh > 4) {
+        const dH = history.humidity[lh - 1] - history.humidity[lh - 4];
+        elHumidityTrend.textContent = dH > 0.4 ? "moistening" : dH < -0.4 ? "drying" : "stable";
+      }
+
+      elVentRate.textContent = env.ventilation_ach.toFixed(2);
+      elVentTrend.textContent =
+        env.ventilation_ach < 0.3
+          ? "nitrogen accumulates slowly"
+          : env.ventilation_ach < 2
+          ? "moderate nitrogen leak"
+          : "aggressive nitrogen leak";
+
+      statusDot.className = "pill-dot";
+      statusText.textContent = "Environment evolving";
+    }
+
+    // --------- Main loop ---------
+    function loop() {
+      for (let i = 0; i < 4; i++) {
+        stepEnvironment();
+      }
+      updateMetrics();
+      drawChart();
+      requestAnimationFrame(loop);
+    }
+
+    // seed some history so graph isn’t empty
+    for (let i = 0; i < 60; i++) {
+      stepEnvironment();
+    }
+
+    updateMetrics();
+    drawChart();
+    requestAnimationFrame(loop);
   </script>
 </body>
 </html>
