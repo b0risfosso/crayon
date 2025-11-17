@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import threading
 import time
 
-from flask import Flask, request, jsonify, render_template, current_app
+from flask import Flask, request, jsonify, render_template
 
 
 from prompts import (
