@@ -1599,94 +1599,87 @@ Your final output should be only the numbered list of core ideas, each on its ow
 
 
 world_context_integrator_prompt = r"""
-
 You will receive a set of core ideas.
-Your task is to build a unified world context: a living, coherent world whose foundations, physics, culture, systems, and dynamics arise directly from the core ideas.
+Your task is to build a unified world context: a living, coherent world whose foundations, physics, internal logic, systems, and dynamics arise directly and concretely from the core ideas.
+The key rule:
+Use the internal ontology, vocabulary, and level of concreteness that the core ideas themselves establish.
+Do not abstract away specifics that appear in the core ideas.
+If the core ideas contain biochemical names, use biochemical names.
+If they contain rocket components, use rocket components.
+If they contain financial terms, use financial terms.
+If they contain emotional categories, use emotional categories.
 The world must feel alive, structurally consistent, and capable of evolving.
-It must not be a collage of disconnected concepts.
-It must be an integrated environment where each core idea becomes part of the world’s laws, architectures, organisms, civilizations, or emergent behaviors.
-Output Format
+All structures must emerge mechanistically from the causal logic of the provided ideas.
+
+Output Requirements
 Produce one continuous world-context essay, 4–8 paragraphs in length.
-No JSON.
 No lists.
+No JSON.
 No bullet points.
-Write as a single integrated piece of prose.
-World-Context Requirements
-The world context should:
-1. Integrate Every Core Idea Into the World
-Each core idea becomes:
-a law
-a system
-a social structure
-a physical phenomenon
-a biological mechanism
-a cultural principle
-an architectural feature
-an emergent behavior
-Do not refer to the core ideas explicitly; embed them.
-2. Build Across Multiple Scales
-The world should feel layered:
-microscopic
-biological
-architectural
-societal
-environmental
-cosmic
-The logic should remain consistent across all scales.
-3. Make the World Alive
+Just a single, integrated piece of prose.
+
+Core Principles
+1. Preserve Ontology
+Use the exact types of entities, objects, mechanisms, and terms that appear in the core ideas.
+Do not generalize them into abstract archetypes unless the core ideas are themselves abstract.
+This means:
+If the core ideas talk about “malate,” “aspartate,” or “urea cycle,” those exact entities must appear in the world.
+If they talk about “cryogenic propellant densification,” those exact mechanisms must appear.
+If they talk about “interest rates” or “liquidity cascades,” those exact financial structures must appear.
+If they talk about “attachment,” “fear,” or “desire,” those exact emotions must appear.
+The world’s ontology is defined by the core ideas.
+2. Build the World Using the Same Level of Detail
+Match the granularity of the core ideas:
+If the core ideas are molecular → the world should be molecular.
+If the core ideas are psychological → the world should be psychological.
+If the core ideas are astrophysical → the world should be astrophysical.
+If the core ideas are aesthetic → the world should be aesthetic.
+Do not generalize upward unless the core ideas themselves support scale expansion.
+3. Integrate Every Core Idea into World Mechanics
+Each core idea should become:
+a physical or computational law
+a binding constraint
+a system or process
+a structure or architecture
+a dynamic state or emergent behavior
+Do not mention the core ideas explicitly.
+Embed them as the world’s operating principles.
+4. Mechanistic Expansion Across Scales
+You may (and should) expand across scales—micro → macro → social → architectural → cosmic—but only when the core ideas mechanistically justify that expansion.
+This means:
+A biochemical shuttle may scale up to planetary cycles only if the logic of gradients, gates, and exchanges justifies it.
+A financial liquidity rule may scale up to social or civilizational dynamics only if those dynamics naturally follow from liquidity constraints.
+An emotional regulatory mechanism may scale up to collective behavior only if the emotional logic supports it.
+Never jump scales by analogy.
+Only jump scales by mechanism.
+5. Never Replace Concrete Entities with Metaphorical Stand-ins
+Do not turn:
+mitochondria → “boundaries”
+rocket engines → “fire organs”
+credit markets → “flow channels”
+grief → “dark pools”
+unless the core ideas themselves already use metaphorical language.
+Stay loyal to the literal substrate of the core ideas.
+6. Allow Emergence, But Keep It Grounded
 The world should:
 grow
-adapt
 respond
+adapt
+reorganize
 evolve
 generate new patterns
-support new forms of intelligence, organization, and identity
-4. Use the Core Ideas as World Physics
-The concepts are not metaphors—
-they become actual forces, ecosystems, signals, architectures, and constraints of the world.
-5. Treat the World as an Engine for Emergence
-The world should produce:
-collective behaviors
-cascades
-new organizations
-adaptive equilibria
-unexpected consequences
-Everything should feel like it’s part of a coherent, complex system.
-6. Preserve Clarity, Depth, and Structural Coherence
-Even when the world is fantastical, its internal rules must be:
-intelligible
-rigorous
-interconnected
-grounded in the core ideas
-7. Ground the world in the intrinsic logic of the core ideas
-All structures, behaviors, and architectures of the world must arise from the causal logic, physics, semantics, or operational patterns present in the core ideas themselves.
-The world should never shift its conceptual substrate.
-8. Allow cross-domain layers only when they emerge from internal mechanisms
-Microscopic → biological → social → architectural → cosmic layers may appear, but only when they follow naturally and causally from the lower-level mechanisms of the world.
-Do not import concepts from unrelated domains.
-9. No external analogies or transplanted metaphors
-Do not use external scaffold metaphors such as cities, governments, corporations, kingdoms, factories, markets, ecosystems, or cosmologies unless the world itself—based on the core ideas—would generate such structures independently.
-Every structure must belong to the world’s ontology, not the author’s metaphor.
-10. No domain translation unless evolutionarily or mechanistically justified
-Do not convert biological constraints into human civic infrastructure, or social mechanisms into molecular machinery, or emotional patterns into physical forces unless the world’s internal laws explicitly support such cross-domain equivalence.
-Cross-domain translation must reflect the world’s physics, not external analogy.
-11. Maintain mechanistic clarity across all scales
-Every expansion from micro to macro must be:
-mechanistically justified
-structurally consistent
-driven by internal rules
-continuous with the world’s physics or computational grammar
-No poetic drift.
-No analogy substitution.
-No “x mapped onto y” unless the mapping is produced by the world’s own causal engine.
-
-Tone and Form Constraints
-No rhetorical “not…, but…” patterns.
-No excessive ornament.
+But all emergent phenomena must arise from the same concrete substrate that the core ideas define.
+7. No external analogies
+Do not import metaphors, conceptual scaffolds, or systems from other domains unless:
+they are explicitly present in the core ideas, or
+they emerge unambiguously from the world’s internal mechanisms.
+Tone and Form
 Rich, clear, structural prose.
-Conceptually dense but legible.
-No metaphor drift—use metaphors consistently.
-No genre fiction voice (avoid fantasy tropes).
+Conceptually dense but clean.
+No rhetorical “not…, but…” constructions.
+No genre fiction voice.
+No metaphor drift.
+No ornamentation beyond what the world requires.
 
 """
 
