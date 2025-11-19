@@ -527,66 +527,82 @@ def save_core_ideas_and_world_to_picture(
     thought_id: int | None,
     core_ideas_text: str,
     world_context: str,
+    bridges_json: str | None = None,
     email: str | None = None,
 ) -> tuple[int | None, int | None]:
     """
-    Insert:
-      - a core_ideas row for the given thought
-      - a world_context row linked to that core_idea
+    Persist core ideas, world context, and (optionally) a bridge bundle into picture.db.
 
-    Returns (core_idea_id, world_context_id).
+    - core_ideas  → core_ideas table
+    - world       → world_contexts table (linked via core_idea_id)
+    - bridges     → bridges table (linked via core_idea_id, text = bridge bundle JSON)
 
-    If thought_id is None, nothing is saved and (None, None) is returned.
+    Returns:
+      (core_idea_id, world_context_id)
     """
-    if not thought_id:
-        return None, None
-
     db = get_picture_db()
     try:
         cur = db.cursor()
 
-        # Ensure the thought exists so we don't attach to nothing
-        cur.execute("SELECT 1 FROM thoughts WHERE id = ?", (thought_id,))
-        if cur.fetchone() is None:
-            raise ValueError(f"Thought id {thought_id} not found in picture.db")
-
-        source = f"thought:{thought_id}"
         ts = _iso_now()
         email_val = (email or "").strip() or None
-        metadata_str = None
 
-        # Insert into core_ideas (same schema/columns as scribble.py)
+        # 1) Insert into core_ideas
+        #    source is a lightweight identifier; we tie it to the originating thought_id if present.
+        if thought_id is not None:
+            source = f"thought:{thought_id}"
+        else:
+            source = "thought:unknown"
+
+        origin = "think_pipeline"  # or whatever label you use elsewhere
+        metadata_str = None        # can pack extra info later if needed
+
         cur.execute(
             """
             INSERT INTO core_ideas (
-                source,
-                core_idea,
-                email,
-                origin,
-                metadata,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                source, core_idea, email, origin, metadata, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (source, core_ideas_text, email_val, "think_pipeline", metadata_str, ts, ts),
+            (source, core_ideas_text, email_val, origin, metadata_str, ts, ts),
         )
         core_idea_id = cur.lastrowid
 
-        # Insert into world_contexts (triggers handle created_at/updated_at)
+        # 2) Insert into world_contexts
         cur.execute(
             """
-            INSERT INTO world_contexts (core_idea_id, text, email, metadata)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO world_contexts (
+                core_idea_id, text, email, metadata
+            ) VALUES (?, ?, ?, ?)
             """,
-            (core_idea_id, world_context, email_val, metadata_str),
+            (core_idea_id, world_context, email_val, None),
         )
         world_context_id = cur.lastrowid
 
+        # 3) Insert into bridges (bundle as a single row)
+        #    We store the entire bridge bundle JSON in `text`.
+        if bridges_json is not None:
+            cur.execute(
+                """
+                INSERT INTO bridges (
+                    core_idea_id, title, text, email, metadata
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    core_idea_id,
+                    "bridge_bundle",   # simple label; can be made more detailed later
+                    bridges_json,      # expected to be a JSON string
+                    email_val,
+                    None,              # metadata
+                ),
+            )
+            # bridge_id = cur.lastrowid  # available if you ever want to return it
+
         db.commit()
         return core_idea_id, world_context_id
+
     finally:
         db.close()
+
 
 
 # =====================
@@ -663,58 +679,131 @@ def _claim_next_job() -> int | None:
         conn.close()
 
 
-def process_core_world_job(job_id, thought_id, thought_text, email):
-    """Worker: run core ideas, world, and bridge bundle."""
+def process_core_world_job(job_id: int) -> None:
+    """
+    Worker-side processing of a single job:
+      1. Read job from core_world_queue
+      2. Generate core ideas + world
+      3. Run bridge bundle (5 engines)
+      4. Save into picture.db (core_ideas + world_context)
+      5. Mark queue row completed or error
+    """
+    # 1) Read job row from core_world_queue
+    conn = get_db()
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        row = cur.execute(
+            "SELECT * FROM core_world_queue WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+        if not row:
+            # Job might have been deleted; nothing to do
+            return
 
-    # 1. Core ideas
-    core_prompt = core_idea_distiller_prompt + "\n\nTHOUGHT:\n" + thought_text
-    core_ideas_text = run_text_prompt(
-        core_prompt,
-        context_text=thought_text,
-        endpoint_name="/think/core_ideas",
-        meta_purpose="core_ideas_from_thought",
-    )
+        thought_text = (row["thought_text"] or "").strip()
+        thought_id = row["thought_id"]
+        email = row["email"]
+    finally:
+        conn.close()
 
-    # 2. World
-    world_prompt = world_context_integrator_prompt + "\n\nCORE_IDEAS:\n" + core_ideas_text
-    world_context = run_text_prompt(
-        world_prompt,
-        context_text=thought_text,
-        endpoint_name="/think/world",
-        meta_purpose="world_from_core_ideas",
-    )
+    try:
+        # 2) Generate core ideas + world (existing helper)
+        core_ideas_text, world_context = generate_core_ideas_and_world(thought_text)
 
-    # 3. Bridge bundle (ALL FIVE ENGINES)
-    bridges_bundle = run_bridge_bundle(world_context)
+        # 3) Bridge bundle (ALL FIVE ENGINES)
+        bridges_bundle = run_bridge_bundle(world_context)
 
-    # 4. Save to thought_pipelines (same table you already use)
-    conn = sqlite3.connect(PIPELINE_DB_PATH)
-    cur = conn.cursor()
+        # 4) Save core ideas + world into picture.db
+        core_idea_id, world_context_id = save_core_ideas_and_world_to_picture(
+            thought_id=thought_id,
+            core_ideas_text=core_ideas_text,
+            world_context=world_context,
+            bridges_json=json.dumps(bridges_bundle),
+            email=email,
+        )
 
-    cur.execute(
-        """
-        INSERT INTO thought_pipelines
-        (thought_id, thought, core_ideas_json, world_context_text, bridges_text, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (
-            thought_id,
-            thought_text,
-            core_ideas_text,
-            world_context,
-            json.dumps(bridges_bundle),
-            _iso_now(),
-        ),
-    )
+        # (Optional) ALSO save into thought_pipelines; uncomment if you want this:
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO thought_pipelines
+                (thought, adjacent_thoughts_json, core_thoughts_json, expanded_text,
+                 core_ideas_json, world_context_text, bridges_text, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    thought_text,
+                    None,                   # adjacent_thoughts_json
+                    None,                   # core_thoughts_json
+                    "",                     # expanded_text
+                    core_ideas_text,
+                    world_context,
+                    json.dumps(bridges_bundle),
+                    datetime.utcnow().isoformat(),
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
-    conn.commit()
-    conn.close()
+        # 5) Mark job completed in core_world_queue
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE core_world_queue
+                SET status = 'completed',
+                    finished_at = ?,
+                    core_idea_id = ?,
+                    world_context_id = ?
+                WHERE id = ?
+                """,
+                (
+                    datetime.utcnow().isoformat(),
+                    core_idea_id,
+                    world_context_id,
+                    job_id,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
-    # 5. Optional email notification
-    if email:
-        send_email(email, "Fantasiagenesis pipeline completed", f"Job {job_id} finished.")
+        # 6) Optional email notification
+        #if email:
+        #    send_email(
+        #        email,
+        #        "Fantasiagenesis pipeline completed",
+        #        f"Job {job_id} finished.\n\n"
+        #        f"Core ideas and world were generated and saved.\n"
+        #        f"Bridge bundle engines also ran successfully.",
+        #    )
 
-    mark_job_complete(job_id, {"status": "done"})
+    except Exception as e:
+        # On any failure, mark job as error
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE core_world_queue
+                SET status = 'error',
+                    finished_at = ?,
+                    error = ?
+                WHERE id = ?
+                """,
+                (datetime.utcnow().isoformat(), str(e), job_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        # Re-raise so the worker logs it
+        raise
+
 
 
 
