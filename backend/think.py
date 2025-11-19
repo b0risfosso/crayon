@@ -16,7 +16,12 @@ from prompts import (
     core_thought_to_deep_expansion_prompt,
     core_idea_distiller_prompt,
     world_context_integrator_prompt,
-    world_to_reality_bridge_generator_prompt,
+    world_to_reality_bridge_generator_prompt,  # still available if you want it elsewhere
+    create_bridge_deterministic,
+    create_bridge_stochastic,
+    create_bridge_agent,
+    create_bridge_differential,
+    create_bridge_energy,
 )
 
 import re
@@ -208,6 +213,13 @@ def init_think_db():
 # =====================
 # LLM CALL SHIMS
 # =====================
+
+def _fill_thought_world(prompt_template: str, world_context: str) -> str:
+    """
+    Replace the {{THOUGHT_WORLD}} placeholder in a bridge prompt.
+    """
+    return prompt_template.replace("{{THOUGHT_WORLD}}", world_context)
+
 
 def run_json_prompt(
     prompt_template: str,
@@ -416,6 +428,58 @@ def run_text_prompt(
         raise
 
 
+def run_bridge_bundle(world_context: str):
+    """Run all 5 bridge engines; return dict with all results."""
+
+    det_prompt = _fill_thought_world(create_bridge_deterministic, world_context)
+    det = run_text_prompt(
+        det_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/deterministic",
+        meta_purpose="bridge_deterministic_from_world",
+    )
+
+    stoch_prompt = _fill_thought_world(create_bridge_stochastic, world_context)
+    stoch = run_text_prompt(
+        stoch_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/stochastic",
+        meta_purpose="bridge_stochastic_from_world",
+    )
+
+    agent_prompt = _fill_thought_world(create_bridge_agent, world_context)
+    agent = run_text_prompt(
+        agent_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/agent",
+        meta_purpose="bridge_agent_from_world",
+    )
+
+    diff_prompt = _fill_thought_world(create_bridge_differential, world_context)
+    diff = run_text_prompt(
+        diff_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/differential",
+        meta_purpose="bridge_differential_from_world",
+    )
+
+    energy_prompt = _fill_thought_world(create_bridge_energy, world_context)
+    energy = run_text_prompt(
+        energy_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/energy",
+        meta_purpose="bridge_energy_from_world",
+    )
+
+    return {
+        "deterministic": det,
+        "stochastic": stoch,
+        "agent": agent,
+        "differential": diff,
+        "energy": energy,
+    }
+
+
 # =====================
 # CORE IDEAS + WORLD PIPELINE HELPERS
 # =====================
@@ -599,77 +663,59 @@ def _claim_next_job() -> int | None:
         conn.close()
 
 
-def process_core_world_job(job_id: int) -> None:
-    """
-    Worker-side processing of a single job:
-      1. Read job
-      2. Generate core ideas + world
-      3. Save into picture.db
-      4. Mark completed or error
-    """
-    # Read job row
-    conn = get_db()
-    try:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        row = cur.execute(
-            "SELECT * FROM core_world_queue WHERE id = ?",
-            (job_id,),
-        ).fetchone()
-        if not row:
-            return  # job might have been deleted
+def process_core_world_job(job_id, thought_id, thought_text, email):
+    """Worker: run core ideas, world, and bridge bundle."""
 
-        thought_text = (row["thought_text"] or "").strip()
-        thought_id = row["thought_id"]
-        email = row["email"]
-    finally:
-        conn.close()
+    # 1. Core ideas
+    core_prompt = core_idea_distiller_prompt + "\n\nTHOUGHT:\n" + thought_text
+    core_ideas_text = run_text_prompt(
+        core_prompt,
+        context_text=thought_text,
+        endpoint_name="/think/core_ideas",
+        meta_purpose="core_ideas_from_thought",
+    )
 
-    try:
-        core_ideas_text, world_context = generate_core_ideas_and_world(thought_text)
-        core_idea_id, world_context_id = save_core_ideas_and_world_to_picture(
+    # 2. World
+    world_prompt = world_context_integrator_prompt + "\n\nCORE_IDEAS:\n" + core_ideas_text
+    world_context = run_text_prompt(
+        world_prompt,
+        context_text=thought_text,
+        endpoint_name="/think/world",
+        meta_purpose="world_from_core_ideas",
+    )
+
+    # 3. Bridge bundle (ALL FIVE ENGINES)
+    bridges_bundle = run_bridge_bundle(world_context)
+
+    # 4. Save to thought_pipelines (same table you already use)
+    conn = sqlite3.connect(PIPELINE_DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO thought_pipelines
+        (thought_id, thought, core_ideas_json, world_context_text, bridges_text, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
             thought_id,
+            thought_text,
             core_ideas_text,
             world_context,
-            email=email,
-        )
+            json.dumps(bridges_bundle),
+            _iso_now(),
+        ),
+    )
 
-        # Mark completed
-        conn = get_db()
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                UPDATE core_world_queue
-                SET status = 'completed',
-                    finished_at = ?,
-                    error = NULL,
-                    core_idea_id = ?,
-                    world_context_id = ?
-                WHERE id = ?
-                """,
-                (datetime.utcnow().isoformat(), core_idea_id, world_context_id, job_id),
-            )
-            conn.commit()
-        finally:
-            conn.close()
-    except Exception as e:
-        conn = get_db()
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                UPDATE core_world_queue
-                SET status = 'error',
-                    finished_at = ?,
-                    error = ?
-                WHERE id = ?
-                """,
-                (datetime.utcnow().isoformat(), str(e), job_id),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+    conn.commit()
+    conn.close()
+
+    # 5. Optional email notification
+    if email:
+        send_email(email, "Fantasiagenesis pipeline completed", f"Job {job_id} finished.")
+
+    mark_job_complete(job_id, {"status": "done"})
+
 
 
 def _core_world_worker_loop(worker_index: int) -> None:
@@ -840,7 +886,6 @@ def build_world_context():
     })
 
 
-
 @app.route("/think/bridges", methods=["POST"])
 def generate_bridges():
     data = request.get_json(force=True)
@@ -848,13 +893,67 @@ def generate_bridges():
     if not world_context:
         return jsonify({"error": "Missing 'world_context'"}), 400
 
-    prompt_text = world_to_reality_bridge_generator_prompt + "\n\nWorld context:\n" + world_context
-    bridges_text = run_text_prompt(prompt_text, world_context)
+    # Deterministic rule engine
+    det_prompt = _fill_thought_world(create_bridge_deterministic, world_context)
+    det_bridge = run_text_prompt(
+        det_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/deterministic",
+        meta_purpose="bridge_deterministic_from_world",
+    )
 
+    # Stochastic shock engine
+    stoch_prompt = _fill_thought_world(create_bridge_stochastic, world_context)
+    stoch_bridge = run_text_prompt(
+        stoch_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/stochastic",
+        meta_purpose="bridge_stochastic_from_world",
+    )
+
+    # Agent-based behavior engine
+    agent_prompt = _fill_thought_world(create_bridge_agent, world_context)
+    agent_bridge = run_text_prompt(
+        agent_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/agent",
+        meta_purpose="bridge_agent_from_world",
+    )
+
+    # Differential equation engine
+    diff_prompt = _fill_thought_world(create_bridge_differential, world_context)
+    diff_bridge = run_text_prompt(
+        diff_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/differential",
+        meta_purpose="bridge_differential_from_world",
+    )
+
+    # Constraint / energy minimization engine
+    energy_prompt = _fill_thought_world(create_bridge_energy, world_context)
+    energy_bridge = run_text_prompt(
+        energy_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/energy",
+        meta_purpose="bridge_energy_from_world",
+    )
+
+    # Bundle all bridge specs together
+    bridges_bundle = {
+        "deterministic": det_bridge,
+        "stochastic": stoch_bridge,
+        "agent": agent_bridge,
+        "differential": diff_bridge,
+        "energy": energy_bridge,
+    }
+
+    # If you want to “save each output” at the API level, we just return the whole bundle;
+    # your frontend or another service can persist it as needed.
     return jsonify({
         "world_context": world_context,
-        "bridges": bridges_text,
+        "bridges": bridges_bundle,
     })
+
 
 
 @app.route("/think/pipeline", methods=["POST"])
@@ -899,14 +998,55 @@ def run_full_pipeline():
         meta_purpose="world_context_from_block",
     )
 
-    # 5. Bridges from world context
-    prompt_text_bridges = world_to_reality_bridge_generator_prompt + "\n\nWorld context:\n" + world_context
-    bridges_text = run_text_prompt(
-        prompt_text_bridges,
+    # 5. Bridges from world context — multi-engine version
+    det_prompt = _fill_thought_world(create_bridge_deterministic, world_context)
+    det_bridge = run_text_prompt(
+        det_prompt,
         context_text=world_context,
-        endpoint_name="/think/bridges",
-        meta_purpose="bridges_from_world_context",
+        endpoint_name="/think/bridges/deterministic",
+        meta_purpose="bridge_deterministic_from_world",
     )
+
+    stoch_prompt = _fill_thought_world(create_bridge_stochastic, world_context)
+    stoch_bridge = run_text_prompt(
+        stoch_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/stochastic",
+        meta_purpose="bridge_stochastic_from_world",
+    )
+
+    agent_prompt = _fill_thought_world(create_bridge_agent, world_context)
+    agent_bridge = run_text_prompt(
+        agent_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/agent",
+        meta_purpose="bridge_agent_from_world",
+    )
+
+    diff_prompt = _fill_thought_world(create_bridge_differential, world_context)
+    diff_bridge = run_text_prompt(
+        diff_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/differential",
+        meta_purpose="bridge_differential_from_world",
+    )
+
+    energy_prompt = _fill_thought_world(create_bridge_energy, world_context)
+    energy_bridge = run_text_prompt(
+        energy_prompt,
+        context_text=world_context,
+        endpoint_name="/think/bridges/energy",
+        meta_purpose="bridge_energy_from_world",
+    )
+
+    bridges_bundle = {
+        "deterministic": det_bridge,
+        "stochastic": stoch_bridge,
+        "agent": agent_bridge,
+        "differential": diff_bridge,
+        "energy": energy_bridge,
+    }
+
 
     # Persist pipeline; keep expanded_text column but store empty string / None
     conn = get_db()
@@ -925,7 +1065,7 @@ def run_full_pipeline():
             "",                   # expanded_text no longer used
             core_ideas_text,      # text block
             world_context,
-            bridges_text,
+            json.dumps(bridges_bundle),
             datetime.utcnow().isoformat(),
         ),
     )
@@ -940,7 +1080,7 @@ def run_full_pipeline():
         "core_thoughts_text": core_thoughts_text,
         "core_ideas_text": core_ideas_text,
         "world_context": world_context,
-        "bridges": bridges_text,
+        "bridges": json.dumps(bridges_bundle),
     })
 
 @app.route("/think/queue_core_world", methods=["POST"])
