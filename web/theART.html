@@ -658,24 +658,20 @@
     <div class="think-container">
       <h1>Core Thought Pipeline</h1>
       <div class="subtitle">
-        Start with a seed thought. You can step through each stage (adjacent → core thoughts → expansion → core ideas → world → bridges), or run the full pipeline in one shot.
+        Start with a seed thought. You can either explore its neighborhood (adjacent thoughts)
+        or ask the system to propose core thoughts / axes that organize it.
       </div>
-
+  
       <label for="thought-input">Seed thought</label>
       <textarea id="thought-input" placeholder="Example: a symphony of a thousand pianos"></textarea>
-
+  
       <div class="top-controls">
-        <button id="adjacent-btn" class="secondary">1 · Adjacent thoughts</button>
-        <button id="core-thoughts-btn" class="secondary">2 · Core thoughts</button>
-        <button id="expand-btn" class="secondary">3 · Expand core thought</button>
-        <button id="core-ideas-btn" class="secondary">4 · Core ideas from expansion</button>
-        <button id="world-context-btn" class="secondary">5 · World context</button>
-        <button id="bridges-btn" class="secondary">6 · Bridges</button>
-        <button id="pipeline-btn">Run full pipeline</button>
+        <button id="adjacent-btn">Run adjacent thoughts</button>
+        <button id="core-thoughts-btn" class="secondary">Run core thoughts</button>
       </div>
-
+  
       <div id="status" class="status"></div>
-
+  
       <div class="row">
         <div class="card">
           <h2>
@@ -687,7 +683,7 @@
           </div>
           <pre id="adjacent-output"></pre>
         </div>
-
+  
         <div class="card">
           <h2>
             Core thoughts architecture
@@ -698,62 +694,29 @@
           </div>
           <pre id="core-thoughts-output"></pre>
         </div>
-
-        <div class="card">
-          <h2>
-            Expanded core thought
-            <span class="badge">deep dive</span>
-          </h2>
-          <div class="card-controls">
-            <small>POST /think/expand_core_thought</small>
-            <div>
-              <label for="core-thought-manual" style="margin-top:4px;">
-                Core thought to expand (optional)
-              </label>
-              <input id="core-thought-manual" class="small-input"
-                     placeholder="If empty, uses first core thought above">
-            </div>
-          </div>
-          <pre id="expansion-output"></pre>
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="card">
-          <h2>
-            Core ideas
-            <span class="badge">distilled seeds</span>
-          </h2>
-          <div class="card-controls">
-            <small>POST /think/core_ideas</small>
-          </div>
-          <pre id="core-ideas-output"></pre>
-        </div>
-
-        <div class="card">
-          <h2>
-            World context
-            <span class="badge">imagined world</span>
-          </h2>
-          <div class="card-controls">
-            <small>POST /think/world_context</small>
-          </div>
-          <pre id="world-context-output"></pre>
-        </div>
-
-        <div class="card">
-          <h2>
-            Bridges
-            <span class="badge">into your world</span>
-          </h2>
-          <div class="card-controls">
-            <small>POST /think/bridges</small>
-          </div>
-          <pre id="bridges-output"></pre>
-        </div>
       </div>
     </div>
+    <div class="row" style="margin-top: 12px;">
+        <div style="flex:1; max-width: 360px;">
+          <label for="core-collection-input">Send core thoughts to collection</label>
+          <input
+            id="core-collection-input"
+            class="small-input"
+            list="collections-datalist"
+            placeholder="e.g. money, black_holes"
+          >
+          <datalist id="collections-datalist"></datalist>
+          <button id="save-core-to-collection-btn" class="secondary" style="margin-top:6px;">
+            Save core thoughts to collection
+          </button>
+          <div style="font-size: 0.75rem; color:#6b7280; margin-top:4px;">
+            Title = seed thought · Thought = core thoughts
+          </div>
+        </div>
+      </div>
+  
   </section>
+  
 
   <!-- === Scribble JS (unchanged except for integration button) === -->
   <script>
@@ -763,6 +726,7 @@
     let currentCollection = null;
     let currentThought = null; // full object from DB
     let statusTimer = null;
+
     const API_BASE = "/scribble/api";
     const THINK_BASE = "/think";
 
@@ -1182,6 +1146,10 @@
       renderCollections();
       updateHeaderCounts();
 
+      if (window.updateThinkCollections) {
+            window.updateThinkCollections(collections);
+        }
+
       document
         .getElementById("new-collection-form")
         .addEventListener("submit", e => {
@@ -1246,33 +1214,22 @@
   <!-- === Think JS (same logic, but setStatus → setThinkStatus to avoid name clash) === -->
   <script>
     const statusEl = document.getElementById("status");
-
+  
     const adjacentOutput = document.getElementById("adjacent-output");
     const coreThoughtsOutput = document.getElementById("core-thoughts-output");
-    const expansionOutput = document.getElementById("expansion-output");
-    const coreIdeasOutput = document.getElementById("core-ideas-output");
-    const worldContextOutput = document.getElementById("world-context-output");
-    const bridgesOutput = document.getElementById("bridges-output");
-
+  
     const adjacentBtn = document.getElementById("adjacent-btn");
     const coreThoughtsBtn = document.getElementById("core-thoughts-btn");
-    const expandBtn = document.getElementById("expand-btn");
-    const coreIdeasBtn = document.getElementById("core-ideas-btn");
-    const worldContextBtn = document.getElementById("world-context-btn");
-    const bridgesBtn = document.getElementById("bridges-btn");
-    const pipelineBtn = document.getElementById("pipeline-btn");
 
-    const coreThoughtManualInput = document.getElementById("core-thought-manual");
+    const saveToCollectionBtn = document.getElementById("save-core-to-collection-btn");
+    const coreCollectionInput = document.getElementById("core-collection-input");
 
-    // State for iterative testing
+  
+    // Simple state
     let lastThought = "";
     let lastAdjacent = null;
     let lastCoreThoughts = null;
-    let lastCoreThoughtExpanded = null;
-    let lastExpansion = "";
-    let lastCoreIdeas = null;
-    let lastWorldContext = "";
-
+  
     function setThinkStatus(msg, isError = false) {
       statusEl.textContent = msg;
       if (isError) {
@@ -1281,19 +1238,11 @@
         statusEl.classList.remove("error");
       }
     }
-
+  
     function disableAllButtons(disabled) {
-      [
-        adjacentBtn,
-        coreThoughtsBtn,
-        expandBtn,
-        coreIdeasBtn,
-        worldContextBtn,
-        bridgesBtn,
-        pipelineBtn
-      ].forEach(btn => btn.disabled = disabled);
+      [adjacentBtn, coreThoughtsBtn].forEach(btn => btn.disabled = disabled);
     }
-
+  
     async function callEndpoint(path, payload) {
       const res = await fetch(path, {
         method: "POST",
@@ -1310,6 +1259,93 @@
       return res.json();
     }
 
+    // Called from scribble.js after collections load
+    window.updateThinkCollections = function(coll) {
+        const datalist = document.getElementById("collections-datalist");
+        if (!datalist) return;
+        datalist.innerHTML = "";
+        (coll || []).forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c.name;
+            datalist.appendChild(opt);
+        });
+    };
+
+    async function saveCoreThoughtsToCollection() {
+        const collectionName = coreCollectionInput.value.trim();
+        const seedThought = document.getElementById("thought-input").value.trim();
+
+        if (!collectionName) {
+            setThinkStatus("Choose a collection name.", true);
+            return;
+        }
+        if (!seedThought) {
+            setThinkStatus("Enter a seed thought first.", true);
+            return;
+        }
+
+        let coreText = "";
+        if (lastCoreThoughts && lastCoreThoughts.core_thoughts_text) {
+            coreText = lastCoreThoughts.core_thoughts_text.trim();
+        } else if (coreThoughtsOutput.textContent) {
+            coreText = coreThoughtsOutput.textContent.trim();
+        }
+
+        if (!coreText) {
+            setThinkStatus("No core thoughts to save. Run core thoughts first.", true);
+            return;
+        }
+
+        setThinkStatus(`Saving to collection "${collectionName}"...`);
+        disableAllButtons(true);
+        try {
+            const payload = {
+            title: seedThought,               // seed thought as title
+            text: coreText,                   // core thoughts as thought body
+            collection: collectionName,
+            order_index: null,
+            author: null,
+            context: "think/core_thoughts export",
+            tags: "core_thoughts_export"
+            };
+
+            // API_BASE is defined in the scribble script and is global
+            const res = await fetch(`${API_BASE}/thoughts`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg || ("HTTP " + res.status));
+            }
+
+            const saved = await res.json();
+
+            // Optional: refresh scribble view, if available
+            try {
+            if (typeof loadCollections === "function") {
+                await loadCollections();
+                if (typeof selectCollection === "function") {
+                await selectCollection(collectionName);
+                }
+            }
+            } catch (err) {
+            console.warn("Could not refresh scribble view after save:", err);
+            }
+
+            setThinkStatus(`Saved core thoughts to "${collectionName}" (id ${saved.id}).`);
+        } catch (e) {
+            console.error(e);
+            setThinkStatus(e.message || "Error saving to collection", true);
+        } finally {
+            disableAllButtons(false);
+        }
+    }
+
+
+  
     async function runAdjacent() {
       const thought = document.getElementById("thought-input").value.trim();
       if (!thought) {
@@ -1322,12 +1358,14 @@
       try {
         const data = await callEndpoint("/think/adjacent", { thought });
         lastAdjacent = data;
+  
         if (data.adjacent_thoughts) {
           const lines = data.adjacent_thoughts.map(t => `${t.id}. ${t.text}`);
           adjacentOutput.textContent = lines.join("\n");
         } else {
           adjacentOutput.textContent = JSON.stringify(data, null, 2);
         }
+  
         setThinkStatus("Adjacent thoughts generated.");
       } catch (e) {
         setThinkStatus(e.message, true);
@@ -1335,7 +1373,7 @@
         disableAllButtons(false);
       }
     }
-
+  
     async function runCoreThoughts() {
       const thought = (lastThought || document.getElementById("thought-input").value.trim());
       if (!thought) {
@@ -1343,178 +1381,38 @@
         return;
       }
       lastThought = thought;
-      setThinkStatus("Generating core thoughts (THINK text block)…");
+  
+      setThinkStatus("Generating core thoughts…");
       disableAllButtons(true);
       try {
         const data = await callEndpoint("/think/core_thoughts", { thought });
-        const block = (data.core_thoughts_text || "").trim();
-        lastCoreThoughts = { core_thoughts_text: block };
-
-        coreThoughtsOutput.textContent = block || "(empty core thoughts text)";
-        setThinkStatus("Core thoughts generated as a single text block.");
-      } catch (e) {
-        setThinkStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
-    }
-
-    async function runExpansion() {
-      setThinkStatus("Expanding core thought...");
-      disableAllButtons(true);
-      try {
-        let coreThought = coreThoughtManualInput.value.trim();
-        if (!coreThought) {
-          if (!lastCoreThoughts || !lastCoreThoughts.core_thoughts || lastCoreThoughts.core_thoughts.length === 0) {
-            setThinkStatus("No core thoughts available. Generate core thoughts or provide a core thought manually.", true);
-            return;
-          }
-          coreThought = lastCoreThoughts.core_thoughts[0].text;
-        }
-
-        const data = await callEndpoint("/think/expand_core_thought", { core_thought: coreThought });
-        lastCoreThoughtExpanded = data;
-        lastExpansion = data.expansion || "";
-        expansionOutput.textContent = "Core thought:\n" + data.core_thought + "\n\nExpansion:\n" + data.expansion;
-        setThinkStatus("Core thought expanded.");
-      } catch (e) {
-        setThinkStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
-    }
-
-    async function runCoreIdeas() {
-      const block =
-        (lastCoreThoughts && lastCoreThoughts.core_thoughts_text) ||
-        coreThoughtsOutput.textContent.trim();
-
-      if (!block) {
-        setThinkStatus("No core thoughts available. Generate core thoughts first.", true);
-        return;
-      }
-
-      setThinkStatus("Distilling core ideas from core thoughts block…");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/core_ideas", { thought: block });
-        const text = (data.core_ideas_text || "").trim();
-
-        lastCoreIdeas = { core_ideas_text: text };
-        coreIdeasOutput.textContent = text || "(empty core ideas text)";
-
-        setThinkStatus("Core ideas distilled as a text block.");
-      } catch (e) {
-        setThinkStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
-    }
-
-    async function runWorldContext() {
-      const block =
-        (lastCoreIdeas && lastCoreIdeas.core_ideas_text) ||
-        coreIdeasOutput.textContent.trim();
-
-      if (!block) {
-        setThinkStatus("No core ideas available. Distill core ideas first.", true);
-        return;
-      }
-
-      setThinkStatus("Generating world context from core ideas text block…");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/world_context", {
-          core_ideas_text: block
-        });
-        const wc = (data.world_context || "").trim();
-
-        lastWorldContext = wc;
-        worldContextOutput.textContent = wc || "(empty world context)";
-
-        setThinkStatus("World context generated from core ideas block.");
-      } catch (e) {
-        setThinkStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
-    }
-
-    async function runBridges() {
-      const ctx = lastWorldContext || worldContextOutput.textContent;
-      if (!ctx) {
-        setThinkStatus("No world context available. Generate world context first.", true);
-        return;
-      }
-      setThinkStatus("Generating bridges...");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/bridges", { world_context: ctx });
-        bridgesOutput.textContent = data.bridges || JSON.stringify(data, null, 2);
-        setThinkStatus("Bridges generated.");
-      } catch (e) {
-        setThinkStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
-    }
-
-    async function runPipeline() {
-      const thought = document.getElementById("thought-input").value.trim();
-      if (!thought) {
-        setThinkStatus("Enter a seed thought first.", true);
-        return;
-      }
-      lastThought = thought;
-      setThinkStatus("Running full pipeline (no expansion step)…");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/pipeline", { thought });
-
-        lastAdjacent = data.adjacent || null;
-        lastCoreThoughts = { core_thoughts_text: data.core_thoughts_text || "" };
-        lastCoreIdeas = { core_ideas_text: data.core_ideas_text || "" };
-        lastWorldContext = data.world_context || "";
-
-        if (data.adjacent && data.adjacent.adjacent_thoughts) {
-          const lines = data.adjacent.adjacent_thoughts.map(t => `${t.id}. ${t.text}`);
-          adjacentOutput.textContent = lines.join("\n");
-        } else if (data.adjacent) {
-          adjacentOutput.textContent = JSON.stringify(data.adjacent, null, 2);
+  
+        // Accept either a single text block or structured list
+        if (data.core_thoughts_text) {
+          lastCoreThoughts = { core_thoughts_text: data.core_thoughts_text };
+          coreThoughtsOutput.textContent = data.core_thoughts_text.trim() || "(empty core thoughts text)";
+        } else if (Array.isArray(data.core_thoughts)) {
+          lastCoreThoughts = { core_thoughts: data.core_thoughts };
+          const lines = data.core_thoughts.map((t, idx) => `${idx + 1}. ${t.text}`);
+          coreThoughtsOutput.textContent = lines.join("\n");
         } else {
-          adjacentOutput.textContent = "(no adjacent thoughts)";
+          lastCoreThoughts = data;
+          coreThoughtsOutput.textContent = JSON.stringify(data, null, 2);
         }
-
-        coreThoughtsOutput.textContent =
-          data.core_thoughts_text || "(no core thoughts text)";
-
-        expansionOutput.textContent =
-          "(expansion step skipped in pipeline; use the Expand control manually if you still want to experiment with expansions.)";
-
-        coreIdeasOutput.textContent =
-          data.core_ideas_text || "(no core ideas text)";
-
-        worldContextOutput.textContent =
-          data.world_context || "(no world context)";
-
-        bridgesOutput.textContent =
-          data.bridges || "(no bridges)";
-
-        setThinkStatus("Full pipeline complete (thought → adjacent → core thoughts → core ideas → world context → bridges). Stored with id " + data.id + ".");
+  
+        setThinkStatus("Core thoughts generated.");
       } catch (e) {
         setThinkStatus(e.message, true);
       } finally {
         disableAllButtons(false);
       }
     }
-
+  
     adjacentBtn.addEventListener("click", runAdjacent);
     coreThoughtsBtn.addEventListener("click", runCoreThoughts);
-    expandBtn.addEventListener("click", runExpansion);
-    coreIdeasBtn.addEventListener("click", runCoreIdeas);
-    worldContextBtn.addEventListener("click", runWorldContext);
-    bridgesBtn.addEventListener("click", runBridges);
-    pipelineBtn.addEventListener("click", runPipeline);
+    saveToCollectionBtn.addEventListener("click", saveCoreThoughtsToCollection);
+
   </script>
+  
 </body>
 </html>
