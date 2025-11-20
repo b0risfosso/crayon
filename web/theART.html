@@ -496,6 +496,65 @@
       margin-top: 8px;
       margin-bottom: 12px;
     }
+
+    /* Adjacent Thoughts List Styling */
+#adjacent-list {
+  max-height: 300px;         /* stay inside card */
+  overflow-y: auto;          /* scrolls */
+  padding-right: 6px;        /* avoid clipping scrollbar */
+  margin-top: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+/* Individual adjacent items */
+.adjacent-item {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin: 6px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: background 0.15s ease;
+}
+
+.adjacent-item:hover {
+  background: #f3f4f6;
+}
+
+/* Adjacent text */
+.adjacent-item .adjacent-text {
+  font-size: 0.9rem;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+/* Row containing meta + action button */
+.adjacent-item .adjacent-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Action button inside item */
+.adjacent-item button {
+  background: #e5e7eb;
+  color: #111827;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.adjacent-item button:hover {
+  background: #d1d5db;
+}
+
   </style>
 </head>
 <body>
@@ -1439,6 +1498,7 @@
     textDiv.style.marginBottom = "4px";
 
     const metaDiv = document.createElement("div");
+    metaDiv.className = "adjacent-meta";
     metaDiv.style.display = "flex";
     metaDiv.style.justifyContent = "space-between";
     metaDiv.style.alignItems = "center";
