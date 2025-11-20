@@ -681,7 +681,8 @@
           <div class="card-controls">
             <small>POST /think/adjacent</small>
           </div>
-          <pre id="adjacent-output"></pre>
+          <pre id="adjacent-output" style="display:none;"></pre>
+          <div id="adjacent-list"></div>
         </div>
   
         <div class="card">
@@ -1216,6 +1217,7 @@
     const statusEl = document.getElementById("status");
   
     const adjacentOutput = document.getElementById("adjacent-output");
+    const adjacentList = document.getElementById("adjacent-list");
     const coreThoughtsOutput = document.getElementById("core-thoughts-output");
   
     const adjacentBtn = document.getElementById("adjacent-btn");
@@ -1223,6 +1225,7 @@
 
     const saveToCollectionBtn = document.getElementById("save-core-to-collection-btn");
     const coreCollectionInput = document.getElementById("core-collection-input");
+    
 
   
     // Simple state
@@ -1347,32 +1350,38 @@
 
   
     async function runAdjacent() {
-      const thought = document.getElementById("thought-input").value.trim();
-      if (!thought) {
-        setThinkStatus("Enter a seed thought first.", true);
-        return;
-      }
-      lastThought = thought;
-      setThinkStatus("Generating adjacent thoughts...");
-      disableAllButtons(true);
-      try {
-        const data = await callEndpoint("/think/adjacent", { thought });
-        lastAdjacent = data;
-  
-        if (data.adjacent_thoughts) {
-          const lines = data.adjacent_thoughts.map(t => `${t.id}. ${t.text}`);
-          adjacentOutput.textContent = lines.join("\n");
-        } else {
-          adjacentOutput.textContent = JSON.stringify(data, null, 2);
+        const thought = document.getElementById("thought-input").value.trim();
+        if (!thought) {
+            setThinkStatus("Enter a seed thought first.", true);
+            return;
         }
-  
-        setThinkStatus("Adjacent thoughts generated.");
-      } catch (e) {
-        setThinkStatus(e.message, true);
-      } finally {
-        disableAllButtons(false);
-      }
+        lastThought = thought;
+        setThinkStatus("Generating adjacent thoughts...");
+        disableAllButtons(true);
+        try {
+            const data = await callEndpoint("/think/adjacent", { thought });
+            lastAdjacent = data;
+
+            // Raw text version (for debugging, if you want)
+            if (data.adjacent_thoughts) {
+            const lines = data.adjacent_thoughts.map(t => `${t.id}. ${t.text}`);
+            adjacentOutput.textContent = lines.join("\n");
+
+            // Structured list with buttons
+            renderAdjacentList(data.adjacent_thoughts);
+            } else {
+            adjacentOutput.textContent = JSON.stringify(data, null, 2);
+            renderAdjacentList([]);
+            }
+
+            setThinkStatus("Adjacent thoughts generated.");
+        } catch (e) {
+            setThinkStatus(e.message, true);
+        } finally {
+            disableAllButtons(false);
+        }
     }
+
   
     async function runCoreThoughts() {
       const thought = (lastThought || document.getElementById("thought-input").value.trim());
@@ -1407,6 +1416,146 @@
         disableAllButtons(false);
       }
     }
+
+    function renderAdjacentList(adjacentData) {
+  if (!adjacentList) return;
+  adjacentList.innerHTML = "";
+
+  const seedThought = document.getElementById("thought-input").value.trim();
+
+  (adjacentData || []).forEach(item => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "adjacent-item";
+    wrapper.style.marginBottom = "6px";
+    wrapper.style.padding = "6px 8px";
+    wrapper.style.borderRadius = "8px";
+    wrapper.style.border = "1px solid #e5e7eb";
+    wrapper.style.background = "#ffffff";
+
+    const textDiv = document.createElement("div");
+    textDiv.className = "adjacent-text";
+    textDiv.textContent = item.text;
+    textDiv.style.fontSize = "0.85rem";
+    textDiv.style.marginBottom = "4px";
+
+    const metaDiv = document.createElement("div");
+    metaDiv.style.display = "flex";
+    metaDiv.style.justifyContent = "space-between";
+    metaDiv.style.alignItems = "center";
+    metaDiv.style.fontSize = "0.75rem";
+    metaDiv.style.color = "#6b7280";
+
+    const labelSpan = document.createElement("span");
+    labelSpan.textContent = `id ${item.id}`;
+
+    const btn = document.createElement("button");
+    btn.textContent = "Save core → collection";
+    btn.className = "secondary";
+    btn.style.fontSize = "0.75rem";
+    btn.style.padding = "4px 8px";
+    btn.style.borderRadius = "999px";
+
+    btn.addEventListener("click", () => {
+      const coll = coreCollectionInput.value.trim();
+      if (!coll) {
+        setThinkStatus("Enter a collection in 'Send core thoughts to collection' first.", true);
+        return;
+      }
+      saveCoreForAdjacent(seedThought, item.text, coll);
+    });
+
+    metaDiv.appendChild(labelSpan);
+    metaDiv.appendChild(btn);
+
+    wrapper.appendChild(textDiv);
+    wrapper.appendChild(metaDiv);
+
+    adjacentList.appendChild(wrapper);
+  });
+}
+
+async function saveCoreForAdjacent(seedThought, adjacentText, collectionName) {
+  const seed = (seedThought || "").trim();
+  const coll = (collectionName || "").trim();
+
+  if (!seed) {
+    setThinkStatus("Seed thought is empty; cannot derive '{seed} - {adjacent}'.", true);
+    return;
+  }
+  if (!coll) {
+    setThinkStatus("Choose a collection name first.", true);
+    return;
+  }
+
+  const combinedThought = `${seed} - ${adjacentText}`;
+
+  setThinkStatus(`Generating core thoughts for "${combinedThought}" and saving to "${coll}"...`);
+  disableAllButtons(true);
+  try {
+    // 1. Generate core thoughts for combined string
+    const data = await callEndpoint("/think/core_thoughts", { thought: combinedThought });
+
+    let coreText = "";
+    if (data.core_thoughts_text) {
+      coreText = data.core_thoughts_text.trim();
+    } else if (Array.isArray(data.core_thoughts)) {
+      coreText = data.core_thoughts
+        .map((t, idx) => `${idx + 1}. ${t.text}`)
+        .join("\n");
+    } else {
+      coreText = JSON.stringify(data, null, 2);
+    }
+
+    if (!coreText) {
+      setThinkStatus("Core thoughts result is empty; nothing to save.", true);
+      return;
+    }
+
+    // 2. Save directly into Scribble as a new thought
+    const payload = {
+      title: combinedThought,           // "{seed} - {adjacent}"
+      text: coreText,                   // generated core thoughts
+      collection: coll,
+      order_index: null,
+      author: null,
+      context: "think/core_thoughts export from adjacent",
+      tags: "core_thoughts_from_adjacent"
+    };
+
+    const res = await fetch(`${API_BASE}/thoughts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(msg || ("HTTP " + res.status));
+    }
+
+    const saved = await res.json();
+
+    // 3. Optional: refresh scribble + select that collection
+    try {
+      if (typeof loadCollections === "function") {
+        await loadCollections();
+        if (typeof selectCollection === "function") {
+          await selectCollection(coll);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not refresh scribble view after adjacent save:", err);
+    }
+
+    setThinkStatus(`Saved core thoughts for "${combinedThought}" to "${coll}" (id ${saved.id}).`);
+  } catch (e) {
+    console.error(e);
+    setThinkStatus(e.message || "Error generating/saving core thoughts for adjacent", true);
+  } finally {
+    disableAllButtons(false);
+  }
+}
+
   
     adjacentBtn.addEventListener("click", runAdjacent);
     coreThoughtsBtn.addEventListener("click", runCoreThoughts);
