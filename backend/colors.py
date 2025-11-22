@@ -205,11 +205,24 @@ ENTITIES_KEYS = [
 ]
 
 def validate_entities_json(parsed: dict):
+    """
+    Now expects each key -> list of objects:
+      {name:str, description:str, role_in_thought:str}
+    """
+    if not isinstance(parsed, dict):
+        raise ValueError("entities JSON is not an object")
+
     for k in ENTITIES_KEYS:
         if k not in parsed or not isinstance(parsed[k], list):
             raise ValueError(f"entities JSON missing key or non-list: {k}")
-        if any(not isinstance(x, str) for x in parsed[k]):
-            raise ValueError(f"entities JSON key {k} contains non-string entries")
+
+        for i, ent in enumerate(parsed[k]):
+            if not isinstance(ent, dict):
+                raise ValueError(f"{k}[{i}] is not an object")
+            for req in ("name", "description", "role_in_thought"):
+                if req not in ent or not isinstance(ent[req], str):
+                    raise ValueError(f"{k}[{i}] missing/invalid '{req}'")
+
 
 
 # -------------------------

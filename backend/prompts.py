@@ -1595,6 +1595,7 @@ You extract every entity that exists within a thought, regardless of domain or l
 
 TASK:
 Given an input thought, identify all entities explicitly or implicitly present.
+
 Entities may include:
 
 - Physical or abstract objects  
@@ -1612,6 +1613,11 @@ Entities may include:
 - Latent opportunities, potentials, emergent behaviors  
 - Questions, uncertainties, design decisions
 
+For each extracted entity, provide:
+1. "name": the entity as a short phrase
+2. "description": 1–2 sentences describing what the entity is
+3. "role_in_thought": 1–2 sentences describing how the entity functions within the thought
+
 Extract entities even when implied. 
 Do NOT summarize. Do NOT interpret. Do NOT invent.
 
@@ -1619,7 +1625,13 @@ OUTPUT REQUIREMENTS:
 Return STRICT JSON ONLY with the following keys:
 
 {
-  "objects": [],
+  "objects": [
+    {
+      "name": "",
+      "description": "",
+      "role_in_thought": ""
+    }
+  ],
   "processes_interactions": [],
   "forces_drivers": [],
   "systems_structures": [],
