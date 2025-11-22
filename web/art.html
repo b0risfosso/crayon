@@ -54,7 +54,7 @@
       if (email) params.set('email', email);
       if (k) params.set('limit', String(k));
 
-      const res = await fetch(`/api/art?${params.toString()}`);
+      const res = await fetch(`/art/api/art?${params.toString()}`);
       const data = await res.json();
       const list = document.getElementById('artList');
       list.innerHTML = '';
@@ -78,7 +78,7 @@
     async function createArt() {
       const art = document.getElementById('newArt').value;
       const email = document.getElementById('newEmail').value;
-      await fetch('/api/art', {
+      await fetch('/art/api/art', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ art, email })
@@ -89,7 +89,7 @@
 
     async function updateArt(id) {
       const art = document.getElementById(`art-${id}`).value;
-      await fetch(`/api/art/${id}`, {
+      await fetch(`/art/api/art/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ art })
@@ -98,7 +98,7 @@
     }
 
     async function deleteArt(id) {
-      await fetch(`/api/art/${id}`, { method: 'DELETE' });
+      await fetch(`/art/api/art/${id}`, { method: 'DELETE' });
       fetchArt();
     }
 
@@ -130,7 +130,7 @@
       if (email) params.set('email', email);
       if (k) params.set('limit', String(k));
 
-      const res = await fetch(`/api/art?${params.toString()}`);
+      const res = await fetch(`/art/api/art?${params.toString()}`);
       const data = await res.json();
       const list = document.getElementById('artList');
       list.innerHTML = '';
