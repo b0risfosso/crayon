@@ -13,11 +13,11 @@
   </style>
 </head>
 <body>
-  <h1>Art Entries</h1>
+  <h1>Art</h1>
 
   <section>
-    <h2>Create New Art</h2>
-    <textarea id="newArt" placeholder="Write art text..."></textarea>
+    <h2>Create Art</h2>
+    <textarea id="newArt" placeholder="Write art..."></textarea>
     <input id="newEmail" type="text" placeholder="Email (optional)" />
     <button onclick="createArt()">Create</button>
   </section>
@@ -25,58 +25,103 @@
   <hr />
 
   <section>
-    <h2>List of Art</h2>
+    <h2>Art</h2>
+    <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <input id="searchQuery" type="text" placeholder="Search art..." style="flex:1; min-width:220px; padding:6px;" />
+    <input id="searchEmail" type="text" placeholder="Email filter (optional)" style="min-width:220px; padding:6px;" />
+    <button onclick="fetchArt()">Search</button>
+    <button onclick="randomLoad()">Random Load</button>
+    <label style="display:flex; align-items:center; gap:4px;">
+    <span>k</span>
+    <input id="k" type="number" value="20" min="1" max="500" style="width:80px; padding:6px;" />
+    </label>
+    </div>
     <div id="artList"></div>
   </section>
 
   <script>
-    async function fetchArt() {
-      const res = await fetch('/art/api/art');
-      const data = await res.json();
-      const list = document.getElementById('artList');
-      list.innerHTML = '';
-      data.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'entry';
-        div.innerHTML = `
-          <strong>ID:</strong> ${item.id}<br />
-          <strong>Email:</strong> ${item.email || ''}<br />
-          <textarea id="art-${item.id}">${item.art}</textarea><br />
-          <button onclick="updateArt(${item.id})">Save</button>
-          <button onclick="deleteArt(${item.id})">Delete</button>
-        `;
-        list.appendChild(div);
-      });
-    }
+async function fetchArt() {
+const q = document.getElementById('searchQuery').value.trim();
+const email = document.getElementById('searchEmail').value.trim();
+const k = parseInt(document.getElementById('k').value || '20', 10);
 
-    async function createArt() {
-      const art = document.getElementById('newArt').value;
-      const email = document.getElementById('newEmail').value;
-      await fetch('/api/art', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ art, email })
-      });
-      document.getElementById('newArt').value = '';
-      fetchArt();
-    }
+const params = new URLSearchParams();
+if (q) params.set('q', q);
+if (email) params.set('email', email);
+if (k) params.set('limit', String(k));
 
-    async function updateArt(id) {
-      const art = document.getElementById(`art-${id}`).value;
-      await fetch(`/api/art/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ art })
-      });
-      fetchArt();
-    }
+const res = await fetch(`/api/art?${params.toString()}`);
+const data = await res.json();
+const list = document.getElementById('artList');
+list.innerHTML = '';
+(Array.isArray(data) ? data : []).forEach(item => {
+const div = document.createElement('div');
+div.className = 'entry';
+div.innerHTML = `
+<strong>ID:</strong> ${item.id}<br />
+<strong>Email:</strong> ${item.email || ''}<br />
+<textarea id="art-${item.id}">${item.art}</textarea><br />
+<button onclick="updateArt(${item.id})">Save</button>
+<button onclick="deleteArt(${item.id})">Delete</button>
+`;
+list.appendChild(div);
+});
+}
 
-    async function deleteArt(id) {
-      await fetch(`/api/art/${id}`, { method: 'DELETE' });
-      fetchArt();
-    }
+async function createArt() {
+const art = document.getElementById('newArt').value;
+const email = document.getElementById('newEmail').value;
+await fetch('/api/art', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ art, email })
+});
+document.getElementById('newArt').value = '';
+fetchArt();
+}
 
-    fetchArt();
-  </script>
+async function updateArt(id) {
+const art = document.getElementById(`art-${id}`).value;
+await fetch(`/api/art/${id}`, {
+method: 'PATCH',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ art })
+});
+fetchArt();
+}
+
+async function deleteArt(id) {
+await fetch(`/api/art/${id}`, { method: 'DELETE' });
+fetchArt();
+}
+
+async function randomLoad() {
+const email = document.getElementById('searchEmail').value.trim();
+const k = parseInt(document.getElementById('k').value || '20', 10);
+const params = new URLSearchParams();
+params.set('random', '1');
+if (email) params.set('email', email);
+if (k) params.set('limit', String(k));
+
+const res = await fetch(`/api/art?${params.toString()}`);
+const data = await res.json();
+const list = document.getElementById('artList');
+list.innerHTML = '';
+(Array.isArray(data) ? data : []).forEach(item => {
+const div = document.createElement('div');
+div.className = 'entry';
+div.innerHTML = `
+<strong>ID:</strong> ${item.id}<br />
+<strong>Email:</strong> ${item.email || ''}<br />
+<textarea id="art-${item.id}">${item.art}</textarea><br />
+<button onclick="updateArt(${item.id})">Save</button>
+<button onclick="deleteArt(${item.id})">Delete</button>
+`;
+list.appendChild(div);
+});
+}
+
+fetchArt();
+</script>
 </body>
 </html>

@@ -39,6 +39,43 @@ app.config["JSON_SORT_KEYS"] = False
 # DB helpers
 # -------------------------
 
+import re
+
+def normalize(s: str) -> str:
+    return re.sub(r"\s+", " ", s.lower()).strip()
+
+def tokenize(s: str):
+    s = normalize(s)
+    return [t for t in re.split(r"[^a-z0-9]+", s) if t]
+
+def trigram_set(s: str):
+    s = normalize(s)
+    s = f"  {s}  "
+    return {s[i:i+3] for i in range(len(s)-2)}
+
+def similarity(query: str, text: str) -> float:
+    """
+    Cheap but decent semantic-ish closeness:
+    - token Jaccard
+    - trigram Jaccard
+    Weighted toward token overlap.
+    """
+    qt = set(tokenize(query))
+    tt = set(tokenize(text))
+    if not qt or not tt:
+        token_score = 0.0
+    else:
+        token_score = len(qt & tt) / len(qt | tt)
+
+    q3 = trigram_set(query)
+    t3 = trigram_set(text)
+    if not q3 or not t3:
+        tri_score = 0.0
+    else:
+        tri_score = len(q3 & t3) / len(q3 | t3)
+
+    return 0.7 * token_score + 0.3 * tri_score
+
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
@@ -156,6 +193,7 @@ def list_art():
     email = request.args.get("email")
     q = request.args.get("q")
     order = request.args.get("order", "desc").lower()
+    random_flag = request.args.get("random")
 
     if order not in ("asc", "desc"):
         abort(400, description="order must be 'asc' or 'desc'")
@@ -167,10 +205,65 @@ def list_art():
         where.append("email = ?")
         params.append(email)
 
-    if q:
-        where.append("art LIKE ?")
-        params.append(f"%{q}%")
+    db = get_db()
 
+    # -------------------------
+    # RANDOM LOAD MODE
+    # -------------------------
+    if random_flag in ("1", "true", "yes"):
+        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+        sql = f"""
+            SELECT * FROM art
+            {where_sql}
+            ORDER BY RANDOM()
+            LIMIT ?
+        """
+        rows = db.execute(sql, params + [limit]).fetchall()
+        return jsonify([row_to_dict(r) for r in rows])
+
+    # -------------------------
+    # SEARCH MODE
+    # -------------------------
+    if q:
+        tokens = tokenize(q)
+
+        # Candidate pool: any row that matches any token in LIKE
+        cand_where = list(where)
+        cand_params = list(params)
+
+        if tokens:
+            like_clauses = []
+            for t in tokens:
+                like_clauses.append("art LIKE ?")
+                cand_params.append(f"%{t}%")
+            cand_where.append("(" + " OR ".join(like_clauses) + ")")
+        else:
+            cand_where.append("art LIKE ?")
+            cand_params.append(f"%{q}%")
+
+        cand_where_sql = "WHERE " + " AND ".join(cand_where)
+        # Pull a bigger pool to rank from
+        candidate_limit = max(limit * 5, 100)
+
+        cand_sql = f"""
+            SELECT * FROM art
+            {cand_where_sql}
+            LIMIT ?
+        """
+        candidates = db.execute(cand_sql, cand_params + [candidate_limit]).fetchall()
+
+        scored = []
+        for r in candidates:
+            txt = r["art"] or ""
+            scored.append((similarity(q, txt), r))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        top_rows = [row_to_dict(r) for score, r in scored[:limit]]
+        return jsonify(top_rows)
+
+    # -------------------------
+    # NORMAL LIST MODE
+    # -------------------------
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     sql = f"""
         SELECT * FROM art
@@ -178,10 +271,7 @@ def list_art():
         ORDER BY created_at {order}
         LIMIT ? OFFSET ?
     """
-    params.extend([limit, offset])
-
-    db = get_db()
-    rows = db.execute(sql, params).fetchall()
+    rows = db.execute(sql, params + [limit, offset]).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 
