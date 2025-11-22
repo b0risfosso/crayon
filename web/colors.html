@@ -6,8 +6,13 @@
   <title>Colors Viewer</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    .block { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; }
+    .block { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; border-radius: 8px; }
     pre { white-space: pre-wrap; }
+    .controls { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+    button { padding: 6px 10px; cursor: pointer; }
+    .status { font-size: 12px; color: #333; margin-top: 6px; white-space: pre-wrap; }
+    .seed { border-top: 1px dashed #ddd; margin-top: 8px; padding-top: 8px; }
+    .seed-title { font-weight: 600; margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -15,6 +20,99 @@
   <div id="content"></div>
 
   <script>
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function openSeedInNewTab(seedText, colorId, idx) {
+      const w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write(`<!DOCTYPE html><html><head><title>Seed ${idx + 1} (Color ${colorId})</title></head><body style="font-family:sans-serif; padding:20px;"><h2>Seed ${idx + 1} (Color ${colorId})</h2><pre style="white-space:pre-wrap;">${escapeHtml(seedText)}</pre></body></html>`);
+      w.document.close();
+    }
+
+    async function fetchSeedsForColor(colorId) {
+      // expects backend route GET /colors/seeds/by_color/<colorId>
+      const res = await fetch(`/colors/seeds/by_color/${colorId}`);
+      if (!res.ok) return [];
+      const rows = await res.json();
+      // rows can be [] or list of db rows with seeds_json as parsed dict or string
+      if (!Array.isArray(rows) || rows.length === 0) return [];
+
+      // take latest row only (newest first)
+      const latest = rows[0];
+      let seedsPayload = latest.seeds_json;
+      if (typeof seedsPayload === 'string') {
+        try { seedsPayload = JSON.parse(seedsPayload); } catch { /* ignore */ }
+      }
+      const seedsList = (seedsPayload && seedsPayload.simulation_seeds) || [];
+      return Array.isArray(seedsList) ? seedsList : [];
+    }
+
+    async function enqueueSeeds(colorId, statusDiv, seedsDiv) {
+      statusDiv.textContent = 'Queued simulation seeds…';
+
+      const res = await fetch('/colors/simulation_seeds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color_id: colorId })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        statusDiv.textContent = data.message || 'Error queueing seeds.';
+        return;
+      }
+
+      const taskId = data.task_id;
+      statusDiv.textContent = `Seeds queued (task ${taskId}). Waiting…`;
+
+      try {
+        const result = await pollTask(taskId, statusDiv);
+        statusDiv.textContent = `Seeds done. Saved #${result.saved_simulation_seeds?.id || ''}.`;
+
+        // refresh displayed seeds
+        const seeds = await fetchSeedsForColor(colorId);
+        renderSeedsList(seedsDiv, seeds, colorId);
+      } catch (e) {
+        statusDiv.textContent = `Seeds error: ${e.message || e}`;
+      }
+    }
+
+    async function pollTask(taskId, statusDiv) {
+      while (true) {
+        const r = await fetch(`/colors/tasks/${taskId}`);
+        const t = await r.json();
+        if (!r.ok) throw new Error(t.message || 'Polling failed');
+        if (t.status === 'done') return t.result;
+        if (t.status === 'error') throw new Error(t.error || 'Task error');
+        statusDiv.textContent = `Status: ${t.status}…`;
+        await new Promise(ok => setTimeout(ok, 1200));
+      }
+    }
+
+    function renderSeedsList(seedsDiv, seeds, colorId) {
+      seedsDiv.innerHTML = '';
+      if (!seeds || seeds.length === 0) {
+        seedsDiv.innerHTML = '<em>No simulation seeds yet.</em>';
+        return;
+      }
+      seeds.forEach((seedText, idx) => {
+        const sdiv = document.createElement('div');
+        sdiv.className = 'seed';
+        sdiv.innerHTML = `
+          <div class="seed-title">Seed ${idx + 1}</div>
+          <div style="white-space:pre-wrap; margin-bottom:6px;">${escapeHtml(seedText)}</div>
+          <button onclick="openSeedInNewTab(${JSON.stringify(seedText)}, ${colorId}, ${idx})">Open seed in new tab</button>
+        `;
+        seedsDiv.appendChild(sdiv);
+      });
+    }
+
     async function loadColor() {
       const params = new URLSearchParams(window.location.search);
       const artId = params.get('art_id');
@@ -34,19 +132,43 @@
           return;
         }
 
-        data.forEach(entry => {
+        for (const entry of data) {
           const div = document.createElement('div');
           div.className = 'block';
+
+          const seedsDivId = `seeds-${entry.id}`;
+          const statusDivId = `status-${entry.id}`;
+
           div.innerHTML = `
             <strong>Color ID:</strong> ${entry.id}<br>
             <strong>Art ID:</strong> ${entry.art_id}<br>
             <strong>Model:</strong> ${entry.model}<br>
             <strong>Temperature:</strong> ${entry.temperature}<br>
             <strong>Created:</strong> ${entry.created_at}<br>
-            <pre>${entry.output_text}</pre>
+            <pre>${escapeHtml(entry.output_text)}</pre>
+
+            <div class="controls">
+              <button id="gen-seeds-btn-${entry.id}">Generate Simulation Seeds</button>
+              <button onclick="window.open('/art.html?art_id=${entry.art_id}', '_blank')">Open Art</button>
+            </div>
+            <div id="${statusDivId}" class="status"></div>
+            <div id="${seedsDivId}" class="status" style="margin-top:8px;"></div>
           `;
+
           container.appendChild(div);
-        });
+
+          const statusDiv = document.getElementById(statusDivId);
+          const seedsDiv = document.getElementById(seedsDivId);
+          const genBtn = document.getElementById(`gen-seeds-btn-${entry.id}`);
+
+          // wire generation button
+          genBtn.onclick = () => enqueueSeeds(entry.id, statusDiv, seedsDiv);
+
+          // load existing seeds
+          const seeds = await fetchSeedsForColor(entry.id);
+          renderSeedsList(seedsDiv, seeds, entry.id);
+        }
+
       } catch (e) {
         document.getElementById('content').textContent = 'Error: ' + e;
       }

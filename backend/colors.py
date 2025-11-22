@@ -20,6 +20,8 @@ from typing import Any, Dict, Optional, Tuple
 from flask import Flask, request, jsonify, abort
 
 from prompts import build_thought_sys, build_thought_user  # type: ignore
+from prompts import digital_playground_bridge_sys, digital_playground_bridge_user  # type: ignore
+
 
 try:
     from openai import OpenAI
@@ -206,14 +208,92 @@ def queue_stats() -> dict:
         "concurrency": 2,
     }
 
+def run_simulation_seeds_from_color(task_id: str, color_id: int, model: str, temperature: float, user_metadata: dict, worker_id: int):
+    db = get_art_db()
+    color_row = db.execute(
+        "SELECT id, art_id, output_text FROM colors WHERE id = ?",
+        (color_id,)
+    ).fetchone()
+
+    if not color_row:
+        db.close()
+        raise ValueError("color not found")
+
+    art_id = color_row["art_id"]
+    thought_text = (color_row["output_text"] or "").strip()
+    if not thought_text:
+        db.close()
+        raise ValueError("color output_text empty")
+
+    system_prompt = digital_playground_bridge_sys
+    user_prompt = digital_playground_bridge_user.format(thought=thought_text)
+
+    t0 = time.time()
+    resp = _client.chat.completions.create(
+        model=model,
+        temperature=temperature,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    duration_ms = int((time.time() - t0) * 1000)
+    output_text = (resp.choices[0].message.content or "").strip()
+
+    # validate STRICT JSON
+    parsed = json.loads(output_text)
+    if "simulation_seeds" not in parsed or not isinstance(parsed["simulation_seeds"], list):
+        db.close()
+        raise ValueError("model returned invalid JSON (missing simulation_seeds list)")
+
+    created_at = utc_now_iso()
+
+    db.execute(
+        """
+        INSERT INTO simulation_seeds
+          (color_id, art_id, input_text, seeds_json, model, temperature, created_at)
+        VALUES (?,        ?,      ?,          ?,         ?,     ?,          ?)
+        """,
+        (
+            color_id,
+            art_id,
+            thought_text,
+            output_text,
+            model,
+            temperature,
+            created_at,
+        ),
+    )
+    db.commit()
+
+    new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    saved_row = db.execute(
+        "SELECT * FROM simulation_seeds WHERE id = ?",
+        (new_id,)
+    ).fetchone()
+    db.close()
+
+    usage = getattr(resp, "usage", None)
+    usage_dict = usage.model_dump() if usage else None
+
+    return {
+        "color_id": color_id,
+        "art_id": art_id,
+        "input_text": thought_text,
+        "seeds": parsed,
+        "saved_simulation_seeds": dict(saved_row),
+        "usage": usage_dict,
+        "duration_ms": duration_ms,
+        "worker_id": worker_id,
+    }
+
+
 
 def worker_loop(worker_id: int):
     while True:
-        task = TASK_QUEUE.get()  # blocks until task available
+        task = TASK_QUEUE.get()  # blocks
         task_id = task["task_id"]
-        art_id = task["art_id"]
-        model = task["model"]
-        user_metadata = task["user_metadata"]
+        task_type = task["task_type"]
 
         with TASKS_LOCK:
             TASKS[task_id]["status"] = "running"
@@ -221,77 +301,211 @@ def worker_loop(worker_id: int):
             TASKS[task_id]["worker_id"] = worker_id
 
         try:
-            # 1) load art text
-            art_row = fetch_art_text(art_id)
-            thought_text = (art_row.get("art") or "").strip()
-            if not thought_text:
-                raise ValueError(f"art id {art_id} has empty art text")
+            # ============================================================
+            #  TYPE 1: build_thought (original Colors expansion)
+            # ============================================================
+            if task_type == "build_thought":
+                art_id = task["art_id"]
+                model = task["model"]
+                user_metadata = task["user_metadata"]
 
-            # 2) format prompt
-            user_prompt = build_thought_user.format(thought=thought_text)
+                # 1) load art text
+                art_row = fetch_art_text(art_id)
+                thought_text = (art_row.get("art") or "").strip()
+                if not thought_text:
+                    raise ValueError(f"art id {art_id} has empty art text")
 
-            projected_tokens = 2000
-            enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+                # 2) format prompt
+                user_prompt = build_thought_user.format(thought=thought_text)
 
-            # 3) call LLM
-            with LLM_LOCK:
-                t0 = time.time()
-                resp = _client.chat.completions.create(
+                projected_tokens = 2000
+                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                # 3) call LLM
+                with LLM_LOCK:
+                    t0 = time.time()
+                    resp = _client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": build_thought_sys},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+
+                expanded = (resp.choices[0].message.content or "").strip()
+
+                usage = getattr(resp, "usage", None)
+                usage_dict = usage.model_dump() if usage else None
+                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
+                duration_ms = int((time.time() - t0) * 1000)
+
+                # 4) log usage
+                log_llm_usage(
+                    ts=utc_now_iso(),
+                    app_name="colors",
                     model=model,
-                    messages=[
-                        {"role": "system", "content": build_thought_sys},
-                        {"role": "user", "content": user_prompt},
-                    ],
+                    endpoint="/colors/build_thought",
+                    email=None,
+                    request_id=task_id,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cost_usd=0.0,
+                    meta_obj={"art_id": art_id, "worker_id": worker_id},
                 )
 
-            expanded = (resp.choices[0].message.content or "").strip()
-            usage = getattr(resp, "usage", None)
-            usage_dict = usage.model_dump() if usage else None
+                # 5) save into colors table
+                colors_row = insert_color_row(
+                    art_id=art_id,
+                    input_art=thought_text,
+                    output_text=expanded,
+                    model=model,
+                    usage=usage_dict,
+                    user_metadata=user_metadata,
+                )
 
-            tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-            tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-            total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-
-            duration_ms = int((time.time() - t0) * 1000)
-
-            log_llm_usage(
-                ts=utc_now_iso(),
-                app_name="colors",
-                model=model,
-                endpoint="/colors/build_thought",
-                email=None,                  # you don’t have email on colors call; OK
-                request_id=task_id,          # your queued task_id
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-                total_tokens=total_tokens,
-                duration_ms=duration_ms,
-                cost_usd=0.0,
-                meta_obj={
-                    "art_id": art_id,
-                    "worker_id": worker_id
-                }
-            )
+                # 6) mark done
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "build_thought",
+                        "art_id": art_id,
+                        "expanded_thought": expanded,
+                        "usage": usage_dict,
+                        "saved_color": colors_row,
+                    }
 
 
-            # 4) save to colors table
-            colors_row = insert_color_row(
-                art_id=art_id,
-                input_art=thought_text,
-                output_text=expanded,
-                model=model,
-                usage=usage_dict,
-                user_metadata=user_metadata,
-            )
 
-            with TASKS_LOCK:
-                TASKS[task_id]["status"] = "done"
-                TASKS[task_id]["finished_at"] = utc_now_iso()
-                TASKS[task_id]["result"] = {
-                    "art_id": art_id,
-                    "expanded_thought": expanded,
-                    "usage": usage_dict,
-                    "saved_color": colors_row,
-                }
+            # ============================================================
+            #  TYPE 2: simulation_seeds (NEW)
+            # ============================================================
+            elif task_type == "simulation_seeds":
+                color_id = task["color_id"]
+                model = task["model"]
+                temperature = float(task["temperature"])
+                user_metadata = task["user_metadata"]
+
+                # Load color row
+                db = get_art_db()
+                row = db.execute(
+                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
+                    (color_id,)
+                ).fetchone()
+                if not row:
+                    db.close()
+                    raise ValueError(f"color id {color_id} not found")
+
+                art_id = row["art_id"]
+                thought_text = (row["output_text"] or "").strip()
+                if not thought_text:
+                    db.close()
+                    raise ValueError(f"color {color_id} has empty output_text")
+
+                system_prompt = digital_playground_bridge_sys
+                user_prompt = digital_playground_bridge_user.format(thought=thought_text)
+
+                projected_tokens = 4000
+                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                # Call LLM
+                with LLM_LOCK:
+                    t0 = time.time()
+                    resp = _client.chat.completions.create(
+                        model=model,
+                        temperature=temperature,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+
+                output_text = (resp.choices[0].message.content or "").strip()
+                usage = getattr(resp, "usage", None)
+                usage_dict = usage.model_dump() if usage else None
+                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
+                duration_ms = int((time.time() - t0) * 1000)
+
+                # STRICT JSON validation
+                parsed = json.loads(output_text)
+                if "simulation_seeds" not in parsed or not isinstance(parsed["simulation_seeds"], list):
+                    db.close()
+                    raise ValueError("model response missing simulation_seeds list")
+
+                # Save to DB
+                created_at = utc_now_iso()
+                db.execute(
+                    """
+                    INSERT INTO simulation_seeds
+                      (color_id, art_id, input_text, seeds_json, model, temperature, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        color_id,
+                        art_id,
+                        thought_text,
+                        output_text,
+                        model,
+                        temperature,
+                        created_at,
+                    ),
+                )
+                db.commit()
+
+                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                saved_row = dict(
+                    db.execute(
+                        "SELECT * FROM simulation_seeds WHERE id = ?",
+                        (new_id,)
+                    ).fetchone()
+                )
+                db.close()
+
+                # LLM usage logging
+                log_llm_usage(
+                    ts=utc_now_iso(),
+                    app_name="colors",
+                    model=model,
+                    endpoint="/colors/simulation_seeds",
+                    email=None,
+                    request_id=task_id,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cost_usd=0.0,
+                    meta_obj={
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "worker_id": worker_id
+                    },
+                )
+
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "simulation_seeds",
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "seeds": parsed,
+                        "saved_simulation_seeds": saved_row,
+                        "usage": usage_dict,
+                    }
+
+
+
+            # ============================================================
+            # Unsupported task type
+            # ============================================================
+            else:
+                raise ValueError(f"Unknown task_type: {task_type}")
 
         except Exception as e:
             with TASKS_LOCK:
@@ -301,6 +515,7 @@ def worker_loop(worker_id: int):
 
         finally:
             TASK_QUEUE.task_done()
+
 
 
 # start 2 background workers when module loads
@@ -544,3 +759,91 @@ def colors_by_art(art_id: int):
 
     return jsonify(out)
 
+
+@app.post("/colors/simulation_seeds")
+def enqueue_simulation_seeds():
+    """
+    Queue Simulation Seed Extractor on a color_id.
+
+    Body:
+      {
+        "color_id": 123,
+        "model": optional,
+        "temperature": optional,
+        "metadata": optional
+      }
+
+    Returns:
+      { task_id, status:'queued' }
+    """
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    color_id = payload.get("color_id")
+    if not isinstance(color_id, int):
+        abort(400, description="'color_id' is required and must be an integer")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    temperature = float(payload.get("temperature", 0.2))
+    user_metadata = payload.get("metadata") or {}
+
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "simulation_seeds",
+            "color_id": color_id,
+            "status": "queued",
+            "created_at": utc_now_iso(),
+            "model": model,
+            "temperature": temperature,
+        }
+
+    TASK_QUEUE.put({
+        "task_id": task_id,
+        "task_type": "simulation_seeds",
+        "color_id": color_id,
+        "model": model,
+        "temperature": temperature,
+        "user_metadata": user_metadata,
+    })
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "queued",
+        "task_type": "simulation_seeds",
+        "color_id": color_id,
+    }), 202
+
+
+@app.get("/colors/seeds/by_color/<int:color_id>")
+def seeds_by_color(color_id: int):
+    """
+    Returns all simulation_seeds rows for a color_id, newest first.
+    """
+    db = get_art_db()
+    rows = db.execute(
+        """
+        SELECT * FROM simulation_seeds
+        WHERE color_id = ?
+        ORDER BY created_at DESC
+        """,
+        (color_id,)
+    ).fetchall()
+    db.close()
+
+    out = []
+    for r in rows:
+        d = dict(r)
+        # try to parse seeds_json for convenience
+        sj = d.get("seeds_json")
+        if isinstance(sj, str):
+            try:
+                d["seeds_json"] = json.loads(sj)
+            except Exception:
+                pass
+        out.append(d)
+
+    return jsonify(out)
