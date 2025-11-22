@@ -11,8 +11,8 @@
     .controls { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
     button { padding: 6px 10px; cursor: pointer; }
     .status { font-size: 12px; color: #333; margin-top: 6px; white-space: pre-wrap; }
-    .seed { border-top: 1px dashed #ddd; margin-top: 8px; padding-top: 8px; }
-    .seed-title { font-weight: 600; margin-bottom: 4px; }
+    .entity { border-top: 1px dashed #ddd; margin-top: 8px; padding-top: 8px; }
+    .entity-title { font-weight: 600; margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -29,57 +29,53 @@
         .replaceAll("'", '&#039;');
     }
 
-    function openSeedInNewTab(seedText, colorId, idx) {
+    function openEntityInNewTab(entityText, colorId, groupKey, idx) {
       const w = window.open('', '_blank');
       if (!w) return;
-      w.document.write(`<!DOCTYPE html><html><head><title>Seed ${idx + 1} (Color ${colorId})</title></head><body style="font-family:sans-serif; padding:20px;"><h2>Seed ${idx + 1} (Color ${colorId})</h2><pre style="white-space:pre-wrap;">${escapeHtml(seedText)}</pre></body></html>`);
+      w.document.write(`<!DOCTYPE html><html><head><title>${escapeHtml(groupKey)} #${idx + 1} (Color ${colorId})</title></head><body style="font-family:sans-serif; padding:20px;"><h2>${escapeHtml(groupKey)} — Entity ${idx + 1} (Color ${colorId})</h2><pre style="white-space:pre-wrap;">${escapeHtml(entityText)}</pre></body></html>`);
       w.document.close();
     }
 
-    async function fetchSeedsForColor(colorId) {
-      // expects backend route GET /colors/seeds/by_color/<colorId>
-      const res = await fetch(`/colors/seeds/by_color/${colorId}`);
-      if (!res.ok) return [];
+    async function fetchEntitiesForColor(colorId) {
+      // expects backend route GET /colors/entities/by_color/<colorId>
+      const res = await fetch(`/colors/entities/by_color/${colorId}`);
+      if (!res.ok) return null;
       const rows = await res.json();
-      // rows can be [] or list of db rows with seeds_json as parsed dict or string
-      if (!Array.isArray(rows) || rows.length === 0) return [];
+      if (!Array.isArray(rows) || rows.length === 0) return null;
 
-      // take latest row only (newest first)
       const latest = rows[0];
-      let seedsPayload = latest.seeds_json;
-      if (typeof seedsPayload === 'string') {
-        try { seedsPayload = JSON.parse(seedsPayload); } catch { /* ignore */ }
+      let payload = latest.entities_json;
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch { /* ignore */ }
       }
-      const seedsList = (seedsPayload && seedsPayload.simulation_seeds) || [];
-      return Array.isArray(seedsList) ? seedsList : [];
+      return payload && typeof payload === 'object' ? payload : null;
     }
 
-    async function enqueueSeeds(colorId, statusDiv, seedsDiv) {
-      statusDiv.textContent = 'Queued simulation seeds…';
+    async function enqueueEntities(colorId, statusDiv, entitiesDiv) {
+      statusDiv.textContent = 'Queued entity extraction…';
 
-      const res = await fetch('/colors/simulation_seeds', {
+      const res = await fetch('/colors/entities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ color_id: colorId })
       });
       const data = await res.json();
       if (!res.ok) {
-        statusDiv.textContent = data.message || 'Error queueing seeds.';
+        statusDiv.textContent = data.message || 'Error queueing entities.';
         return;
       }
 
       const taskId = data.task_id;
-      statusDiv.textContent = `Seeds queued (task ${taskId}). Waiting…`;
+      statusDiv.textContent = `Entities queued (task ${taskId}). Waiting…`;
 
       try {
         const result = await pollTask(taskId, statusDiv);
-        statusDiv.textContent = `Seeds done. Saved #${result.saved_simulation_seeds?.id || ''}.`;
+        statusDiv.textContent = `Entities done. Saved #${result.saved_entities?.id || ''}.`;
 
-        // refresh displayed seeds
-        const seeds = await fetchSeedsForColor(colorId);
-        renderSeedsList(seedsDiv, seeds, colorId);
+        const entitiesPayload = await fetchEntitiesForColor(colorId);
+        renderEntities(entitiesDiv, entitiesPayload, colorId);
       } catch (e) {
-        statusDiv.textContent = `Seeds error: ${e.message || e}`;
+        statusDiv.textContent = `Entities error: ${e.message || e}`;
       }
     }
 
@@ -91,26 +87,47 @@
         if (t.status === 'done') return t.result;
         if (t.status === 'error') throw new Error(t.error || 'Task error');
         statusDiv.textContent = `Status: ${t.status}…`;
-        await new Promise(ok => setTimeout(ok, 2500));
+        await new Promise(ok => setTimeout(ok, 2000));
       }
     }
 
-    function renderSeedsList(seedsDiv, seeds, colorId) {
-      seedsDiv.innerHTML = '';
-      if (!seeds || seeds.length === 0) {
-        seedsDiv.innerHTML = '<em>No simulation seeds yet.</em>';
+    function renderEntities(entitiesDiv, payload, colorId) {
+      entitiesDiv.innerHTML = '';
+      if (!payload) {
+        entitiesDiv.innerHTML = '<em>No entities yet.</em>';
         return;
       }
-      seeds.forEach((seedText, idx) => {
-        const sdiv = document.createElement('div');
-        sdiv.className = 'seed';
-        sdiv.innerHTML = `
-          <div class="seed-title">Seed ${idx + 1}</div>
-          <div style="white-space:pre-wrap; margin-bottom:6px;">${escapeHtml(seedText)}</div>
-          <button onclick="openSeedInNewTab(${JSON.stringify(seedText)}, ${colorId}, ${idx})">Open in playground</button>
-        `;
-        seedsDiv.appendChild(sdiv);
+
+      const keys = Object.keys(payload);
+      if (keys.length === 0) {
+        entitiesDiv.innerHTML = '<em>No entities yet.</em>';
+        return;
+      }
+
+      keys.forEach(groupKey => {
+        const items = payload[groupKey];
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        const groupBlock = document.createElement('div');
+        groupBlock.className = 'entity';
+        groupBlock.innerHTML = `<div class="entity-title">${escapeHtml(groupKey)} (${items.length})</div>`;
+
+        items.forEach((entityText, idx) => {
+          const row = document.createElement('div');
+          row.style.marginBottom = '6px';
+          row.innerHTML = `
+            <div style="white-space:pre-wrap; margin-bottom:4px;">${escapeHtml(entityText)}</div>
+            <button onclick="openEntityInNewTab(${JSON.stringify(entityText)}, ${colorId}, ${JSON.stringify(groupKey)}, ${idx})">Open in new tab</button>
+          `;
+          groupBlock.appendChild(row);
+        });
+
+        entitiesDiv.appendChild(groupBlock);
       });
+
+      if (!entitiesDiv.innerHTML.trim()) {
+        entitiesDiv.innerHTML = '<em>No entities yet.</em>';
+      }
     }
 
     async function loadColor() {
@@ -136,7 +153,7 @@
           const div = document.createElement('div');
           div.className = 'block';
 
-          const seedsDivId = `seeds-${entry.id}`;
+          const entitiesDivId = `entities-${entry.id}`;
           const statusDivId = `status-${entry.id}`;
 
           div.innerHTML = `
@@ -148,24 +165,22 @@
             <pre>${escapeHtml(entry.output_text)}</pre>
 
             <div class="controls">
-              <button id="gen-seeds-btn-${entry.id}">Bridge to Digital Playground</button>
+              <button id="gen-entities-btn-${entry.id}">Extract Entities</button>
             </div>
             <div id="${statusDivId}" class="status"></div>
-            <div id="${seedsDivId}" class="status" style="margin-top:8px;"></div>
+            <div id="${entitiesDivId}" class="status" style="margin-top:8px;"></div>
           `;
 
           container.appendChild(div);
 
           const statusDiv = document.getElementById(statusDivId);
-          const seedsDiv = document.getElementById(seedsDivId);
-          const genBtn = document.getElementById(`gen-seeds-btn-${entry.id}`);
+          const entitiesDiv = document.getElementById(entitiesDivId);
+          const genBtn = document.getElementById(`gen-entities-btn-${entry.id}`);
 
-          // wire generation button
-          genBtn.onclick = () => enqueueSeeds(entry.id, statusDiv, seedsDiv);
+          genBtn.onclick = () => enqueueEntities(entry.id, statusDiv, entitiesDiv);
 
-          // load existing seeds
-          const seeds = await fetchSeedsForColor(entry.id);
-          renderSeedsList(seedsDiv, seeds, entry.id);
+          const entitiesPayload = await fetchEntitiesForColor(entry.id);
+          renderEntities(entitiesDiv, entitiesPayload, entry.id);
         }
 
       } catch (e) {
@@ -177,3 +192,4 @@
   </script>
 </body>
 </html>
+
