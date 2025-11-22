@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colors Viewer</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .block { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Colors Expansion</h1>
+  <div id="content"></div>
+
+  <script>
+    async function loadColor() {
+      const params = new URLSearchParams(window.location.search);
+      const artId = params.get('art_id');
+      if (!artId) {
+        document.getElementById('content').textContent = 'Missing art_id parameter.';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/colors/by_art/${artId}`);
+        const data = await res.json();
+        const container = document.getElementById('content');
+        container.innerHTML = '';
+
+        if (!Array.isArray(data) || data.length === 0) {
+          container.textContent = 'No colors expansions found for this art.';
+          return;
+        }
+
+        data.forEach(entry => {
+          const div = document.createElement('div');
+          div.className = 'block';
+          div.innerHTML = `
+            <strong>Color ID:</strong> ${entry.id}<br>
+            <strong>Art ID:</strong> ${entry.art_id}<br>
+            <strong>Model:</strong> ${entry.model}<br>
+            <strong>Temperature:</strong> ${entry.temperature}<br>
+            <strong>Created:</strong> ${entry.created_at}<br>
+            <pre>${entry.output_text}</pre>
+          `;
+          container.appendChild(div);
+        });
+      } catch (e) {
+        document.getElementById('content').textContent = 'Error: ' + e;
+      }
+    }
+
+    loadColor();
+  </script>
+</body>
+</html>

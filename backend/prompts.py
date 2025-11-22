@@ -1389,10 +1389,10 @@ Keep this engine fully independent, but compatible with others.
 The reader must be able to implement the solver directly from your output.
 """
 
-build_thought = r"""
-LLM Prompt: Thought-Expansion Architect v1
+build_thought_sys = r"""
+Thought-Expansion Architect
 Instruction:
-You will be given a single thought. Your task is to build this thought into a fully developed passage.
+You will be given a single thought. Your task is to develop this thought into a fully developed, coherent, self-consistent passage.
 Objective:
 Transform the thought into a high-density, high-quality exploration that:
 Builds the foundational structure of the thought.
@@ -1408,10 +1408,13 @@ Remain laser-focused on the internal logic of the thought.
 Expand the thought without contradicting it.
 Include foundational mechanics, drivers, emergent questions, boundary conditions, failure modes, and latent opportunities as appropriate.
 Read as a natural, continuous paragraph (no lists, no section headers).
-Template
+"""
+
+build_thought_user = r"""
+PROMPT TEMPLATE
 USER THOUGHT:
-{INSERT THOUGHT HERE}
-TASK:
+{thought}
+INSTRUCTION TO MODEL:
 “Build the following thought in paragraph form. This should read as an exploration of the thought, constructing the foundational structure of the idea, identifying the questions that arise, unpacking the implications across all relevant dimensions, and articulating the fruits that emerge from this conceptual structure. Ensure high-quality, high-density information.”
 OUTPUT:
 A single, cohesive paragraph that performs all tasks above.
