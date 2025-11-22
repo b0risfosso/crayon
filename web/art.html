@@ -31,7 +31,7 @@
 
   <script>
     async function fetchArt() {
-      const res = await fetch('/api/art');
+      const res = await fetch('/art/api/art');
       const data = await res.json();
       const list = document.getElementById('artList');
       list.innerHTML = '';
