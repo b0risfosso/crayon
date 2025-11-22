@@ -658,27 +658,28 @@ def colors_build_thought():
     with TASKS_LOCK:
         TASKS[task_id] = {
             "task_id": task_id,
+            "task_type": "build_thought",
             "art_id": art_id,
             "status": "queued",
             "created_at": utc_now_iso(),
             "model": model,
-            "temperature": temperature,
         }
+
 
     TASK_QUEUE.put({
         "task_id": task_id,
+        "task_type": "build_thought",
         "art_id": art_id,
         "model": model,
-        "temperature": temperature,
         "user_metadata": user_metadata,
     })
+
 
     return jsonify({
         "task_id": task_id,
         "status": "queued",
         "art_id": art_id,
         "model": model,
-        "temperature": temperature,
         "queue": queue_stats(),
     }), 202
 
@@ -769,7 +770,6 @@ def enqueue_simulation_seeds():
       {
         "color_id": 123,
         "model": optional,
-        "temperature": optional,
         "metadata": optional
       }
 
