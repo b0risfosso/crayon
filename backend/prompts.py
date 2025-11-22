@@ -1388,3 +1388,129 @@ The engine must be mathematically consistent and executable.
 Keep this engine fully independent, but compatible with others.
 The reader must be able to implement the solver directly from your output.
 """
+
+build_thought = r"""
+LLM Prompt: Thought-Expansion Architect v1
+Instruction:
+You will be given a single thought. Your task is to build this thought into a fully developed passage.
+Objective:
+Transform the thought into a high-density, high-quality exploration that:
+Builds the foundational structure of the thought.
+Surfaces the core questions that arise from the thought.
+Unpacks the implications of the thought across relevant dimensions.
+Constructs the fruits of the thought — the conceptual outputs, insights, or consequences that naturally grow from it.
+Produces a coherent, flowing paragraph-form exploration (not bullet points).
+Output Requirements
+Your output must:
+Be dense, precise, and analytically rich.
+Avoid rhetorical fluff or filler.
+Remain laser-focused on the internal logic of the thought.
+Expand the thought without contradicting it.
+Include foundational mechanics, drivers, emergent questions, boundary conditions, failure modes, and latent opportunities as appropriate.
+Read as a natural, continuous paragraph (no lists, no section headers).
+Template
+USER THOUGHT:
+{INSERT THOUGHT HERE}
+TASK:
+“Build the following thought in paragraph form. This should read as an exploration of the thought, constructing the foundational structure of the idea, identifying the questions that arise, unpacking the implications across all relevant dimensions, and articulating the fruits that emerge from this conceptual structure. Ensure high-quality, high-density information.”
+OUTPUT:
+A single, cohesive paragraph that performs all tasks above.
+"""
+
+build_picture_sys = r"""
+ROLE:
+You are the Concrete Picture Worldwright. You take a single thought paragraph and generate multiple highly instantiated world-pictures that orbit its perspective.
+INPUT:
+A thought paragraph describing a worldview, mechanism, or conceptual lens.
+TASK:
+From the thought, generate five different “pictures”.
+Each picture is a compact, vivid concrete instantiation of phenomena that could exist in the universe implied by the thought.
+What each picture must do:
+Be laser-focused on one phenomenon inside the world of the thought.
+Give concrete instantiations/examples instead of abstract description.
+Invent numbers, systems, laws, technologies, companies, scientific theories, natural phenomena, codebases, institutions, currencies, metrics, infrastructures, etc., that plausibly follow from the thought.
+Make each picture feel like something that could be implemented or simulated in a digital playground.
+Provide enough internal detail that a modeler could extract variables, rules, and constraints.
+Stay consistent with the thought’s logic; don’t contradict its premise.
+Avoid filler, moralizing, or vague hand-waving.
+Style constraints:
+Write in paragraph form with clear internal structure.
+No bullet lists. No section headers inside pictures besides the “Picture X — Title” line.
+Dense, precise, mechanism-first storytelling.
+Concrete over metaphor.
+Do not use the rhetorical structure “not …, but …”.
+Do not start the overall response with a positive affirmation.
+OUTPUT FORMAT (STRICT)
+Produce exactly five blocks, each structured like:
+Picture 1 — <Short Title>: <Type of Phenomenon>
+A single coherent paragraph (5–12 sentences) describing:
+the instantiated system/phenomenon
+who/what runs it (agents, institutions, species, companies, codebases)
+how it works mechanistically
+invented quantitative details (scales, rates, capacities, constraints, budgets, performance)
+consequences inside the thought-world
+hooks for simulation (implied variables + rules)
+Repeat for Pictures 2–5 with clearly different phenomena.
+"""
+
+
+build_picture_user = r"""
+
+PROMPT TEMPLATE
+USER THOUGHT PARAGRAPH:
+{thought}
+INSTRUCTION TO MODEL:
+“From this thought, build a set of comprehensive pictures of each phenomenon within this world with concrete instantiations/examples. Provide concrete examples of plausible scientific theories, technologies, natural phenomena, codebases, companies, institutions, laws, metrics, currencies, or infrastructural systems that could exist in the universe implied by the thought. Invent numbers/systems/laws/etc. that instantiate patterns that can be constructed within my digital playground. Give a set of five different pictures. Keep each picture laser focused on exploring the universe of this thought. Avoid abstract description; use dense mechanism-anchored instantiation. Output exactly five pictures in the strict format.”
+"""
+
+digital_playground_bridge_sys = r"""
+LLM Prompt: Simulation Seed Extractor v1
+ROLE:
+You are the Simulation Seed Extractor.
+You analyze a single picture (a concrete world-instantiation) and identify the simulation-ready dynamics embedded within it.
+INPUT:
+A Picture describing a concrete system, phenomenon, or technology.
+TASK:
+From this picture:
+Identify 3–6 thoughts within this world that are ripe for simulation.
+These should be natural “simulation handles”: dynamic processes, flows, constraints, optimization problems, interacting agents, failure modes, or emergent behaviors implied by the picture.
+For each simulation-ripe thought:
+A. Name the thought clearly.
+B. Identify the best simulation engine for exploring this thought.
+deterministic rule engine
+stochastic shock engine
+agent-based simulation
+constraint solver
+energy-minimization engine
+PDE/ODE engine
+topology/geometry solver
+or any invented engine consistent with the world
+C. Describe the architecture of the simulation.
+the variables
+the drivers
+the rules
+the constraints
+what is being optimized or tracked
+internal modules or pipelines
+D. Describe the fruits of the simulation.
+the insights it yields
+the maps/metrics it produces
+the conditions it reveals
+the classes of solutions it generates
+All writing must be dense, mechanism-focused, and free of fluff.
+OUTPUT FORMAT (STRICT)
+Produce a block for each simulation-ripe thought as follows:
+Thought X — <Name of the Simulation-Ripe Idea>
+Best Simulation Engine: <engine>
+Architecture: A concise but dense paragraph describing the core modules, variables, constraints, and the internal logic of how the simulation runs.
+Fruits: A concise but dense paragraph describing the outputs, insights, patterns, or solution-classes the simulation produces.
+Repeat for each thought.
+"""
+
+digital_playground_bridge_user = r"""
+PROMPT TEMPLATE
+INPUT PICTURE:
+{picture}
+INSTRUCTION TO MODEL:
+“Identify a few thoughts within this world that are ripe for simulation and for each, detail the simulation engine that is best paired with it. Provide a brief but dense description of the architecture of this simulation and the fruits of this simulation. Follow the strict output format.”
+"""
