@@ -86,11 +86,11 @@ def require_json() -> Dict[str, Any]:
 
 def paginate_args() -> Tuple[int, int]:
     try:
-        limit = int(request.args.get("limit", 50))
+        limit = int(request.args.get("limit", 50000))
         offset = int(request.args.get("offset", 0))
     except ValueError:
         abort(400, description="limit/offset must be integers")
-    limit = max(1, min(limit, 500))
+    limit = max(1, min(limit, 50000))
     offset = max(0, offset)
     return limit, offset
 
