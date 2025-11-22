@@ -1622,17 +1622,17 @@ Extract entities even when implied.
 Do NOT summarize. Do NOT invent.
 
 OUTPUT REQUIREMENTS:
-Return STRICT JSON ONLY with the following keys:
+Return STRICT JSON ONLY with exactly these keys.
+Each key maps to an array of OBJECTS with fields:
+{name, description, role_in_thought}
 
 {
   "objects": [
-    {
-      "name": "",
-      "description": "",
-      "role_in_thought": ""
-    }
+    {"name": "", "description": "", "role_in_thought": ""}
   ],
-  "processes_interactions": [],
+  "processes_interactions": [
+    {"name": "", "description": "", "role_in_thought": ""}
+  ],
   "forces_drivers": [],
   "systems_structures": [],
   "variables_state_quantities": [],
@@ -1647,10 +1647,7 @@ Return STRICT JSON ONLY with the following keys:
   "questions_uncertainties": []
 }
 
-Each value must be an array of strings, each string representing a single extracted entity.
-
-OUTPUT:
-STRICT JSON ONLY following the schema above.
+No extra keys. No markdown. No text outside JSON.
 
 """
 

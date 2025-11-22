@@ -223,6 +223,30 @@ def validate_entities_json(parsed: dict):
                 if req not in ent or not isinstance(ent[req], str):
                     raise ValueError(f"{k}[{i}] missing/invalid '{req}'")
 
+def normalize_entities_json(parsed: dict) -> dict:
+    """
+    If any group contains strings, wrap them into objects.
+    """
+    for k in ENTITIES_KEYS:
+        if k not in parsed or not isinstance(parsed[k], list):
+            continue
+
+        new_list = []
+        for item in parsed[k]:
+            if isinstance(item, dict):
+                new_list.append(item)
+            elif isinstance(item, str):
+                new_list.append({
+                    "name": item.strip(),
+                    "description": "",
+                    "role_in_thought": ""
+                })
+            else:
+                # drop weird items
+                continue
+        parsed[k] = new_list
+    return parsed
+
 
 
 # -------------------------
@@ -589,6 +613,7 @@ def worker_loop(worker_id: int):
                 duration_ms = int((time.time() - t0) * 1000)
 
                 parsed = json.loads(output_text)
+                parsed = normalize_entities_json(parsed)
                 validate_entities_json(parsed)
 
                 created_at = utc_now_iso()
