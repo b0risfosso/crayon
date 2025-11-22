@@ -29,7 +29,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from flask import Flask, request, jsonify, g, abort
 
-DB_PATH = os.environ.get("ART_DB_PATH", "art.db")
+DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
@@ -418,7 +418,45 @@ def json_error(err):
     }), code
 
 
-if __name__ == "__main__":
-    # Example:
-    #   ART_DB_PATH=/var/www/site/current/art.db python art_api.py
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5055)), debug=True)
+ART_DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
+def get_art_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(ART_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
+@app.get("/api/art/color_exists")
+def colors_exists_batch():
+    """
+    GET /colors/exists?art_ids=1,2,3
+    Returns: { "1": true, "2": false, "3": true }
+    """
+    art_ids_param = request.args.get("art_ids", "")
+    if not art_ids_param.strip():
+        abort(400, description="art_ids query param required")
+
+    try:
+        art_ids = [int(x) for x in art_ids_param.split(",") if x.strip()]
+    except ValueError:
+        abort(400, description="art_ids must be comma-separated integers")
+
+    if not art_ids:
+        return jsonify({})
+
+    db = get_art_db()
+    placeholders = ",".join(["?"] * len(art_ids))
+
+    rows = db.execute(
+        f"""
+        SELECT DISTINCT art_id
+        FROM colors
+        WHERE art_id IN ({placeholders})
+        """,
+        art_ids
+    ).fetchall()
+    db.close()
+
+    existing = {str(r["art_id"]) for r in rows}
+    out = {str(aid): (str(aid) in existing) for aid in art_ids}
+    return jsonify(out)
