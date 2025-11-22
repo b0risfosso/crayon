@@ -31,7 +31,7 @@
 
   <script>
     async function fetchArt() {
-      const res = await fetch('/art/api/art');
+      const res = await fetch('/api/art');
       const data = await res.json();
       const list = document.getElementById('artList');
       list.innerHTML = '';
@@ -52,7 +52,7 @@
     async function createArt() {
       const art = document.getElementById('newArt').value;
       const email = document.getElementById('newEmail').value;
-      await fetch('/art/api/art', {
+      await fetch('/api/art', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ art, email })
@@ -63,7 +63,7 @@
 
     async function updateArt(id) {
       const art = document.getElementById(`art-${id}`).value;
-      await fetch(`/art/api/art/${id}`, {
+      await fetch(`/api/art/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ art })
@@ -72,7 +72,7 @@
     }
 
     async function deleteArt(id) {
-      await fetch(`/art/api/art/${id}`, { method: 'DELETE' });
+      await fetch(`/api/art/${id}`, { method: 'DELETE' });
       fetchArt();
     }
 
