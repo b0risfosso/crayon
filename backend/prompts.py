@@ -1619,7 +1619,7 @@ For each extracted entity, provide:
 3. "role_in_thought": 1–2 sentences describing how the entity functions within the thought
 
 Extract entities even when implied. 
-Do NOT summarize. Do NOT interpret. Do NOT invent.
+Do NOT summarize. Do NOT invent.
 
 OUTPUT REQUIREMENTS:
 Return STRICT JSON ONLY with the following keys:
