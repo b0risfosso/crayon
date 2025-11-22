@@ -28,7 +28,7 @@ except Exception as e:
     _client = None
     _client_err = e
 
-MODEL_DEFAULT = os.environ.get("COLORS_MODEL", "gpt-5.1-mini")
+MODEL_DEFAULT = os.environ.get("COLORS_MODEL", "gpt-5.1")
 APP_PORT = int(os.environ.get("PORT", "9018"))
 ART_DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
 
