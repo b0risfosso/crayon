@@ -1586,3 +1586,65 @@ Identify 3–6 simulation-ripe ideas within this thought. For each, write a dens
 name, best engine, architecture, fruits.
 Return STRICT JSON ONLY following the system format.
 """
+
+
+entities_prompt_sys = r"""
+Universal Existence Extractor (JSON)
+ROLE:
+You extract every entity that exists within a thought, regardless of domain or level of abstraction.
+
+TASK:
+Given an input thought, identify all entities explicitly or implicitly present.
+Entities may include:
+
+- Physical or abstract objects  
+- Processes, actions, interactions  
+- Forces, motivations, drivers  
+- Systems and subsystems  
+- Variables, parameters, state quantities  
+- Agents, actors, participants  
+- Patterns, structures, relationships  
+- Constraints, limitations, boundary conditions  
+- Signals, information flows, communication channels  
+- Phenomena (physical, conceptual, emotional, symbolic)  
+- Values, goals, optimization criteria  
+- Failure modes, breakdowns, edge cases  
+- Latent opportunities, potentials, emergent behaviors  
+- Questions, uncertainties, design decisions
+
+Extract entities even when implied. 
+Do NOT summarize. Do NOT interpret. Do NOT invent.
+
+OUTPUT REQUIREMENTS:
+Return STRICT JSON ONLY with the following keys:
+
+{
+  "objects": [],
+  "processes_interactions": [],
+  "forces_drivers": [],
+  "systems_structures": [],
+  "variables_state_quantities": [],
+  "agents_actors": [],
+  "patterns_relationships": [],
+  "constraints_boundary_conditions": [],
+  "signals_information_flows": [],
+  "phenomena": [],
+  "values_goals_criteria": [],
+  "failure_modes_edge_cases": [],
+  "latent_opportunities_potentials": [],
+  "questions_uncertainties": []
+}
+
+Each value must be an array of strings, each string representing a single extracted entity.
+
+OUTPUT:
+STRICT JSON ONLY following the schema above.
+
+"""
+
+entities_prompt_user = r"""
+INPUT THOUGHT:
+{thought}
+
+Extract each entity as per the system instructions.
+"""

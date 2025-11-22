@@ -21,6 +21,8 @@ from flask import Flask, request, jsonify, abort
 
 from prompts import build_thought_sys, build_thought_user  # type: ignore
 from prompts import digital_playground_bridge_sys, digital_playground_bridge_user  # type: ignore
+from prompts import entities_prompt_sys, entities_prompt_user  # type: ignore
+
 
 
 try:
@@ -184,6 +186,31 @@ def log_llm_usage(
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+
+ENTITIES_KEYS = [
+    "objects",
+    "processes_interactions",
+    "forces_drivers",
+    "systems_structures",
+    "variables_state_quantities",
+    "agents_actors",
+    "patterns_relationships",
+    "constraints_boundary_conditions",
+    "signals_information_flows",
+    "phenomena",
+    "values_goals_criteria",
+    "failure_modes_edge_cases",
+    "latent_opportunities_potentials",
+    "questions_uncertainties",
+]
+
+def validate_entities_json(parsed: dict):
+    for k in ENTITIES_KEYS:
+        if k not in parsed or not isinstance(parsed[k], list):
+            raise ValueError(f"entities JSON missing key or non-list: {k}")
+        if any(not isinstance(x, str) for x in parsed[k]):
+            raise ValueError(f"entities JSON key {k} contains non-string entries")
+
 
 # -------------------------
 # Queue + workers (concurrency = 2)
@@ -499,7 +526,116 @@ def worker_loop(worker_id: int):
                         "usage": usage_dict,
                     }
 
+            # ============================================================
+            #  TYPE 3: entities (NEW)
+            # ============================================================
+            elif task_type == "entities":
+                color_id = task["color_id"]
+                model = task["model"]
+                temperature = float(task["temperature"])
+                user_metadata = task["user_metadata"]
 
+                db = get_art_db()
+                row = db.execute(
+                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
+                    (color_id,)
+                ).fetchone()
+                if not row:
+                    db.close()
+                    raise ValueError(f"color id {color_id} not found")
+
+                art_id = row["art_id"]
+                thought_text = (row["output_text"] or "").strip()
+                if not thought_text:
+                    db.close()
+                    raise ValueError(f"color {color_id} has empty output_text")
+
+                system_prompt = entities_prompt_sys
+                user_prompt = entities_prompt_user.format(thought=thought_text)
+
+                projected_tokens = 4000
+                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                with LLM_LOCK:
+                    t0 = time.time()
+                    resp = _client.chat.completions.create(
+                        model=model,
+                        temperature=temperature,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+
+                output_text = (resp.choices[0].message.content or "").strip()
+                usage = getattr(resp, "usage", None)
+                usage_dict = usage.model_dump() if usage else None
+                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
+                duration_ms = int((time.time() - t0) * 1000)
+
+                parsed = json.loads(output_text)
+                validate_entities_json(parsed)
+
+                created_at = utc_now_iso()
+                db.execute(
+                    """
+                    INSERT INTO entities
+                      (color_id, art_id, input_text, entities_json, model, temperature, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        color_id,
+                        art_id,
+                        thought_text,
+                        output_text,
+                        model,
+                        temperature,
+                        created_at,
+                    ),
+                )
+                db.commit()
+
+                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                saved_row = dict(
+                    db.execute(
+                        "SELECT * FROM entities WHERE id = ?",
+                        (new_id,)
+                    ).fetchone()
+                )
+                db.close()
+
+                log_llm_usage(
+                    ts=utc_now_iso(),
+                    app_name="colors",
+                    model=model,
+                    endpoint="/colors/entities",
+                    email=None,
+                    request_id=task_id,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cost_usd=0.0,
+                    meta_obj={
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "worker_id": worker_id
+                    },
+                )
+
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "entities",
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "entities": parsed,
+                        "saved_entities": saved_row,
+                        "usage": usage_dict,
+                    }
 
             # ============================================================
             # Unsupported task type
@@ -842,6 +978,87 @@ def seeds_by_color(color_id: int):
         if isinstance(sj, str):
             try:
                 d["seeds_json"] = json.loads(sj)
+            except Exception:
+                pass
+        out.append(d)
+
+    return jsonify(out)
+
+
+@app.post("/colors/entities")
+def enqueue_entities():
+    """
+    Queue entity extraction on color_id.
+    Body:
+      {
+        "color_id": 123,
+        "model": optional,
+        "temperature": optional,
+        "metadata": optional
+      }
+    """
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    color_id = payload.get("color_id")
+    if not isinstance(color_id, int):
+        abort(400, description="'color_id' is required and must be an integer")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    temperature = float(payload.get("temperature", 0.2))
+    user_metadata = payload.get("metadata") or {}
+
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "entities",
+            "color_id": color_id,
+            "status": "queued",
+            "created_at": utc_now_iso(),
+            "model": model,
+            "temperature": temperature,
+        }
+
+    TASK_QUEUE.put({
+        "task_id": task_id,
+        "task_type": "entities",
+        "color_id": color_id,
+        "model": model,
+        "temperature": temperature,
+        "user_metadata": user_metadata,
+    })
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "queued",
+        "task_type": "entities",
+        "color_id": color_id,
+    }), 202
+
+
+@app.get("/colors/entities/by_color/<int:color_id>")
+def entities_by_color(color_id: int):
+    db = get_art_db()
+    rows = db.execute(
+        """
+        SELECT * FROM entities
+        WHERE color_id = ?
+        ORDER BY created_at DESC
+        """,
+        (color_id,)
+    ).fetchall()
+    db.close()
+
+    out = []
+    for r in rows:
+        d = dict(r)
+        ej = d.get("entities_json")
+        if isinstance(ej, str):
+            try:
+                d["entities_json"] = json.loads(ej)
             except Exception:
                 pass
         out.append(d)

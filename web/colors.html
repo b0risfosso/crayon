@@ -91,7 +91,7 @@
         if (t.status === 'done') return t.result;
         if (t.status === 'error') throw new Error(t.error || 'Task error');
         statusDiv.textContent = `Status: ${t.status}…`;
-        await new Promise(ok => setTimeout(ok, 1200));
+        await new Promise(ok => setTimeout(ok, 2500));
       }
     }
 
@@ -107,7 +107,7 @@
         sdiv.innerHTML = `
           <div class="seed-title">Seed ${idx + 1}</div>
           <div style="white-space:pre-wrap; margin-bottom:6px;">${escapeHtml(seedText)}</div>
-          <button onclick="openSeedInNewTab(${JSON.stringify(seedText)}, ${colorId}, ${idx})">Open seed in new tab</button>
+          <button onclick="openSeedInNewTab(${JSON.stringify(seedText)}, ${colorId}, ${idx})">Open in playground</button>
         `;
         seedsDiv.appendChild(sdiv);
       });
