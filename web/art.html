@@ -41,7 +41,7 @@
 
   <script>
     function openColors(id) {
-        window.location = `/colors.html?art_id=${id}`;
+        window.open(`/colors.html?art_id=${id}`, '_blank');
     }
 
     async function fetchArt() {
