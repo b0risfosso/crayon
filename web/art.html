@@ -6,10 +6,13 @@
   <title>Art Entries</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    .entry { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    .entry { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
     textarea { width: 100%; height: 80px; }
     input, textarea { margin-bottom: 10px; }
-    .controls { margin-top: 10px; }
+    button { padding: 6px 10px; cursor: pointer; }
+    .controls { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .meta { font-size: 12px; color: #666; margin-top: 6px; }
+    .status { font-size: 12px; color: #333; margin-top: 6px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -19,7 +22,10 @@
     <h2>Create New Art</h2>
     <textarea id="newArt" placeholder="Write art text..."></textarea>
     <input id="newEmail" type="text" placeholder="Email (optional)" />
-    <button onclick="createArt()">Create</button>
+    <div class="controls">
+      <button onclick="createArt()">Create</button>
+      <button onclick="fetchArt()">Refresh</button>
+    </div>
   </section>
 
   <hr />
@@ -36,14 +42,11 @@
         <input id="k" type="number" value="20" min="1" max="500" style="width:80px; padding:6px;" />
       </label>
     </div>
+
     <div id="artList"></div>
   </section>
 
   <script>
-    function openColors(id) {
-        window.open(`/colors.html?art_id=${id}`, '_blank');
-    }
-
     async function fetchArt() {
       const q = document.getElementById('searchQuery').value.trim();
       const email = document.getElementById('searchEmail').value.trim();
@@ -58,18 +61,60 @@
       const data = await res.json();
       const list = document.getElementById('artList');
       list.innerHTML = '';
+
       (Array.isArray(data) ? data : []).forEach(item => {
         const div = document.createElement('div');
         div.className = 'entry';
         div.innerHTML = `
           <strong>ID:</strong> ${item.id}<br />
           <strong>Email:</strong> ${item.email || ''}<br />
-          <textarea id="art-${item.id}">${item.art}</textarea><br />
-          <button onclick="updateArt(${item.id})">Save</button>
-          <button onclick="deleteArt(${item.id})">Delete</button>
-          <button onclick="expandColors(${item.id})">Expand → Colors</button>
-          <button onclick="openColors(${item.id})">Open Colors</button>
-          <div id="colors-${item.id}" style="margin-top:8px; white-space:pre-wrap;"></div>
+          <textarea id="art-${item.id}">${item.art}</textarea>
+          <div class="controls">
+            <button onclick="updateArt(${item.id})">Save</button>
+            <button onclick="deleteArt(${item.id})">Delete</button>
+            <button onclick="enqueueColors(${item.id})">Expand → Colors</button>
+            <button onclick="openColors(${item.id})">Open Colors</button>
+          </div>
+          <div class="meta">
+            Created: ${item.created_at || ''} | Updated: ${item.updated_at || ''}
+          </div>
+          <div id="colors-status-${item.id}" class="status"></div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    async function randomLoad() {
+      const email = document.getElementById('searchEmail').value.trim();
+      const k = parseInt(document.getElementById('k').value || '20', 10);
+
+      const params = new URLSearchParams();
+      params.set('random', '1');
+      if (email) params.set('email', email);
+      if (k) params.set('limit', String(k));
+
+      const res = await fetch(`/art/api/art?${params.toString()}`);
+      const data = await res.json();
+
+      const list = document.getElementById('artList');
+      list.innerHTML = '';
+      (Array.isArray(data) ? data : []).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'entry';
+        div.innerHTML = `
+          <strong>ID:</strong> ${item.id}<br />
+          <strong>Email:</strong> ${item.email || ''}<br />
+          <textarea id="art-${item.id}">${item.art}</textarea>
+          <div class="controls">
+            <button onclick="updateArt(${item.id})">Save</button>
+            <button onclick="deleteArt(${item.id})">Delete</button>
+            <button onclick="enqueueColors(${item.id})">Expand → Colors</button>
+            <button onclick="openColors(${item.id})">Open Colors</button>
+          </div>
+          <div class="meta">
+            Created: ${item.created_at || ''} | Updated: ${item.updated_at || ''}
+          </div>
+          <div id="colors-status-${item.id}" class="status"></div>
         `;
         list.appendChild(div);
       });
@@ -78,11 +123,13 @@
     async function createArt() {
       const art = document.getElementById('newArt').value;
       const email = document.getElementById('newEmail').value;
+
       await fetch('/art/api/art', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ art, email })
       });
+
       document.getElementById('newArt').value = '';
       fetchArt();
     }
@@ -102,53 +149,56 @@
       fetchArt();
     }
 
-    async function expandColors(id) {
-      const outDiv = document.getElementById(`colors-${id}`);
-      outDiv.textContent = 'Expanding…';
+    function openColors(id) {
+      window.open(`/colors.html?art_id=${id}`, '_blank');
+    }
+
+    async function enqueueColors(id) {
+      const outDiv = document.getElementById(`colors-status-${id}`);
+      outDiv.textContent = 'Queued…';
+
+      const res = await fetch('/colors/build_thought', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ art_id: id })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        outDiv.textContent = data.message || 'Error queueing.';
+        return;
+      }
+
+      const taskId = data.task_id;
+      outDiv.textContent = `Queued (task ${taskId}). Waiting for worker…`;
+
       try {
-        const res = await fetch('/colors/build_thought', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ art_id: id })
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          outDiv.textContent = data.message || 'Error expanding.';
-          return;
-        }
-        outDiv.textContent = data.expanded_thought || '(no output)';
+        const result = await pollTask(taskId, outDiv);
+        outDiv.textContent = `Done. Saved color #${result.saved_color?.id || ''}.`;
       } catch (e) {
-        outDiv.textContent = String(e);
+        outDiv.textContent = `Error: ${e.message || e}`;
       }
     }
 
-    async function randomLoad() {
-      const email = document.getElementById('searchEmail').value.trim();
-      const k = parseInt(document.getElementById('k').value || '20', 10);
-      const params = new URLSearchParams();
-      params.set('random', '1');
-      if (email) params.set('email', email);
-      if (k) params.set('limit', String(k));
+    async function pollTask(taskId, outDiv) {
+      while (true) {
+        const r = await fetch(`/colors/tasks/${taskId}`);
+        const t = await r.json();
 
-      const res = await fetch(`/art/api/art?${params.toString()}`);
-      const data = await res.json();
-      const list = document.getElementById('artList');
-      list.innerHTML = '';
-      (Array.isArray(data) ? data : []).forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'entry';
-        div.innerHTML = `
-          <strong>ID:</strong> ${item.id}<br />
-          <strong>Email:</strong> ${item.email || ''}<br />
-          <textarea id="art-${item.id}">${item.art}</textarea><br />
-          <button onclick="updateArt(${item.id})">Save</button>
-          <button onclick="deleteArt(${item.id})">Delete</button>
-          <button onclick="expandColors(${item.id})">Expand → Colors</button>
-          <button onclick="openColors(${item.id})">Open Colors</button>
-          <div id="colors-${item.id}" style="margin-top:8px; white-space:pre-wrap;"></div>
-        `;
-        list.appendChild(div);
-      });
+        if (!r.ok) {
+          throw new Error(t.message || 'Polling failed');
+        }
+
+        if (t.status === 'done') {
+          return t.result;
+        }
+        if (t.status === 'error') {
+          throw new Error(t.error || 'Task error');
+        }
+
+        outDiv.textContent = `Status: ${t.status}…`;
+        await new Promise(ok => setTimeout(ok, 1200));
+      }
     }
 
     fetchArt();
