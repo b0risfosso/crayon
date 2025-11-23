@@ -150,6 +150,49 @@
         archDiv.appendChild(pre);
     }
 
+    function renderTheoryArchitecture(div, text) {
+  div.innerHTML = '';
+  if (!text) {
+    div.innerHTML = '<em>No theory architecture yet.</em>';
+    return;
+  }
+  const pre = document.createElement('pre');
+  pre.textContent = text;
+  div.appendChild(pre);
+}
+
+async function enqueueTheoryArchitecture(colorId, statusDiv, outDiv) {
+  statusDiv.textContent = 'Queued theory architecture…';
+
+  const res = await fetch('/colors/theory_architecture', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ color_id: colorId })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    statusDiv.textContent = data.message || 'Error queueing theory architecture.';
+    return;
+  }
+
+  const taskId = data.task_id;
+  statusDiv.textContent = `Theory architecture queued (task ${taskId}). Waiting…`;
+
+  try {
+    const result = await pollTask(taskId, statusDiv);
+    statusDiv.textContent = `Theory architecture done. Saved #${result.saved_bridge?.id || ''}.`;
+
+    // Use the task output directly (don’t refetch bridges, since table is shared)
+    const text = result.theory_text || result.architecture_text || '';
+    renderTheoryArchitecture(outDiv, text);
+
+  } catch (e) {
+    statusDiv.textContent = `Theory architecture error: ${e.message || e}`;
+  }
+}
+
+
 
     async function loadColor() {
       const params = new URLSearchParams(window.location.search);
@@ -186,10 +229,13 @@
             <pre>${escapeHtml(entry.output_text)}</pre>
 
             <div class="controls">
-            <button id="gen-arch-btn-${entry.id}">Build Bridges</button>
+            <button id="gen-arch-btn-${entry.id}">Simulation Architecture</button>
+            <button id="gen-theory-btn-${entry.id}">Theory Architecture</button>
             </div>
             <div id="${statusDivId}" class="status"></div>
             <div id="${entitiesDivId}" class="status" style="margin-top:8px;"></div>
+            <div id="theory-div-${entry.id}" class="status" style="margin-top:8px;"></div>
+
 
           `;
 
@@ -199,10 +245,15 @@
           const entitiesDiv = document.getElementById(entitiesDivId);
           const genBtn = document.getElementById(`gen-arch-btn-${entry.id}`);
           genBtn.onclick = () => enqueueBridge(entry.id, statusDiv, entitiesDiv);
-
+          const theoryDiv = document.getElementById(`theory-div-${entry.id}`);
+          const theoryBtn = document.getElementById(`gen-theory-btn-${entry.id}`);
+          theoryBtn.onclick = () => enqueueTheoryArchitecture(entry.id, statusDiv, theoryDiv);
 
           const text = await fetchBridgeForColor(entry.id);
           renderBridge(entitiesDiv, text);
+
+          // no fetch on load (bridges table is shared)
+          renderTheoryArchitecture(theoryDiv, null);
 
         }
 

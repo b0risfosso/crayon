@@ -23,6 +23,7 @@ from prompts import build_thought_sys, build_thought_user  # type: ignore
 from prompts import digital_playground_bridge_sys, digital_playground_bridge_user  # type: ignore
 from prompts import entities_prompt_sys, entities_prompt_user  # type: ignore
 from prompts import bridge_simulation_prompt  # type: ignore
+from prompts import theory_architecture_prompt  # type: ignore
 
 
 
@@ -725,7 +726,7 @@ def worker_loop(worker_id: int):
                 db.execute(
                     """
                     INSERT INTO bridges
-                      (color_id, art_id, input_text, bridge_text, model, created_at)
+                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -733,6 +734,7 @@ def worker_loop(worker_id: int):
                         art_id,
                         thought_text,
                         output_text,
+                        "simulation_architecture",
                         model,
                         created_at,
                     ),
@@ -785,6 +787,118 @@ def worker_loop(worker_id: int):
                         "usage": usage_dict,
                         "duration_ms": duration_ms,
                     }
+
+                        # ============================================================
+            #  TYPE 5: theory_architecture (NEW) -> saves to bridges
+            # ============================================================
+            elif task_type == "theory_architecture":
+                color_id = task["color_id"]
+                model = task["model"]
+                temperature = float(task["temperature"])
+                user_metadata = task["user_metadata"]
+
+                # Load color row
+                db = get_art_db()
+                row = db.execute(
+                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
+                    (color_id,)
+                ).fetchone()
+                if not row:
+                    db.close()
+                    raise ValueError(f"color id {color_id} not found")
+
+                art_id = row["art_id"]
+                thought_text = (row["output_text"] or "").strip()
+                if not thought_text:
+                    db.close()
+                    raise ValueError(f"color {color_id} has empty output_text")
+
+                system_prompt = theory_architecture_prompt.format(thought=thought_text)
+                user_prompt = ""
+
+                projected_tokens = 5000
+                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                with LLM_LOCK:
+                    t0 = time.time()
+                    resp = _client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+
+                output_text = (resp.choices[0].message.content or "").strip()
+
+                usage = getattr(resp, "usage", None)
+                usage_dict = usage.model_dump() if usage else None
+                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
+                duration_ms = int((time.time() - t0) * 1000)
+
+                # Save to bridges table (same as simulation_architecture)
+                created_at = utc_now_iso()
+                db.execute(
+                    """
+                    INSERT INTO bridges
+                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        color_id,
+                        art_id,
+                        thought_text,
+                        output_text,
+                        "theory_architecture",
+                        model,
+                        created_at,
+                    ),
+                )
+                db.commit()
+
+                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                saved_row = dict(
+                    db.execute(
+                        "SELECT * FROM bridges WHERE id = ?",
+                        (new_id,)
+                    ).fetchone()
+                )
+                db.close()
+
+                log_llm_usage(
+                    ts=utc_now_iso(),
+                    app_name="colors",
+                    model=model,
+                    endpoint="/colors/theory_architecture",
+                    email=None,
+                    request_id=task_id,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cost_usd=0.0,
+                    meta_obj={
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "worker_id": worker_id,
+                        "user_metadata": user_metadata,
+                    },
+                )
+
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "theory_architecture",
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "theory_text": output_text,
+                        "saved_bridge": saved_row,
+                        "usage": usage_dict,
+                    }
+
 
             # ============================================================
             # Unsupported task type
@@ -1288,3 +1402,50 @@ def bridges_by_color(color_id: int):
     db.close()
 
     return jsonify([dict(r) for r in rows])
+
+
+@app.post("/colors/theory_architecture")
+def enqueue_theory_architecture():
+    """
+    Queue theory architecture generation on a color_id.
+    """
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    color_id = payload.get("color_id")
+    if not isinstance(color_id, int):
+        abort(400, description="'color_id' is required and must be an integer")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    temperature = float(payload.get("temperature", 0.2))
+    user_metadata = payload.get("metadata") or {}
+
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "theory_architecture",
+            "color_id": color_id,
+            "status": "queued",
+            "created_at": utc_now_iso(),
+            "model": model,
+            "temperature": temperature,
+        }
+
+    TASK_QUEUE.put({
+        "task_id": task_id,
+        "task_type": "theory_architecture",
+        "color_id": color_id,
+        "model": model,
+        "temperature": temperature,
+        "user_metadata": user_metadata,
+    })
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "queued",
+        "task_type": "theory_architecture",
+        "color_id": color_id,
+    }), 202

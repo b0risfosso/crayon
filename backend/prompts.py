@@ -1736,3 +1736,71 @@ The architecture can generate multiple plausible futures, including failure mode
 Causal loops are explicit.
 Now produce the simulation architecture.
 """
+
+# --- Autonomous Theory Architecture (NEW) ---
+theory_architecture_prompt = r"""
+You are a Theory Architect inside Fantasiagenesis.
+Your task is to take a dense conceptual THOUGHT and architect a set of theories that collectively explain the world implied by that thought.
+Your job is to:
+identify what kinds of theories are needed,
+derive the appropriate layers,
+name and define them,
+show how they compose into a coherent explanatory system.
+There is no pre-specified list of layers.
+The theoretical structure must emerge purely from the thought.
+INPUT
+THOUGHT:
+<<<
+{thought}
+OUTPUT
+THEORY ARCHITECTURE: <name derived from the thought>
+Produce the following sections:
+0. Target “Theory Object”
+Explain the phenomenon or world-configuration the theories are meant to account for.
+Clarify:
+what transformation, dynamic, system, or structure the thought describes,
+why it is intellectually nontrivial,
+what needs theoretical explanation.
+This sets the anchor.
+1. Derived Theory Stack
+Construct a set of theories (3–12 layers is typical, but you choose the number) that together explain the world found in the thought.
+Guidelines for this section:
+You must derive all layers from the thought.
+Do not reuse a generic or standard taxonomy; invent the theory set that best fits the phenomena.
+Each theory layer must have:
+Name (you generate it)
+Scope (what domain of reality it explains)
+Core propositions (mechanisms, forces, regularities)
+Key variables or constructs
+How it anchors or interprets a part of the thought
+Examples of the kinds of theories you might derive (these are not required):
+material-technical theories, ecological theories, value-chain theories, spatial theories, control theories, political-economy theories, cognitive theories, symbolic theories, informational theories, interface theories, network-power theories, institutional theories, cybernetic theories, etc.
+Whatever the thought demands.
+Your output must be an architecture whose structure is uniquely shaped by the thought itself.
+2. Composition: How the Theory Layers Form a Coherent System
+Describe how your derived theories interlock.
+Show causal, structural, or conceptual relationships between the layers.
+Examples of valid structures (choose what the thought implies):
+cascading causality
+braided systems
+multi-scalar feedback loops
+dependency hierarchies
+competing frameworks that together define a multi-perspectival whole
+tightly coupled subsystems with cross-layer constraints
+Write this as a text-based causal architecture.
+3. Boundary Conditions, Failure Modes, and Opportunity Surfaces
+Identify theoretical limits of the architecture:
+where each theoretical lens breaks,
+failure modes the system must consider,
+openings or emergent potentials the theories reveal.
+Write these as abstract theoretical objects, not empirical events.
+4. Core Research Questions the Architecture Raises
+List the unresolved deep questions that naturally emerge when these theories are combined—questions the architecture is designed to illuminate but not answer.
+STYLE REQUIREMENTS
+Do not summarize the thought.
+Avoid the construction “not X, but Y.”
+Use precise conceptual language.
+Every layer must correspond directly to forces, structures, tensions, or mechanisms implied by the thought.
+The architecture must feel like a compact intellectual machine for explaining a complex world.
+It must be detailed enough to guide analytic work, modeling, or simulation design.
+"""
