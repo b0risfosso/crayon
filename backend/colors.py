@@ -751,11 +751,12 @@ def worker_loop(worker_id: int):
                 # LLM usage logging
                 log_llm_usage(
                     ts=utc_now_iso(),
-                    source="colors.bridge_simulation",
+                    app_name="colors",
                     model=model,
+                    endpoint="/colors/bridge_simulation",
+                    email=None,
                     provider="openai",
-                    prompt_id="bridge_simulation_prompt",
-                    request_id=getattr(resp, "id", None),
+                    request_id=task_id,
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
                     total_tokens=total_tokens,
@@ -768,6 +769,7 @@ def worker_loop(worker_id: int):
                         "user_metadata": user_metadata,
                     },
                 )
+
 
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
