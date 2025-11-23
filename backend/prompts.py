@@ -1864,3 +1864,78 @@ Ensure every physical manifestation is meaningfully tied to a specific conceptua
 The bridge should feel like a translation engine from invisible conceptual forces → visible physical infrastructures.
 Now produce the bridge from the conceptual world of the thought to its physical manifestations.
 """
+
+
+# --- Bridge: Thought → Mathematics (Autonomous Architecture) (NEW) ---
+math_bridge_prompt = r"""
+You are a Mathematical Bridge Architect inside Fantasiagenesis.
+Goal:
+Given a conceptual THOUGHT, infer the world it implies and construct a mathematical architecture that fully builds/captures that world.
+You will translate conceptual structures into formal objects: sets, variables, spaces, functions, constraints, stochastic processes, games, networks, and update rules.
+You must allow the mathematical structure to emerge from the thought.
+Do not rely on any predefined math template.
+Invent the right math for this world.
+
+INPUT
+THOUGHT:
+<<<
+{thought}
+
+OUTPUT
+BRIDGE: Conceptual World → Mathematical World
+
+Produce the following sections, in order.
+
+0. The Object You’re Mathematizing
+Define the “world-object” implied by the thought in precise terms.
+State what kind of system it is mathematically at the top level.
+
+1. Mathematical Ontology (Derived From the Thought)
+Derive the core mathematical entities needed to hold this world.
+Include, as required by the thought:
+- Sets / spaces
+- State variables
+- Action/control variables
+- Parameters
+- Time structure
+
+2. Structural Skeleton of the World
+Define the foundational mathematical structures (only those implied by the thought):
+- graphs, multiplex networks
+- spatial lattices / manifolds
+- tensors, matrices
+- fields
+- orderings / partial orders
+
+3. Dynamics and Update Rules
+Specify the governing laws of motion.
+For each major dynamic:
+- define the update rule
+- classify it (deterministic, stochastic, game-theoretic, diffusion, etc.)
+- define inputs/outputs
+- connect to the thought's mechanism
+
+4. Agents, Objectives, and Strategic Structure (if implied)
+Define agent sets, objective functions, feasible actions, information sets, and equilibrium concepts.
+If not implied, skip.
+
+5. Constraints, Boundary Conditions, Conserved Quantities
+Formalize the limits the thought imposes.
+
+6. Shocks, Noise, and Failure/Opportunity Formalization
+Define stochastic processes, jump shocks, perturbations, rare-event structures.
+
+7. Derived Observables and Indices
+Define metrics that summarize the world's implied behavior.
+
+8. Full System Summary (“Stitched Architecture”)
+Provide a compact definition of the entire mathematical system.
+
+QUALITY CHECK
+- Every conceptual mechanism in the thought appears in sections 1–7.
+- All variables are defined.
+- Dynamics and constraints are consistent.
+- The architecture can generate multiple futures, including failures and opportunities.
+
+Now produce the bridge.
+"""

@@ -163,6 +163,7 @@
           const simContentId = `sim-content-${entry.id}`;
           const theoryContentId = `theory-content-${entry.id}`;
           const physContentId = `phys-content-${entry.id}`;
+          const mathContentId = `math-content-${entry.id}`;
 
           div.innerHTML = `
             <strong>Color ID:</strong> ${entry.id}<br>
@@ -176,6 +177,7 @@
               <button id="gen-sim-btn-${entry.id}">Simulation Architecture</button>
               <button id="gen-theory-btn-${entry.id}">Theory Architecture</button>
               <button id="gen-phys-btn-${entry.id}">Physical World Bridge</button>
+              <button id="gen-math-btn-${entry.id}">Math Bridge</button>
             </div>
             <div id="${statusDivId}" class="status"></div>
 
@@ -211,6 +213,18 @@
               </div>
               <div class="bridge-content collapsed" id="${physContentId}"></div>
             </div>
+
+            <div class="bridge-group">
+                <div class="bridge-header" id="math-header-${entry.id}">
+                    <div>Math Bridge</div>
+                    <div class="meta">
+                    <span id="math-meta-${entry.id}">latest</span>
+                    <span class="caret">▶</span>
+                    </div>
+                </div>
+                <div class="bridge-content collapsed" id="${mathContentId}"></div>
+                </div>
+
           `;
 
           container.appendChild(div);
@@ -220,14 +234,19 @@
           const simContentDiv = document.getElementById(simContentId);
           const theoryContentDiv = document.getElementById(theoryContentId);
           const physContentDiv = document.getElementById(physContentId);
+          const mathContentDiv = document.getElementById(mathContentId);
+          
 
           const simMeta = document.getElementById(`sim-meta-${entry.id}`);
           const theoryMeta = document.getElementById(`theory-meta-${entry.id}`);
           const physMeta = document.getElementById(`phys-meta-${entry.id}`);
+          const mathMeta = document.getElementById(`math-meta-${entry.id}`);
 
           wireCollapse(document.getElementById(`sim-header-${entry.id}`), simContentDiv);
           wireCollapse(document.getElementById(`theory-header-${entry.id}`), theoryContentDiv);
           wireCollapse(document.getElementById(`phys-header-${entry.id}`), physContentDiv);
+          wireCollapse(document.getElementById(`math-header-${entry.id}`), mathContentDiv);
+
 
           // Load existing bridges by type
           const simText = await fetchBridgeOfType(entry.id, "simulation_architecture");
@@ -238,6 +257,9 @@
 
           const physText = await fetchBridgeOfType(entry.id, "physical_world_bridge");
           renderBridge(physContentDiv, physText);
+
+          const mathText = await fetchBridgeOfType(entry.id, "math_bridge");
+          renderBridge(mathContentDiv, mathText);
 
           // Wire buttons
           const simBtn = document.getElementById(`gen-sim-btn-${entry.id}`);
@@ -254,6 +276,11 @@
           physBtn.onclick = () =>
             enqueueBridge(entry.id, "physical_world_bridge", "/colors/physical_world_bridge",
               statusDiv, physContentDiv, physMeta, physBtn);
+        
+           const mathBtn = document.getElementById(`gen-math-btn-${entry.id}`);
+            mathBtn.onclick = () =>
+            enqueueBridge(entry.id, "math_bridge", "/colors/math_bridge",
+                statusDiv, mathContentDiv, mathMeta, mathBtn);
         }
 
       } catch (e) {
