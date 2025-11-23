@@ -727,7 +727,7 @@ def worker_loop(worker_id: int):
                     """
                     INSERT INTO bridges
                       (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         color_id,
@@ -844,7 +844,7 @@ def worker_loop(worker_id: int):
                     """
                     INSERT INTO bridges
                       (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         color_id,
