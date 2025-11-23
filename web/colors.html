@@ -8,11 +8,40 @@
     body { font-family: sans-serif; padding: 20px; }
     .block { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; border-radius: 8px; }
     pre { white-space: pre-wrap; }
+
     .controls { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
     button { padding: 6px 10px; cursor: pointer; }
     .status { font-size: 12px; color: #333; margin-top: 6px; white-space: pre-wrap; }
-    .entity { border-top: 1px dashed #ddd; margin-top: 8px; padding-top: 8px; }
-    .entity-title { font-weight: 600; margin-bottom: 4px; }
+
+    /* Collapsible groups */
+    .entity-group { border-top: 1px dashed #ddd; margin-top: 10px; padding-top: 8px; }
+    .entity-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 700;
+      padding: 6px 4px;
+      border-radius: 6px;
+      background: #f7f7f7;
+    }
+    .entity-header:hover { background: #efefef; }
+    .entity-caret {
+      width: 18px;
+      text-align: center;
+      font-size: 12px;
+    }
+    .entity-count {
+      font-weight: 400;
+      font-size: 12px;
+      color: #555;
+    }
+    .entity-body { margin-top: 8px; padding-left: 6px; }
+    .entity-item { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+    .entity-item:last-child { border-bottom: none; }
+    .entity-name { font-weight: 600; margin-bottom: 4px; }
+    .entity-text { white-space: pre-wrap; margin: 4px 0; }
   </style>
 </head>
 <body>
@@ -30,36 +59,35 @@
     }
 
     function openEntityInNewTab(entityObj, colorId, groupKey, idx) {
-        const w = window.open('', '_blank');
-        if (!w) return;
+      const w = window.open('', '_blank');
+      if (!w) return;
 
-        const name = escapeHtml(entityObj.name || '');
-        const desc = escapeHtml(entityObj.description || '');
-        const role = escapeHtml(entityObj.role_in_thought || '');
+      const name = escapeHtml(entityObj.name || '');
+      const desc = escapeHtml(entityObj.description || '');
+      const role = escapeHtml(entityObj.role_in_thought || '');
 
-        w.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>${escapeHtml(groupKey)} #${idx + 1} (Color ${colorId})</title>
-            </head>
-            <body style="font-family:sans-serif; padding:20px;">
-                <h2>${escapeHtml(groupKey)} — Entity ${idx + 1} (Color ${colorId})</h2>
-                <h3>${name}</h3>
-                <p><strong>Description:</strong> ${desc}</p>
-                <p><strong>Role in thought:</strong> ${role}</p>
-                <pre style="white-space:pre-wrap;">${escapeHtml(JSON.stringify(entityObj, null, 2))}</pre>
-            </body>
-            </html>
-        `);
-        w.document.close();
-        }
-
+      w.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${escapeHtml(groupKey)} #${idx + 1} (Color ${colorId})</title>
+          </head>
+          <body style="font-family:sans-serif; padding:20px;">
+            <h2>${escapeHtml(groupKey)} — Entity ${idx + 1} (Color ${colorId})</h2>
+            <h3>${name}</h3>
+            <p><strong>Description:</strong> ${desc}</p>
+            <p><strong>Role in thought:</strong> ${role}</p>
+            <pre style="white-space:pre-wrap;">${escapeHtml(JSON.stringify(entityObj, null, 2))}</pre>
+          </body>
+        </html>
+      `);
+      w.document.close();
+    }
 
     async function fetchEntitiesForColor(colorId) {
-      // expects backend route GET /colors/entities/by_color/<colorId>
       const res = await fetch(`/colors/entities/by_color/${colorId}`);
       if (!res.ok) return null;
+
       const rows = await res.json();
       if (!Array.isArray(rows) || rows.length === 0) return null;
 
@@ -68,11 +96,11 @@
       if (typeof payload === 'string') {
         try { payload = JSON.parse(payload); } catch { /* ignore */ }
       }
-      return payload && typeof payload === 'object' ? payload : null;
+      return payload || null;
     }
 
     async function enqueueEntities(colorId, statusDiv, entitiesDiv) {
-      statusDiv.textContent = 'Queued entity extraction…';
+      statusDiv.textContent = 'Queued entities…';
 
       const res = await fetch('/colors/entities', {
         method: 'POST',
@@ -92,8 +120,8 @@
         const result = await pollTask(taskId, statusDiv);
         statusDiv.textContent = `Entities done. Saved #${result.saved_entities?.id || ''}.`;
 
-        const entitiesPayload = await fetchEntitiesForColor(colorId);
-        renderEntities(entitiesDiv, entitiesPayload, colorId);
+        const payload = await fetchEntitiesForColor(colorId);
+        renderEntities(entitiesDiv, payload, colorId);
       } catch (e) {
         statusDiv.textContent = `Entities error: ${e.message || e}`;
       }
@@ -107,59 +135,85 @@
         if (t.status === 'done') return t.result;
         if (t.status === 'error') throw new Error(t.error || 'Task error');
         statusDiv.textContent = `Status: ${t.status}…`;
-        await new Promise(ok => setTimeout(ok, 2000));
+        await new Promise(ok => setTimeout(ok, 1200));
       }
     }
 
     function renderEntities(entitiesDiv, payload, colorId) {
-        entitiesDiv.innerHTML = '';
-        if (!payload) {
-            entitiesDiv.innerHTML = '<em>No entities yet.</em>';
-            return;
+      entitiesDiv.innerHTML = '';
+      if (!payload || typeof payload !== 'object') {
+        entitiesDiv.innerHTML = '<em>No entities yet.</em>';
+        return;
+      }
+
+      const keys = Object.keys(payload);
+      let renderedAnything = false;
+
+      keys.forEach(groupKey => {
+        const items = payload[groupKey];
+        if (!Array.isArray(items) || items.length === 0) {
+          return; // skip empty groups
         }
 
-        const keys = Object.keys(payload);
-        if (keys.length === 0) {
-            entitiesDiv.innerHTML = '<em>No entities yet.</em>';
-            return;
-        }
+        renderedAnything = true;
 
-        keys.forEach(groupKey => {
-            const items = payload[groupKey];
-            if (!Array.isArray(items) || items.length === 0) return;
+        const groupBlock = document.createElement('div');
+        groupBlock.className = 'entity-group';
 
-            const groupBlock = document.createElement('div');
-            groupBlock.className = 'entity';
-            groupBlock.innerHTML = `<div class="entity-title">${escapeHtml(groupKey)} (${items.length})</div>`;
+        const header = document.createElement('div');
+        header.className = 'entity-header';
 
-            items.forEach((entityObj, idx) => {
-            if (!entityObj || typeof entityObj !== 'object') return;
+        const caret = document.createElement('div');
+        caret.className = 'entity-caret';
+        caret.textContent = '▾'; // expanded by default
 
-            const name = escapeHtml(entityObj.name || '');
-            const desc = escapeHtml(entityObj.description || '');
-            const role = escapeHtml(entityObj.role_in_thought || '');
+        const title = document.createElement('div');
+        title.innerHTML = `${escapeHtml(groupKey)} <span class="entity-count">(${items.length})</span>`;
 
-            const row = document.createElement('div');
-            row.style.marginBottom = '10px';
-            row.innerHTML = `
-                <div style="font-weight:600;">${name}</div>
-                <div style="white-space:pre-wrap; margin:4px 0;"><strong>Description:</strong> ${desc}</div>
-                <div style="white-space:pre-wrap; margin-bottom:6px;"><strong>Role:</strong> ${role}</div>
-                <button onclick='openEntityInNewTab(${JSON.stringify(entityObj)}, ${colorId}, ${JSON.stringify(groupKey)}, ${idx})'>
-                Open in new tab
-                </button>
-            `;
-            groupBlock.appendChild(row);
-            });
+        header.appendChild(caret);
+        header.appendChild(title);
 
-            entitiesDiv.appendChild(groupBlock);
+        const body = document.createElement('div');
+        body.className = 'entity-body';
+
+        // default: expanded if has items
+        let isOpen = true;
+
+        header.onclick = () => {
+          isOpen = !isOpen;
+          body.style.display = isOpen ? 'block' : 'none';
+          caret.textContent = isOpen ? '▾' : '▸';
+        };
+
+        items.forEach((entityObj, idx) => {
+          if (!entityObj || typeof entityObj !== 'object') return;
+
+          const name = escapeHtml(entityObj.name || '');
+          const desc = escapeHtml(entityObj.description || '');
+          const role = escapeHtml(entityObj.role_in_thought || '');
+
+          const row = document.createElement('div');
+          row.className = 'entity-item';
+          row.innerHTML = `
+            <div class="entity-name">${name}</div>
+            <div class="entity-text"><strong>Description:</strong> ${desc}</div>
+            <div class="entity-text"><strong>Role:</strong> ${role}</div>
+            <button onclick='openEntityInNewTab(${JSON.stringify(entityObj)}, ${colorId}, ${JSON.stringify(groupKey)}, ${idx})'>
+              Open in new tab
+            </button>
+          `;
+          body.appendChild(row);
         });
 
-        if (!entitiesDiv.innerHTML.trim()) {
-            entitiesDiv.innerHTML = '<em>No entities yet.</em>';
-        }
-        }
+        groupBlock.appendChild(header);
+        groupBlock.appendChild(body);
+        entitiesDiv.appendChild(groupBlock);
+      });
 
+      if (!renderedAnything) {
+        entitiesDiv.innerHTML = '<em>No entities yet.</em>';
+      }
+    }
 
     async function loadColor() {
       const params = new URLSearchParams(window.location.search);
@@ -210,8 +264,8 @@
 
           genBtn.onclick = () => enqueueEntities(entry.id, statusDiv, entitiesDiv);
 
-          const entitiesPayload = await fetchEntitiesForColor(entry.id);
-          renderEntities(entitiesDiv, entitiesPayload, entry.id);
+          const payload = await fetchEntitiesForColor(entry.id);
+          renderEntities(entitiesDiv, payload, entry.id);
         }
 
       } catch (e) {
@@ -223,4 +277,3 @@
   </script>
 </body>
 </html>
-
