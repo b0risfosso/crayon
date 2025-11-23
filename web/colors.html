@@ -177,7 +177,9 @@
         body.className = 'entity-body';
 
         // default: expanded if has items
-        let isOpen = true;
+        let isOpen = false;
+        body.style.display = 'none';
+        caret.textContent = '▸';
 
         header.onclick = () => {
           isOpen = !isOpen;
