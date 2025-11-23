@@ -11,192 +11,134 @@
 
     .controls { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
     button { padding: 6px 10px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
     .status { font-size: 12px; color: #333; margin-top: 6px; white-space: pre-wrap; }
 
-    /* Collapsible groups */
-    .entity-group { border-top: 1px dashed #ddd; margin-top: 10px; padding-top: 8px; }
-    .entity-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* Collapsible bridge sections */
+    .bridge-group { margin-top: 10px; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; }
+    .bridge-header {
+      background: #f7f7f7;
+      padding: 6px 8px;
       cursor: pointer;
       user-select: none;
-      font-weight: 700;
-      padding: 6px 4px;
-      border-radius: 6px;
-      background: #f7f7f7;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
-    .entity-header:hover { background: #efefef; }
-    .entity-caret {
-      width: 18px;
-      text-align: center;
-      font-size: 12px;
-    }
-    .entity-count {
-      font-weight: 400;
-      font-size: 12px;
-      color: #555;
-    }
-    .entity-body { margin-top: 8px; padding-left: 6px; }
-    .entity-item { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
-    .entity-item:last-child { border-bottom: none; }
-    .entity-name { font-weight: 600; margin-bottom: 4px; }
-    .entity-text { white-space: pre-wrap; margin: 4px 0; }
+    .bridge-header .meta { font-weight: 400; font-size: 12px; color: #555; }
+    .bridge-content { padding: 8px; border-top: 1px solid #eee; }
+    .bridge-content.collapsed { display: none; }
+    .caret { font-size: 12px; color: #666; margin-left: 6px; }
   </style>
 </head>
 <body>
-  <h1>Colors Expansion</h1>
-  <div id="content"></div>
+  <h1>Colors Viewer</h1>
+  <div id="content">Loading...</div>
 
   <script>
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
-    function openEntityInNewTab(entityObj, colorId, groupKey, idx) {
-      const w = window.open('', '_blank');
-      if (!w) return;
-
-      const name = escapeHtml(entityObj.name || '');
-      const desc = escapeHtml(entityObj.description || '');
-      const role = escapeHtml(entityObj.role_in_thought || '');
-
-      w.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${escapeHtml(groupKey)} #${idx + 1} (Color ${colorId})</title>
-          </head>
-          <body style="font-family:sans-serif; padding:20px;">
-            <h2>${escapeHtml(groupKey)} — Entity ${idx + 1} (Color ${colorId})</h2>
-            <h3>${name}</h3>
-            <p><strong>Description:</strong> ${desc}</p>
-            <p><strong>Role in thought:</strong> ${role}</p>
-            <pre style="white-space:pre-wrap;">${escapeHtml(JSON.stringify(entityObj, null, 2))}</pre>
-          </body>
-        </html>
-      `);
-      w.document.close();
+    function getParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
     }
-
-    async function fetchBridgeForColor(colorId) {
-        const res = await fetch(`/colors/bridges/by_color/${colorId}`);
-        if (!res.ok) return null;
-
-        const rows = await res.json();
-        if (!Array.isArray(rows) || rows.length === 0) return null;
-
-        const latest = rows[0];
-        return latest.bridge_text || null;
-        }
-
-
-    async function enqueueBridge(colorId, statusDiv, archDiv) {
-        statusDiv.textContent = 'Queued bridge…';
-
-        const res = await fetch('/colors/bridge_simulation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ color_id: colorId })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-            statusDiv.textContent = data.message || 'Error queueing simulation bridge.';
-            return;
-        }
-
-        const taskId = data.task_id;
-        statusDiv.textContent = `Simulation bridge queued (task ${taskId}). Waiting…`;
-
-        try {
-            const result = await pollTask(taskId, statusDiv);
-            statusDiv.textContent = `Simulation bridge done. Saved #${result.saved_bridge?.id || ''}.`;
-
-            const text = await fetchBridgeForColor(colorId);
-            renderBridge(archDiv, text);
-        } catch (e) {
-            statusDiv.textContent = `Simulation bridge error: ${e.message || e}`;
-        }
-    }
-
 
     async function pollTask(taskId, statusDiv) {
+      const maxMs = 120000;
+      const intervalMs = 1200;
+      const t0 = Date.now();
+
       while (true) {
-        const r = await fetch(`/colors/tasks/${taskId}`);
-        const t = await r.json();
-        if (!r.ok) throw new Error(t.message || 'Polling failed');
-        if (t.status === 'done') return t.result;
-        if (t.status === 'error') throw new Error(t.error || 'Task error');
-        statusDiv.textContent = `Status: ${t.status}…`;
-        await new Promise(ok => setTimeout(ok, 1200));
+        const res = await fetch(`/colors/tasks/${taskId}`);
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.message || 'task poll failed');
+        if (data.status === 'done') return data.result;
+        if (data.status === 'error') throw new Error(data.error || 'task error');
+
+        const elapsed = Date.now() - t0;
+        statusDiv.textContent = `Task ${taskId}: ${data.status}… (${Math.floor(elapsed/1000)}s)`;
+        if (elapsed > maxMs) throw new Error('task timed out');
+        await new Promise(r => setTimeout(r, intervalMs));
       }
     }
 
-    function renderBridge(archDiv, text) {
-        archDiv.innerHTML = '';
-        if (!text) {
-            archDiv.innerHTML = '<em>No simulation bridge yet.</em>';
-            return;
-        }
-
-        const pre = document.createElement('pre');
-        pre.textContent = text;
-        archDiv.appendChild(pre);
+    async function fetchBridgeOfType(colorId, bridgeType) {
+      const res = await fetch(`/colors/bridges/by_color/${colorId}/${bridgeType}`);
+      if (!res.ok) return null;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) return null;
+      return rows[0].bridge_text || null;
     }
 
-    function renderTheoryArchitecture(div, text) {
-  div.innerHTML = '';
-  if (!text) {
-    div.innerHTML = '<em>No theory architecture yet.</em>';
-    return;
-  }
-  const pre = document.createElement('pre');
-  pre.textContent = text;
-  div.appendChild(pre);
-}
+    function renderBridge(contentDiv, text) {
+      contentDiv.innerHTML = '';
+      if (!text) {
+        contentDiv.innerHTML = '<em>No bridge yet.</em>';
+        return;
+      }
+      const pre = document.createElement('pre');
+      pre.textContent = text;
+      contentDiv.appendChild(pre);
+    }
 
-async function enqueueTheoryArchitecture(colorId, statusDiv, outDiv) {
-  statusDiv.textContent = 'Queued theory architecture…';
+    function wireCollapse(headerEl, contentEl) {
+      headerEl.addEventListener('click', () => {
+        const collapsed = contentEl.classList.toggle('collapsed');
+        const caret = headerEl.querySelector('.caret');
+        if (caret) caret.textContent = collapsed ? '▶' : '▼';
+      });
+    }
 
-  const res = await fetch('/colors/theory_architecture', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ color_id: colorId })
-  });
+    async function enqueueBridge(colorId, bridgeType, endpoint, statusDiv, contentDiv, headerMetaEl, buttonEl) {
+      statusDiv.textContent = `Queued ${bridgeType}…`;
+      buttonEl.disabled = true;
 
-  const data = await res.json();
-  if (!res.ok) {
-    statusDiv.textContent = data.message || 'Error queueing theory architecture.';
-    return;
-  }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color_id: colorId })
+      });
 
-  const taskId = data.task_id;
-  statusDiv.textContent = `Theory architecture queued (task ${taskId}). Waiting…`;
+      const data = await res.json();
+      if (!res.ok) {
+        statusDiv.textContent = data.message || `Error queueing ${bridgeType}.`;
+        buttonEl.disabled = false;
+        return;
+      }
 
-  try {
-    const result = await pollTask(taskId, statusDiv);
-    statusDiv.textContent = `Theory architecture done. Saved #${result.saved_bridge?.id || ''}.`;
+      const taskId = data.task_id;
+      statusDiv.textContent = `${bridgeType} queued (task ${taskId}). Waiting…`;
 
-    // Use the task output directly (don’t refetch bridges, since table is shared)
-    const text = result.theory_text || result.architecture_text || '';
-    renderTheoryArchitecture(outDiv, text);
-
-  } catch (e) {
-    statusDiv.textContent = `Theory architecture error: ${e.message || e}`;
-  }
-}
-
-
+      try {
+        const result = await pollTask(taskId, statusDiv);
+        const text = result.bridge_text || result.architecture_text || result.theory_text || '';
+        renderBridge(contentDiv, text);
+        contentDiv.classList.remove('collapsed');
+        const caret = contentDiv.parentElement.querySelector('.caret');
+        if (caret) caret.textContent = '▼';
+        const savedId = result.saved_bridge?.id;
+        headerMetaEl.textContent = savedId ? `latest #${savedId}` : 'latest';
+        statusDiv.textContent = `${bridgeType} done.`;
+      } catch (e) {
+        statusDiv.textContent = `${bridgeType} error: ${e.message || e}`;
+      } finally {
+        buttonEl.disabled = false;
+      }
+    }
 
     async function loadColor() {
-      const params = new URLSearchParams(window.location.search);
-      const artId = params.get('art_id');
+      const artId = getParam('art_id');
       if (!artId) {
         document.getElementById('content').textContent = 'Missing art_id parameter.';
         return;
@@ -217,44 +159,101 @@ async function enqueueTheoryArchitecture(colorId, statusDiv, outDiv) {
           const div = document.createElement('div');
           div.className = 'block';
 
-          const entitiesDivId = `entities-${entry.id}`;
           const statusDivId = `status-${entry.id}`;
+          const simContentId = `sim-content-${entry.id}`;
+          const theoryContentId = `theory-content-${entry.id}`;
+          const physContentId = `phys-content-${entry.id}`;
 
           div.innerHTML = `
             <strong>Color ID:</strong> ${entry.id}<br>
             <strong>Art ID:</strong> ${entry.art_id}<br>
-            <strong>Model:</strong> ${entry.model}<br>
+            <strong>Model:</strong> ${escapeHtml(entry.model)}<br>
             <strong>Temperature:</strong> ${entry.temperature}<br>
             <strong>Created:</strong> ${entry.created_at}<br>
             <pre>${escapeHtml(entry.output_text)}</pre>
 
             <div class="controls">
-            <button id="gen-arch-btn-${entry.id}">Simulation Architecture</button>
-            <button id="gen-theory-btn-${entry.id}">Theory Architecture</button>
+              <button id="gen-sim-btn-${entry.id}">Simulation Architecture</button>
+              <button id="gen-theory-btn-${entry.id}">Theory Architecture</button>
+              <button id="gen-phys-btn-${entry.id}">Physical World Bridge</button>
             </div>
             <div id="${statusDivId}" class="status"></div>
-            <div id="${entitiesDivId}" class="status" style="margin-top:8px;"></div>
-            <div id="theory-div-${entry.id}" class="status" style="margin-top:8px;"></div>
 
+            <div class="bridge-group">
+              <div class="bridge-header" id="sim-header-${entry.id}">
+                <div>Simulation Architecture</div>
+                <div class="meta">
+                  <span id="sim-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${simContentId}"></div>
+            </div>
 
+            <div class="bridge-group">
+              <div class="bridge-header" id="theory-header-${entry.id}">
+                <div>Theory Architecture</div>
+                <div class="meta">
+                  <span id="theory-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${theoryContentId}"></div>
+            </div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="phys-header-${entry.id}">
+                <div>Physical World Bridge</div>
+                <div class="meta">
+                  <span id="phys-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${physContentId}"></div>
+            </div>
           `;
 
           container.appendChild(div);
 
           const statusDiv = document.getElementById(statusDivId);
-          const entitiesDiv = document.getElementById(entitiesDivId);
-          const genBtn = document.getElementById(`gen-arch-btn-${entry.id}`);
-          genBtn.onclick = () => enqueueBridge(entry.id, statusDiv, entitiesDiv);
-          const theoryDiv = document.getElementById(`theory-div-${entry.id}`);
+
+          const simContentDiv = document.getElementById(simContentId);
+          const theoryContentDiv = document.getElementById(theoryContentId);
+          const physContentDiv = document.getElementById(physContentId);
+
+          const simMeta = document.getElementById(`sim-meta-${entry.id}`);
+          const theoryMeta = document.getElementById(`theory-meta-${entry.id}`);
+          const physMeta = document.getElementById(`phys-meta-${entry.id}`);
+
+          wireCollapse(document.getElementById(`sim-header-${entry.id}`), simContentDiv);
+          wireCollapse(document.getElementById(`theory-header-${entry.id}`), theoryContentDiv);
+          wireCollapse(document.getElementById(`phys-header-${entry.id}`), physContentDiv);
+
+          // Load existing bridges by type
+          const simText = await fetchBridgeOfType(entry.id, "simulation_architecture");
+          renderBridge(simContentDiv, simText);
+
+          const theoryText = await fetchBridgeOfType(entry.id, "theory_architecture");
+          renderBridge(theoryContentDiv, theoryText);
+
+          const physText = await fetchBridgeOfType(entry.id, "physical_world_bridge");
+          renderBridge(physContentDiv, physText);
+
+          // Wire buttons
+          const simBtn = document.getElementById(`gen-sim-btn-${entry.id}`);
+          simBtn.onclick = () =>
+            enqueueBridge(entry.id, "simulation_architecture", "/colors/simulation_architecture",
+              statusDiv, simContentDiv, simMeta, simBtn);
+
           const theoryBtn = document.getElementById(`gen-theory-btn-${entry.id}`);
-          theoryBtn.onclick = () => enqueueTheoryArchitecture(entry.id, statusDiv, theoryDiv);
+          theoryBtn.onclick = () =>
+            enqueueBridge(entry.id, "theory_architecture", "/colors/theory_architecture",
+              statusDiv, theoryContentDiv, theoryMeta, theoryBtn);
 
-          const text = await fetchBridgeForColor(entry.id);
-          renderBridge(entitiesDiv, text);
-
-          // no fetch on load (bridges table is shared)
-          renderTheoryArchitecture(theoryDiv, null);
-
+          const physBtn = document.getElementById(`gen-phys-btn-${entry.id}`);
+          physBtn.onclick = () =>
+            enqueueBridge(entry.id, "physical_world_bridge", "/colors/physical_world_bridge",
+              statusDiv, physContentDiv, physMeta, physBtn);
         }
 
       } catch (e) {
