@@ -84,48 +84,47 @@
       w.document.close();
     }
 
-    async function fetchEntitiesForColor(colorId) {
-      const res = await fetch(`/colors/entities/by_color/${colorId}`);
-      if (!res.ok) return null;
+    async function fetchBridgeForColor(colorId) {
+        const res = await fetch(`/colors/bridges/by_color/${colorId}`);
+        if (!res.ok) return null;
 
-      const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return null;
+        const rows = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) return null;
 
-      const latest = rows[0];
-      let payload = latest.entities_json;
-      if (typeof payload === 'string') {
-        try { payload = JSON.parse(payload); } catch { /* ignore */ }
-      }
-      return payload || null;
+        const latest = rows[0];
+        return latest.bridge_text || null;
+        }
+
+
+    async function enqueueBridge(colorId, statusDiv, archDiv) {
+        statusDiv.textContent = 'Queued bridge…';
+
+        const res = await fetch('/colors/bridge_simulation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ color_id: colorId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            statusDiv.textContent = data.message || 'Error queueing simulation bridge.';
+            return;
+        }
+
+        const taskId = data.task_id;
+        statusDiv.textContent = `Simulation bridge queued (task ${taskId}). Waiting…`;
+
+        try {
+            const result = await pollTask(taskId, statusDiv);
+            statusDiv.textContent = `Simulation bridge done. Saved #${result.saved_bridge?.id || ''}.`;
+
+            const text = await fetchBridgeForColor(colorId);
+            renderBridge(archDiv, text);
+        } catch (e) {
+            statusDiv.textContent = `Simulation bridge error: ${e.message || e}`;
+        }
     }
 
-    async function enqueueEntities(colorId, statusDiv, entitiesDiv) {
-      statusDiv.textContent = 'Queued entities…';
-
-      const res = await fetch('/colors/entities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ color_id: colorId })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        statusDiv.textContent = data.message || 'Error queueing entities.';
-        return;
-      }
-
-      const taskId = data.task_id;
-      statusDiv.textContent = `Entities queued (task ${taskId}). Waiting…`;
-
-      try {
-        const result = await pollTask(taskId, statusDiv);
-        statusDiv.textContent = `Entities done. Saved #${result.saved_entities?.id || ''}.`;
-
-        const payload = await fetchEntitiesForColor(colorId);
-        renderEntities(entitiesDiv, payload, colorId);
-      } catch (e) {
-        statusDiv.textContent = `Entities error: ${e.message || e}`;
-      }
-    }
 
     async function pollTask(taskId, statusDiv) {
       while (true) {
@@ -139,83 +138,18 @@
       }
     }
 
-    function renderEntities(entitiesDiv, payload, colorId) {
-      entitiesDiv.innerHTML = '';
-      if (!payload || typeof payload !== 'object') {
-        entitiesDiv.innerHTML = '<em>No entities yet.</em>';
-        return;
-      }
-
-      const keys = Object.keys(payload);
-      let renderedAnything = false;
-
-      keys.forEach(groupKey => {
-        const items = payload[groupKey];
-        if (!Array.isArray(items) || items.length === 0) {
-          return; // skip empty groups
+    function renderBridge(archDiv, text) {
+        archDiv.innerHTML = '';
+        if (!text) {
+            archDiv.innerHTML = '<em>No simulation bridge yet.</em>';
+            return;
         }
 
-        renderedAnything = true;
-
-        const groupBlock = document.createElement('div');
-        groupBlock.className = 'entity-group';
-
-        const header = document.createElement('div');
-        header.className = 'entity-header';
-
-        const caret = document.createElement('div');
-        caret.className = 'entity-caret';
-        caret.textContent = '▾'; // expanded by default
-
-        const title = document.createElement('div');
-        title.innerHTML = `${escapeHtml(groupKey)} <span class="entity-count">(${items.length})</span>`;
-
-        header.appendChild(caret);
-        header.appendChild(title);
-
-        const body = document.createElement('div');
-        body.className = 'entity-body';
-
-        // default: expanded if has items
-        let isOpen = false;
-        body.style.display = 'none';
-        caret.textContent = '▸';
-
-        header.onclick = () => {
-          isOpen = !isOpen;
-          body.style.display = isOpen ? 'block' : 'none';
-          caret.textContent = isOpen ? '▾' : '▸';
-        };
-
-        items.forEach((entityObj, idx) => {
-          if (!entityObj || typeof entityObj !== 'object') return;
-
-          const name = escapeHtml(entityObj.name || '');
-          const desc = escapeHtml(entityObj.description || '');
-          const role = escapeHtml(entityObj.role_in_thought || '');
-
-          const row = document.createElement('div');
-          row.className = 'entity-item';
-          row.innerHTML = `
-            <div class="entity-name">${name}</div>
-            <div class="entity-text"><strong>Description:</strong> ${desc}</div>
-            <div class="entity-text"><strong>Role:</strong> ${role}</div>
-            <button onclick='openEntityInNewTab(${JSON.stringify(entityObj)}, ${colorId}, ${JSON.stringify(groupKey)}, ${idx})'>
-              Open in new tab
-            </button>
-          `;
-          body.appendChild(row);
-        });
-
-        groupBlock.appendChild(header);
-        groupBlock.appendChild(body);
-        entitiesDiv.appendChild(groupBlock);
-      });
-
-      if (!renderedAnything) {
-        entitiesDiv.innerHTML = '<em>No entities yet.</em>';
-      }
+        const pre = document.createElement('pre');
+        pre.textContent = text;
+        archDiv.appendChild(pre);
     }
+
 
     async function loadColor() {
       const params = new URLSearchParams(window.location.search);
@@ -252,22 +186,24 @@
             <pre>${escapeHtml(entry.output_text)}</pre>
 
             <div class="controls">
-              <button id="gen-entities-btn-${entry.id}">Extract Entities</button>
+            <button id="gen-arch-btn-${entry.id}">Build Bridges</button>
             </div>
             <div id="${statusDivId}" class="status"></div>
             <div id="${entitiesDivId}" class="status" style="margin-top:8px;"></div>
+
           `;
 
           container.appendChild(div);
 
           const statusDiv = document.getElementById(statusDivId);
           const entitiesDiv = document.getElementById(entitiesDivId);
-          const genBtn = document.getElementById(`gen-entities-btn-${entry.id}`);
+          const genBtn = document.getElementById(`gen-arch-btn-${entry.id}`);
+          genBtn.onclick = () => enqueueBridge(entry.id, statusDiv, entitiesDiv);
 
-          genBtn.onclick = () => enqueueEntities(entry.id, statusDiv, entitiesDiv);
 
-          const payload = await fetchEntitiesForColor(entry.id);
-          renderEntities(entitiesDiv, payload, entry.id);
+          const text = await fetchBridgeForColor(entry.id);
+          renderBridge(entitiesDiv, text);
+
         }
 
       } catch (e) {

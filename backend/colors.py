@@ -22,6 +22,8 @@ from flask import Flask, request, jsonify, abort
 from prompts import build_thought_sys, build_thought_user  # type: ignore
 from prompts import digital_playground_bridge_sys, digital_playground_bridge_user  # type: ignore
 from prompts import entities_prompt_sys, entities_prompt_user  # type: ignore
+from prompts import bridge_simulation_prompt  # type: ignore
+
 
 
 
@@ -295,7 +297,6 @@ def run_simulation_seeds_from_color(task_id: str, color_id: int, model: str, tem
     t0 = time.time()
     resp = _client.chat.completions.create(
         model=model,
-        temperature=temperature,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -481,7 +482,6 @@ def worker_loop(worker_id: int):
                     t0 = time.time()
                     resp = _client.chat.completions.create(
                         model=model,
-                        temperature=temperature,
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
@@ -597,7 +597,6 @@ def worker_loop(worker_id: int):
                     t0 = time.time()
                     resp = _client.chat.completions.create(
                         model=model,
-                        temperature=temperature,
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
@@ -673,6 +672,116 @@ def worker_loop(worker_id: int):
                         "entities": parsed,
                         "saved_entities": saved_row,
                         "usage": usage_dict,
+                    }
+            elif task_type == "bridge_simulation":
+                color_id = task["color_id"]
+                model = task["model"]
+                temperature = float(task["temperature"])
+                user_metadata = task["user_metadata"]
+
+                # Load color row
+                db = get_art_db()
+                row = db.execute(
+                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
+                    (color_id,)
+                ).fetchone()
+                if not row:
+                    db.close()
+                    raise ValueError(f"color id {color_id} not found")
+
+                art_id = int(row["art_id"])
+                thought_text = row["output_text"] or ""
+
+                # Build prompt (single-message prompt stored in prompts.py)
+                system_prompt = bridge_simulation_prompt.format(thought=thought_text)
+                user_prompt = ""  # prompt is carried in system message
+
+                projected_tokens = 5000
+                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                # Call LLM
+                with LLM_LOCK:
+                    t0 = time.time()
+                    resp = _client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+                    duration_ms = int((time.time() - t0) * 1000)
+
+                output_text = (resp.choices[0].message.content or "").strip()
+
+                usage = getattr(resp, "usage", None)
+                usage_dict = usage.model_dump() if usage else None
+                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
+                duration_ms = int((time.time() - t0) * 1000)
+
+                # Save to bridges table (NEW)
+                created_at = utc_now_iso()
+                db.execute(
+                    """
+                    INSERT INTO bridges
+                      (color_id, art_id, input_text, bridge_text, model, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        color_id,
+                        art_id,
+                        thought_text,
+                        output_text,
+                        model,
+                        created_at,
+                    ),
+                )
+                db.commit()
+
+                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                saved_row = dict(
+                    db.execute(
+                        "SELECT * FROM bridges WHERE id = ?",
+                        (new_id,)
+                    ).fetchone()
+                )
+                db.close()
+
+                # LLM usage logging
+                log_llm_usage(
+                    ts=utc_now_iso(),
+                    source="colors.bridge_simulation",
+                    model=model,
+                    provider="openai",
+                    prompt_id="bridge_simulation_prompt",
+                    request_id=getattr(resp, "id", None),
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cost_usd=0.0,
+                    meta_obj={
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "worker_id": worker_id,
+                        "user_metadata": user_metadata,
+                    },
+                )
+
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "bridge_simulation",
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "input_text": thought_text,
+                        "output_text": output_text,
+                        "model": model,
+                        "temperature": temperature,
+                        "usage": usage_dict,
+                        "duration_ms": duration_ms,
                     }
 
             # ============================================================
@@ -1102,3 +1211,78 @@ def entities_by_color(color_id: int):
         out.append(d)
 
     return jsonify(out)
+
+
+@app.post("/colors/bridge_simulation")
+def enqueue_bridge_simulation():
+    """
+    Queue Simulation Architecture prompt on a color_id.
+    Body:
+      {
+        "color_id": 123,
+        "model": optional,
+        "temperature": optional,
+        "metadata": optional
+      }
+    Returns:
+      { task_id, status:'queued' }
+    """
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    color_id = payload.get("color_id")
+    if not isinstance(color_id, int):
+        abort(400, description="'color_id' is required and must be an integer")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    temperature = float(payload.get("temperature", 0.2))
+    user_metadata = payload.get("metadata") or {}
+
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "bridge_simulation",
+            "color_id": color_id,
+            "status": "queued",
+            "created_at": utc_now_iso(),
+            "model": model,
+            "temperature": temperature,
+        }
+
+    TASK_QUEUE.put({
+        "task_id": task_id,
+        "task_type": "bridge_simulation",
+        "color_id": color_id,
+        "model": model,
+        "temperature": temperature,
+        "user_metadata": user_metadata,
+    })
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "queued",
+        "task_type": "bridge_simulation",
+        "color_id": color_id,
+    }), 202
+
+
+@app.get("/colors/bridges/by_color/<int:color_id>")
+def bridges_by_color(color_id: int):
+    """
+    Returns all bridges rows for a color_id, newest first.
+    """
+    db = get_art_db()
+    rows = db.execute(
+        """
+        SELECT * FROM bridges
+        WHERE color_id = ?
+        ORDER BY created_at DESC
+        """,
+        (color_id,)
+    ).fetchall()
+    db.close()
+
+    return jsonify([dict(r) for r in rows])
