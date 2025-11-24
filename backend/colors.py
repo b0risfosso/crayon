@@ -2335,7 +2335,7 @@ def entities_by_color(color_id: int):
     return jsonify(out)
 
 
-@app.post("/colors/bridge_simulation")
+@app.post("/colors/simulation_architecture")
 def enqueue_bridge_simulation():
     """
     Queue Simulation Architecture prompt on a color_id.
