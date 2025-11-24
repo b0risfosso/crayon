@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brush Stroke Viewer</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    h1 { margin: 0 0 6px 0; }
+    .muted { color: #666; font-size: 12px; }
+    .row { display: flex; gap: 12px; align-items: flex-start; }
+
+    .block { border: 1px solid #ddd; padding: 12px; margin: 12px 0; border-radius: 8px; }
+    pre { white-space: pre-wrap; margin: 0; font-size: 14px; line-height: 1.35; }
+
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .panel {
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fafafa;
+      min-height: 80px;
+    }
+    .panel h3 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .tag {
+      font-size: 11px;
+      color: #555;
+      background: #fff;
+      border: 1px solid #eee;
+      padding: 2px 6px;
+      border-radius: 999px;
+    }
+
+    /* collapsible */
+    .group { border: 1px solid #e6e6e6; border-radius: 8px; overflow: hidden; margin-top: 10px; }
+    .group-header {
+      background: #f5f5f5;
+      padding: 8px 10px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .group-content { padding: 10px; display: none; }
+    .group-content.open { display: block; }
+    .caret { font-size: 12px; color: #666; }
+
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    button { padding: 6px 10px; cursor: pointer; }
+    input[type="text"] { padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; }
+
+    .error { color: #b00020; font-size: 13px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Brush Stroke Bridges</h1>
+  <div id="subtitle" class="muted"></div>
+
+  <div class="toolbar">
+    <button id="refresh-btn">Refresh</button>
+    <label class="muted">Entity:
+      <input id="entity-input" type="text" placeholder="entity name" />
+    </label>
+    <label class="muted">Color ID:
+      <input id="color-input" type="text" placeholder="color id" />
+    </label>
+    <button id="go-btn">Go</button>
+  </div>
+
+  <div id="status" class="muted" style="margin-top:8px;"></div>
+  <div id="error" class="error"></div>
+
+  <div id="content"></div>
+
+  <script>
+    function getParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    function setParam(name, value) {
+      const params = new URLSearchParams(window.location.search);
+      if (value == null || value === '') params.delete(name);
+      else params.set(name, value);
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, "", newUrl);
+    }
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.message || data?.error || res.statusText;
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    async function resolveEntityIdByName(name) {
+      const rows = await fetchJson(`/colors/entities/search?name=${encodeURIComponent(name)}`);
+      if (!Array.isArray(rows) || rows.length === 0) return null;
+
+      const lower = name.toLowerCase();
+      const exact = rows.find(r => (r.name || '').toLowerCase() === lower);
+      return (exact || rows[0]).id;
+    }
+
+    function stripBrushSuffix(t) {
+      return t.endsWith("_brush_stroke") ? t.slice(0, -"_brush_stroke".length) : t;
+    }
+
+    function buildPairs(allBridges, entityId, entityName, colorId) {
+      // Base bridges: newest per base type, excluding brush strokes
+      const baseByType = {};
+      for (const b of allBridges) {
+        if (!b.bridge_type) continue;
+        if (b.bridge_type.endsWith("_brush_stroke")) continue;
+        if (!(b.bridge_type in baseByType)) baseByType[b.bridge_type] = b;
+      }
+
+      // Brush-stroke bridges for this entity
+      const bsRows = allBridges.filter(b => {
+        if (!b.bridge_type?.endsWith("_brush_stroke")) return false;
+        if (entityId != null && b.entity_id === entityId) return true;
+        // fallback if entity_id missing in older data
+        return (b.input_text || '').toLowerCase() === entityName.toLowerCase();
+      });
+
+      const bsByBaseType = {};
+      for (const b of bsRows) {
+        const baseType = stripBrushSuffix(b.bridge_type);
+        if (!(baseType in bsByBaseType)) bsByBaseType[baseType] = [];
+        bsByBaseType[baseType].push(b);
+      }
+
+      // Make pairs list ordered by base type order (from base bridges)
+      const baseTypes = Object.keys(baseByType);
+
+      // Include baseTypes even if no base exists but brush stroke does
+      for (const bt of Object.keys(bsByBaseType)) {
+        if (!baseTypes.includes(bt)) baseTypes.push(bt);
+      }
+
+      return baseTypes.map(bt => {
+        const base = baseByType[bt] || null;
+        const strokes = (bsByBaseType[bt] || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+        return { baseType: bt, base, strokes };
+      });
+    }
+
+    function render(contentEl, pairs, entityName, colorId) {
+      contentEl.innerHTML = '';
+
+      if (!pairs.length) {
+        contentEl.innerHTML = `<div class="block"><em>No bridges found for this color/entity.</em></div>`;
+        return;
+      }
+
+      for (const p of pairs) {
+        const group = document.createElement('div');
+        group.className = 'group';
+
+        const head = document.createElement('div');
+        head.className = 'group-header';
+        head.innerHTML = `
+          <div>${escapeHtml(p.baseType)}</div>
+          <div class="muted"><span class="caret">▶</span></div>
+        `;
+
+        const body = document.createElement('div');
+        body.className = 'group-content';
+
+        // Base panel
+        const baseText = p.base?.bridge_text || '';
+        const baseId = p.base?.id;
+
+        // Brush strokes panels (can be multiple, newest first)
+        const strokes = p.strokes;
+
+        let strokesHtml = '';
+        if (!strokes.length) {
+          strokesHtml = `
+            <div class="panel">
+              <h3>Brush stroke <span class="tag">none</span></h3>
+              <em>No brush-stroke bridge yet.</em>
+            </div>
+          `;
+        } else {
+          strokesHtml = strokes.map(s => `
+            <div class="panel">
+              <h3>
+                Brush stroke
+                <span class="tag">#${s.id}</span>
+              </h3>
+              <pre>${escapeHtml(s.bridge_text || '')}</pre>
+              <div class="muted" style="margin-top:6px;">
+                created_at: ${escapeHtml(s.created_at || '')}
+              </div>
+            </div>
+          `).join('');
+        }
+
+        body.innerHTML = `
+          <div class="pair">
+            <div class="panel">
+              <h3>
+                Base bridge
+                ${baseId ? `<span class="tag">#${baseId}</span>` : `<span class="tag">missing</span>`}
+              </h3>
+              ${baseText ? `<pre>${escapeHtml(baseText)}</pre>` : `<em>No base bridge yet.</em>`}
+              ${p.base?.created_at ? `<div class="muted" style="margin-top:6px;">created_at: ${escapeHtml(p.base.created_at)}</div>` : ''}
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              ${strokesHtml}
+            </div>
+          </div>
+        `;
+
+        head.addEventListener('click', () => {
+          const open = body.classList.toggle('open');
+          head.querySelector('.caret').textContent = open ? '▼' : '▶';
+        });
+
+        group.appendChild(head);
+        group.appendChild(body);
+        contentEl.appendChild(group);
+      }
+    }
+
+    async function load() {
+      const statusEl = document.getElementById('status');
+      const errorEl = document.getElementById('error');
+      const contentEl = document.getElementById('content');
+      const subtitleEl = document.getElementById('subtitle');
+
+      errorEl.textContent = '';
+      contentEl.innerHTML = '';
+      statusEl.textContent = 'Loading…';
+
+      const colorIdRaw = getParam('color_id');
+      const entityNameRaw = getParam('entity');
+
+      document.getElementById('color-input').value = colorIdRaw || '';
+      document.getElementById('entity-input').value = entityNameRaw || '';
+
+      if (!colorIdRaw || !entityNameRaw) {
+        statusEl.textContent = '';
+        subtitleEl.textContent = 'Provide ?color_id=...&entity=...';
+        return;
+      }
+
+      const colorId = Number(colorIdRaw);
+      const entityName = entityNameRaw.trim();
+
+      subtitleEl.textContent = `color_id=${colorId} · entity=${entityName}`;
+
+      try {
+        // resolve entity id
+        statusEl.textContent = 'Resolving entity…';
+        const entityId = await resolveEntityIdByName(entityName);
+
+        // fetch all bridges for this color
+        statusEl.textContent = 'Fetching bridges…';
+        const allBridges = await fetchJson(`/colors/bridges/by_color/${colorId}`);
+
+        const pairs = buildPairs(allBridges, entityId, entityName, colorId);
+        render(contentEl, pairs, entityName, colorId);
+
+        statusEl.textContent = `Loaded ${pairs.length} bridge type(s).`;
+      } catch (e) {
+        statusEl.textContent = '';
+        errorEl.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    document.getElementById('refresh-btn').onclick = load;
+    document.getElementById('go-btn').onclick = () => {
+      const colorId = document.getElementById('color-input').value.trim();
+      const entity = document.getElementById('entity-input').value.trim();
+      setParam('color_id', colorId);
+      setParam('entity', entity);
+      load();
+    };
+
+    load();
+  </script>
+</body>
+</html>
