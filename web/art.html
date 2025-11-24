@@ -39,7 +39,7 @@
   <section>
     <h2>List of Art</h2>
     <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <input id="searchQuery" type="text" placeholder="Search art..." style="flex:1; min-width:220px; padding:6px;" />
+      <input id="searchQuery" type="text" value="solar microgrid" placeholder="Search art..." style="flex:1; min-width:220px; padding:6px;" />
       <input id="searchEmail" type="text" placeholder="Email filter (optional)" style="min-width:220px; padding:6px;" />
       <button onclick="fetchArt()">Search</button>
       <button onclick="randomLoad()">Random Load</button>
@@ -78,7 +78,7 @@
           <div class="controls">
             <button onclick="updateArt(${item.id})">Save</button>
             <button onclick="deleteArt(${item.id})">Delete</button>
-            <button onclick="enqueueColors(${item.id})">Expand → Colors</button>
+            <button onclick="enqueueColors(${item.id})">Create Colors</button>
             <button id="open-btn-${item.id}" onclick="openColors(${item.id})">Open Colors</button>
           </div>
           <div class="meta">
