@@ -1941,13 +1941,7 @@ def worker_loop(worker_id: int):
                         entity_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
 
                     # After entity_id is known
-                    db.execute(
-                        """
-                        INSERT INTO entity_instances (entity_id, color_id, bridge_id, origin, created_at)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (entity_id, color_id, new_bridge_id, "brush_stroke", now)
-                    )
+                    
                     # ---- LLM CALL ----
                     system_prompt = entity_bridge_relationship_prompt.format(
                         thought=thought_text,
@@ -1991,8 +1985,8 @@ def worker_loop(worker_id: int):
                     db.execute(
                         """
                         INSERT INTO bridges
-                        (color_id, art_id, input_text, bridge_text, bridge_type, entity_id, model, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        (color_id, art_id, input_text, bridge_text, bridge_type, entity, entity_id, model, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             color_id,
@@ -2000,12 +1994,22 @@ def worker_loop(worker_id: int):
                             entity_text,    # store entity in input_text for compatibility
                             output_text,
                             new_bridge_type,
+                            entity_text,
                             entity_id,      # NEW: link to entity table
                             model,
                             created_at,
                         ),
                     )
                     new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+                    db.execute(
+                        """
+                        INSERT INTO entity_instances (entity_id, color_id, bridge_id, origin, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (entity_id, color_id, new_id, "brush_stroke", now)
+                    )
+
                     db.commit()
 
                     saved_row = dict(
