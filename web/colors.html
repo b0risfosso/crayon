@@ -521,77 +521,96 @@
 
           // RUN ALL wiring
           const allBtn = document.getElementById(`gen-all-btn-${entry.id}`);
-          allBtn.onclick = async () => {
-            allBtn.disabled = true;
-            allStatusDiv.textContent = "Bridge all started…";
+  allBtn.onclick = async () => {
+    allBtn.disabled = true;
+    allStatusDiv.textContent = "Bridge all started… queueing everything.";
 
-            // Specs in your preferred order
-            const specs = [
-              { type: "simulation_architecture", endpoint: "/colors/simulation_architecture",
-                status: simulation_architectureStatusDiv, content: simulation_architectureContentDiv,
-                meta: simulation_architectureMeta, btn: simulation_architectureBtn },
-              { type: "theory_architecture", endpoint: "/colors/theory_architecture",
-                status: theory_architectureStatusDiv, content: theory_architectureContentDiv,
-                meta: theory_architectureMeta, btn: theory_architectureBtn },
-              { type: "physical_world_bridge", endpoint: "/colors/physical_world_bridge",
-                status: physical_world_bridgeStatusDiv, content: physical_world_bridgeContentDiv,
-                meta: physical_world_bridgeMeta, btn: physical_world_bridgeBtn },
-              { type: "math_bridge", endpoint: "/colors/math_bridge",
-                status: math_bridgeStatusDiv, content: math_bridgeContentDiv,
-                meta: math_bridgeMeta, btn: math_bridgeBtn },
-              { type: "language_bridge", endpoint: "/colors/language_bridge",
-                status: language_bridgeStatusDiv, content: language_bridgeContentDiv,
-                meta: language_bridgeMeta, btn: language_bridgeBtn },
-              { type: "data_bridge", endpoint: "/colors/data_bridge",
-                status: data_bridgeStatusDiv, content: data_bridgeContentDiv,
-                meta: data_bridgeMeta, btn: data_bridgeBtn },
-              { type: "computational_bridge", endpoint: "/colors/computational_bridge",
-                status: computational_bridgeStatusDiv, content: computational_bridgeContentDiv,
-                meta: computational_bridgeMeta, btn: computational_bridgeBtn },
-              { type: "music_bridge", endpoint: "/colors/music_bridge",
-                status: music_bridgeStatusDiv, content: music_bridgeContentDiv,
-                meta: music_bridgeMeta, btn: music_bridgeBtn },
-              { type: "information_bridge", endpoint: "/colors/information_bridge",
-                status: information_bridgeStatusDiv, content: information_bridgeContentDiv,
-                meta: information_bridgeMeta, btn: information_bridgeBtn },
-              { type: "poetry_bridge", endpoint: "/colors/poetry_bridge",
-                status: poetry_bridgeStatusDiv, content: poetry_bridgeContentDiv,
-                meta: poetry_bridgeMeta, btn: poetry_bridgeBtn },
-              { type: "metaphysics_bridge", endpoint: "/colors/metaphysics_bridge",
-                status: metaphysics_bridgeStatusDiv, content: metaphysics_bridgeContentDiv,
-                meta: metaphysics_bridgeMeta, btn: metaphysics_bridgeBtn },
-              { type: "thought", endpoint: "/colors/thought_bridge",
-                status: thoughtStatusDiv, content: thoughtContentDiv,
-                meta: thoughtMeta, btn: thoughtBtn },
-            ];
+    const specs = [
+      { type: "simulation_architecture", endpoint: "/colors/simulation_architecture",
+        status: simulation_architectureStatusDiv, content: simulation_architectureContentDiv,
+        meta: simulation_architectureMeta, btn: simulation_architectureBtn },
+      { type: "theory_architecture", endpoint: "/colors/theory_architecture",
+        status: theory_architectureStatusDiv, content: theory_architectureContentDiv,
+        meta: theory_architectureMeta, btn: theory_architectureBtn },
+      { type: "physical_world_bridge", endpoint: "/colors/physical_world_bridge",
+        status: physical_world_bridgeStatusDiv, content: physical_world_bridgeContentDiv,
+        meta: physical_world_bridgeMeta, btn: physical_world_bridgeBtn },
+      { type: "math_bridge", endpoint: "/colors/math_bridge",
+        status: math_bridgeStatusDiv, content: math_bridgeContentDiv,
+        meta: math_bridgeMeta, btn: math_bridgeBtn },
+      { type: "language_bridge", endpoint: "/colors/language_bridge",
+        status: language_bridgeStatusDiv, content: language_bridgeContentDiv,
+        meta: language_bridgeMeta, btn: language_bridgeBtn },
+      { type: "data_bridge", endpoint: "/colors/data_bridge",
+        status: data_bridgeStatusDiv, content: data_bridgeContentDiv,
+        meta: data_bridgeMeta, btn: data_bridgeBtn },
+      { type: "computational_bridge", endpoint: "/colors/computational_bridge",
+        status: computational_bridgeStatusDiv, content: computational_bridgeContentDiv,
+        meta: computational_bridgeMeta, btn: computational_bridgeBtn },
+      { type: "music_bridge", endpoint: "/colors/music_bridge",
+        status: music_bridgeStatusDiv, content: music_bridgeContentDiv,
+        meta: music_bridgeMeta, btn: music_bridgeBtn },
+      { type: "information_bridge", endpoint: "/colors/information_bridge",
+        status: information_bridgeStatusDiv, content: information_bridgeContentDiv,
+        meta: information_bridgeMeta, btn: information_bridgeBtn },
+      { type: "poetry_bridge", endpoint: "/colors/poetry_bridge",
+        status: poetry_bridgeStatusDiv, content: poetry_bridgeContentDiv,
+        meta: poetry_bridgeMeta, btn: poetry_bridgeBtn },
+      { type: "metaphysics_bridge", endpoint: "/colors/metaphysics_bridge",
+        status: metaphysics_bridgeStatusDiv, content: metaphysics_bridgeContentDiv,
+        meta: metaphysics_bridgeMeta, btn: metaphysics_bridgeBtn },
+      { type: "thought", endpoint: "/colors/thought_bridge",
+        status: thoughtStatusDiv, content: thoughtContentDiv,
+        meta: thoughtMeta, btn: thoughtBtn },
+    ];
 
-            let failures = 0;
+    // Create one promise per bridge. These will all start immediately.
+    const jobs = specs.map(async (s) => {
+      try {
+        // If already exists, render + skip without queueing.
+        const existing = await fetchBridgeOfType(entry.id, s.type);
+        if (existing) {
+          renderBridge(s.content, existing);
+          s.status.textContent = `${s.type} already exists, skipped.`;
+          return { type: s.type, skipped: true };
+        }
 
-            for (const s of specs) {
-              try {
-                // check existing
-                const existing = await fetchBridgeOfType(entry.id, s.type);
-                if (existing) {
-                  renderBridge(s.content, existing);
-                  s.status.textContent = `${s.type} already exists, skipped.`;
-                  continue;
-                }
+        // Queue + poll concurrently.
+        s.status.textContent = `${s.type} queued…`;
+        await enqueueBridge(entry.id, s.type, s.endpoint, s.status, s.content, s.meta, s.btn);
+        return { type: s.type, ok: true };
+      } catch (e) {
+        // enqueueBridge already writes status, but we return error for aggregation.
+        return { type: s.type, error: e };
+      }
+    });
 
-                allStatusDiv.textContent = `Running ${s.type}…`;
-                await enqueueBridge(entry.id, s.type, s.endpoint, s.status, s.content, s.meta, s.btn);
-              } catch (e) {
-                failures += 1;
-                allStatusDiv.textContent = `Error in ${s.type} (continuing)…`;
-              }
-            }
+    allStatusDiv.textContent = "All bridges queued. Waiting for completion…";
 
-            allStatusDiv.textContent =
-              failures === 0
-                ? "Bridge all complete."
-                : `Bridge all complete with ${failures} error(s).`;
+    const results = await Promise.allSettled(jobs);
 
-            allBtn.disabled = false;
-          };
+    let failures = 0;
+    let skipped = 0;
+    let succeeded = 0;
+
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        if (r.value?.error) failures += 1;
+        else if (r.value?.skipped) skipped += 1;
+        else succeeded += 1;
+      } else {
+        failures += 1;
+      }
+    }
+
+    allStatusDiv.textContent =
+      failures === 0
+        ? `Bridge all complete. (${succeeded} ran, ${skipped} skipped)`
+        : `Bridge all complete with ${failures} error(s). (${succeeded} ran, ${skipped} skipped)`;
+
+    allBtn.disabled = false;
+  };
+
         }
 
       } catch (e) {
