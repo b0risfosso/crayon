@@ -243,20 +243,12 @@
 
     // ---------- Brush strokes ----------
     async function fetchEntitiesForColor(colorId) {
-      const res = await fetch(`/colors/entities/by_color/${colorId}`);
-      if (!res.ok) return [];
-      const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return [];
-      const latest = rows[0];
-      const ej = latest.entities_json;
-      if (Array.isArray(ej)) return ej;
-      try {
-        const parsed = JSON.parse(ej);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
+    const res = await fetch(`/colors/entities/by_color/${colorId}`);
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
     }
+
 
     async function loadBrushStrokes(colorId, listEl) {
       listEl.innerHTML = '';
