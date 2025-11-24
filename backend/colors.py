@@ -772,7 +772,6 @@ def worker_loop(worker_id: int):
                     model=model,
                     endpoint="/colors/bridge_simulation",
                     email=None,
-                    provider="openai",
                     request_id=task_id,
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
@@ -1901,11 +1900,91 @@ def worker_loop(worker_id: int):
                         "saved_bridge": saved_row,
                         "usage": usage_dict,
                     }
+                        # ============================================================
+            #  TYPE: thought_bridge (NO LLM: copies thought -> bridge_text)
+            # ============================================================
+            elif task_type == "thought_bridge":
+                color_id = task["color_id"]
+                model = task.get("model") or "none"
+                user_metadata = task.get("user_metadata") or {}
 
+                db = get_art_db()
+                row = db.execute(
+                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
+                    (color_id,)
+                ).fetchone()
 
+                if not row:
+                    db.close()
+                    raise ValueError(f"color id {color_id} not found")
 
+                art_id = row["art_id"]
+                thought_text = (row["output_text"] or "").strip()
 
+                if not thought_text:
+                    db.close()
+                    raise ValueError(f"color {color_id} has empty output_text")
 
+                created_at = utc_now_iso()
+
+                # Save the thought directly as a bridge
+                db.execute(
+                    """
+                    INSERT INTO bridges
+                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        color_id,
+                        art_id,
+                        thought_text,      # input_text
+                        thought_text,      # bridge_text (copy)
+                        "thought",         # bridge_type
+                        model,             # "none" or whatever you want
+                        created_at,
+                    ),
+                )
+                db.commit()
+
+                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                saved_row = dict(
+                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
+                )
+                db.close()
+
+                # Optional: still log usage as 0 tokens
+                log_llm_usage(
+                    ts=utc_now_iso(),
+                    app_name="colors",
+                    model=model,
+                    endpoint="/colors/thought_bridge",
+                    email=None,
+                    request_id=task_id,
+                    tokens_in=0,
+                    tokens_out=0,
+                    total_tokens=0,
+                    duration_ms=0,
+                    cost_usd=0.0,
+                    meta_obj={
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "worker_id": worker_id,
+                        "user_metadata": user_metadata,
+                        "no_llm": True,
+                    },
+                )
+
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "thought_bridge",
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "bridge_text": thought_text,
+                        "saved_bridge": saved_row,
+                        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                    }
             # ============================================================
             # Unsupported task type
             # ============================================================
@@ -2883,5 +2962,44 @@ def enqueue_metaphysics_bridge():
         "task_id": task_id,
         "status": "queued",
         "task_type": "metaphysics_bridge",
+        "color_id": color_id,
+    }), 202
+
+
+@app.post("/colors/thought_bridge")
+def enqueue_thought_bridge():
+    payload = require_json()
+    color_id = payload.get("color_id")
+
+    if not isinstance(color_id, int):
+        abort(400, description="'color_id' must be an integer")
+
+    model = payload.get("model", "none")
+    user_metadata = payload.get("metadata") or {}
+
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "thought_bridge",
+            "color_id": color_id,
+            "status": "queued",
+            "created_at": utc_now_iso(),
+            "model": model,
+        }
+
+    TASK_QUEUE.put({
+        "task_id": task_id,
+        "task_type": "thought_bridge",
+        "color_id": color_id,
+        "model": model,
+        "user_metadata": user_metadata,
+    })
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "queued",
+        "task_type": "thought_bridge",
         "color_id": color_id,
     }), 202

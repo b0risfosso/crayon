@@ -10,9 +10,11 @@
     pre { white-space: pre-wrap; }
 
     .controls { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .controls.individual { margin-top: 6px; padding: 6px 0 0 8px; border-left: 2px solid #eee; }
     button { padding: 6px 10px; cursor: pointer; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .status { font-size: 12px; color: #333; margin-top: 6px; white-space: pre-wrap; }
+    .muted { font-size: 12px; color: #666; }
 
     /* Collapsible bridge sections */
     .bridge-group { margin-top: 10px; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; }
@@ -54,46 +56,41 @@
     }
 
     async function pollTask(taskId, statusDiv) {
-  // Soft timeout: after this, we keep polling but show a different message.
-  const softMaxMs = 2 * 60 * 1000;   // 2 minutes
-  const hardMaxMs = 30 * 60 * 1000;  // 30 minutes safety cap
+      const softMaxMs = 2 * 60 * 1000;   // 2 minutes
+      const hardMaxMs = 30 * 60 * 1000;  // 30 minutes safety cap
 
-  const t0 = Date.now();
-  let intervalMs = 1200;
+      const t0 = Date.now();
+      let intervalMs = 1200;
 
-  while (true) {
-    const res = await fetch(`/colors/tasks/${taskId}`);
-    const data = await res.json();
+      while (true) {
+        const res = await fetch(`/colors/tasks/${taskId}`);
+        const data = await res.json();
 
-    if (!res.ok) throw new Error(data.message || 'task poll failed');
-    if (data.status === 'done') return data.result;
-    if (data.status === 'error') throw new Error(data.error || 'task error');
+        if (!res.ok) throw new Error(data.message || 'task poll failed');
+        if (data.status === 'done') return data.result;
+        if (data.status === 'error') throw new Error(data.error || 'task error');
 
-    const elapsed = Date.now() - t0;
-    const elapsedS = Math.floor(elapsed / 1000);
+        const elapsed = Date.now() - t0;
+        const elapsedS = Math.floor(elapsed / 1000);
 
-    // Message mode changes after soft timeout
-    if (elapsed > softMaxMs) {
-      statusDiv.textContent =
-        `Task ${taskId}: ${data.status}… still running (${elapsedS}s).`;
-      // backoff to reduce hammering
-      intervalMs = Math.min(intervalMs * 1.25, 8000);
-    } else {
-      statusDiv.textContent =
-        `Task ${taskId}: ${data.status}… (${elapsedS}s)`;
+        if (elapsed > softMaxMs) {
+          statusDiv.textContent =
+            `Task ${taskId}: ${data.status}… still running (${elapsedS}s).`;
+          intervalMs = Math.min(intervalMs * 1.25, 8000);
+        } else {
+          statusDiv.textContent =
+            `Task ${taskId}: ${data.status}… (${elapsedS}s)`;
+        }
+
+        if (elapsed > hardMaxMs) {
+          throw new Error(
+            `task exceeded ${Math.floor(hardMaxMs/60000)}min client cap; worker may still be running`
+          );
+        }
+
+        await new Promise(r => setTimeout(r, intervalMs));
+      }
     }
-
-    // True safety cap; if you want “never stop”, remove this block.
-    if (elapsed > hardMaxMs) {
-      throw new Error(
-        `task exceeded ${Math.floor(hardMaxMs/60000)}min client cap; worker may still be running`
-      );
-    }
-
-    await new Promise(r => setTimeout(r, intervalMs));
-  }
-}
-
 
     async function fetchBridgeOfType(colorId, bridgeType) {
       const res = await fetch(`/colors/bridges/by_color/${colorId}/${bridgeType}`);
@@ -124,7 +121,7 @@
 
     async function enqueueBridge(colorId, bridgeType, endpoint, statusDiv, contentDiv, headerMetaEl, buttonEl) {
       statusDiv.textContent = `Queued ${bridgeType}…`;
-      buttonEl.disabled = true;
+      if (buttonEl) buttonEl.disabled = true;
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -135,7 +132,7 @@
       const data = await res.json();
       if (!res.ok) {
         statusDiv.textContent = data.message || `Error queueing ${bridgeType}.`;
-        buttonEl.disabled = false;
+        if (buttonEl) buttonEl.disabled = false;
         return;
       }
 
@@ -154,8 +151,9 @@
         statusDiv.textContent = `${bridgeType} done.`;
       } catch (e) {
         statusDiv.textContent = `${bridgeType} error: ${e.message || e}`;
+        throw e;
       } finally {
-        buttonEl.disabled = false;
+        if (buttonEl) buttonEl.disabled = false;
       }
     }
 
@@ -193,6 +191,7 @@
           contentIds['information_bridge'] = `information_bridge-content-${entry.id}`;
           contentIds['poetry_bridge'] = `poetry_bridge-content-${entry.id}`;
           contentIds['metaphysics_bridge'] = `metaphysics_bridge-content-${entry.id}`;
+          contentIds['thought'] = `thought-content-${entry.id}`;
 
           div.innerHTML = `
             <strong>Color ID:</strong> ${entry.id}<br>
@@ -202,7 +201,15 @@
             <strong>Created:</strong> ${entry.created_at}<br>
             <pre>${escapeHtml(entry.output_text)}</pre>
 
+            <!-- RUN ALL + TOGGLE -->
             <div class="controls">
+              <button id="gen-all-btn-${entry.id}">Bridge All</button>
+              <button id="toggle-individual-btns-${entry.id}" class="muted">Show individual bridges ▶</button>
+            </div>
+            <div id="all-status-${entry.id}" class="status"></div>
+
+            <!-- INDIVIDUAL BUTTONS (collapsed by default) -->
+            <div id="individual-btns-${entry.id}" class="controls individual" style="display:none;">
               <button id="gen-simulation_architecture-btn-${entry.id}">Simulation Architecture</button>
               <button id="gen-theory_architecture-btn-${entry.id}">Theory Architecture</button>
               <button id="gen-physical_world_bridge-btn-${entry.id}">Physical World Bridge</button>
@@ -214,8 +221,8 @@
               <button id="gen-information_bridge-btn-${entry.id}">Information Bridge</button>
               <button id="gen-poetry_bridge-btn-${entry.id}">Poetry Bridge</button>
               <button id="gen-metaphysics_bridge-btn-${entry.id}">Metaphysics Bridge</button>
+              <button id="gen-thought-btn-${entry.id}">Thought → Thought</button>
             </div>
-
 
             <div class="bridge-group">
               <div class="bridge-header" id="simulation_architecture-header-${entry.id}">
@@ -348,93 +355,110 @@
               <div class="bridge-content collapsed" id="${contentIds['metaphysics_bridge']}"></div>
             </div>
             <div id="metaphysics_bridge-status-${entry.id}" class="status"></div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="thought-header-${entry.id}">
+                <div>Thought → Thought</div>
+                <div class="meta">
+                  <span id="thought-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['thought']}"></div>
+            </div>
+            <div id="thought-status-${entry.id}" class="status"></div>
           `;
 
           container.appendChild(div);
 
+          // Toggle individual buttons visibility
+          const individualBtnsDiv = document.getElementById(`individual-btns-${entry.id}`);
+          const toggleBtnsBtn = document.getElementById(`toggle-individual-btns-${entry.id}`);
+          toggleBtnsBtn.onclick = () => {
+            const isHidden = individualBtnsDiv.style.display === 'none';
+            individualBtnsDiv.style.display = isHidden ? 'flex' : 'none';
+            toggleBtnsBtn.textContent = isHidden ? 'Hide individual bridges ▼' : 'Show individual bridges ▶';
+          };
 
+          // Content + meta + collapse wiring
           const simulation_architectureContentDiv = document.getElementById(contentIds['simulation_architecture']);
           const simulation_architectureMeta = document.getElementById(`simulation_architecture-meta-${entry.id}`);
           wireCollapse(document.getElementById(`simulation_architecture-header-${entry.id}`), simulation_architectureContentDiv);
+
           const theory_architectureContentDiv = document.getElementById(contentIds['theory_architecture']);
           const theory_architectureMeta = document.getElementById(`theory_architecture-meta-${entry.id}`);
           wireCollapse(document.getElementById(`theory_architecture-header-${entry.id}`), theory_architectureContentDiv);
+
           const physical_world_bridgeContentDiv = document.getElementById(contentIds['physical_world_bridge']);
           const physical_world_bridgeMeta = document.getElementById(`physical_world_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`physical_world_bridge-header-${entry.id}`), physical_world_bridgeContentDiv);
+
           const math_bridgeContentDiv = document.getElementById(contentIds['math_bridge']);
           const math_bridgeMeta = document.getElementById(`math_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`math_bridge-header-${entry.id}`), math_bridgeContentDiv);
+
           const language_bridgeContentDiv = document.getElementById(contentIds['language_bridge']);
           const language_bridgeMeta = document.getElementById(`language_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`language_bridge-header-${entry.id}`), language_bridgeContentDiv);
+
           const data_bridgeContentDiv = document.getElementById(contentIds['data_bridge']);
           const data_bridgeMeta = document.getElementById(`data_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`data_bridge-header-${entry.id}`), data_bridgeContentDiv);
+
           const computational_bridgeContentDiv = document.getElementById(contentIds['computational_bridge']);
           const computational_bridgeMeta = document.getElementById(`computational_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`computational_bridge-header-${entry.id}`), computational_bridgeContentDiv);
+
           const music_bridgeContentDiv = document.getElementById(contentIds['music_bridge']);
           const music_bridgeMeta = document.getElementById(`music_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`music_bridge-header-${entry.id}`), music_bridgeContentDiv);
+
           const information_bridgeContentDiv = document.getElementById(contentIds['information_bridge']);
           const information_bridgeMeta = document.getElementById(`information_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`information_bridge-header-${entry.id}`), information_bridgeContentDiv);
+
           const poetry_bridgeContentDiv = document.getElementById(contentIds['poetry_bridge']);
           const poetry_bridgeMeta = document.getElementById(`poetry_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`poetry_bridge-header-${entry.id}`), poetry_bridgeContentDiv);
+
           const metaphysics_bridgeContentDiv = document.getElementById(contentIds['metaphysics_bridge']);
           const metaphysics_bridgeMeta = document.getElementById(`metaphysics_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`metaphysics_bridge-header-${entry.id}`), metaphysics_bridgeContentDiv);
 
-          const metaphysics_bridgeStatusDiv = document.getElementById(`metaphysics_bridge-status-${entry.id}`);
-          const poetry_bridgeStatusDiv = document.getElementById(`poetry_bridge-status-${entry.id}`);
-          const information_bridgeStatusDiv = document.getElementById(`information_bridge-status-${entry.id}`);
-          const music_bridgeStatusDiv = document.getElementById(`music_bridge-status-${entry.id}`);
-          const computational_bridgeStatusDiv = document.getElementById(`computational_bridge-status-${entry.id}`);
-          const data_bridgeStatusDiv = document.getElementById(`data_bridge-status-${entry.id}`);
-          const language_bridgeStatusDiv = document.getElementById(`language_bridge-status-${entry.id}`);
-          const math_bridgeStatusDiv = document.getElementById(`math_bridge-status-${entry.id}`);
-          const physical_world_bridgeStatusDiv = document.getElementById(`physical_world_bridge-status-${entry.id}`);
-          const theory_architectureStatusDiv = document.getElementById(`theory_architecture-status-${entry.id}`);
-          const simulation_architectureStatusDiv = document.getElementById(`simulation_architecture-status-${entry.id}`);
+          const thoughtContentDiv = document.getElementById(contentIds['thought']);
+          const thoughtMeta = document.getElementById(`thought-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`thought-header-${entry.id}`), thoughtContentDiv);
 
+          // Per-bridge status divs
+          const simulation_architectureStatusDiv = document.getElementById(`simulation_architecture-status-${entry.id}`);
+          const theory_architectureStatusDiv = document.getElementById(`theory_architecture-status-${entry.id}`);
+          const physical_world_bridgeStatusDiv = document.getElementById(`physical_world_bridge-status-${entry.id}`);
+          const math_bridgeStatusDiv = document.getElementById(`math_bridge-status-${entry.id}`);
+          const language_bridgeStatusDiv = document.getElementById(`language_bridge-status-${entry.id}`);
+          const data_bridgeStatusDiv = document.getElementById(`data_bridge-status-${entry.id}`);
+          const computational_bridgeStatusDiv = document.getElementById(`computational_bridge-status-${entry.id}`);
+          const music_bridgeStatusDiv = document.getElementById(`music_bridge-status-${entry.id}`);
+          const information_bridgeStatusDiv = document.getElementById(`information_bridge-status-${entry.id}`);
+          const poetry_bridgeStatusDiv = document.getElementById(`poetry_bridge-status-${entry.id}`);
+          const metaphysics_bridgeStatusDiv = document.getElementById(`metaphysics_bridge-status-${entry.id}`);
+          const thoughtStatusDiv = document.getElementById(`thought-status-${entry.id}`);
+          const allStatusDiv = document.getElementById(`all-status-${entry.id}`);
 
           // Load existing bridges by type
-          const simulation_architectureText = await fetchBridgeOfType(entry.id, "simulation_architecture");
-          renderBridge(simulation_architectureContentDiv, simulation_architectureText);
+          renderBridge(simulation_architectureContentDiv, await fetchBridgeOfType(entry.id, "simulation_architecture"));
+          renderBridge(theory_architectureContentDiv, await fetchBridgeOfType(entry.id, "theory_architecture"));
+          renderBridge(physical_world_bridgeContentDiv, await fetchBridgeOfType(entry.id, "physical_world_bridge"));
+          renderBridge(math_bridgeContentDiv, await fetchBridgeOfType(entry.id, "math_bridge"));
+          renderBridge(language_bridgeContentDiv, await fetchBridgeOfType(entry.id, "language_bridge"));
+          renderBridge(data_bridgeContentDiv, await fetchBridgeOfType(entry.id, "data_bridge"));
+          renderBridge(computational_bridgeContentDiv, await fetchBridgeOfType(entry.id, "computational_bridge"));
+          renderBridge(music_bridgeContentDiv, await fetchBridgeOfType(entry.id, "music_bridge"));
+          renderBridge(information_bridgeContentDiv, await fetchBridgeOfType(entry.id, "information_bridge"));
+          renderBridge(poetry_bridgeContentDiv, await fetchBridgeOfType(entry.id, "poetry_bridge"));
+          renderBridge(metaphysics_bridgeContentDiv, await fetchBridgeOfType(entry.id, "metaphysics_bridge"));
+          renderBridge(thoughtContentDiv, await fetchBridgeOfType(entry.id, "thought"));
 
-          const theory_architectureText = await fetchBridgeOfType(entry.id, "theory_architecture");
-          renderBridge(theory_architectureContentDiv, theory_architectureText);
-
-          const physical_world_bridgeText = await fetchBridgeOfType(entry.id, "physical_world_bridge");
-          renderBridge(physical_world_bridgeContentDiv, physical_world_bridgeText);
-
-          const math_bridgeText = await fetchBridgeOfType(entry.id, "math_bridge");
-          renderBridge(math_bridgeContentDiv, math_bridgeText);
-
-          const language_bridgeText = await fetchBridgeOfType(entry.id, "language_bridge");
-          renderBridge(language_bridgeContentDiv, language_bridgeText);
-
-          const data_bridgeText = await fetchBridgeOfType(entry.id, "data_bridge");
-          renderBridge(data_bridgeContentDiv, data_bridgeText);
-
-          const computational_bridgeText = await fetchBridgeOfType(entry.id, "computational_bridge");
-          renderBridge(computational_bridgeContentDiv, computational_bridgeText);
-
-          const music_bridgeText = await fetchBridgeOfType(entry.id, "music_bridge");
-          renderBridge(music_bridgeContentDiv, music_bridgeText);
-
-          const information_bridgeText = await fetchBridgeOfType(entry.id, "information_bridge");
-          renderBridge(information_bridgeContentDiv, information_bridgeText);
-
-          const poetry_bridgeText = await fetchBridgeOfType(entry.id, "poetry_bridge");
-          renderBridge(poetry_bridgeContentDiv, poetry_bridgeText);
-
-          const metaphysics_bridgeText = await fetchBridgeOfType(entry.id, "metaphysics_bridge");
-          renderBridge(metaphysics_bridgeContentDiv, metaphysics_bridgeText);
-
-          // Wire buttons
+          // Individual buttons wiring
           const simulation_architectureBtn = document.getElementById(`gen-simulation_architecture-btn-${entry.id}`);
           simulation_architectureBtn.onclick = () =>
             enqueueBridge(entry.id, "simulation_architecture", "/colors/simulation_architecture",
@@ -490,7 +514,84 @@
             enqueueBridge(entry.id, "metaphysics_bridge", "/colors/metaphysics_bridge",
               metaphysics_bridgeStatusDiv, metaphysics_bridgeContentDiv, metaphysics_bridgeMeta, metaphysics_bridgeBtn);
 
+          const thoughtBtn = document.getElementById(`gen-thought-btn-${entry.id}`);
+          thoughtBtn.onclick = () =>
+            enqueueBridge(entry.id, "thought", "/colors/thought_bridge",
+              thoughtStatusDiv, thoughtContentDiv, thoughtMeta, thoughtBtn);
 
+          // RUN ALL wiring
+          const allBtn = document.getElementById(`gen-all-btn-${entry.id}`);
+          allBtn.onclick = async () => {
+            allBtn.disabled = true;
+            allStatusDiv.textContent = "Bridge all started…";
+
+            // Specs in your preferred order
+            const specs = [
+              { type: "simulation_architecture", endpoint: "/colors/simulation_architecture",
+                status: simulation_architectureStatusDiv, content: simulation_architectureContentDiv,
+                meta: simulation_architectureMeta, btn: simulation_architectureBtn },
+              { type: "theory_architecture", endpoint: "/colors/theory_architecture",
+                status: theory_architectureStatusDiv, content: theory_architectureContentDiv,
+                meta: theory_architectureMeta, btn: theory_architectureBtn },
+              { type: "physical_world_bridge", endpoint: "/colors/physical_world_bridge",
+                status: physical_world_bridgeStatusDiv, content: physical_world_bridgeContentDiv,
+                meta: physical_world_bridgeMeta, btn: physical_world_bridgeBtn },
+              { type: "math_bridge", endpoint: "/colors/math_bridge",
+                status: math_bridgeStatusDiv, content: math_bridgeContentDiv,
+                meta: math_bridgeMeta, btn: math_bridgeBtn },
+              { type: "language_bridge", endpoint: "/colors/language_bridge",
+                status: language_bridgeStatusDiv, content: language_bridgeContentDiv,
+                meta: language_bridgeMeta, btn: language_bridgeBtn },
+              { type: "data_bridge", endpoint: "/colors/data_bridge",
+                status: data_bridgeStatusDiv, content: data_bridgeContentDiv,
+                meta: data_bridgeMeta, btn: data_bridgeBtn },
+              { type: "computational_bridge", endpoint: "/colors/computational_bridge",
+                status: computational_bridgeStatusDiv, content: computational_bridgeContentDiv,
+                meta: computational_bridgeMeta, btn: computational_bridgeBtn },
+              { type: "music_bridge", endpoint: "/colors/music_bridge",
+                status: music_bridgeStatusDiv, content: music_bridgeContentDiv,
+                meta: music_bridgeMeta, btn: music_bridgeBtn },
+              { type: "information_bridge", endpoint: "/colors/information_bridge",
+                status: information_bridgeStatusDiv, content: information_bridgeContentDiv,
+                meta: information_bridgeMeta, btn: information_bridgeBtn },
+              { type: "poetry_bridge", endpoint: "/colors/poetry_bridge",
+                status: poetry_bridgeStatusDiv, content: poetry_bridgeContentDiv,
+                meta: poetry_bridgeMeta, btn: poetry_bridgeBtn },
+              { type: "metaphysics_bridge", endpoint: "/colors/metaphysics_bridge",
+                status: metaphysics_bridgeStatusDiv, content: metaphysics_bridgeContentDiv,
+                meta: metaphysics_bridgeMeta, btn: metaphysics_bridgeBtn },
+              { type: "thought", endpoint: "/colors/thought_bridge",
+                status: thoughtStatusDiv, content: thoughtContentDiv,
+                meta: thoughtMeta, btn: thoughtBtn },
+            ];
+
+            let failures = 0;
+
+            for (const s of specs) {
+              try {
+                // check existing
+                const existing = await fetchBridgeOfType(entry.id, s.type);
+                if (existing) {
+                  renderBridge(s.content, existing);
+                  s.status.textContent = `${s.type} already exists, skipped.`;
+                  continue;
+                }
+
+                allStatusDiv.textContent = `Running ${s.type}…`;
+                await enqueueBridge(entry.id, s.type, s.endpoint, s.status, s.content, s.meta, s.btn);
+              } catch (e) {
+                failures += 1;
+                allStatusDiv.textContent = `Error in ${s.type} (continuing)…`;
+              }
+            }
+
+            allStatusDiv.textContent =
+              failures === 0
+                ? "Bridge all complete."
+                : `Bridge all complete with ${failures} error(s).`;
+
+            allBtn.disabled = false;
+          };
         }
 
       } catch (e) {
