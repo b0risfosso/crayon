@@ -37,13 +37,6 @@ from prompts import entity_bridge_relationship_prompt  # type: ignore
 
 
 
-
-
-
-
-
-
-
 try:
     from openai import OpenAI
     _client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -53,9 +46,10 @@ except Exception as e:
 
 import threading
 import queue
-import uuid
 import time
 
+import uuid
+from contextlib import contextmanager
 
 
 MODEL_DEFAULT = os.environ.get("COLORS_MODEL", "gpt-5.1")
@@ -66,6 +60,55 @@ DAILY_LIMITS = json.loads(os.environ.get("COLORS_DAILY_TOKEN_LIMITS_JSON", "{}")
 
 LLM_USAGE_DB_PATH = os.environ.get("LLM_USAGE_DB", "/var/www/site/data/llm_usage.db")
 DAILY_LIMITS = json.loads(os.environ.get("COLORS_DAILY_TOKEN_LIMITS_JSON", "{}"))
+
+@contextmanager
+def open_db():
+    db = get_art_db()
+    try:
+        yield db
+        db.commit()
+    finally:
+        db.close()
+
+def fetch_one(sql, params=()):
+    with open_db() as db:
+        row = db.execute(sql, params).fetchone()
+        return dict(row) if row else None
+
+def fetch_all(sql, params=()):
+    with open_db() as db:
+        rows = db.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+def execute_returning_id(sql, params=()):
+    """
+    Preferred: use SQLite RETURNING to get inserted id safely.
+    """
+    with open_db() as db:
+        row = db.execute(sql + " RETURNING id", params).fetchone()
+        if not row:
+            raise RuntimeError("INSERT did not return an id")
+        return int(row["id"])
+
+def execute(sql, params=()):
+    with open_db() as db:
+        db.execute(sql, params)
+
+def safe_insert_then_fetch(sql_insert, insert_params, sql_fetch, fetch_params):
+    """
+    Fallback if you don't want RETURNING:
+      - generate insert_key
+      - insert with insert_key
+      - fetch by insert_key
+    """
+    insert_key = str(uuid.uuid4())
+    insert_params = (*insert_params, insert_key)
+    with open_db() as db:
+        db.execute(sql_insert, insert_params)
+    row = fetch_one(sql_fetch, fetch_params + (insert_key,))
+    if not row:
+        raise RuntimeError("Insert lookup by insert_key failed")
+    return row
 
 
 def usage_day_utc(ts_iso: str) -> str:
@@ -370,6 +413,93 @@ def run_simulation_seeds_from_color(task_id: str, color_id: int, model: str, tem
     }
 
 
+def run_bridge_task(color_id, model, temperature, user_metadata, *,
+                    system_prompt_tmpl, bridge_type, projected_tokens, endpoint):
+    # 1) Read color row (short-lived)
+    row = fetch_one(
+        "SELECT id, art_id, output_text FROM colors WHERE id = ?",
+        (color_id,)
+    )
+    if not row:
+        raise ValueError(f"color id {color_id} not found")
+
+    art_id = row["art_id"]
+    thought_text = (row["output_text"] or "").strip()
+    if not thought_text:
+        raise ValueError(f"color {color_id} has empty output_text")
+
+    system_prompt = system_prompt_tmpl.format(thought=thought_text)
+    user_prompt = ""
+
+    enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+    # 2) LLM (no DB)
+    with LLM_LOCK:
+        t0 = time.time()
+        resp = _client.chat.completions.create(
+            model=model,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+
+    output_text = (resp.choices[0].message.content or "").strip()
+
+    usage = getattr(resp, "usage", None)
+    usage_dict = usage.model_dump() if usage else None
+    tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+    tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+    total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
+    duration_ms = int((time.time() - t0) * 1000)
+
+    created_at = utc_now_iso()
+
+    # 3) Insert bridge + RETURNING id (short-lived)
+    new_bridge_id = execute_returning_id(
+        """
+        INSERT INTO bridges
+          (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (color_id, art_id, thought_text, output_text, bridge_type, model, created_at)
+    )
+
+    saved_row = fetch_one("SELECT * FROM bridges WHERE id = ?", (new_bridge_id,))
+
+    # 4) Log usage
+    log_llm_usage(
+        ts=created_at,
+        app_name="colors",
+        model=model,
+        endpoint=endpoint,
+        email=None,
+        request_id=None,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        total_tokens=total_tokens,
+        duration_ms=duration_ms,
+        cost_usd=0.0,
+        meta_obj={
+            "color_id": color_id,
+            "art_id": art_id,
+            "bridge_id": new_bridge_id,
+            "worker_id": None,
+            "user_metadata": user_metadata,
+        },
+    )
+
+    return {
+        "color_id": color_id,
+        "art_id": art_id,
+        "bridge_text": output_text,
+        "saved_bridge": saved_row,
+        "usage": usage_dict,
+        "duration_ms": duration_ms,
+    }
+
+
 
 def worker_loop(worker_id: int):
     while True:
@@ -391,8 +521,8 @@ def worker_loop(worker_id: int):
                 model = task["model"]
                 user_metadata = task["user_metadata"]
 
-                # 1) load art text
-                art_row = fetch_art_text(art_id)
+                # 1) load art text (short-lived DB)
+                art_row = fetch_art_text(art_id)  # ensure this opens+closes internally
                 thought_text = (art_row.get("art") or "").strip()
                 if not thought_text:
                     raise ValueError(f"art id {art_id} has empty art text")
@@ -403,7 +533,7 @@ def worker_loop(worker_id: int):
                 projected_tokens = 2000
                 enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
 
-                # 3) call LLM
+                # 3) LLM call (no DB open here)
                 with LLM_LOCK:
                     t0 = time.time()
                     resp = _client.chat.completions.create(
@@ -413,7 +543,6 @@ def worker_loop(worker_id: int):
                             {"role": "user", "content": user_prompt},
                         ],
                     )
-
                 expanded = (resp.choices[0].message.content or "").strip()
 
                 usage = getattr(resp, "usage", None)
@@ -460,1343 +589,202 @@ def worker_loop(worker_id: int):
                         "usage": usage_dict,
                         "saved_color": colors_row,
                     }
-
-
-
-            # ============================================================
-            #  TYPE 2: simulation_seeds (NEW)
-            # ============================================================
-            elif task_type == "simulation_seeds":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                # Load color row
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = digital_playground_bridge_sys
-                user_prompt = digital_playground_bridge_user.format(thought=thought_text)
-
-                projected_tokens = 4000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                # Call LLM
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                # STRICT JSON validation
-                parsed = json.loads(output_text)
-                if "simulation_seeds" not in parsed or not isinstance(parsed["simulation_seeds"], list):
-                    db.close()
-                    raise ValueError("model response missing simulation_seeds list")
-
-                # Save to DB
-                created_at = utc_now_iso()
-                db.execute(
-                    """
-                    INSERT INTO simulation_seeds
-                      (color_id, art_id, input_text, seeds_json, model, temperature, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        model,
-                        temperature,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute(
-                        "SELECT * FROM simulation_seeds WHERE id = ?",
-                        (new_id,)
-                    ).fetchone()
-                )
-                db.close()
-
-                # LLM usage logging
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
-                    endpoint="/colors/simulation_seeds",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id
-                    },
-                )
-
-                with TASKS_LOCK:
-                    TASKS[task_id]["status"] = "done"
-                    TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "simulation_seeds",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "seeds": parsed,
-                        "saved_simulation_seeds": saved_row,
-                        "usage": usage_dict,
-                    }
-
-            # ============================================================
-            #  TYPE 3: entities (NEW)
-            # ============================================================
-            #elif task_type == "entities":
-            # deleted
             elif task_type == "bridge_simulation":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                # Load color row
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = int(row["art_id"])
-                thought_text = row["output_text"] or ""
-
-                # Build prompt (single-message prompt stored in prompts.py)
-                system_prompt = bridge_simulation_prompt.format(thought=thought_text)
-                user_prompt = ""  # prompt is carried in system message
-
-                projected_tokens = 5000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                # Call LLM
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-                    duration_ms = int((time.time() - t0) * 1000)
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                # Save to bridges table (NEW)
-                created_at = utc_now_iso()
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "simulation_architecture",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute(
-                        "SELECT * FROM bridges WHERE id = ?",
-                        (new_id,)
-                    ).fetchone()
-                )
-                db.close()
-
-                # LLM usage logging
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=bridge_simulation_prompt,
+                    bridge_type="simulation_architecture",
+                    projected_tokens=5000,
                     endpoint="/colors/bridge_simulation",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "bridge_simulation",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "input_text": thought_text,
-                        "output_text": output_text,
-                        "model": model,
-                        "temperature": temperature,
-                        "usage": usage_dict,
-                        "duration_ms": duration_ms,
-                    }
-
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "bridge_simulation", **result}
+            # ============================================================
             #  TYPE 5: theory_architecture (NEW) -> saves to bridges
             # ============================================================
             elif task_type == "theory_architecture":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                # Load color row
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = theory_architecture_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 5000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                # Save to bridges table (same as simulation_architecture)
-                created_at = utc_now_iso()
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "theory_architecture",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute(
-                        "SELECT * FROM bridges WHERE id = ?",
-                        (new_id,)
-                    ).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=theory_architecture_prompt,
+                    bridge_type="theory_architecture",
+                    projected_tokens=5000,
                     endpoint="/colors/theory_architecture",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "theory_architecture",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "theory_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "theory_architecture", **result}
+            # ============================================================
             #  TYPE 6: physical_world_bridge (NEW) -> saves to bridges
             # ============================================================
             elif task_type == "physical_world_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = physical_world_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 5000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                # Save to bridges with bridge_type
-                created_at = utc_now_iso()
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "physical_world_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute(
-                        "SELECT * FROM bridges WHERE id = ?",
-                        (new_id,)
-                    ).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=physical_world_bridge_prompt,
+                    bridge_type="physical_world_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/physical_world_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "physical_world_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "physical_world_bridge", **result}
+            # ============================================================
             #  TYPE: math_bridge (NEW)
             # ============================================================
             elif task_type == "math_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = math_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 5000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                created_at = utc_now_iso()
-
-                # --- SAVE INTO BRIDGES ---
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "math_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=math_bridge_prompt,
+                    bridge_type="math_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/math_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "math_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "math_bridge", **result}
+            # ============================================================
             #  TYPE: language_bridge (NEW)
             # ============================================================
             elif task_type == "language_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = language_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 5000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                created_at = utc_now_iso()
-
-                # --- SAVE INTO bridges WITH TYPE ---
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "language_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=language_bridge_prompt,
+                    bridge_type="language_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/language_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "language_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "language_bridge", **result}
+            # ============================================================
             #  TYPE: data_bridge (NEW)
             # ============================================================
             elif task_type == "data_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = data_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 5000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                created_at = utc_now_iso()
-
-                # --- SAVE INTO bridges WITH TYPE ---
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "data_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=data_bridge_prompt,
+                    bridge_type="data_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/data_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "data_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "data_bridge", **result}
+            # ============================================================
             #  TYPE: computational_bridge (NEW)
             # ============================================================
             elif task_type == "computational_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = computational_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 6000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                created_at = utc_now_iso()
-
-                # SAVE INTO bridges WITH TYPE
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "computational_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=computational_bridge_prompt,
+                    bridge_type="computational_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/computational_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "computational_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "computational_bridge", **result}
+            # ============================================================
             #  TYPE: music_bridge (NEW)
             # ============================================================
             elif task_type == "music_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = music_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 6000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                created_at = utc_now_iso()
-
-                # SAVE INTO bridges WITH TYPE
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "music_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=music_bridge_prompt,
+                    bridge_type="music_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/music_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "music_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "music_bridge", **result}
+            # ============================================================
             #  TYPE: information_bridge (NEW)
             # ============================================================
             elif task_type == "information_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = information_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 6000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0)*1000)
-
-                created_at = utc_now_iso()
-
-                # save in bridges with bridge_type
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "information_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=information_bridge_prompt,
+                    bridge_type="information_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/information_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "information_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "information_bridge", **result}
+            # ============================================================
             #  TYPE: poetry_bridge (NEW)
             # ============================================================
             elif task_type == "poetry_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = poetry_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 6000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                created_at = utc_now_iso()
-
-                # SAVE INTO bridges WITH TYPE
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "poetry_bridge",
-                        model,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=poetry_bridge_prompt,
+                    bridge_type="poetry_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/poetry_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    },
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "poetry_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "poetry_bridge", **result}
+            # ============================================================
             #  TYPE: metaphysics_bridge (NEW)
             # ============================================================
             elif task_type == "metaphysics_bridge":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = metaphysics_bridge_prompt.format(thought=thought_text)
-                user_prompt = ""
-
-                projected_tokens = 6000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        temperature=temperature,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = tokens_in + tokens_out
-                duration_ms = int((time.time() - t0) * 1000)
-
-                created_at = utc_now_iso()
-
-                # SAVE INTO bridges WITH TYPE
-                db.execute(
-                    """
-                    INSERT INTO bridges
-                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        "metaphysics_bridge",
-                        model,
-                        created_at,
-                    )
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
+                result = run_bridge_task(
+                    color_id=task["color_id"],
+                    model=task["model"],
+                    temperature=float(task["temperature"]),
+                    user_metadata=task["user_metadata"],
+                    system_prompt_tmpl=metaphysics_bridge_prompt,
+                    bridge_type="metaphysics_bridge",
+                    projected_tokens=5000,
                     endpoint="/colors/metaphysics_bridge",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id,
-                        "user_metadata": user_metadata,
-                    }
                 )
-
                 with TASKS_LOCK:
                     TASKS[task_id]["status"] = "done"
                     TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "metaphysics_bridge",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "bridge_text": output_text,
-                        "saved_bridge": saved_row,
-                        "usage": usage_dict,
-                    }
-                        # ============================================================
+                    TASKS[task_id]["result"] = {"task_type": "metaphysics_bridge", **result}
+            # ============================================================
             #  TYPE: thought_bridge (NO LLM: copies thought -> bridge_text)
             # ============================================================
             elif task_type == "thought_bridge":
@@ -1804,50 +792,29 @@ def worker_loop(worker_id: int):
                 model = task.get("model") or "none"
                 user_metadata = task.get("user_metadata") or {}
 
-                db = get_art_db()
-                row = db.execute(
+                row = fetch_one(
                     "SELECT id, art_id, output_text FROM colors WHERE id = ?",
                     (color_id,)
-                ).fetchone()
-
+                )
                 if not row:
-                    db.close()
                     raise ValueError(f"color id {color_id} not found")
 
                 art_id = row["art_id"]
                 thought_text = (row["output_text"] or "").strip()
-
                 if not thought_text:
-                    db.close()
                     raise ValueError(f"color {color_id} has empty output_text")
 
                 created_at = utc_now_iso()
 
-                # Save the thought directly as a bridge
-                db.execute(
+                new_bridge_id = execute_returning_id(
                     """
                     INSERT INTO bridges
-                      (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
+                    (color_id, art_id, input_text, bridge_text, bridge_type, model, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,      # input_text
-                        thought_text,      # bridge_text (copy)
-                        "thought",         # bridge_type
-                        model,             # "none" or whatever you want
-                        created_at,
-                    ),
+                    (color_id, art_id, thought_text, thought_text, "thought", model, created_at)
                 )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                )
-                db.close()
-
+                saved_row = fetch_one("SELECT * FROM bridges WHERE id = ?", (new_bridge_id,))
                 # Optional: still log usage as 0 tokens
                 log_llm_usage(
                     ts=utc_now_iso(),
@@ -1892,176 +859,140 @@ def worker_loop(worker_id: int):
                 temperature = float(task["temperature"])
                 user_metadata = task["user_metadata"]
 
-                db = get_art_db()
-                try:
-                    # Fetch bridge row
-                    bridge_row = db.execute(
-                        "SELECT * FROM bridges WHERE id = ?",
-                        (bridge_id,),
-                    ).fetchone()
+                # ---- PHASE A: read bridge + color/thought (short-lived DB) ----
+                bridge_row = fetch_one("SELECT * FROM bridges WHERE id = ?", (bridge_id,))
+                if bridge_row is None:
+                    raise ValueError(f"bridge id {bridge_id} not found")
 
-                    if bridge_row is None:
-                        raise ValueError(f"bridge id {bridge_id} not found")
+                color_id = bridge_row["color_id"]
+                art_id = bridge_row["art_id"]
+                orig_bridge_type = bridge_row.get("bridge_type") or "bridge"
+                bridge_text = bridge_row.get("bridge_text") or ""
 
-                    bridge_row = dict(bridge_row)
-                    color_id = bridge_row["color_id"]
-                    art_id = bridge_row["art_id"]
-                    orig_bridge_type = bridge_row["bridge_type"] or "bridge"
-                    bridge_text = bridge_row["bridge_text"] or ""
+                color_row = fetch_one("SELECT * FROM colors WHERE id = ?", (color_id,))
+                thought_text = (color_row.get("output_text") if color_row else None) or "NONE"
 
-                    # Fetch thought (optional)
-                    color_row = db.execute(
-                        "SELECT * FROM colors WHERE id = ?",
-                        (color_id,),
-                    ).fetchone()
-                    thought_text = "NONE"
-                    if color_row is not None:
-                        thought_text = (dict(color_row).get("output_text") or "NONE")
+                now = utc_now_iso()
 
-                    # ---- ENTITY TABLE INSERTION / FETCH ----
-                    now = utc_now_iso()
-
-                    # 1. Check if entity already exists
-                    existing_entity = db.execute(
-                        "SELECT id FROM entities WHERE name = ?",
-                        (entity_text,),
-                    ).fetchone()
-
-                    if existing_entity:
-                        entity_id = existing_entity["id"]
-                    else:
-                        # 2. Insert new entity
-                        db.execute(
-                            """
-                            INSERT INTO entities (name, canonical_name, created_at)
-                            VALUES (?, ?, ?)
-                            """,
-                            (entity_text, entity_text, now),
-                        )
-                        entity_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-
-                    # After entity_id is known
-                    
-                    # ---- LLM CALL ----
-                    system_prompt = entity_bridge_relationship_prompt.format(
-                        thought=thought_text,
-                        bridge_type=orig_bridge_type,
-                        bridge_text=bridge_text,
-                        entity_text=entity_text,
-                    )
-                    user_prompt = ""
-
-                    projected_tokens = 7000
-                    enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                    with LLM_LOCK:
-                        t0 = time.time()
-                        resp = _client.chat.completions.create(
-                            model=model,
-                            temperature=temperature,
-                            messages=[
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": user_prompt},
-                            ],
-                        )
-                    output_text = (resp.choices[0].message.content or "").strip()
-
-                    usage = getattr(resp, "usage", None)
-                    usage_dict = {
-                        "prompt_tokens": getattr(usage, "prompt_tokens", 0) if usage else 0,
-                        "completion_tokens": getattr(usage, "completion_tokens", 0) if usage else 0,
-                        "total_tokens": getattr(usage, "total_tokens", 0) if usage else 0,
-                    }
-
-                    tokens_in = int(usage_dict.get("prompt_tokens", 0))
-                    tokens_out = int(usage_dict.get("completion_tokens", 0))
-                    total_tokens = int(usage_dict.get("total_tokens", tokens_in + tokens_out))
-                    duration_ms = int((time.time() - t0) * 1000)
-
-                    # ---- SAVE NEW BRUSH-STROKE BRIDGE ----
-                    new_bridge_type = f"{orig_bridge_type}_brush_stroke"
-                    created_at = now
-
-                    db.execute(
+                # ---- PHASE B: ensure entity exists (short-lived DB) ----
+                existing = fetch_one("SELECT id FROM entities WHERE name = ?", (entity_text,))
+                if existing:
+                    entity_id = existing["id"]
+                else:
+                    entity_id = execute_returning_id(
                         """
-                        INSERT INTO bridges
-                        (color_id, art_id, input_text, bridge_text, bridge_type, entity, entity_id, model, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO entities (name, canonical_name, created_at)
+                        VALUES (?, ?, ?)
                         """,
-                        (
-                            color_id,
-                            art_id,
-                            entity_text,    # store entity in input_text for compatibility
-                            output_text,
-                            new_bridge_type,
-                            entity_text,
-                            entity_id,      # NEW: link to entity table
-                            model,
-                            created_at,
-                        ),
-                    )
-                    new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-
-                    db.execute(
-                        """
-                        INSERT INTO entity_instances (entity_id, color_id, bridge_id, origin, created_at)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (entity_id, color_id, new_id, "brush_stroke", now)
+                        (entity_text, entity_text, now)
                     )
 
-                    db.commit()
+                # ---- PHASE C: LLM (no DB) ----
+                system_prompt = entity_bridge_relationship_prompt.format(
+                    thought=thought_text,
+                    bridge_type=orig_bridge_type,
+                    bridge_text=bridge_text,
+                    entity_text=entity_text,
+                )
+                user_prompt = ""
 
-                    saved_row = dict(
-                        db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
-                    )
+                enforce_daily_cap_or_429(model=model, projected_tokens=7000)
 
-                    # ---- LLM USAGE LOG ----
-                    log_llm_usage(
-                        ts=created_at,
-                        app_name="colors",
+                with LLM_LOCK:
+                    t0 = time.time()
+                    resp = _client.chat.completions.create(
                         model=model,
-                        endpoint="brush_stroke_bridge",
-                        email=user_metadata.get("email") if isinstance(user_metadata, dict) else None,
-                        request_id=task_id,
-                        tokens_in=tokens_in,
-                        tokens_out=tokens_out,
-                        total_tokens=total_tokens,
-                        duration_ms=duration_ms,
-                        cost_usd=0.0,
-                        meta_obj={
-                            "color_id": color_id,
-                            "art_id": art_id,
-                            "bridge_id": bridge_id,
-                            "entity": entity_text,
-                            "entity_id": entity_id,
-                            "orig_bridge_type": orig_bridge_type,
-                            "new_bridge_type": new_bridge_type,
-                            "worker_id": worker_id,
-                            "user_metadata": user_metadata,
-                        },
+                        temperature=temperature,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
                     )
+                output_text = (resp.choices[0].message.content or "").strip()
 
-                    with TASKS_LOCK:
-                        TASKS[task_id]["status"] = "done"
-                        TASKS[task_id]["result"] = {
-                            "task_type": "brush_stroke_bridge",
-                            "bridge_id": bridge_id,
-                            "new_bridge_entry_id": new_id,
-                            "entity": entity_text,
-                            "entity_id": entity_id,
-                            "bridge_type": new_bridge_type,
-                            "bridge_text": output_text,
-                            "saved_bridge": saved_row,
-                            "usage": usage_dict,
-                        }
+                usage = getattr(resp, "usage", None)
+                usage_dict = {
+                    "prompt_tokens": getattr(usage, "prompt_tokens", 0) if usage else 0,
+                    "completion_tokens": getattr(usage, "completion_tokens", 0) if usage else 0,
+                    "total_tokens": getattr(usage, "total_tokens", 0) if usage else 0,
+                }
+                tokens_in = int(usage_dict["prompt_tokens"])
+                tokens_out = int(usage_dict["completion_tokens"])
+                total_tokens = int(usage_dict["total_tokens"] or (tokens_in + tokens_out))
+                duration_ms = int((time.time() - t0) * 1000)
 
-                except Exception as e:
-                    with TASKS_LOCK:
-                        TASKS[task_id]["status"] = "error"
-                        TASKS[task_id]["error"] = str(e)
-                finally:
-                    db.close()
+                # ---- PHASE D: insert new brush-stroke bridge (short-lived DB) ----
+                new_bridge_type = f"{orig_bridge_type}_brush_stroke"
+
+                new_id = execute_returning_id(
+                    """
+                    INSERT INTO bridges
+                    (color_id, art_id, input_text, bridge_text, bridge_type, entity, entity_id, model, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        color_id,
+                        art_id,
+                        entity_text,   # input_text for compat
+                        output_text,
+                        new_bridge_type,
+                        entity_text,
+                        entity_id,
+                        model,
+                        now,
+                    )
+                )
+
+                # ---- PHASE E: insert entity_instance linked to new bridge (short-lived DB) ----
+                execute(
+                    """
+                    INSERT INTO entity_instances (entity_id, color_id, bridge_id, origin, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (entity_id, color_id, new_id, "brush_stroke", now)
+                )
+
+                saved_row = fetch_one("SELECT * FROM bridges WHERE id = ?", (new_id,))
+
+                # ---- LLM USAGE LOG ----
+                log_llm_usage(
+                    ts=created_at,
+                    app_name="colors",
+                    model=model,
+                    endpoint="brush_stroke_bridge",
+                    email=user_metadata.get("email") if isinstance(user_metadata, dict) else None,
+                    request_id=task_id,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cost_usd=0.0,
+                    meta_obj={
+                        "color_id": color_id,
+                        "art_id": art_id,
+                        "bridge_id": bridge_id,
+                        "entity": entity_text,
+                        "entity_id": entity_id,
+                        "orig_bridge_type": orig_bridge_type,
+                        "new_bridge_type": new_bridge_type,
+                        "worker_id": worker_id,
+                        "user_metadata": user_metadata,
+                    },
+                )
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "brush_stroke_bridge",
+                        "bridge_id": bridge_id,
+                        "new_bridge_entry_id": new_id,
+                        "entity": entity_text,
+                        "entity_id": entity_id,
+                        "bridge_type": new_bridge_type,
+                        "bridge_text": output_text,
+                        "saved_bridge": saved_row,
+                        "usage": usage_dict,
+                    }
 
             # ============================================================
             # Unsupported task type
@@ -2113,11 +1044,19 @@ def get_art_db() -> sqlite3.Connection:
 
 def fetch_art_text(art_id: int) -> Dict[str, Any]:
     db = get_art_db()
-    row = db.execute("SELECT * FROM art WHERE id = ?", (art_id,)).fetchone()
-    db.close()
+    try:
+        row = db.execute(
+            "SELECT * FROM art WHERE id = ?",
+            (art_id,)
+        ).fetchone()
+    finally:
+        db.close()
+
     if row is None:
         abort(404, description=f"art id {art_id} not found")
+
     return dict(row)
+
 
 
 def insert_color_row(
@@ -2139,28 +1078,30 @@ def insert_color_row(
     }
     md_str = json.dumps(md_obj, ensure_ascii=False)
 
+    # short-lived DB scope
     db = get_art_db()
-    cur = db.execute(
-        """
-        INSERT INTO colors
-          (art_id, input_art, output_text, model, provider, metadata, created_at, updated_at)
-        VALUES (?,      ?,         ?,          ?,        ?,        ?,        ?,          ?)
-        """,
-        (
-            art_id,
-            input_art,
-            output_text,
-            model,
-            "openai",
-            md_str,
-            created_at,
-            updated_at,
-        ),
-    )
-    db.commit()
-    new_id = cur.lastrowid
-    row = db.execute("SELECT * FROM colors WHERE id = ?", (new_id,)).fetchone()
-    db.close()
+    try:
+        row = db.execute(
+            """
+            INSERT INTO colors
+              (art_id, input_art, output_text, model, provider, metadata, created_at, updated_at)
+            VALUES (?,      ?,         ?,          ?,        ?,        ?,        ?,          ?)
+            RETURNING *
+            """,
+            (
+                art_id,
+                input_art,
+                output_text,
+                model,
+                "openai",
+                md_str,
+                created_at,
+                updated_at,
+            ),
+        ).fetchone()
+        db.commit()
+    finally:
+        db.close()
 
     out = dict(row)
     try:
@@ -2168,6 +1109,7 @@ def insert_color_row(
     except Exception:
         pass
     return out
+
 
 
 # -------------------------
