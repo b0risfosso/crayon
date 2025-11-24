@@ -889,6 +889,9 @@
                 ? `Brush strokes complete for ${ok} bridge(s).`
                 : `Brush strokes complete: ${ok} ok, ${fail} failed.`;
 
+            // 🔁 reload entities list regardless of outcome
+            await loadBrushStrokes(entry.id, brushListEl);
+
             bsBtn.disabled = false;
           };
         }

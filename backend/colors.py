@@ -956,7 +956,7 @@ def worker_loop(worker_id: int):
 
                 # ---- LLM USAGE LOG ----
                 log_llm_usage(
-                    ts=created_at,
+                    ts=now,
                     app_name="colors",
                     model=model,
                     endpoint="brush_stroke_bridge",
