@@ -1824,7 +1824,6 @@ def worker_loop(worker_id: int):
                 enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
 
                 with LLM_LOCK:
-                    import time
                     t0 = time.time()
                     resp = _client.chat.completions.create(
                         model=model,
