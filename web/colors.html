@@ -159,8 +159,6 @@
           const div = document.createElement('div');
           div.className = 'block';
 
-          const statusDivId = `status-${entry.id}`;
-
           const contentIds = {};
           contentIds['simulation_architecture'] = `simulation_architecture-content-${entry.id}`;
           contentIds['theory_architecture'] = `theory_architecture-content-${entry.id}`;
@@ -195,7 +193,6 @@
               <button id="gen-poetry_bridge-btn-${entry.id}">Poetry Bridge</button>
               <button id="gen-metaphysics_bridge-btn-${entry.id}">Metaphysics Bridge</button>
             </div>
-            <div id="${statusDivId}" class="status"></div>
 
 
             <div class="bridge-group">
@@ -208,6 +205,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['simulation_architecture']}"></div>
             </div>
+            <div id="simulation_architecture-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="theory_architecture-header-${entry.id}">
@@ -219,6 +217,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['theory_architecture']}"></div>
             </div>
+            <div id="theory_architecture-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="physical_world_bridge-header-${entry.id}">
@@ -230,6 +229,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['physical_world_bridge']}"></div>
             </div>
+            <div id="physical_world_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="math_bridge-header-${entry.id}">
@@ -241,6 +241,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['math_bridge']}"></div>
             </div>
+            <div id="math_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="language_bridge-header-${entry.id}">
@@ -252,6 +253,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['language_bridge']}"></div>
             </div>
+            <div id="language_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="data_bridge-header-${entry.id}">
@@ -263,6 +265,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['data_bridge']}"></div>
             </div>
+            <div id="data_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="computational_bridge-header-${entry.id}">
@@ -274,6 +277,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['computational_bridge']}"></div>
             </div>
+            <div id="computational_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="music_bridge-header-${entry.id}">
@@ -285,6 +289,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['music_bridge']}"></div>
             </div>
+            <div id="music_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="information_bridge-header-${entry.id}">
@@ -296,6 +301,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['information_bridge']}"></div>
             </div>
+            <div id="information_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="poetry_bridge-header-${entry.id}">
@@ -307,6 +313,7 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['poetry_bridge']}"></div>
             </div>
+            <div id="poetry_bridge-status-${entry.id}" class="status"></div>
 
             <div class="bridge-group">
               <div class="bridge-header" id="metaphysics_bridge-header-${entry.id}">
@@ -318,11 +325,11 @@
               </div>
               <div class="bridge-content collapsed" id="${contentIds['metaphysics_bridge']}"></div>
             </div>
+            <div id="metaphysics_bridge-status-${entry.id}" class="status"></div>
           `;
 
           container.appendChild(div);
 
-          const statusDiv = document.getElementById(statusDivId);
 
           const simulation_architectureContentDiv = document.getElementById(contentIds['simulation_architecture']);
           const simulation_architectureMeta = document.getElementById(`simulation_architecture-meta-${entry.id}`);
@@ -357,6 +364,19 @@
           const metaphysics_bridgeContentDiv = document.getElementById(contentIds['metaphysics_bridge']);
           const metaphysics_bridgeMeta = document.getElementById(`metaphysics_bridge-meta-${entry.id}`);
           wireCollapse(document.getElementById(`metaphysics_bridge-header-${entry.id}`), metaphysics_bridgeContentDiv);
+
+          const metaphysics_bridgeStatusDiv = document.getElementById(`metaphysics_bridge-status-${entry.id}`);
+          const poetry_bridgeStatusDiv = document.getElementById(`poetry_bridge-status-${entry.id}`);
+          const information_bridgeStatusDiv = document.getElementById(`information_bridge-status-${entry.id}`);
+          const music_bridgeStatusDiv = document.getElementById(`music_bridge-status-${entry.id}`);
+          const computational_bridgeStatusDiv = document.getElementById(`computational_bridge-status-${entry.id}`);
+          const data_bridgeStatusDiv = document.getElementById(`data_bridge-status-${entry.id}`);
+          const language_bridgeStatusDiv = document.getElementById(`language_bridge-status-${entry.id}`);
+          const math_bridgeStatusDiv = document.getElementById(`math_bridge-status-${entry.id}`);
+          const physical_world_bridgeStatusDiv = document.getElementById(`physical_world_bridge-status-${entry.id}`);
+          const theory_architectureStatusDiv = document.getElementById(`theory_architecture-status-${entry.id}`);
+          const simulation_architectureDiv = document.getElementById(`simulation_architecture-status-${entry.id}`);
+
 
           // Load existing bridges by type
           const simulation_architectureText = await fetchBridgeOfType(entry.id, "simulation_architecture");
@@ -396,57 +416,57 @@
           const simulation_architectureBtn = document.getElementById(`gen-simulation_architecture-btn-${entry.id}`);
           simulation_architectureBtn.onclick = () =>
             enqueueBridge(entry.id, "simulation_architecture", "/colors/simulation_architecture",
-              statusDiv, simulation_architectureContentDiv, simulation_architectureMeta, simulation_architectureBtn);
+              simulation_architectureStatusDiv, simulation_architectureContentDiv, simulation_architectureMeta, simulation_architectureBtn);
 
           const theory_architectureBtn = document.getElementById(`gen-theory_architecture-btn-${entry.id}`);
           theory_architectureBtn.onclick = () =>
             enqueueBridge(entry.id, "theory_architecture", "/colors/theory_architecture",
-              statusDiv, theory_architectureContentDiv, theory_architectureMeta, theory_architectureBtn);
+              theory_architectureStatusDiv, theory_architectureContentDiv, theory_architectureMeta, theory_architectureBtn);
 
           const physical_world_bridgeBtn = document.getElementById(`gen-physical_world_bridge-btn-${entry.id}`);
           physical_world_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "physical_world_bridge", "/colors/physical_world_bridge",
-              statusDiv, physical_world_bridgeContentDiv, physical_world_bridgeMeta, physical_world_bridgeBtn);
+              physical_world_bridgeStatusDiv, physical_world_bridgeContentDiv, physical_world_bridgeMeta, physical_world_bridgeBtn);
 
           const math_bridgeBtn = document.getElementById(`gen-math_bridge-btn-${entry.id}`);
           math_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "math_bridge", "/colors/math_bridge",
-              statusDiv, math_bridgeContentDiv, math_bridgeMeta, math_bridgeBtn);
+              math_bridgeStatusDiv, math_bridgeContentDiv, math_bridgeMeta, math_bridgeBtn);
 
           const language_bridgeBtn = document.getElementById(`gen-language_bridge-btn-${entry.id}`);
           language_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "language_bridge", "/colors/language_bridge",
-              statusDiv, language_bridgeContentDiv, language_bridgeMeta, language_bridgeBtn);
+              language_bridgeStatusDiv, language_bridgeContentDiv, language_bridgeMeta, language_bridgeBtn);
 
           const data_bridgeBtn = document.getElementById(`gen-data_bridge-btn-${entry.id}`);
           data_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "data_bridge", "/colors/data_bridge",
-              statusDiv, data_bridgeContentDiv, data_bridgeMeta, data_bridgeBtn);
+              data_bridgeStatusDiv, data_bridgeContentDiv, data_bridgeMeta, data_bridgeBtn);
 
           const computational_bridgeBtn = document.getElementById(`gen-computational_bridge-btn-${entry.id}`);
           computational_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "computational_bridge", "/colors/computational_bridge",
-              statusDiv, computational_bridgeContentDiv, computational_bridgeMeta, computational_bridgeBtn);
+              computational_bridgeStatusDiv, computational_bridgeContentDiv, computational_bridgeMeta, computational_bridgeBtn);
 
           const music_bridgeBtn = document.getElementById(`gen-music_bridge-btn-${entry.id}`);
           music_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "music_bridge", "/colors/music_bridge",
-              statusDiv, music_bridgeContentDiv, music_bridgeMeta, music_bridgeBtn);
+              music_bridgeStatusDiv, music_bridgeContentDiv, music_bridgeMeta, music_bridgeBtn);
 
           const information_bridgeBtn = document.getElementById(`gen-information_bridge-btn-${entry.id}`);
           information_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "information_bridge", "/colors/information_bridge",
-              statusDiv, information_bridgeContentDiv, information_bridgeMeta, information_bridgeBtn);
+              information_bridgeStatusDiv, information_bridgeContentDiv, information_bridgeMeta, information_bridgeBtn);
 
           const poetry_bridgeBtn = document.getElementById(`gen-poetry_bridge-btn-${entry.id}`);
           poetry_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "poetry_bridge", "/colors/poetry_bridge",
-              statusDiv, poetry_bridgeContentDiv, poetry_bridgeMeta, poetry_bridgeBtn);
+              poetry_bridgeStatusDiv, poetry_bridgeContentDiv, poetry_bridgeMeta, poetry_bridgeBtn);
 
           const metaphysics_bridgeBtn = document.getElementById(`gen-metaphysics_bridge-btn-${entry.id}`);
           metaphysics_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "metaphysics_bridge", "/colors/metaphysics_bridge",
-              statusDiv, metaphysics_bridgeContentDiv, metaphysics_bridgeMeta, metaphysics_bridgeBtn);
+              metaphysics_bridgeStatusDiv, metaphysics_bridgeContentDiv, metaphysics_bridgeMeta, metaphysics_bridgeBtn);
 
 
         }
