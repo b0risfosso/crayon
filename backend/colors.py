@@ -3155,24 +3155,17 @@ def search_entities():
 
 @app.get("/colors/entities/by_color/<int:color_id>")
 def entities_by_color(color_id: int):
-    """
-    Return all canonical entities that are actually used by brush-stroke bridges
-    for the given color_id.
-    """
     db = get_art_db()
-
     rows = db.execute(
         """
-        SELECT DISTINCT e.id, e.name, e.canonical_name, e.created_at
+        SELECT DISTINCT e.*
         FROM entities e
-        JOIN bridges b ON b.entity_id = e.id
-        WHERE b.color_id = ?
-          AND b.entity_id IS NOT NULL
+        JOIN entity_instances x ON x.entity_id = e.id
+        WHERE x.color_id = ?
         ORDER BY e.name ASC
         """,
         (color_id,)
     ).fetchall()
-
     db.close()
 
     return jsonify([dict(r) for r in rows])
