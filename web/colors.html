@@ -33,6 +33,62 @@
     .bridge-content { padding: 8px; border-top: 1px solid #eee; }
     .bridge-content.collapsed { display: none; }
     .caret { font-size: 12px; color: #666; margin-left: 6px; }
+
+    /* two-column layout below thought */
+    .below-thought {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      margin-top: 12px;
+    }
+
+    /* LEFT is bridges now */
+    .bridge-col {
+      width: 70%;
+      position: relative;
+      min-width: 380px;
+    }
+
+    /* RIGHT is brush strokes now */
+    .brush-col {
+      width: 30%;
+      min-width: 220px;
+      position: relative;
+    }
+
+    /* Brush strokes styling */
+    .brush-box {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fafafa;
+    }
+    .brush-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .brush-list {
+      list-style: disc;
+      padding-left: 18px;
+      margin: 0 0 10px 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .brush-item {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+    .brush-controls {
+      display: flex;
+      gap: 6px;
+    }
+    .brush-controls input {
+      flex: 1;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -157,6 +213,31 @@
       }
     }
 
+    function seedBrushStrokes(entryId) {
+      return [
+        "grainy refractive edge",
+        "thermal inertia motif",
+        "supply-chain chokepoint",
+        "silica-to-polysilicon arc"
+      ].map(s => ({ id: crypto.randomUUID(), text: s }));
+    }
+
+    function renderBrushList(listEl, strokes) {
+      listEl.innerHTML = '';
+      for (const s of strokes) {
+        const li = document.createElement('li');
+        li.className = 'brush-item';
+        li.textContent = s.text;
+        listEl.appendChild(li);
+      }
+      if (strokes.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'brush-item muted';
+        li.textContent = 'No brush strokes yet.';
+        listEl.appendChild(li);
+      }
+    }
+
     async function loadColor() {
       const artId = getParam('art_id');
       if (!artId) {
@@ -194,6 +275,7 @@
           contentIds['thought'] = `thought-content-${entry.id}`;
 
           div.innerHTML = `
+            <!-- THOUGHT / HEADER (full width) -->
             <strong>Color ID:</strong> ${entry.id}<br>
             <strong>Art ID:</strong> ${entry.art_id}<br>
             <strong>Model:</strong> ${escapeHtml(entry.model)}<br>
@@ -201,175 +283,218 @@
             <strong>Created:</strong> ${entry.created_at}<br>
             <pre>${escapeHtml(entry.output_text)}</pre>
 
-            <!-- RUN ALL + TOGGLE -->
-            <div class="controls">
-              <button id="gen-all-btn-${entry.id}">Bridge All</button>
-              <button id="toggle-individual-btns-${entry.id}" class="muted">Show individual bridges ▶</button>
-            </div>
-            <div id="all-status-${entry.id}" class="status"></div>
+            <!-- BELOW THOUGHT: BRIDGES (LEFT) + BRUSH STROKES (RIGHT) -->
+            <div class="below-thought">
 
-            <!-- INDIVIDUAL BUTTONS (collapsed by default) -->
-            <div id="individual-btns-${entry.id}" class="controls individual" style="display:none;">
-              <button id="gen-simulation_architecture-btn-${entry.id}">Simulation Architecture</button>
-              <button id="gen-theory_architecture-btn-${entry.id}">Theory Architecture</button>
-              <button id="gen-physical_world_bridge-btn-${entry.id}">Physical World Bridge</button>
-              <button id="gen-math_bridge-btn-${entry.id}">Math Bridge</button>
-              <button id="gen-language_bridge-btn-${entry.id}">Language Bridge</button>
-              <button id="gen-data_bridge-btn-${entry.id}">Data Bridge</button>
-              <button id="gen-computational_bridge-btn-${entry.id}">Computational Bridge</button>
-              <button id="gen-music_bridge-btn-${entry.id}">Music Bridge</button>
-              <button id="gen-information_bridge-btn-${entry.id}">Information Bridge</button>
-              <button id="gen-poetry_bridge-btn-${entry.id}">Poetry Bridge</button>
-              <button id="gen-metaphysics_bridge-btn-${entry.id}">Metaphysics Bridge</button>
-              <button id="gen-thought-btn-${entry.id}">Thought → Thought</button>
-            </div>
+              <!-- LEFT COLUMN: BRIDGES (70% width) -->
+              <div class="bridge-col">
 
-            <div class="bridge-group">
-              <div class="bridge-header" id="simulation_architecture-header-${entry.id}">
-                <div>Simulation Architecture</div>
-                <div class="meta">
-                  <span id="simulation_architecture-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
+                <!-- RUN ALL + TOGGLE -->
+                <div class="controls">
+                  <button id="gen-all-btn-${entry.id}">Bridge All</button>
+                  <button id="toggle-individual-btns-${entry.id}" class="muted">Show individual bridges ▶</button>
+                </div>
+                <div id="all-status-${entry.id}" class="status"></div>
+
+                <!-- INDIVIDUAL BUTTONS (collapsed by default) -->
+                <div id="individual-btns-${entry.id}" class="controls individual" style="display:none;">
+                  <button id="gen-simulation_architecture-btn-${entry.id}">Simulation Architecture</button>
+                  <button id="gen-theory_architecture-btn-${entry.id}">Theory Architecture</button>
+                  <button id="gen-physical_world_bridge-btn-${entry.id}">Physical World Bridge</button>
+                  <button id="gen-math_bridge-btn-${entry.id}">Math Bridge</button>
+                  <button id="gen-language_bridge-btn-${entry.id}">Language Bridge</button>
+                  <button id="gen-data_bridge-btn-${entry.id}">Data Bridge</button>
+                  <button id="gen-computational_bridge-btn-${entry.id}">Computational Bridge</button>
+                  <button id="gen-music_bridge-btn-${entry.id}">Music Bridge</button>
+                  <button id="gen-information_bridge-btn-${entry.id}">Information Bridge</button>
+                  <button id="gen-poetry_bridge-btn-${entry.id}">Poetry Bridge</button>
+                  <button id="gen-metaphysics_bridge-btn-${entry.id}">Metaphysics Bridge</button>
+                  <button id="gen-thought-btn-${entry.id}">Thought → Thought</button>
+                </div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="simulation_architecture-header-${entry.id}">
+                    <div>Simulation Architecture</div>
+                    <div class="meta">
+                      <span id="simulation_architecture-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['simulation_architecture']}"></div>
+                </div>
+                <div id="simulation_architecture-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="theory_architecture-header-${entry.id}">
+                    <div>Theory Architecture</div>
+                    <div class="meta">
+                      <span id="theory_architecture-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['theory_architecture']}"></div>
+                </div>
+                <div id="theory_architecture-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="physical_world_bridge-header-${entry.id}">
+                    <div>Physical World Bridge</div>
+                    <div class="meta">
+                      <span id="physical_world_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['physical_world_bridge']}"></div>
+                </div>
+                <div id="physical_world_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="math_bridge-header-${entry.id}">
+                    <div>Math Bridge</div>
+                    <div class="meta">
+                      <span id="math_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['math_bridge']}"></div>
+                </div>
+                <div id="math_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="language_bridge-header-${entry.id}">
+                    <div>Language Bridge</div>
+                    <div class="meta">
+                      <span id="language_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['language_bridge']}"></div>
+                </div>
+                <div id="language_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="data_bridge-header-${entry.id}">
+                    <div>Data Bridge</div>
+                    <div class="meta">
+                      <span id="data_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['data_bridge']}"></div>
+                </div>
+                <div id="data_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="computational_bridge-header-${entry.id}">
+                    <div>Computational Bridge</div>
+                    <div class="meta">
+                      <span id="computational_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['computational_bridge']}"></div>
+                </div>
+                <div id="computational_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="music_bridge-header-${entry.id}">
+                    <div>Music Bridge</div>
+                    <div class="meta">
+                      <span id="music_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['music_bridge']}"></div>
+                </div>
+                <div id="music_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="information_bridge-header-${entry.id}">
+                    <div>Information Bridge</div>
+                    <div class="meta">
+                      <span id="information_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['information_bridge']}"></div>
+                </div>
+                <div id="information_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="poetry_bridge-header-${entry.id}">
+                    <div>Poetry Bridge</div>
+                    <div class="meta">
+                      <span id="poetry_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['poetry_bridge']}"></div>
+                </div>
+                <div id="poetry_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="metaphysics_bridge-header-${entry.id}">
+                    <div>Metaphysics Bridge</div>
+                    <div class="meta">
+                      <span id="metaphysics_bridge-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['metaphysics_bridge']}"></div>
+                </div>
+                <div id="metaphysics_bridge-status-${entry.id}" class="status"></div>
+
+                <div class="bridge-group">
+                  <div class="bridge-header" id="thought-header-${entry.id}">
+                    <div>Thought → Thought</div>
+                    <div class="meta">
+                      <span id="thought-meta-${entry.id}">latest</span>
+                      <span class="caret">▶</span>
+                    </div>
+                  </div>
+                  <div class="bridge-content collapsed" id="${contentIds['thought']}"></div>
+                </div>
+                <div id="thought-status-${entry.id}" class="status"></div>
+
+              </div>
+
+              <!-- RIGHT COLUMN: BRUSH STROKES -->
+              <div class="brush-col">
+                <div class="brush-box">
+                  <div class="brush-title">Brush Strokes</div>
+                  <ul id="brush-list-${entry.id}" class="brush-list"></ul>
+                  <div class="brush-controls">
+                    <input id="brush-input-${entry.id}" placeholder="Add a brush stroke…" />
+                    <button id="brush-add-${entry.id}">Add</button>
+                  </div>
                 </div>
               </div>
-              <div class="bridge-content collapsed" id="${contentIds['simulation_architecture']}"></div>
-            </div>
-            <div id="simulation_architecture-status-${entry.id}" class="status"></div>
 
-            <div class="bridge-group">
-              <div class="bridge-header" id="theory_architecture-header-${entry.id}">
-                <div>Theory Architecture</div>
-                <div class="meta">
-                  <span id="theory_architecture-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['theory_architecture']}"></div>
             </div>
-            <div id="theory_architecture-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="physical_world_bridge-header-${entry.id}">
-                <div>Physical World Bridge</div>
-                <div class="meta">
-                  <span id="physical_world_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['physical_world_bridge']}"></div>
-            </div>
-            <div id="physical_world_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="math_bridge-header-${entry.id}">
-                <div>Math Bridge</div>
-                <div class="meta">
-                  <span id="math_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['math_bridge']}"></div>
-            </div>
-            <div id="math_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="language_bridge-header-${entry.id}">
-                <div>Language Bridge</div>
-                <div class="meta">
-                  <span id="language_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['language_bridge']}"></div>
-            </div>
-            <div id="language_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="data_bridge-header-${entry.id}">
-                <div>Data Bridge</div>
-                <div class="meta">
-                  <span id="data_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['data_bridge']}"></div>
-            </div>
-            <div id="data_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="computational_bridge-header-${entry.id}">
-                <div>Computational Bridge</div>
-                <div class="meta">
-                  <span id="computational_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['computational_bridge']}"></div>
-            </div>
-            <div id="computational_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="music_bridge-header-${entry.id}">
-                <div>Music Bridge</div>
-                <div class="meta">
-                  <span id="music_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['music_bridge']}"></div>
-            </div>
-            <div id="music_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="information_bridge-header-${entry.id}">
-                <div>Information Bridge</div>
-                <div class="meta">
-                  <span id="information_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['information_bridge']}"></div>
-            </div>
-            <div id="information_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="poetry_bridge-header-${entry.id}">
-                <div>Poetry Bridge</div>
-                <div class="meta">
-                  <span id="poetry_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['poetry_bridge']}"></div>
-            </div>
-            <div id="poetry_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="metaphysics_bridge-header-${entry.id}">
-                <div>Metaphysics Bridge</div>
-                <div class="meta">
-                  <span id="metaphysics_bridge-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['metaphysics_bridge']}"></div>
-            </div>
-            <div id="metaphysics_bridge-status-${entry.id}" class="status"></div>
-
-            <div class="bridge-group">
-              <div class="bridge-header" id="thought-header-${entry.id}">
-                <div>Thought → Thought</div>
-                <div class="meta">
-                  <span id="thought-meta-${entry.id}">latest</span>
-                  <span class="caret">▶</span>
-                </div>
-              </div>
-              <div class="bridge-content collapsed" id="${contentIds['thought']}"></div>
-            </div>
-            <div id="thought-status-${entry.id}" class="status"></div>
           `;
 
           container.appendChild(div);
+
+          /* ---------- Brush strokes wiring ---------- */
+          let strokes = seedBrushStrokes(entry.id);
+          const brushListEl = document.getElementById(`brush-list-${entry.id}`);
+          const brushInputEl = document.getElementById(`brush-input-${entry.id}`);
+          const brushAddBtn = document.getElementById(`brush-add-${entry.id}`);
+
+          renderBrushList(brushListEl, strokes);
+
+          function addStrokeFromInput() {
+            const val = (brushInputEl.value || '').trim();
+            if (!val) return;
+            strokes.push({ id: crypto.randomUUID(), text: val });
+            brushInputEl.value = '';
+            renderBrushList(brushListEl, strokes);
+          }
+
+          brushAddBtn.onclick = addStrokeFromInput;
+          brushInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') addStrokeFromInput();
+          });
 
           // Toggle individual buttons visibility
           const individualBtnsDiv = document.getElementById(`individual-btns-${entry.id}`);
@@ -521,96 +646,91 @@
 
           // RUN ALL wiring
           const allBtn = document.getElementById(`gen-all-btn-${entry.id}`);
-  allBtn.onclick = async () => {
-    allBtn.disabled = true;
-    allStatusDiv.textContent = "Bridge all started… queueing everything.";
+          allBtn.onclick = async () => {
+            allBtn.disabled = true;
+            allStatusDiv.textContent = "Bridge all started… queueing everything.";
 
-    const specs = [
-      { type: "simulation_architecture", endpoint: "/colors/simulation_architecture",
-        status: simulation_architectureStatusDiv, content: simulation_architectureContentDiv,
-        meta: simulation_architectureMeta, btn: simulation_architectureBtn },
-      { type: "theory_architecture", endpoint: "/colors/theory_architecture",
-        status: theory_architectureStatusDiv, content: theory_architectureContentDiv,
-        meta: theory_architectureMeta, btn: theory_architectureBtn },
-      { type: "physical_world_bridge", endpoint: "/colors/physical_world_bridge",
-        status: physical_world_bridgeStatusDiv, content: physical_world_bridgeContentDiv,
-        meta: physical_world_bridgeMeta, btn: physical_world_bridgeBtn },
-      { type: "math_bridge", endpoint: "/colors/math_bridge",
-        status: math_bridgeStatusDiv, content: math_bridgeContentDiv,
-        meta: math_bridgeMeta, btn: math_bridgeBtn },
-      { type: "language_bridge", endpoint: "/colors/language_bridge",
-        status: language_bridgeStatusDiv, content: language_bridgeContentDiv,
-        meta: language_bridgeMeta, btn: language_bridgeBtn },
-      { type: "data_bridge", endpoint: "/colors/data_bridge",
-        status: data_bridgeStatusDiv, content: data_bridgeContentDiv,
-        meta: data_bridgeMeta, btn: data_bridgeBtn },
-      { type: "computational_bridge", endpoint: "/colors/computational_bridge",
-        status: computational_bridgeStatusDiv, content: computational_bridgeContentDiv,
-        meta: computational_bridgeMeta, btn: computational_bridgeBtn },
-      { type: "music_bridge", endpoint: "/colors/music_bridge",
-        status: music_bridgeStatusDiv, content: music_bridgeContentDiv,
-        meta: music_bridgeMeta, btn: music_bridgeBtn },
-      { type: "information_bridge", endpoint: "/colors/information_bridge",
-        status: information_bridgeStatusDiv, content: information_bridgeContentDiv,
-        meta: information_bridgeMeta, btn: information_bridgeBtn },
-      { type: "poetry_bridge", endpoint: "/colors/poetry_bridge",
-        status: poetry_bridgeStatusDiv, content: poetry_bridgeContentDiv,
-        meta: poetry_bridgeMeta, btn: poetry_bridgeBtn },
-      { type: "metaphysics_bridge", endpoint: "/colors/metaphysics_bridge",
-        status: metaphysics_bridgeStatusDiv, content: metaphysics_bridgeContentDiv,
-        meta: metaphysics_bridgeMeta, btn: metaphysics_bridgeBtn },
-      { type: "thought", endpoint: "/colors/thought_bridge",
-        status: thoughtStatusDiv, content: thoughtContentDiv,
-        meta: thoughtMeta, btn: thoughtBtn },
-    ];
+            const specs = [
+              { type: "simulation_architecture", endpoint: "/colors/simulation_architecture",
+                status: simulation_architectureStatusDiv, content: simulation_architectureContentDiv,
+                meta: simulation_architectureMeta, btn: simulation_architectureBtn },
+              { type: "theory_architecture", endpoint: "/colors/theory_architecture",
+                status: theory_architectureStatusDiv, content: theory_architectureContentDiv,
+                meta: theory_architectureMeta, btn: theory_architectureBtn },
+              { type: "physical_world_bridge", endpoint: "/colors/physical_world_bridge",
+                status: physical_world_bridgeStatusDiv, content: physical_world_bridgeContentDiv,
+                meta: physical_world_bridgeMeta, btn: physical_world_bridgeBtn },
+              { type: "math_bridge", endpoint: "/colors/math_bridge",
+                status: math_bridgeStatusDiv, content: math_bridgeContentDiv,
+                meta: math_bridgeMeta, btn: math_bridgeBtn },
+              { type: "language_bridge", endpoint: "/colors/language_bridge",
+                status: language_bridgeStatusDiv, content: language_bridgeContentDiv,
+                meta: language_bridgeMeta, btn: language_bridgeBtn },
+              { type: "data_bridge", endpoint: "/colors/data_bridge",
+                status: data_bridgeStatusDiv, content: data_bridgeContentDiv,
+                meta: data_bridgeMeta, btn: data_bridgeBtn },
+              { type: "computational_bridge", endpoint: "/colors/computational_bridge",
+                status: computational_bridgeStatusDiv, content: computational_bridgeContentDiv,
+                meta: computational_bridgeMeta, btn: computational_bridgeBtn },
+              { type: "music_bridge", endpoint: "/colors/music_bridge",
+                status: music_bridgeStatusDiv, content: music_bridgeContentDiv,
+                meta: music_bridgeMeta, btn: music_bridgeBtn },
+              { type: "information_bridge", endpoint: "/colors/information_bridge",
+                status: information_bridgeStatusDiv, content: information_bridgeContentDiv,
+                meta: information_bridgeMeta, btn: information_bridgeBtn },
+              { type: "poetry_bridge", endpoint: "/colors/poetry_bridge",
+                status: poetry_bridgeStatusDiv, content: poetry_bridgeContentDiv,
+                meta: poetry_bridgeMeta, btn: poetry_bridgeBtn },
+              { type: "metaphysics_bridge", endpoint: "/colors/metaphysics_bridge",
+                status: metaphysics_bridgeStatusDiv, content: metaphysics_bridgeContentDiv,
+                meta: metaphysics_bridgeMeta, btn: metaphysics_bridgeBtn },
+              { type: "thought", endpoint: "/colors/thought_bridge",
+                status: thoughtStatusDiv, content: thoughtContentDiv,
+                meta: thoughtMeta, btn: thoughtBtn },
+            ];
 
-    // Create one promise per bridge. These will all start immediately.
-    const jobs = specs.map(async (s) => {
-      try {
-        // If already exists, render + skip without queueing.
-        const existing = await fetchBridgeOfType(entry.id, s.type);
-        if (existing) {
-          renderBridge(s.content, existing);
-          s.status.textContent = `${s.type} already exists, skipped.`;
-          return { type: s.type, skipped: true };
-        }
+            const jobs = specs.map(async (s) => {
+              try {
+                const existing = await fetchBridgeOfType(entry.id, s.type);
+                if (existing) {
+                  renderBridge(s.content, existing);
+                  s.status.textContent = `${s.type} already exists, skipped.`;
+                  return { type: s.type, skipped: true };
+                }
 
-        // Queue + poll concurrently.
-        s.status.textContent = `${s.type} queued…`;
-        await enqueueBridge(entry.id, s.type, s.endpoint, s.status, s.content, s.meta, s.btn);
-        return { type: s.type, ok: true };
-      } catch (e) {
-        // enqueueBridge already writes status, but we return error for aggregation.
-        return { type: s.type, error: e };
-      }
-    });
+                s.status.textContent = `${s.type} queued…`;
+                await enqueueBridge(entry.id, s.type, s.endpoint, s.status, s.content, s.meta, s.btn);
+                return { type: s.type, ok: true };
+              } catch (e) {
+                return { type: s.type, error: e };
+              }
+            });
 
-    allStatusDiv.textContent = "All bridges queued. Waiting for completion…";
+            allStatusDiv.textContent = "All bridges queued. Waiting for completion…";
 
-    const results = await Promise.allSettled(jobs);
+            const results = await Promise.allSettled(jobs);
 
-    let failures = 0;
-    let skipped = 0;
-    let succeeded = 0;
+            let failures = 0;
+            let skipped = 0;
+            let succeeded = 0;
 
-    for (const r of results) {
-      if (r.status === "fulfilled") {
-        if (r.value?.error) failures += 1;
-        else if (r.value?.skipped) skipped += 1;
-        else succeeded += 1;
-      } else {
-        failures += 1;
-      }
-    }
+            for (const r of results) {
+              if (r.status === "fulfilled") {
+                if (r.value?.error) failures += 1;
+                else if (r.value?.skipped) skipped += 1;
+                else succeeded += 1;
+              } else {
+                failures += 1;
+              }
+            }
 
-    allStatusDiv.textContent =
-      failures === 0
-        ? `Bridge all complete. (${succeeded} ran, ${skipped} skipped)`
-        : `Bridge all complete with ${failures} error(s). (${succeeded} ran, ${skipped} skipped)`;
+            allStatusDiv.textContent =
+              failures === 0
+                ? `Bridge all complete. (${succeeded} ran, ${skipped} skipped)`
+                : `Bridge all complete with ${failures} error(s). (${succeeded} ran, ${skipped} skipped)`;
 
-    allBtn.disabled = false;
-  };
-
+            allBtn.disabled = false;
+          };
         }
 
       } catch (e) {
