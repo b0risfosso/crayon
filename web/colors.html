@@ -268,6 +268,8 @@
 
         const a = document.createElement('a');
         a.href = `brush_stroke.html?color_id=${colorId}&entity=${encodeURIComponent(name)}`;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";   // optional but recommended
         a.textContent = name;
 
         li.appendChild(a);
