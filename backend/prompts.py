@@ -2837,3 +2837,134 @@ QUALITY CHECK
 
 Now build the bridge.
 """
+
+# --- Entity × Bridge Relationship Searcher (Brush Strokes) ---
+
+entity_bridge_relationship_prompt = r"""
+LLM PROMPT — Entity × Bridge Relationship Searcher (Autonomous Bridge Evolution)
+
+Role:
+You are a Bridge–Entity Interaction Explorer inside Fantasiagenesis.
+
+Goal:
+Given a THOUGHT (optional), a BRIDGE/DIMENSION, and an ENTITY, you will:
+Search for all relationships that can exist between the entity and the bridge.
+Show how the entity can be encoded within the bridge (as a first-class object in that dimension).
+Enumerate roles the entity can play in that bridge-world.
+Trace interactions between the entity and bridge components, including cross-component effects.
+Explain how these interactions re-architect the bridge and shift outcomes.
+Propose ways the bridge itself could evolve to explore deeper interactions.
+Describe how the search process evolves over time within this dimension, moving from direct links to emergent multi-order effects.
+
+You must let structure emerge from the bridge and thought.
+Do not use any fixed taxonomy.
+Derive components, engines, grammars, or structures appropriate to the given bridge.
+Avoid the rhetorical form “not X, but Y”.
+
+INPUT
+
+THOUGHT (optional, include if the bridge is about a specific world):
+<<<
+{thought}
+>>>
+
+BRIDGE / DIMENSION:
+{bridge_type}
+
+BRIDGE TEXT (the bridge to search within):
+<<<
+{bridge_text}
+>>>
+
+ENTITY / SYSTEM / COMPONENT / INSTRUMENT:
+{entity_text}
+
+OUTPUT
+
+ENTITY × BRIDGE INTERACTION SEARCH
+
+Produce the following sections in order:
+
+1. Instantiate the Entity Inside the Bridge
+Explain how the entity becomes a valid object in this dimension.
+Include:
+bridge-appropriate representation (variables, symbols, objects, motifs, datasets, rules, physical artifacts, etc.)
+attributes/parameters the entity needs in this dimension
+where it lives inside the bridge architecture (which structures it plugs into)
+Goal: make the entity “real” in the bridge-world.
+
+2. Identify What the Entity Can Touch
+Derive the bridge’s core components/structures (as implied by the bridge and thought), then map all plausible contact points.
+For each contact point:
+bridge component
+interaction channel (resource, constraint, signal, motif, control, symbol, encoding, dependency, etc.)
+how the entity couples to it
+why this coupling makes sense in this dimension
+This is the adjacency map: entity → bridge.
+
+3. Roles the Entity Can Play in the Bridge
+Enumerate distinct roles the entity may assume, derived from the bridge logic.
+For each role:
+role name
+mechanism of action in this dimension
+what changes when this role is active
+which bridge outcomes it influences
+Roles should be meaningfully different (precursor, chokepoint, catalyst, substrate, controller, destabilizer, stabilizer, symbol-carrier, boundary condition, etc.), only if implied by bridge+thought.
+
+4. Interaction Pathways and Architectural Effects
+Search through the bridge to find interaction pathways:
+direct (first-order) interactions
+indirect (second-order) interactions via other components
+feedback loops
+cross-scale effects if the bridge spans scales
+emergent combinations of roles
+For each pathway:
+path description (entity → component A → component B → … → outcome)
+architectural change induced (new edges, reweighted rules, new constraints, new motifs, new agents, altered grammar, etc.)
+outcome shift (what futures become more likely, less likely, newly possible)
+
+5. How the Bridge Evolves to Explore These Interactions
+Propose modifications/extensions the bridge could undergo to better explore entity interactions.
+Examples (choose what fits):
+adding new substructures/engines/grammars
+splitting the entity into sub-entities or latent variables
+introducing new coupling terms
+enabling new forms of observation/measurement
+increasing expressivity (more states, richer motifs, more channels)
+allowing adaptive role-switching
+For each evolution:
+what changes in the bridge architecture
+what new interaction space becomes searchable
+what new outcomes become testable
+
+6. How the Search Process Evolves in This Dimension
+Describe how the exploration itself grows over time.
+Include stages such as:
+Role explosion: enumerate all plausible placements/roles.
+Sensitivity scanning: vary entity attributes to find high-impact couplings.
+Counterfactual worlds: test alternative bridge-worlds where the entity is scarce/abundant/central/marginal, etc.
+Emergence detection: scan for new chokepoints, coalitions, motifs, standards, equilibria, or instabilities caused by the entity.
+Multi-order cascades: trace third-/fourth-order effects.
+Endogenize the entity: let the entity’s own production/decay/learning co-evolve with the bridge.
+Structural learning: allow the bridge to update its own ontology of “where the entity matters.”
+Tailor these stages to the bridge dimension.
+
+7. Outcome Space Summary
+List the major classes of outcomes the bridge may discover because of the entity, stated in bridge-appropriate terms.
+For each outcome class:
+name
+signature in the bridge (variables, motifs, metrics, constraints, equilibria, etc.)
+why it arises from the entity interactions
+
+QUALITY CHECK
+
+Before finalizing:
+Every claim is grounded in the given bridge dimension and thought (if provided).
+The entity is fully representable inside the bridge.
+Interactions include direct, indirect, and emergent pathways.
+The bridge evolution proposals increase search power.
+The search evolution is staged and dimension-specific.
+Avoid “not X, but Y”.
+
+Now perform the entity × bridge interaction search.
+"""

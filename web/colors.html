@@ -34,61 +34,80 @@
     .bridge-content.collapsed { display: none; }
     .caret { font-size: 12px; color: #666; margin-left: 6px; }
 
-    /* two-column layout below thought */
+    /* New split layout */
     .below-thought {
       display: flex;
-      gap: 16px;
+      gap: 12px;
+      margin-top: 10px;
       align-items: flex-start;
-      margin-top: 12px;
     }
-
-    /* LEFT is bridges now */
-    .bridge-col {
+    .left-col {
       width: 70%;
-      position: relative;
-      min-width: 380px;
+      min-width: 0;
     }
-
-    /* RIGHT is brush strokes now */
-    .brush-col {
+    .right-col {
       width: 30%;
       min-width: 220px;
-      position: relative;
+      border-left: 1px solid #eee;
+      padding-left: 10px;
+      position: sticky;
+      top: 12px; /* mild stickiness when scrolling within big blocks */
     }
 
-    /* Brush strokes styling */
-    .brush-box {
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      padding: 10px;
+    /* Brush strokes panel */
+    .brush-panel h3 { margin: 0 0 6px 0; font-size: 16px; }
+    .brush-list {
+      list-style: none;
+      padding: 0;
+      margin: 6px 0 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid #f0f0f0;
+      border-radius: 6px;
+      padding: 6px;
       background: #fafafa;
     }
-    .brush-title {
-      font-weight: 700;
-      margin-bottom: 8px;
+    .brush-item a {
+      text-decoration: none;
+      color: #111;
+      display: block;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: white;
+      border: 1px solid #eee;
     }
-    .brush-list {
-      list-style: disc;
-      padding-left: 18px;
-      margin: 0 0 10px 0;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-    .brush-item {
-      margin: 4px 0;
-      font-size: 14px;
-    }
-    .brush-controls {
+    .brush-item a:hover { background: #f5f5f5; }
+
+    .brush-form {
       display: flex;
+      flex-direction: column;
       gap: 6px;
+      margin-top: 8px;
     }
-    .brush-controls input {
-      flex: 1;
+    .brush-form input[type="text"] {
       padding: 6px 8px;
       border: 1px solid #ccc;
       border-radius: 6px;
-      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
     }
+    .bridge-select {
+      border: 1px solid #eee;
+      background: #fff;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 180px;
+      overflow: auto;
+      font-size: 12px;
+    }
+    .bridge-select label { display: flex; gap: 6px; align-items: center; }
+    .divider { height: 1px; background: #eee; margin: 6px 0; }
   </style>
 </head>
 <body>
@@ -96,6 +115,8 @@
   <div id="content">Loading...</div>
 
   <script>
+    const BRUSH_STROKE_ENDPOINT = "/colors/brush_stroke_bridge";
+
     function escapeHtml(str) {
       if (str == null) return '';
       return String(str)
@@ -156,6 +177,13 @@
       return rows[0].bridge_text || null;
     }
 
+    async function fetchAllBridges(colorId) {
+      const res = await fetch(`/colors/bridges/by_color/${colorId}`);
+      if (!res.ok) return [];
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : [];
+    }
+
     function renderBridge(contentDiv, text) {
       contentDiv.innerHTML = '';
       if (!text) {
@@ -213,28 +241,102 @@
       }
     }
 
-    function seedBrushStrokes(entryId) {
-      return [
-        "grainy refractive edge",
-        "thermal inertia motif",
-        "supply-chain chokepoint",
-        "silica-to-polysilicon arc"
-      ].map(s => ({ id: crypto.randomUUID(), text: s }));
+    // ---------- Brush strokes ----------
+    async function fetchEntitiesForColor(colorId) {
+      const res = await fetch(`/colors/entities/by_color/${colorId}`);
+      if (!res.ok) return [];
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) return [];
+      const latest = rows[0];
+      const ej = latest.entities_json;
+      if (Array.isArray(ej)) return ej;
+      try {
+        const parsed = JSON.parse(ej);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
     }
 
-    function renderBrushList(listEl, strokes) {
+    async function loadBrushStrokes(colorId, listEl) {
       listEl.innerHTML = '';
-      for (const s of strokes) {
+      const entities = await fetchEntitiesForColor(colorId);
+
+      if (!entities.length) {
+        const li = document.createElement('li');
+        li.innerHTML = '<em>No entities yet. Run entity extraction.</em>';
+        listEl.appendChild(li);
+        return;
+      }
+
+      for (const ent of entities) {
+        const name = ent?.name || 'unknown';
         const li = document.createElement('li');
         li.className = 'brush-item';
-        li.textContent = s.text;
+
+        const a = document.createElement('a');
+        a.href = `brush_stroke.html?color_id=${colorId}&entity=${encodeURIComponent(name)}`;
+        a.textContent = name;
+
+        li.appendChild(a);
         listEl.appendChild(li);
       }
-      if (strokes.length === 0) {
-        const li = document.createElement('li');
-        li.className = 'brush-item muted';
-        li.textContent = 'No brush strokes yet.';
-        listEl.appendChild(li);
+    }
+
+    function baseBridgeTypes() {
+      // must match your canonical “base” bridge types
+      return [
+        "simulation_architecture",
+        "theory_architecture",
+        "physical_world_bridge",
+        "math_bridge",
+        "language_bridge",
+        "data_bridge",
+        "computational_bridge",
+        "music_bridge",
+        "information_bridge",
+        "poetry_bridge",
+        "metaphysics_bridge",
+        "thought"
+      ];
+    }
+
+    async function getLatestBridgeIdByType(colorId) {
+      const rows = await fetchAllBridges(colorId);
+      const byType = {};
+      for (const r of rows) {
+        const t = r.bridge_type;
+        if (!t || t.endsWith("_brush_stroke")) continue;
+        if (!(t in byType)) byType[t] = r; // rows already newest-first
+      }
+      return byType; // {type: row}
+    }
+
+    async function enqueueBrushStroke(bridgeId, entityText, statusDiv) {
+      statusDiv.textContent = `Queued brush stroke for bridge ${bridgeId}…`;
+
+      const res = await fetch(BRUSH_STROKE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bridge_id: bridgeId, entity_text: entityText })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        statusDiv.textContent = data.message || "Error queueing brush stroke.";
+        return { bridgeId, ok: false };
+      }
+
+      const taskId = data.task_id;
+      statusDiv.textContent = `Brush stroke queued (task ${taskId}). Waiting…`;
+
+      try {
+        await pollTask(taskId, statusDiv);
+        statusDiv.textContent = `Brush stroke done for bridge ${bridgeId}.`;
+        return { bridgeId, ok: true };
+      } catch (e) {
+        statusDiv.textContent = `Brush stroke error for bridge ${bridgeId}: ${e.message || e}`;
+        return { bridgeId, ok: false, error: e };
       }
     }
 
@@ -274,8 +376,8 @@
           contentIds['metaphysics_bridge'] = `metaphysics_bridge-content-${entry.id}`;
           contentIds['thought'] = `thought-content-${entry.id}`;
 
+          // Thought (full width), then split below
           div.innerHTML = `
-            <!-- THOUGHT / HEADER (full width) -->
             <strong>Color ID:</strong> ${entry.id}<br>
             <strong>Art ID:</strong> ${entry.art_id}<br>
             <strong>Model:</strong> ${escapeHtml(entry.model)}<br>
@@ -283,12 +385,8 @@
             <strong>Created:</strong> ${entry.created_at}<br>
             <pre>${escapeHtml(entry.output_text)}</pre>
 
-            <!-- BELOW THOUGHT: BRIDGES (LEFT) + BRUSH STROKES (RIGHT) -->
             <div class="below-thought">
-
-              <!-- LEFT COLUMN: BRIDGES (70% width) -->
-              <div class="bridge-col">
-
+              <div class="left-col">
                 <!-- RUN ALL + TOGGLE -->
                 <div class="controls">
                   <button id="gen-all-btn-${entry.id}">Bridge All</button>
@@ -312,6 +410,7 @@
                   <button id="gen-thought-btn-${entry.id}">Thought → Thought</button>
                 </div>
 
+                <!-- BRIDGES -->
                 <div class="bridge-group">
                   <div class="bridge-header" id="simulation_architecture-header-${entry.id}">
                     <div>Simulation Architecture</div>
@@ -455,46 +554,36 @@
                   <div class="bridge-content collapsed" id="${contentIds['thought']}"></div>
                 </div>
                 <div id="thought-status-${entry.id}" class="status"></div>
-
               </div>
 
-              <!-- RIGHT COLUMN: BRUSH STROKES -->
-              <div class="brush-col">
-                <div class="brush-box">
-                  <div class="brush-title">Brush Strokes</div>
+              <div class="right-col">
+                <div class="brush-panel">
+                  <h3>Brush Strokes</h3>
+                  <div class="muted">Entities for this color</div>
                   <ul id="brush-list-${entry.id}" class="brush-list"></ul>
-                  <div class="brush-controls">
-                    <input id="brush-input-${entry.id}" placeholder="Add a brush stroke…" />
-                    <button id="brush-add-${entry.id}">Add</button>
+
+                  <div class="divider"></div>
+
+                  <div class="muted">Add brush stroke</div>
+                  <div class="brush-form">
+                    <input id="brush-input-${entry.id}" type="text" placeholder="entity / brush stroke text" />
+
+                    <label class="muted">
+                      <input id="brush-all-${entry.id}" type="checkbox" checked />
+                      All bridges
+                    </label>
+
+                    <div id="brush-bridge-select-${entry.id}" class="bridge-select"></div>
+
+                    <button id="brush-add-btn-${entry.id}">Add brush stroke → selected bridges</button>
+                    <div id="brush-status-${entry.id}" class="status"></div>
                   </div>
                 </div>
               </div>
-
             </div>
           `;
 
           container.appendChild(div);
-
-          /* ---------- Brush strokes wiring ---------- */
-          let strokes = seedBrushStrokes(entry.id);
-          const brushListEl = document.getElementById(`brush-list-${entry.id}`);
-          const brushInputEl = document.getElementById(`brush-input-${entry.id}`);
-          const brushAddBtn = document.getElementById(`brush-add-${entry.id}`);
-
-          renderBrushList(brushListEl, strokes);
-
-          function addStrokeFromInput() {
-            const val = (brushInputEl.value || '').trim();
-            if (!val) return;
-            strokes.push({ id: crypto.randomUUID(), text: val });
-            brushInputEl.value = '';
-            renderBrushList(brushListEl, strokes);
-          }
-
-          brushAddBtn.onclick = addStrokeFromInput;
-          brushInputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') addStrokeFromInput();
-          });
 
           // Toggle individual buttons visibility
           const individualBtnsDiv = document.getElementById(`individual-btns-${entry.id}`);
@@ -554,7 +643,6 @@
           const thoughtMeta = document.getElementById(`thought-meta-${entry.id}`);
           wireCollapse(document.getElementById(`thought-header-${entry.id}`), thoughtContentDiv);
 
-          // Per-bridge status divs
           const simulation_architectureStatusDiv = document.getElementById(`simulation_architecture-status-${entry.id}`);
           const theory_architectureStatusDiv = document.getElementById(`theory_architecture-status-${entry.id}`);
           const physical_world_bridgeStatusDiv = document.getElementById(`physical_world_bridge-status-${entry.id}`);
@@ -644,7 +732,7 @@
             enqueueBridge(entry.id, "thought", "/colors/thought_bridge",
               thoughtStatusDiv, thoughtContentDiv, thoughtMeta, thoughtBtn);
 
-          // RUN ALL wiring
+          // RUN ALL wiring (unchanged)
           const allBtn = document.getElementById(`gen-all-btn-${entry.id}`);
           allBtn.onclick = async () => {
             allBtn.disabled = true;
@@ -707,7 +795,6 @@
             });
 
             allStatusDiv.textContent = "All bridges queued. Waiting for completion…";
-
             const results = await Promise.allSettled(jobs);
 
             let failures = 0;
@@ -719,9 +806,7 @@
                 if (r.value?.error) failures += 1;
                 else if (r.value?.skipped) skipped += 1;
                 else succeeded += 1;
-              } else {
-                failures += 1;
-              }
+              } else failures += 1;
             }
 
             allStatusDiv.textContent =
@@ -731,8 +816,88 @@
 
             allBtn.disabled = false;
           };
-        }
 
+          // ---- Brush strokes panel wiring ----
+          const brushListEl = document.getElementById(`brush-list-${entry.id}`);
+          await loadBrushStrokes(entry.id, brushListEl);
+
+          const bsAllCb = document.getElementById(`brush-all-${entry.id}`);
+          const bsSelectDiv = document.getElementById(`brush-bridge-select-${entry.id}`);
+          const bsInput = document.getElementById(`brush-input-${entry.id}`);
+          const bsBtn = document.getElementById(`brush-add-btn-${entry.id}`);
+          const bsStatus = document.getElementById(`brush-status-${entry.id}`);
+
+          // render bridge checkboxes
+          const types = baseBridgeTypes();
+          bsSelectDiv.innerHTML = types.map(t => `
+            <label>
+              <input type="checkbox" data-bridge-type="${t}" />
+              ${t}
+            </label>
+          `).join("");
+
+          function setCheckboxesEnabled(enabled) {
+            bsSelectDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+              cb.disabled = !enabled;
+              if (!enabled) cb.checked = false;
+            });
+          }
+          setCheckboxesEnabled(false);
+
+          bsAllCb.addEventListener("change", () => {
+            setCheckboxesEnabled(!bsAllCb.checked);
+          });
+
+          bsBtn.onclick = async () => {
+            const entityText = (bsInput.value || "").trim();
+            if (!entityText) {
+              bsStatus.textContent = "Enter an entity / brush stroke text first.";
+              return;
+            }
+
+            bsBtn.disabled = true;
+            bsStatus.textContent = "Preparing brush strokes…";
+
+            // get latest bridge ids
+            const latestByType = await getLatestBridgeIdByType(entry.id);
+
+            let selectedTypes;
+            if (bsAllCb.checked) {
+              selectedTypes = types;
+            } else {
+              selectedTypes = Array.from(bsSelectDiv.querySelectorAll('input[type="checkbox"]'))
+                .filter(cb => cb.checked)
+                .map(cb => cb.dataset.bridgeType);
+            }
+
+            const bridgeRows = selectedTypes
+              .map(t => latestByType[t])
+              .filter(Boolean);
+
+            if (!bridgeRows.length) {
+              bsStatus.textContent = "No selected bridges exist yet for this color.";
+              bsBtn.disabled = false;
+              return;
+            }
+
+            bsStatus.textContent =
+              `Queueing brush strokes for ${bridgeRows.length} bridge(s)…`;
+
+            // Fire everything at once; backend handles concurrency
+            const jobs = bridgeRows.map(r => enqueueBrushStroke(r.id, entityText, bsStatus));
+            const results = await Promise.all(jobs);
+
+            const ok = results.filter(r => r.ok).length;
+            const fail = results.length - ok;
+
+            bsStatus.textContent =
+              fail === 0
+                ? `Brush strokes complete for ${ok} bridge(s).`
+                : `Brush strokes complete: ${ok} ok, ${fail} failed.`;
+
+            bsBtn.disabled = false;
+          };
+        }
       } catch (e) {
         document.getElementById('content').textContent = 'Error: ' + e;
       }

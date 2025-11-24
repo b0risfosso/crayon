@@ -33,6 +33,7 @@ from prompts import music_bridge_prompt  # type: ignore
 from prompts import information_bridge_prompt  # type: ignore
 from prompts import poetry_bridge_prompt  # type: ignore
 from prompts import metaphysics_bridge_prompt  # type: ignore
+from prompts import entity_bridge_relationship_prompt  # type: ignore
 
 
 
@@ -1986,6 +1987,176 @@ def worker_loop(worker_id: int):
                         "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
                     }
             # ============================================================
+            #  TYPE: brush_stroke_bridge
+            # ============================================================
+
+            elif task_type == "brush_stroke_bridge":
+                bridge_id = task["bridge_id"]
+                entity_text = task["entity_text"].strip()
+                model = task["model"]
+                temperature = float(task["temperature"])
+                user_metadata = task["user_metadata"]
+
+                db = get_art_db()
+                try:
+                    # Fetch bridge row
+                    bridge_row = db.execute(
+                        "SELECT * FROM bridges WHERE id = ?",
+                        (bridge_id,),
+                    ).fetchone()
+
+                    if bridge_row is None:
+                        raise ValueError(f"bridge id {bridge_id} not found")
+
+                    bridge_row = dict(bridge_row)
+                    color_id = bridge_row["color_id"]
+                    art_id = bridge_row["art_id"]
+                    orig_bridge_type = bridge_row["bridge_type"] or "bridge"
+                    bridge_text = bridge_row["bridge_text"] or ""
+
+                    # Fetch thought (optional)
+                    color_row = db.execute(
+                        "SELECT * FROM colors WHERE id = ?",
+                        (color_id,),
+                    ).fetchone()
+                    thought_text = "NONE"
+                    if color_row is not None:
+                        thought_text = (dict(color_row).get("output_text") or "NONE")
+
+                    # ---- ENTITY TABLE INSERTION / FETCH ----
+                    now = utc_now_iso()
+
+                    # 1. Check if entity already exists
+                    existing_entity = db.execute(
+                        "SELECT id FROM entities WHERE name = ?",
+                        (entity_text,),
+                    ).fetchone()
+
+                    if existing_entity:
+                        entity_id = existing_entity["id"]
+                    else:
+                        # 2. Insert new entity
+                        db.execute(
+                            """
+                            INSERT INTO entities (name, canonical_name, created_at)
+                            VALUES (?, ?, ?)
+                            """,
+                            (entity_text, entity_text, now),
+                        )
+                        entity_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+                    # ---- LLM CALL ----
+                    system_prompt = entity_bridge_relationship_prompt.format(
+                        thought=thought_text,
+                        bridge_type=orig_bridge_type,
+                        bridge_text=bridge_text,
+                        entity_text=entity_text,
+                    )
+                    user_prompt = ""
+
+                    projected_tokens = 7000
+                    enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                    with LLM_LOCK:
+                        t0 = time.time()
+                        resp = _client.chat.completions.create(
+                            model=model,
+                            temperature=temperature,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt},
+                            ],
+                        )
+                    output_text = (resp.choices[0].message.content or "").strip()
+
+                    usage = getattr(resp, "usage", None)
+                    usage_dict = {
+                        "prompt_tokens": getattr(usage, "prompt_tokens", 0) if usage else 0,
+                        "completion_tokens": getattr(usage, "completion_tokens", 0) if usage else 0,
+                        "total_tokens": getattr(usage, "total_tokens", 0) if usage else 0,
+                    }
+
+                    tokens_in = int(usage_dict.get("prompt_tokens", 0))
+                    tokens_out = int(usage_dict.get("completion_tokens", 0))
+                    total_tokens = int(usage_dict.get("total_tokens", tokens_in + tokens_out))
+                    duration_ms = int((time.time() - t0) * 1000)
+
+                    # ---- SAVE NEW BRUSH-STROKE BRIDGE ----
+                    new_bridge_type = f"{orig_bridge_type}_brush_stroke"
+                    created_at = now
+
+                    db.execute(
+                        """
+                        INSERT INTO bridges
+                        (color_id, art_id, input_text, bridge_text, bridge_type, entity_id, model, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            color_id,
+                            art_id,
+                            entity_text,    # store entity in input_text for compatibility
+                            output_text,
+                            new_bridge_type,
+                            entity_id,      # NEW: link to entity table
+                            model,
+                            created_at,
+                        ),
+                    )
+                    new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                    db.commit()
+
+                    saved_row = dict(
+                        db.execute("SELECT * FROM bridges WHERE id = ?", (new_id,)).fetchone()
+                    )
+
+                    # ---- LLM USAGE LOG ----
+                    log_llm_usage(
+                        ts=created_at,
+                        app_name="colors",
+                        model=model,
+                        endpoint="brush_stroke_bridge",
+                        email=user_metadata.get("email") if isinstance(user_metadata, dict) else None,
+                        request_id=task_id,
+                        tokens_in=tokens_in,
+                        tokens_out=tokens_out,
+                        total_tokens=total_tokens,
+                        duration_ms=duration_ms,
+                        cost_usd=0.0,
+                        meta_obj={
+                            "color_id": color_id,
+                            "art_id": art_id,
+                            "bridge_id": bridge_id,
+                            "entity": entity_text,
+                            "entity_id": entity_id,
+                            "orig_bridge_type": orig_bridge_type,
+                            "new_bridge_type": new_bridge_type,
+                            "worker_id": worker_id,
+                            "user_metadata": user_metadata,
+                        },
+                    )
+
+                    with TASKS_LOCK:
+                        TASKS[task_id]["status"] = "done"
+                        TASKS[task_id]["result"] = {
+                            "task_type": "brush_stroke_bridge",
+                            "bridge_id": bridge_id,
+                            "new_bridge_entry_id": new_id,
+                            "entity": entity_text,
+                            "entity_id": entity_id,
+                            "bridge_type": new_bridge_type,
+                            "bridge_text": output_text,
+                            "saved_bridge": saved_row,
+                            "usage": usage_dict,
+                        }
+
+                except Exception as e:
+                    with TASKS_LOCK:
+                        TASKS[task_id]["status"] = "error"
+                        TASKS[task_id]["error"] = str(e)
+                finally:
+                    db.close()
+
+            # ============================================================
             # Unsupported task type
             # ============================================================
             else:
@@ -3003,3 +3174,110 @@ def enqueue_thought_bridge():
         "task_type": "thought_bridge",
         "color_id": color_id,
     }), 202
+
+@app.post("/colors/brush_stroke_bridge")
+def enqueue_brush_stroke_bridge():
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    bridge_id = payload.get("bridge_id")
+    entity_text = payload.get("entity_text") or payload.get("entity")
+
+    if not isinstance(bridge_id, int):
+        abort(400, description="'bridge_id' must be an integer")
+    if not isinstance(entity_text, str) or not entity_text.strip():
+        abort(400, description="'entity_text' must be a non-empty string")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    temperature = float(payload.get("temperature", 0.2))
+    user_metadata = payload.get("metadata") or {}
+
+    task_id = str(uuid.uuid4())
+    created_at = utc_now_iso()
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "status": "queued",
+            "created_at": created_at,
+            "task_type": "brush_stroke_bridge",
+        }
+
+    TASK_QUEUE.put({
+        "task_id": task_id,
+        "task_type": "brush_stroke_bridge",
+        "bridge_id": bridge_id,
+        "entity_text": entity_text.strip(),
+        "model": model,
+        "temperature": temperature,
+        "user_metadata": user_metadata,
+    })
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "queued",
+        "task_type": "brush_stroke_bridge",
+        "bridge_id": bridge_id,
+    }), 202
+
+
+@app.get("/colors/bridges/by_entity/<int:entity_id>")
+def get_bridges_by_entity(entity_id: int):
+    """
+    Returns bridges rows for a given entity_id, newest first.
+    Also includes entity_name for convenience.
+    """
+    db = get_art_db()
+
+    # optional: ensure entity exists (nice 404)
+    ent = db.execute(
+        "SELECT * FROM entities WHERE id = ?",
+        (entity_id,)
+    ).fetchone()
+    if ent is None:
+        db.close()
+        abort(404, description=f"entity id {entity_id} not found")
+
+    rows = db.execute(
+        """
+        SELECT b.*, e.name AS entity_name
+        FROM bridges b
+        LEFT JOIN entities e ON b.entity_id = e.id
+        WHERE b.entity_id = ?
+        ORDER BY b.created_at DESC
+        """,
+        (entity_id,)
+    ).fetchall()
+    db.close()
+
+    return jsonify([dict(r) for r in rows])
+
+
+@app.get("/colors/entities/search")
+def search_entities():
+    """
+    Search entities by name substring.
+    Query param:
+      /colors/entities/search?name=sand
+    Returns up to 50 matches, ordered alphabetically.
+    """
+    q = (request.args.get("name") or "").strip()
+    if not q:
+        abort(400, description="missing required query param 'name'")
+
+    like = f"%{q}%"
+    db = get_art_db()
+    rows = db.execute(
+        """
+        SELECT *
+        FROM entities
+        WHERE name LIKE ?
+           OR canonical_name LIKE ?
+        ORDER BY name ASC
+        LIMIT 50
+        """,
+        (like, like)
+    ).fetchall()
+    db.close()
+
+    return jsonify([dict(r) for r in rows])
