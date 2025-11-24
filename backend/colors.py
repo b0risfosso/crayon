@@ -583,113 +583,8 @@ def worker_loop(worker_id: int):
             # ============================================================
             #  TYPE 3: entities (NEW)
             # ============================================================
-            elif task_type == "entities":
-                color_id = task["color_id"]
-                model = task["model"]
-                temperature = float(task["temperature"])
-                user_metadata = task["user_metadata"]
-
-                db = get_art_db()
-                row = db.execute(
-                    "SELECT id, art_id, output_text FROM colors WHERE id = ?",
-                    (color_id,)
-                ).fetchone()
-                if not row:
-                    db.close()
-                    raise ValueError(f"color id {color_id} not found")
-
-                art_id = row["art_id"]
-                thought_text = (row["output_text"] or "").strip()
-                if not thought_text:
-                    db.close()
-                    raise ValueError(f"color {color_id} has empty output_text")
-
-                system_prompt = entities_prompt_sys
-                user_prompt = entities_prompt_user.format(thought=thought_text)
-
-                projected_tokens = 4000
-                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
-
-                with LLM_LOCK:
-                    t0 = time.time()
-                    resp = _client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-
-                output_text = (resp.choices[0].message.content or "").strip()
-                usage = getattr(resp, "usage", None)
-                usage_dict = usage.model_dump() if usage else None
-                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
-                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
-                total_tokens = int((usage_dict or {}).get("total_tokens", tokens_in + tokens_out))
-                duration_ms = int((time.time() - t0) * 1000)
-
-                parsed = json.loads(output_text)
-                parsed = normalize_entities_json(parsed)
-                validate_entities_json(parsed)
-
-                created_at = utc_now_iso()
-                db.execute(
-                    """
-                    INSERT INTO entities
-                      (color_id, art_id, input_text, entities_json, model, temperature, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        color_id,
-                        art_id,
-                        thought_text,
-                        output_text,
-                        model,
-                        temperature,
-                        created_at,
-                    ),
-                )
-                db.commit()
-
-                new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                saved_row = dict(
-                    db.execute(
-                        "SELECT * FROM entities WHERE id = ?",
-                        (new_id,)
-                    ).fetchone()
-                )
-                db.close()
-
-                log_llm_usage(
-                    ts=utc_now_iso(),
-                    app_name="colors",
-                    model=model,
-                    endpoint="/colors/entities",
-                    email=None,
-                    request_id=task_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    total_tokens=total_tokens,
-                    duration_ms=duration_ms,
-                    cost_usd=0.0,
-                    meta_obj={
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "worker_id": worker_id
-                    },
-                )
-
-                with TASKS_LOCK:
-                    TASKS[task_id]["status"] = "done"
-                    TASKS[task_id]["finished_at"] = utc_now_iso()
-                    TASKS[task_id]["result"] = {
-                        "task_type": "entities",
-                        "color_id": color_id,
-                        "art_id": art_id,
-                        "entities": parsed,
-                        "saved_entities": saved_row,
-                        "usage": usage_dict,
-                    }
+            #elif task_type == "entities":
+            # deleted
             elif task_type == "bridge_simulation":
                 color_id = task["color_id"]
                 model = task["model"]
@@ -3255,29 +3150,22 @@ def get_bridges_by_entity(entity_id: int):
 
 @app.get("/colors/entities/search")
 def search_entities():
-    """
-    Search entities by name substring.
-    Query param:
-      /colors/entities/search?name=sand
-    Returns up to 50 matches, ordered alphabetically.
-    """
-    q = (request.args.get("name") or "").strip()
-    if not q:
-        abort(400, description="missing required query param 'name'")
+    name = (request.args.get("name") or "").strip()
+    if not name:
+        return jsonify({"entities": []})
 
-    like = f"%{q}%"
     db = get_art_db()
     rows = db.execute(
         """
-        SELECT *
+        SELECT id, name, canonical_name, created_at
         FROM entities
-        WHERE name LIKE ?
-           OR canonical_name LIKE ?
+        WHERE name LIKE ? OR canonical_name LIKE ?
         ORDER BY name ASC
         LIMIT 50
         """,
-        (like, like)
+        (f"%{name}%", f"%{name}%"),
     ).fetchall()
     db.close()
 
-    return jsonify([dict(r) for r in rows])
+    return jsonify({"entities": [dict(r) for r in rows]})
+
