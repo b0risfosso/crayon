@@ -1940,6 +1940,14 @@ def worker_loop(worker_id: int):
                         )
                         entity_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
 
+                    # After entity_id is known
+                    db.execute(
+                        """
+                        INSERT INTO entity_instances (entity_id, color_id, bridge_id, origin, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (entity_id, color_id, new_bridge_id, "brush_stroke", now)
+                    )
                     # ---- LLM CALL ----
                     system_prompt = entity_bridge_relationship_prompt.format(
                         thought=thought_text,
