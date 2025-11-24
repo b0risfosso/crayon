@@ -1939,3 +1939,901 @@ QUALITY CHECK
 
 Now produce the bridge.
 """
+
+
+# --- Bridge: Thought → Language (Autonomous Linguistic Architecture) (NEW) ---
+language_bridge_prompt = r"""
+You are a Linguistic Bridge Architect inside Fantasiagenesis.
+Goal:
+Given a conceptual THOUGHT, infer the world it implies and construct the architecture of linguistic structures required to fully build/capture that world in language.
+You will translate the thought’s world into:
+- the kinds of things language must be able to name,
+- the relations language must be able to express,
+- the causal, temporal, modal, and scale structures language must support,
+- the discourse forms needed to hold the world coherently.
+You must allow the linguistic architecture to emerge from the thought.
+Do not use any predefined linguistic checklist.
+Invent the required linguistic machinery based on the world the thought contains.
+
+INPUT  
+THOUGHT:  
+<<<
+{thought}
+>>>
+
+OUTPUT  
+BRIDGE: Conceptual World → Linguistic World
+
+Produce the following sections, in order:
+
+0. The World-Object You’re Linguistifying  
+State what kind of world this thought describes in linguistic terms.  
+Define the “target linguistic object.”
+
+1. Derived Linguistic Ontology  
+Derive the minimal ontology of entities the language must denote.  
+For each family:  
+- Name (you invent)  
+- What exists in it  
+- Why the thought requires it  
+- Linguistic implications
+
+2. Derived Relational Grammar  
+Define the relational backbone the language must encode.  
+For each relational family:  
+- Name  
+- What it connects  
+- Needed grammatical/predicate structures  
+- Example schematic frames
+
+3. Derived Causal / Mechanistic Grammar  
+For each implied causal mode:  
+- Causal mode name  
+- Type (linear chain, emergent, feedback, adversarial, threshold, cross-scale, etc.)  
+- Linguistic operators needed  
+- Nesting/composition architecture
+
+4. Temporal, Modal, and Counterfactual Architecture  
+For each temporal or modal family:  
+- Name  
+- Operators required (tense, aspect, conditionality, probability, normativity)  
+- Why the thought demands them
+
+5. Scale-Transition and Perspective Grammar  
+Define:  
+- Scale types  
+- Operators to shift scale/perspective  
+- Compositional devices for cross-level coherence
+
+6. Discourse Architecture  
+Identify discourse forms the thought requires.  
+For each:  
+- Name  
+- Purpose  
+- Linguistic structures enabling it
+
+7. Semantic Field Integration & Narrative Operators  
+Identify semantic fields the language must blend.  
+Define bridging devices, cross-domain docking terms, metaphors, analogies, and world-shaping operators.
+
+8. Condensed Full Bridge  
+A compact bullet-list representation of the whole linguistic architecture.
+
+QUALITY CHECK  
+- Every conceptual mechanism in the thought appears in sections 1–7.  
+- Each linguistic subsystem is justified.  
+- The architecture can generate many coherent utterances about the world, including failure/opportunity cases.  
+- Avoid “not X, but Y.”
+
+Now produce the linguistic bridge.
+"""
+
+
+# --- Bridge: Thought → Data Architecture (Autonomous Data-World Builder) (NEW) ---
+data_bridge_prompt = r"""
+You are a Data Architect inside Fantasiagenesis.
+Your task is to take a conceptual THOUGHT and construct the complete data architecture that would capture, encode, and operationalize the entire world implied by that thought.
+You will translate conceptual structures into:
+datasets
+tables
+fields
+graph layers
+schemas
+metrics
+event logs
+time series
+ontologies
+constraint structures
+multi-layer networks
+cross-domain relational modules
+All data structures must emerge from the thought itself, not from a fixed template.
+INPUT
+THOUGHT:
+<<<
+{thought}
+OUTPUT
+BRIDGE: Conceptual World → Data World
+(Architecture of Datasets Needed to Capture the Thought)
+Produce the following sections in order:
+0. Data-World Object You’re Building
+State what kind of world the thought describes in data terms:
+What is the “data universe” implied by the thought?
+What categories of information exist?
+What system(s) must the data architecture faithfully encode?
+This anchors the data design.
+1. Derived Entity Ontology (Data-Level)
+Identify all entity classes implied by the thought.
+For each entity class:
+Name of the entity family
+Why the thought requires it
+Key attributes/fields
+Data types (numeric, categorical, temporal, geospatial, JSON, graph-structured, etc.)
+Primary keys / unique identifiers
+The ontology should reflect every type of “thing” that exists in the thought-world.
+2. Derived Relationship & Dependency Structures
+Determine all relationships the thought implies, and formalize them as datasets.
+For each relationship type:
+Name of the relation
+Entities it links
+Fields / metrics describing strength, direction, type of dependency
+Representation (edge list, association table, adjacency matrix, hypergraph, bipartite graph, multiplex network layer, etc.)
+This is the relational skeleton of the entire world.
+3. Process, Event, and Dynamics Datasets
+If the thought contains processes, flows, transitions, or dynamics, derive datasets that capture these.
+Possible dataset forms:
+time-series tables
+event logs
+transactional datasets
+state-transition datasets
+decision/action logs
+diffusion or propagation datasets
+dynamic network rewiring datasets
+For each:
+Name of the dataset
+What process it encodes
+Schema of columns / fields
+Temporal structure (timestamps, discrete steps, continuous intervals)
+4. Structural Modules (Data Subsystems)
+Organize the derived datasets into modules or subsystems that reflect coherent domains of the thought.
+For each module:
+Module name (you derive it)
+What aspect of the world it encodes
+Tables / structures included
+How it corresponds to specific conceptual structures in the thought
+Examples of module types (only include if the thought requires them):
+resource module
+actor module
+infrastructure module
+incentive module
+ecological module
+semantic/symbolic module
+risk module
+institutional/political module
+technological module
+communication/signal module
+5. Data Representations of Constraints, Risks, or Boundaries
+If the thought includes:
+constraints
+vulnerabilities
+bottlenecks
+risks
+uncertainties
+obstacles
+failure modes
+dependencies with fragility
+derive datasets that encode them explicitly.
+For each:
+Dataset name
+What boundary/condition it represents
+Fields / parameters needed
+Representation (tables, risk matrices, threshold arrays, probabilistic structures)
+6. Metrics, Indices, and Derived Quantities
+Define any computed metrics needed to quantify the conceptual world.
+For each metric:
+Metric name
+Formula or data sources
+Interpretation in terms of the thought
+Data type (scalar, vector, time series, graph metric)
+How it will be used (e.g., dependency index, exposure score, influence metric, capacity measure, etc.)
+7. Multi-Layer Graph Architecture (if implied)
+If the thought describes a world of flows, influence, interactions, supply chains, ecosystems, coalitions, or multi-scale structures, derive the graph structure(s) needed.
+Specify:
+Graph layers
+Nodes
+Edges
+Edge attributes
+Directionality
+Layer-to-layer coupling
+Adjacency representations
+This captures the topological geometry of the thought-world.
+8. Temporal Evolution and Longitudinal Data
+Derive datasets needed to track:
+historical evolution
+future scenarios
+time-dependent changes
+policy shifts
+dynamic responses
+Describe:
+Time indexing scheme
+Archival fields
+Projection fields (if the thought implies forecasts or branching futures)
+Update cadence
+9. Data Needed to Capture Failure Modes & Opportunity Surfaces
+If the thought includes collapse modes, crises, transformation points, or latent potentials:
+For each:
+Dataset name
+Triggers or preconditions
+Attributes capturing severity, probability, cascading effects
+Data structures for representing opportunities or alternative outcomes
+10. Full Stitched Data Architecture
+Construct a compact summary tying everything together.
+A diagram in prose form showing:
+the modules
+the datasets
+the relationships
+the graph layers
+the metrics
+the flows
+This should read like a blueprint for a graph database + tabular system that fully mirrors the world inside the thought.
+QUALITY CHECK
+Before finalizing:
+Every concept in the thought appears somewhere as a dataset, field, or relationship.
+The architecture captures both structural elements and dynamic elements.
+No “not X, but Y” constructions appear.
+The final data architecture can support simulation, analytics, querying, and scenario modeling of the thought-world.
+Now generate the data architecture for the input thought.
+"""
+
+
+# --- Bridge: Thought → Computational Architecture (Autonomous Computational Architecture) (NEW) ---
+computational_bridge_prompt = r"""
+You are a Computational Bridge Architect inside Fantasiagenesis.
+Goal:
+Given a conceptual THOUGHT, infer the world it implies and design the computational architecture capable of fully building/capturing that world in code.
+You will translate conceptual structures into:
+computational objects and data structures
+state representations (stocks/traits/parameters)
+relational skeletons (graphs, multiplex layers, spatial structures)
+dynamics engines (difference equations, ABM, control, diffusion, games, solvers)
+agent decision systems (rules, optimization, bounded rationality, learning)
+shock/scenario mechanisms
+metrics/readouts
+software module boundaries and tick/update schedule
+minimal class/interface sketches
+All architecture must emerge from the thought itself.
+Do not use any fixed template.
+Invent the right computational machinery for the world you see in the thought.
+
+INPUT
+THOUGHT:
+<<<
+{thought}
+>>>
+
+OUTPUT
+BRIDGE: Conceptual World → Computational World
+(Architecture of Code Structures Needed to Capture the Thought)
+
+Produce the following sections in order:
+
+0. The World-Object You’re Computing
+Define the top-level computational object implied by the thought.
+Describe what kind of simulation/computation it is.
+
+1. Derived Computational Ontology
+Define only the computational entities implied by the thought:
+- node/entity types
+- edge/relation types
+- state variables
+- global variables
+- action/control variables
+- time structure
+
+2. Core Representation of the World (Structural Skeleton)
+Define the main data structures (only those demanded by the thought):
+- multiplex graphs
+- grids/lattices
+- hypergraphs
+- tensors
+- nested objects
+Define how indexing, layering, and state-location work.
+
+3. State Model: Stocks, Flows, and Traits
+Define computational state:
+- stocks evolving each tick
+- slow traits
+- flows along edges
+- computed/derived indices
+
+4. Dynamics Kernel (How the World Moves)
+For each major dynamic:
+- engine name
+- what variables it updates
+- update type (system dynamics, ABM, diffusion, optimization, game, etc.)
+- inputs/outputs
+- couplings to other engines
+Include pseudo-update rules when helpful.
+
+5. Agents and Decision Systems (if implied)
+If relevant:
+- agent classes
+- observations
+- belief/forecast machinery
+- decision logic
+- heuristics / learning / bounded optimization
+- action objects
+If the thought has no decision-makers, skip.
+
+6. Shocks, Scenarios, Failure Modes, Opportunities
+Define:
+- shock/event objects
+- parameters
+- injection points in engines
+- scenario orchestration logic
+
+7. Constraints and Boundary Enforcement
+Formalize implied constraints:
+- feasibility filters
+- penalty terms
+- solver modules (LP/MILP/CSP)
+- safety/reliability requirements
+
+8. Metrics and Readout Engine
+Define metrics:
+- name
+- function of state
+- interpretation
+- who uses it (observer, agents, evaluator)
+
+9. Software Module Architecture
+Define modules:
+- world/state
+- dynamics kernel
+- agent library
+- shock orchestrator
+- metrics engine
+- ingest/calibration
+- visualization/query API
+- explainability/logging
+
+10. Tick / Update Schedule
+Define:
+- order of engines
+- where agents act
+- where shocks enter
+- where constraints are enforced
+- where metrics compute
+
+11. Minimal Class / Interface Sketch
+Provide small code-oriented sketches:
+- WorldState
+- Agent
+- Action object(s)
+- DynamicsKernel.step()
+- Shock/Event types
+- main loop pseudocode
+
+QUALITY CHECK
+- Every mechanism in the thought appears as a computational object.
+- No unused classes or symbols.
+- Architecture supports multiple futures including failures and opportunities.
+- Avoid the construction “not X, but Y.”
+
+Now generate the computational bridge.
+"""
+
+
+# --- Bridge: Thought → Music (Autonomous Musical Architecture Builder) (NEW) ---
+music_bridge_prompt = r"""
+You are a Musical Bridge Architect inside Fantasiagenesis.
+Goal:
+Given a conceptual THOUGHT, infer the world it implies and design the architecture of musical structures, forms, motifs, timbres, rhythms, harmonic systems, and compositional processes needed to fully build/capture that world in music.
+You are constructing the musical world that expresses the thought-world.
+The structure must arise directly from the thought.
+INPUT
+THOUGHT:
+<<<
+{thought}
+OUTPUT
+BRIDGE: Conceptual World → Musical World
+(Architecture of Compositional Structures Needed to Capture the Thought)
+Produce the following sections in order:
+0. The World-Object You’re Translating Into Music
+Explain, in one or two paragraphs, what kind of world the thought embodies from a musical standpoint.
+Identify:
+what emotional, structural, systemic, spatial, or dynamic qualities must be translatable into sound;
+what global musical container (e.g., suite, system-piece, multi-movement cycle, modular installation, algorithmic work) best matches the thought’s architecture.
+This anchors the musical design.
+1. Derived Ontology of Musical Equivalents
+Identify the major conceptual categories in the thought and derive their musical equivalents.
+For each conceptual entity or force:
+Conceptual element
+Musical analogue (rhythm, motif, timbre, harmonic field, form, texture, spatialization, gesture, meter, dynamics, etc.)
+Reason for the mapping
+What musical constraints or properties it requires
+This creates the ontology that links world → sound.
+2. Macro-Structural Architecture (Global Form)
+Derive the large-scale forms needed to express the world.
+Depending on the thought, you might derive:
+multi-movement cycles
+generative/algorithmic forms
+evolving drones
+network-counterpoint
+passacaglia-like systems
+theme-and-transformation arcs
+poly-temporal landscapes
+modular or multi-layered structures
+fugue-like network expansions
+fractal repetition structures
+improvisatory frameworks
+electroacoustic system states
+For each macro-structure:
+Name (you derive it)
+Purpose inside the musical realization
+Structural rules (exposition, collision, inversion, dissolution, transformation, etc.)
+How it matches mechanisms in the thought
+3. Micro-Structural Architecture (Motifs, Rhythms, Harmonic Systems)
+Derive the building blocks of the musical world.
+Include categories such as:
+motif types
+rhythmic cells
+harmonic systems or modes
+timbral families
+pitch materials or pitch constraints
+textural grammars
+metric/temporal architectures
+orchestration principles
+electronic/signal-processing analogues
+spatial distribution of voices
+For each micro-structure:
+Name and description
+Musical mechanics
+Conceptual mapping to the thought
+Rules for development or repetition
+4. Relational & Interactional Musical Grammar
+If the thought describes:
+interactions
+dependencies
+coalitions
+conflicts
+flows
+competition
+coordination
+emergence
+dominance or peripheries
+derive the musical grammar that encodes these interactions.
+For each relational pattern:
+Name (you derive it)
+Musical mechanism (counterpoint, cross-rhythm, motif parasitism, call-response, dissonance battles, cluster tension, dynamic suppression, register dominance, polyrhythmic governance, etc.)
+How the relation is expressed in sound
+Why this captures the conceptual relation
+5. Temporal, Transformational, and Evolutionary Structures
+If the thought includes:
+transitions
+emergence
+path-dependence
+shocks
+evolution
+cascades
+cycles
+resilience
+feedback loops
+derive the musical equivalents.
+Define:
+temporal operators (e.g., tempo morphing, rhythmic erosion, swelling, microtiming shifts)
+transformational devices (modulations, re-orchestrations, inversion, retrograde, density shifts, spectral expansion)
+evolutionary patterns (theme mutation, algorithmic variation, self-similar growth)
+Explain how each mirrors the thought’s internal mechanisms.
+6. Timbre, Texture, and Instrumentation World
+Design the timbral universe for the thought.
+Define:
+instrument families or electronic sources
+timbre categories (bright, metallic, granular, fragile, saturated, percussive, resonant, algorithmic, degraded, lush)
+texture rules (polyphony, heterophony, microsound, clustered fields, isolated strands)
+how timbre embodies conceptual forces
+All timbral choices must arise from the thought.
+7. Spatialization, Distribution, and Multi-Voice Geometry (if implied)
+If the thought describes:
+networks
+distributed systems
+centers/peripheries
+multi-node structures
+flows
+topology
+derive the spatial or voice-distribution system.
+Define:
+voicing geometry
+spatialization logic
+distance, proximity, clustering
+movement across space or registers
+Show how spatial structure musically encodes the world’s topology.
+8. Compositional Logic: How the Thought Becomes a Musical Engine
+Explain how the entire musical system behaves like the thought-world.
+Examples:
+motifs act like agents
+registers act like hierarchies
+harmonic fields act like power blocs
+timbral constraints encode scarcity or chokepoints
+metric fields encode governance quality
+glitches encode cyber shocks
+densities encode industrial capacity
+consonance/dissonance encode cooperation/conflict
+cadences encode transitions or unresolved futures
+Provide a coherent mapping from system behavior → world behavior.
+9. Complete Musical Architecture Blueprint
+Produce a concise summary of the entire architecture as a compositional blueprint:
+macro-forms
+micro-structures
+timbral system
+interaction grammar
+transformations
+spatial logic
+mapping principles
+This blueprint should be detailed enough for a composer or generative-music engine to implement directly.
+QUALITY CHECK
+Before finalizing:
+Every major conceptual mechanism in the thought has a musical analogue.
+The musical architecture is rich enough to express the entire world of the thought.
+No “not X, but Y” constructions appear.
+The architecture could be implemented as real composition(s) or generative music.
+Now produce the bridge.
+"""
+
+
+# --- Bridge: Thought → Information (Autonomous Information-Theoretic Architecture Builder) (NEW) ---
+information_bridge_prompt = r"""
+You are an Information Architect inside Fantasiagenesis.
+Goal:
+Given a conceptual THOUGHT, infer the world it implies and construct the complete information architecture that captures the world of that thought in an information-theoretic dimension.
+This includes:
+What information exists
+How it flows
+How it is encoded
+How agents perceive, distort, or transform it
+What uncertainty structures govern the world
+How signals, channels, protocols, noise, and compression appear
+What informational bottlenecks, constraints, asymmetries, or capacities define system behavior
+What information is necessary/sufficient to reconstruct the world
+All structures must emerge directly from the thought itself.
+
+INPUT
+THOUGHT:
+<<<
+{thought}
+>>>
+
+OUTPUT
+BRIDGE: Conceptual World → Information World
+(Information-Theoretic Architecture of the World Inside the Thought)
+
+Produce the following sections in order:
+
+0. The World-Object You Are Recasting as Information
+Describe the information system implied by the thought.
+
+1. Derived Information Ontology
+Define all informational objects:
+- what they represent
+- type (discrete, continuous, symbolic, probabilistic)
+- source
+- uncertainty/entropy properties
+
+2. Channel Architecture (Information Flow + Transmission)
+For each channel:
+- sender → receiver
+- channel type (noisy, adversarial, constrained, latent, implicit, encrypted, etc.)
+- capacity limits, distortion, lag
+- why the thought implies it
+
+3. Encoding, Representation, and Symbol Systems
+For each encoding:
+- name
+- alphabet/symbol basis
+- compression/redundancy
+- mapping from world → symbols
+
+4. Information Dynamics
+For each dynamic:
+- what information evolves
+- transformation rule (update operator, diffusion, Bayesian update, etc.)
+- couplings
+- mapping to the thought
+
+5. Information Asymmetries, Bottlenecks, and Constraints
+Define:
+- asymmetries
+- hidden/latent information
+- bottlenecks
+- observability limits
+- informational chokepoints
+
+6. Noise Models, Corruption, Degradation, Uncertainty
+Define:
+- noise types
+- sources
+- effects
+- governing distributions
+- why they follow from the thought
+
+7. Agent Information States & Epistemic Structures (if implied)
+Define:
+- information sets
+- observability
+- belief updates
+- private vs public info
+- manipulation / misinformation patterns
+
+8. Metrics: Information Measures & Capacities
+Define:
+- entropy
+- mutual information
+- redundancy
+- imbalance indices
+- observability metrics
+- flow centrality
+- complexity measures
+
+9. Full Stitched Information Architecture
+Produce a compact description showing how:
+ontology + channels + encodings + dynamics + asymmetries + noise models + metrics  
+form a coherent information-theoretic world.
+
+QUALITY CHECK
+- Every major mechanism in the thought appears as an information-theoretic structure.
+- Architecture can reconstruct the world using information alone.
+- No “not X, but Y” constructions appear.
+
+Now produce the bridge.
+"""
+
+# --- Bridge: Thought → Poetry (Autonomous Poetic Architecture Builder) (NEW) ---
+poetry_bridge_prompt = r"""
+You are a Poetic Bridge Architect inside Fantasiagenesis.
+Goal:
+Given a conceptual THOUGHT, infer the world it implies and construct the architecture of poetry that fully builds/captures that world.
+You are not writing the poem itself. You are designing the poetry-system capable of expressing the thought’s entire world.
+This requires deriving the poetic structures—motifs, symbols, metaphors, forms, voices, tensions, emotional architectures—that map the conceptual world into a poetic one.
+All structure must emerge directly from the thought.
+INPUT
+THOUGHT:
+<<<
+{thought}
+>>>
+OUTPUT
+BRIDGE: Conceptual World → Poetic World
+(Architecture of Poetic Structures That Capture the Thought)
+Produce the following sections:
+0. The Poetic Object of the Thought
+Describe what kind of poetic universe the thought implies.
+Identify:
+the emotional, symbolic, structural, and existential qualities that poetry must hold
+what “kind” of poem or poetic system matches the world (e.g., epic field, fractal lyric system, braided long-form sequence, mythopoetic codex, polyphonic cycle, documentary-poetic architecture, etc.)
+This anchors the poetic design.
+1. Derived Poetic Ontology
+Identify the conceptual elements inside the thought and derive their poetic equivalents.
+For each conceptual entity or force:
+Conceptual element
+Poetic analogue
+Symbolic function
+Imagistic or sensory field
+Emotional resonance
+Why this mapping is necessary
+Examples (do not use unless thought demands):
+infrastructure → skeletons of light
+power → gravitational verbs
+scarcity → broken meter
+interdependence → braided lines
+risk → tremor motifs
+transition → hinge-images
+2. Metaphor & Symbol Architecture
+Derive the symbolic system required to express the thought.
+For each symbolic family:
+Name (you invent it)
+Dominant symbolic material (light, metal, ash, river, city, memory, shadow, code, stone, fracture, network, breath…)
+Metaphorical mechanics (transformation, mirroring, inversion, recursion, dilation, erasure)
+Conceptual function in the world of the thought
+This section defines the mythic/metaphoric backbone.
+3. Tonal & Affective Architecture
+Define the tonal world demanded by the thought.
+For each tonal mode:
+Tonal category (solemn, crystalline, volatile, intimate, tectonic, recursive, tense, lucid, fragile…)
+Affective field (wonder, dread, longing, defiance, erosion, emergence…)
+Emotional arcs
+Where each tone is required (concept-to-tone mapping)
+This forms the emotive skeleton.
+4. Rhythm, Lineation, and Temporal Architecture
+Derive the temporal structure of the poem.
+For each temporal or rhythmic element:
+Name
+Meter / submeter logic
+Cadence patterns
+Lineation strategy (long braided lines, clipped enjambments, breath-intervals, recursive stanzas…)
+Temporal mapping to concepts (e.g., intermittency encoded as syncopation)
+5. Imagery Architecture
+Identify the imagistic fields necessary to capture the thought.
+For each field:
+Image domain (landscape, mechanical, bodily, cosmic, microscopic…)
+Key recurring image-types
+Synesthetic overlays (light-as-weight, sound-as-distance, heat-as-memory…)
+Symbolic density (minimal, saturated, fractal, sparse)
+How this imagistic system expresses the world of the thought
+6. Voice, Persona, and Perspective Geometry
+If the thought involves:
+systems
+agents
+conflicts
+distributed structures
+asymmetries
+inner/outer dynamics
+derive the voice architecture.
+For each voice geometry:
+Narrative stance (omniscient field, multi-voice mosaic, whispering substructure, embodied sensorium…)
+Who or what speaks (conceptually)
+What perspective constraints exist
+How voices interact, merge, fracture, or remain separate
+Why these voices are necessary for the thought
+7. Structural Forms & High-Level Poetic Systems
+Derive the formal scaffolds.
+Possibilities include (only if implied):
+polyphonic braids
+iterative accretion structures
+hinge-stanzas
+recursive refrains
+modular “movement”-like arcs
+call–response lattices
+anti-lyric documentary sections
+mythic cycles
+network-structured poems
+For each form:
+Name
+Formal rules
+How it expresses the thought’s dynamics
+Where it fits into the whole
+8. Tensions, Fractures, Contrasts, and Poetic Dynamics
+Identify internal tensions in the thought and express how poetry renders them.
+For each tension:
+Conceptual tension
+Poetic manifestation (dissonance vs consonance, fragmentation vs flow, rupture vs continuity, opacity vs lucidity)
+Compositional encoding (syntax fracture, motif contamination, register shifts, tonal collision)
+This defines the engine of poetic motion.
+9. Complete Poetic Architecture Blueprint
+Produce a concise blueprint summarizing:
+Ontologies
+Metaphor systems
+Tonal structures
+Rhythmic/temporal logic
+Imagery fields
+Voice geometry
+Formal scaffolds
+Poetic tensions and engines
+This blueprint should be sufficient to guide a poet—or a generative poetry engine—in constructing work that expresses the full conceptual world of the thought.
+QUALITY CHECK
+Before finalizing:
+Every major conceptual structure in the thought appears as metaphor, symbol, tone, image, rhythm, or voice.
+The architecture can generate a coherent, world-complete poetic universe.
+No “not X, but Y” constructions appear.
+The architecture is expressive enough for multiple poems or an entire poetic cycle.
+Now produce the bridge.
+"""
+
+
+# --- Bridge: Thought → Metaphysics (Autonomous Metaphysical Architecture Builder) (NEW) ---
+metaphysics_bridge_prompt = r"""
+You are a Metaphysical Bridge Architect inside Fantasiagenesis.
+Goal:
+Given a conceptual THOUGHT, derive the metaphysical architecture that fully builds and captures the world inside that thought.
+This means identifying:
+what kinds of things exist
+what kinds of existence those things have
+what grounds or conditions their being
+what relations, forces, potentials, or necessities shape them
+what metaphysical laws or principles govern the world
+what modal landscape (possible, necessary, impossible) the thought implies
+what the deep structure of reality must be for the thought to be true, coherent, or possible
+You are not giving an interpretation—you are constructing the metaphysical system implied by the thought.
+All structure must emerge directly from the thought itself.
+
+INPUT
+THOUGHT:
+<<<
+{thought}
+>>>
+
+OUTPUT
+BRIDGE: Conceptual World → Metaphysical World
+(Metaphysical Architecture Required to Capture the Thought)
+
+Produce the following sections in order:
+
+0. Metaphysical Object of the Thought
+Describe the kind of metaphysical universe the thought implies.
+Identify:
+- the kind of reality suggested
+- the metaphysical scale
+- the nature of worldness
+- which metaphysical categories must exist
+
+1. Ontological Commitments
+For each category:
+- name of category
+- mode of being (material, structural, processual, emergent, dispositional, symbolic, potential, actual…)
+- metaphysical properties
+- justification from the thought
+
+2. Metaphysical Forces, Principles, and Generators
+For each:
+- principle name (you invent)
+- domain (causal, structural, teleological, informational…)
+- operation
+- metaphysical necessity
+- grounding in the thought
+
+3. Modal Architecture (Possibility, Necessity, Contingency)
+For each modal class:
+- what is possible
+- what is necessary
+- what is impossible
+- how possibilities shift
+- modal mapping to thought mechanisms
+
+4. Causation, Acausation, and Causal Geometry
+Identify causal forms:
+- type (efficient, structural, dispositional, emergent, recursive…)
+- constraints
+- domains
+- necessity for thought-world coherence
+
+5. Space, Time, and World-Structure
+For each:
+- spatial ontology (container, relational, networked, multi-layer)
+- temporal ontology (linear, cyclical, branching, emergent)
+- how these shape world-structure
+- metaphysical commitments implied
+
+6. Identity, Individuation, Boundaries
+For each type of entity or system:
+- identity rule
+- persistence rule
+- boundary definition
+- transformation/dissolution conditions
+
+7. Value, Meaning, Normative Layers (if implied)
+For each layer:
+- kind of value
+- grounding condition
+- how meaning arises
+- interaction with metaphysical structure
+
+8. Metaphysical Tensions, Contradictions, Harmonies
+For each tension:
+- conceptual conflict
+- metaphysical form of the tension
+- ways it resolves, transforms, or persists
+
+9. Ultimate Grounds, Foundations, Limits
+For each grounding structure:
+- source of metaphysical stability
+- limit conditions
+- invariants
+- foundational assumptions
+
+10. Full Metaphysical Architecture Blueprint
+Summarize:
+- ontologies
+- generative principles
+- causal geometry
+- modal structure
+- world-structure
+- identity/boundaries
+- values/normativity
+- tensions
+- grounding
+This is the metaphysical engine of the thought-world.
+
+QUALITY CHECK
+- Every conceptual mechanism in the thought appears metaphysically.
+- No “not X, but Y” constructions.
+- Architecture is coherent and world-complete.
+
+Now build the bridge.
+"""

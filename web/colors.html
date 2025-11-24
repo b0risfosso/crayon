@@ -160,10 +160,19 @@
           div.className = 'block';
 
           const statusDivId = `status-${entry.id}`;
-          const simContentId = `sim-content-${entry.id}`;
-          const theoryContentId = `theory-content-${entry.id}`;
-          const physContentId = `phys-content-${entry.id}`;
-          const mathContentId = `math-content-${entry.id}`;
+
+          const contentIds = {};
+          contentIds['simulation_architecture'] = `simulation_architecture-content-${entry.id}`;
+          contentIds['theory_architecture'] = `theory_architecture-content-${entry.id}`;
+          contentIds['physical_world_bridge'] = `physical_world_bridge-content-${entry.id}`;
+          contentIds['math_bridge'] = `math_bridge-content-${entry.id}`;
+          contentIds['language_bridge'] = `language_bridge-content-${entry.id}`;
+          contentIds['data_bridge'] = `data_bridge-content-${entry.id}`;
+          contentIds['computational_bridge'] = `computational_bridge-content-${entry.id}`;
+          contentIds['music_bridge'] = `music_bridge-content-${entry.id}`;
+          contentIds['information_bridge'] = `information_bridge-content-${entry.id}`;
+          contentIds['poetry_bridge'] = `poetry_bridge-content-${entry.id}`;
+          contentIds['metaphysics_bridge'] = `metaphysics_bridge-content-${entry.id}`;
 
           div.innerHTML = `
             <strong>Color ID:</strong> ${entry.id}<br>
@@ -174,113 +183,272 @@
             <pre>${escapeHtml(entry.output_text)}</pre>
 
             <div class="controls">
-              <button id="gen-sim-btn-${entry.id}">Simulation Architecture</button>
-              <button id="gen-theory-btn-${entry.id}">Theory Architecture</button>
-              <button id="gen-phys-btn-${entry.id}">Physical World Bridge</button>
-              <button id="gen-math-btn-${entry.id}">Math Bridge</button>
+              <button id="gen-simulation_architecture-btn-${entry.id}">Simulation Architecture</button>
+              <button id="gen-theory_architecture-btn-${entry.id}">Theory Architecture</button>
+              <button id="gen-physical_world_bridge-btn-${entry.id}">Physical World Bridge</button>
+              <button id="gen-math_bridge-btn-${entry.id}">Math Bridge</button>
+              <button id="gen-language_bridge-btn-${entry.id}">Language Bridge</button>
+              <button id="gen-data_bridge-btn-${entry.id}">Data Bridge</button>
+              <button id="gen-computational_bridge-btn-${entry.id}">Computational Bridge</button>
+              <button id="gen-music_bridge-btn-${entry.id}">Music Bridge</button>
+              <button id="gen-information_bridge-btn-${entry.id}">Information Bridge</button>
+              <button id="gen-poetry_bridge-btn-${entry.id}">Poetry Bridge</button>
+              <button id="gen-metaphysics_bridge-btn-${entry.id}">Metaphysics Bridge</button>
             </div>
             <div id="${statusDivId}" class="status"></div>
 
+
             <div class="bridge-group">
-              <div class="bridge-header" id="sim-header-${entry.id}">
+              <div class="bridge-header" id="simulation_architecture-header-${entry.id}">
                 <div>Simulation Architecture</div>
                 <div class="meta">
-                  <span id="sim-meta-${entry.id}">latest</span>
+                  <span id="simulation_architecture-meta-${entry.id}">latest</span>
                   <span class="caret">▶</span>
                 </div>
               </div>
-              <div class="bridge-content collapsed" id="${simContentId}"></div>
+              <div class="bridge-content collapsed" id="${contentIds['simulation_architecture']}"></div>
             </div>
 
             <div class="bridge-group">
-              <div class="bridge-header" id="theory-header-${entry.id}">
+              <div class="bridge-header" id="theory_architecture-header-${entry.id}">
                 <div>Theory Architecture</div>
                 <div class="meta">
-                  <span id="theory-meta-${entry.id}">latest</span>
+                  <span id="theory_architecture-meta-${entry.id}">latest</span>
                   <span class="caret">▶</span>
                 </div>
               </div>
-              <div class="bridge-content collapsed" id="${theoryContentId}"></div>
+              <div class="bridge-content collapsed" id="${contentIds['theory_architecture']}"></div>
             </div>
 
             <div class="bridge-group">
-              <div class="bridge-header" id="phys-header-${entry.id}">
+              <div class="bridge-header" id="physical_world_bridge-header-${entry.id}">
                 <div>Physical World Bridge</div>
                 <div class="meta">
-                  <span id="phys-meta-${entry.id}">latest</span>
+                  <span id="physical_world_bridge-meta-${entry.id}">latest</span>
                   <span class="caret">▶</span>
                 </div>
               </div>
-              <div class="bridge-content collapsed" id="${physContentId}"></div>
+              <div class="bridge-content collapsed" id="${contentIds['physical_world_bridge']}"></div>
             </div>
 
             <div class="bridge-group">
-                <div class="bridge-header" id="math-header-${entry.id}">
-                    <div>Math Bridge</div>
-                    <div class="meta">
-                    <span id="math-meta-${entry.id}">latest</span>
-                    <span class="caret">▶</span>
-                    </div>
+              <div class="bridge-header" id="math_bridge-header-${entry.id}">
+                <div>Math Bridge</div>
+                <div class="meta">
+                  <span id="math_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
                 </div>
-                <div class="bridge-content collapsed" id="${mathContentId}"></div>
-                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['math_bridge']}"></div>
+            </div>
 
+            <div class="bridge-group">
+              <div class="bridge-header" id="language_bridge-header-${entry.id}">
+                <div>Language Bridge</div>
+                <div class="meta">
+                  <span id="language_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['language_bridge']}"></div>
+            </div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="data_bridge-header-${entry.id}">
+                <div>Data Bridge</div>
+                <div class="meta">
+                  <span id="data_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['data_bridge']}"></div>
+            </div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="computational_bridge-header-${entry.id}">
+                <div>Computational Bridge</div>
+                <div class="meta">
+                  <span id="computational_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['computational_bridge']}"></div>
+            </div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="music_bridge-header-${entry.id}">
+                <div>Music Bridge</div>
+                <div class="meta">
+                  <span id="music_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['music_bridge']}"></div>
+            </div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="information_bridge-header-${entry.id}">
+                <div>Information Bridge</div>
+                <div class="meta">
+                  <span id="information_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['information_bridge']}"></div>
+            </div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="poetry_bridge-header-${entry.id}">
+                <div>Poetry Bridge</div>
+                <div class="meta">
+                  <span id="poetry_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['poetry_bridge']}"></div>
+            </div>
+
+            <div class="bridge-group">
+              <div class="bridge-header" id="metaphysics_bridge-header-${entry.id}">
+                <div>Metaphysics Bridge</div>
+                <div class="meta">
+                  <span id="metaphysics_bridge-meta-${entry.id}">latest</span>
+                  <span class="caret">▶</span>
+                </div>
+              </div>
+              <div class="bridge-content collapsed" id="${contentIds['metaphysics_bridge']}"></div>
+            </div>
           `;
 
           container.appendChild(div);
 
           const statusDiv = document.getElementById(statusDivId);
 
-          const simContentDiv = document.getElementById(simContentId);
-          const theoryContentDiv = document.getElementById(theoryContentId);
-          const physContentDiv = document.getElementById(physContentId);
-          const mathContentDiv = document.getElementById(mathContentId);
-          
-
-          const simMeta = document.getElementById(`sim-meta-${entry.id}`);
-          const theoryMeta = document.getElementById(`theory-meta-${entry.id}`);
-          const physMeta = document.getElementById(`phys-meta-${entry.id}`);
-          const mathMeta = document.getElementById(`math-meta-${entry.id}`);
-
-          wireCollapse(document.getElementById(`sim-header-${entry.id}`), simContentDiv);
-          wireCollapse(document.getElementById(`theory-header-${entry.id}`), theoryContentDiv);
-          wireCollapse(document.getElementById(`phys-header-${entry.id}`), physContentDiv);
-          wireCollapse(document.getElementById(`math-header-${entry.id}`), mathContentDiv);
-
+          const simulation_architectureContentDiv = document.getElementById(contentIds['simulation_architecture']);
+          const simulation_architectureMeta = document.getElementById(`simulation_architecture-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`simulation_architecture-header-${entry.id}`), simulation_architectureContentDiv);
+          const theory_architectureContentDiv = document.getElementById(contentIds['theory_architecture']);
+          const theory_architectureMeta = document.getElementById(`theory_architecture-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`theory_architecture-header-${entry.id}`), theory_architectureContentDiv);
+          const physical_world_bridgeContentDiv = document.getElementById(contentIds['physical_world_bridge']);
+          const physical_world_bridgeMeta = document.getElementById(`physical_world_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`physical_world_bridge-header-${entry.id}`), physical_world_bridgeContentDiv);
+          const math_bridgeContentDiv = document.getElementById(contentIds['math_bridge']);
+          const math_bridgeMeta = document.getElementById(`math_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`math_bridge-header-${entry.id}`), math_bridgeContentDiv);
+          const language_bridgeContentDiv = document.getElementById(contentIds['language_bridge']);
+          const language_bridgeMeta = document.getElementById(`language_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`language_bridge-header-${entry.id}`), language_bridgeContentDiv);
+          const data_bridgeContentDiv = document.getElementById(contentIds['data_bridge']);
+          const data_bridgeMeta = document.getElementById(`data_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`data_bridge-header-${entry.id}`), data_bridgeContentDiv);
+          const computational_bridgeContentDiv = document.getElementById(contentIds['computational_bridge']);
+          const computational_bridgeMeta = document.getElementById(`computational_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`computational_bridge-header-${entry.id}`), computational_bridgeContentDiv);
+          const music_bridgeContentDiv = document.getElementById(contentIds['music_bridge']);
+          const music_bridgeMeta = document.getElementById(`music_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`music_bridge-header-${entry.id}`), music_bridgeContentDiv);
+          const information_bridgeContentDiv = document.getElementById(contentIds['information_bridge']);
+          const information_bridgeMeta = document.getElementById(`information_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`information_bridge-header-${entry.id}`), information_bridgeContentDiv);
+          const poetry_bridgeContentDiv = document.getElementById(contentIds['poetry_bridge']);
+          const poetry_bridgeMeta = document.getElementById(`poetry_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`poetry_bridge-header-${entry.id}`), poetry_bridgeContentDiv);
+          const metaphysics_bridgeContentDiv = document.getElementById(contentIds['metaphysics_bridge']);
+          const metaphysics_bridgeMeta = document.getElementById(`metaphysics_bridge-meta-${entry.id}`);
+          wireCollapse(document.getElementById(`metaphysics_bridge-header-${entry.id}`), metaphysics_bridgeContentDiv);
 
           // Load existing bridges by type
-          const simText = await fetchBridgeOfType(entry.id, "simulation_architecture");
-          renderBridge(simContentDiv, simText);
+          const simulation_architectureText = await fetchBridgeOfType(entry.id, "simulation_architecture");
+          renderBridge(simulation_architectureContentDiv, simulation_architectureText);
 
-          const theoryText = await fetchBridgeOfType(entry.id, "theory_architecture");
-          renderBridge(theoryContentDiv, theoryText);
+          const theory_architectureText = await fetchBridgeOfType(entry.id, "theory_architecture");
+          renderBridge(theory_architectureContentDiv, theory_architectureText);
 
-          const physText = await fetchBridgeOfType(entry.id, "physical_world_bridge");
-          renderBridge(physContentDiv, physText);
+          const physical_world_bridgeText = await fetchBridgeOfType(entry.id, "physical_world_bridge");
+          renderBridge(physical_world_bridgeContentDiv, physical_world_bridgeText);
 
-          const mathText = await fetchBridgeOfType(entry.id, "math_bridge");
-          renderBridge(mathContentDiv, mathText);
+          const math_bridgeText = await fetchBridgeOfType(entry.id, "math_bridge");
+          renderBridge(math_bridgeContentDiv, math_bridgeText);
+
+          const language_bridgeText = await fetchBridgeOfType(entry.id, "language_bridge");
+          renderBridge(language_bridgeContentDiv, language_bridgeText);
+
+          const data_bridgeText = await fetchBridgeOfType(entry.id, "data_bridge");
+          renderBridge(data_bridgeContentDiv, data_bridgeText);
+
+          const computational_bridgeText = await fetchBridgeOfType(entry.id, "computational_bridge");
+          renderBridge(computational_bridgeContentDiv, computational_bridgeText);
+
+          const music_bridgeText = await fetchBridgeOfType(entry.id, "music_bridge");
+          renderBridge(music_bridgeContentDiv, music_bridgeText);
+
+          const information_bridgeText = await fetchBridgeOfType(entry.id, "information_bridge");
+          renderBridge(information_bridgeContentDiv, information_bridgeText);
+
+          const poetry_bridgeText = await fetchBridgeOfType(entry.id, "poetry_bridge");
+          renderBridge(poetry_bridgeContentDiv, poetry_bridgeText);
+
+          const metaphysics_bridgeText = await fetchBridgeOfType(entry.id, "metaphysics_bridge");
+          renderBridge(metaphysics_bridgeContentDiv, metaphysics_bridgeText);
 
           // Wire buttons
-          const simBtn = document.getElementById(`gen-sim-btn-${entry.id}`);
-          simBtn.onclick = () =>
+          const simulation_architectureBtn = document.getElementById(`gen-simulation_architecture-btn-${entry.id}`);
+          simulation_architectureBtn.onclick = () =>
             enqueueBridge(entry.id, "simulation_architecture", "/colors/simulation_architecture",
-              statusDiv, simContentDiv, simMeta, simBtn);
+              statusDiv, simulation_architectureContentDiv, simulation_architectureMeta, simulation_architectureBtn);
 
-          const theoryBtn = document.getElementById(`gen-theory-btn-${entry.id}`);
-          theoryBtn.onclick = () =>
+          const theory_architectureBtn = document.getElementById(`gen-theory_architecture-btn-${entry.id}`);
+          theory_architectureBtn.onclick = () =>
             enqueueBridge(entry.id, "theory_architecture", "/colors/theory_architecture",
-              statusDiv, theoryContentDiv, theoryMeta, theoryBtn);
+              statusDiv, theory_architectureContentDiv, theory_architectureMeta, theory_architectureBtn);
 
-          const physBtn = document.getElementById(`gen-phys-btn-${entry.id}`);
-          physBtn.onclick = () =>
+          const physical_world_bridgeBtn = document.getElementById(`gen-physical_world_bridge-btn-${entry.id}`);
+          physical_world_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "physical_world_bridge", "/colors/physical_world_bridge",
-              statusDiv, physContentDiv, physMeta, physBtn);
-        
-           const mathBtn = document.getElementById(`gen-math-btn-${entry.id}`);
-            mathBtn.onclick = () =>
+              statusDiv, physical_world_bridgeContentDiv, physical_world_bridgeMeta, physical_world_bridgeBtn);
+
+          const math_bridgeBtn = document.getElementById(`gen-math_bridge-btn-${entry.id}`);
+          math_bridgeBtn.onclick = () =>
             enqueueBridge(entry.id, "math_bridge", "/colors/math_bridge",
-                statusDiv, mathContentDiv, mathMeta, mathBtn);
+              statusDiv, math_bridgeContentDiv, math_bridgeMeta, math_bridgeBtn);
+
+          const language_bridgeBtn = document.getElementById(`gen-language_bridge-btn-${entry.id}`);
+          language_bridgeBtn.onclick = () =>
+            enqueueBridge(entry.id, "language_bridge", "/colors/language_bridge",
+              statusDiv, language_bridgeContentDiv, language_bridgeMeta, language_bridgeBtn);
+
+          const data_bridgeBtn = document.getElementById(`gen-data_bridge-btn-${entry.id}`);
+          data_bridgeBtn.onclick = () =>
+            enqueueBridge(entry.id, "data_bridge", "/colors/data_bridge",
+              statusDiv, data_bridgeContentDiv, data_bridgeMeta, data_bridgeBtn);
+
+          const computational_bridgeBtn = document.getElementById(`gen-computational_bridge-btn-${entry.id}`);
+          computational_bridgeBtn.onclick = () =>
+            enqueueBridge(entry.id, "computational_bridge", "/colors/computational_bridge",
+              statusDiv, computational_bridgeContentDiv, computational_bridgeMeta, computational_bridgeBtn);
+
+          const music_bridgeBtn = document.getElementById(`gen-music_bridge-btn-${entry.id}`);
+          music_bridgeBtn.onclick = () =>
+            enqueueBridge(entry.id, "music_bridge", "/colors/music_bridge",
+              statusDiv, music_bridgeContentDiv, music_bridgeMeta, music_bridgeBtn);
+
+          const information_bridgeBtn = document.getElementById(`gen-information_bridge-btn-${entry.id}`);
+          information_bridgeBtn.onclick = () =>
+            enqueueBridge(entry.id, "information_bridge", "/colors/information_bridge",
+              statusDiv, information_bridgeContentDiv, information_bridgeMeta, information_bridgeBtn);
+
+          const poetry_bridgeBtn = document.getElementById(`gen-poetry_bridge-btn-${entry.id}`);
+          poetry_bridgeBtn.onclick = () =>
+            enqueueBridge(entry.id, "poetry_bridge", "/colors/poetry_bridge",
+              statusDiv, poetry_bridgeContentDiv, poetry_bridgeMeta, poetry_bridgeBtn);
+
+          const metaphysics_bridgeBtn = document.getElementById(`gen-metaphysics_bridge-btn-${entry.id}`);
+          metaphysics_bridgeBtn.onclick = () =>
+            enqueueBridge(entry.id, "metaphysics_bridge", "/colors/metaphysics_bridge",
+              statusDiv, metaphysics_bridgeContentDiv, metaphysics_bridgeMeta, metaphysics_bridgeBtn);
+
+
         }
 
       } catch (e) {
