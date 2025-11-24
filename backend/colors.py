@@ -2453,31 +2453,7 @@ def enqueue_entities():
     }), 202
 
 
-@app.get("/colors/entities/by_color/<int:color_id>")
-def entities_by_color(color_id: int):
-    db = get_art_db()
-    rows = db.execute(
-        """
-        SELECT * FROM entities
-        WHERE color_id = ?
-        ORDER BY created_at DESC
-        """,
-        (color_id,)
-    ).fetchall()
-    db.close()
 
-    out = []
-    for r in rows:
-        d = dict(r)
-        ej = d.get("entities_json")
-        if isinstance(ej, str):
-            try:
-                d["entities_json"] = json.loads(ej)
-            except Exception:
-                pass
-        out.append(d)
-
-    return jsonify(out)
 
 
 @app.post("/colors/simulation_architecture")
@@ -3169,3 +3145,26 @@ def search_entities():
 
     return jsonify({"entities": [dict(r) for r in rows]})
 
+@app.get("/colors/entities/by_color/<int:color_id>")
+def entities_by_color(color_id: int):
+    """
+    Return all canonical entities that are actually used by brush-stroke bridges
+    for the given color_id.
+    """
+    db = get_art_db()
+
+    rows = db.execute(
+        """
+        SELECT DISTINCT e.id, e.name, e.canonical_name, e.created_at
+        FROM entities e
+        JOIN bridges b ON b.entity_id = e.id
+        WHERE b.color_id = ?
+          AND b.entity_id IS NOT NULL
+        ORDER BY e.name ASC
+        """,
+        (color_id,)
+    ).fetchall()
+
+    db.close()
+
+    return jsonify([dict(r) for r in rows])
