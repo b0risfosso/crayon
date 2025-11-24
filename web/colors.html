@@ -54,24 +54,46 @@
     }
 
     async function pollTask(taskId, statusDiv) {
-      const maxMs = 120000;
-      const intervalMs = 1200;
-      const t0 = Date.now();
+  // Soft timeout: after this, we keep polling but show a different message.
+  const softMaxMs = 2 * 60 * 1000;   // 2 minutes
+  const hardMaxMs = 30 * 60 * 1000;  // 30 minutes safety cap
 
-      while (true) {
-        const res = await fetch(`/colors/tasks/${taskId}`);
-        const data = await res.json();
+  const t0 = Date.now();
+  let intervalMs = 1200;
 
-        if (!res.ok) throw new Error(data.message || 'task poll failed');
-        if (data.status === 'done') return data.result;
-        if (data.status === 'error') throw new Error(data.error || 'task error');
+  while (true) {
+    const res = await fetch(`/colors/tasks/${taskId}`);
+    const data = await res.json();
 
-        const elapsed = Date.now() - t0;
-        statusDiv.textContent = `Task ${taskId}: ${data.status}… (${Math.floor(elapsed/1000)}s)`;
-        if (elapsed > maxMs) throw new Error('task timed out');
-        await new Promise(r => setTimeout(r, intervalMs));
-      }
+    if (!res.ok) throw new Error(data.message || 'task poll failed');
+    if (data.status === 'done') return data.result;
+    if (data.status === 'error') throw new Error(data.error || 'task error');
+
+    const elapsed = Date.now() - t0;
+    const elapsedS = Math.floor(elapsed / 1000);
+
+    // Message mode changes after soft timeout
+    if (elapsed > softMaxMs) {
+      statusDiv.textContent =
+        `Task ${taskId}: ${data.status}… still running (${elapsedS}s).`;
+      // backoff to reduce hammering
+      intervalMs = Math.min(intervalMs * 1.25, 8000);
+    } else {
+      statusDiv.textContent =
+        `Task ${taskId}: ${data.status}… (${elapsedS}s)`;
     }
+
+    // True safety cap; if you want “never stop”, remove this block.
+    if (elapsed > hardMaxMs) {
+      throw new Error(
+        `task exceeded ${Math.floor(hardMaxMs/60000)}min client cap; worker may still be running`
+      );
+    }
+
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+}
+
 
     async function fetchBridgeOfType(colorId, bridgeType) {
       const res = await fetch(`/colors/bridges/by_color/${colorId}/${bridgeType}`);
