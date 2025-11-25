@@ -52,7 +52,7 @@ import uuid
 from contextlib import contextmanager
 
 
-MODEL_DEFAULT = os.environ.get("COLORS_MODEL", "gpt-5.1")
+MODEL_DEFAULT = os.environ.get("COLORS_MODEL", "gpt-5-mini-2025-08-07")
 APP_PORT = int(os.environ.get("PORT", "9018"))
 ART_DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
 LLM_USAGE_DB_PATH = os.environ.get("LLM_USAGE_DB", "/var/www/site/data/llm_usage.db")
