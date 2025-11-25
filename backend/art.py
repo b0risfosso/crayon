@@ -194,6 +194,7 @@ def list_art():
     q = request.args.get("q")
     order = request.args.get("order", "desc").lower()
     random_flag = request.args.get("random")
+    collection_id = request.args.get("collection_id")
 
     if order not in ("asc", "desc"):
         abort(400, description="order must be 'asc' or 'desc'")
@@ -202,10 +203,25 @@ def list_art():
     params = []
 
     if email:
-        where.append("email = ?")
+        where.append("a.email = ?")
         params.append(email)
 
+    if collection_id:
+        try:
+            cid = int(collection_id)
+        except ValueError:
+            abort(400, description="collection_id must be int")
+        where.append("aci.collection_id = ?")
+        params.append(cid)
+
     db = get_db()
+
+    # Use join only if filtering by collection_id
+    join_sql = ""
+    from_sql = "FROM art a"
+    if collection_id:
+        join_sql = "JOIN art_collection_items aci ON aci.art_id = a.id"
+        from_sql = f"FROM art a {join_sql}"
 
     # -------------------------
     # RANDOM LOAD MODE
@@ -213,7 +229,8 @@ def list_art():
     if random_flag in ("1", "true", "yes"):
         where_sql = ("WHERE " + " AND ".join(where)) if where else ""
         sql = f"""
-            SELECT * FROM art
+            SELECT a.*
+            {from_sql}
             {where_sql}
             ORDER BY RANDOM()
             LIMIT ?
@@ -227,26 +244,25 @@ def list_art():
     if q:
         tokens = tokenize(q)
 
-        # Candidate pool: any row that matches any token in LIKE
         cand_where = list(where)
         cand_params = list(params)
 
         if tokens:
             like_clauses = []
             for t in tokens:
-                like_clauses.append("art LIKE ?")
+                like_clauses.append("a.art LIKE ?")
                 cand_params.append(f"%{t}%")
             cand_where.append("(" + " OR ".join(like_clauses) + ")")
         else:
-            cand_where.append("art LIKE ?")
+            cand_where.append("a.art LIKE ?")
             cand_params.append(f"%{q}%")
 
         cand_where_sql = "WHERE " + " AND ".join(cand_where)
-        # Pull a bigger pool to rank from
         candidate_limit = max(limit * 5, 100)
 
         cand_sql = f"""
-            SELECT * FROM art
+            SELECT a.*
+            {from_sql}
             {cand_where_sql}
             LIMIT ?
         """
@@ -266,13 +282,15 @@ def list_art():
     # -------------------------
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     sql = f"""
-        SELECT * FROM art
+        SELECT a.*
+        {from_sql}
         {where_sql}
-        ORDER BY created_at {order}
+        ORDER BY a.created_at {order}
         LIMIT ? OFFSET ?
     """
     rows = db.execute(sql, params + [limit, offset]).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
+
 
 
 # -------------------------
@@ -460,3 +478,324 @@ def colors_exists_batch():
     existing = {str(r["art_id"]) for r in rows}
     out = {str(aid): (str(aid) in existing) for aid in art_ids}
     return jsonify(out)
+
+# -------------------------
+# COLLECTIONS: CREATE
+# -------------------------
+
+@app.post("/api/collections")
+def create_collection():
+    payload = require_json()
+    name = payload.get("name")
+    email = payload.get("email")
+    description = payload.get("description")
+    metadata = payload.get("metadata")
+
+    if not isinstance(name, str) or not name.strip():
+        abort(400, description="'name' is required and must be a non-empty string")
+    if not isinstance(email, str) or not email.strip():
+        abort(400, description="'email' is required and must be a non-empty string")
+
+    created_at = utc_now_iso()
+    updated_at = created_at
+
+    md_str = None
+    if metadata is not None:
+        if isinstance(metadata, (dict, list)):
+            md_str = json.dumps(metadata, ensure_ascii=False)
+        elif isinstance(metadata, str):
+            md_str = metadata
+        else:
+            abort(400, description="'metadata' must be object/array/string if provided")
+
+    db = get_db()
+    cur = db.execute(
+        """
+        INSERT INTO art_collections (name, email, description, metadata, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (name.strip(), email.strip(), description, md_str, created_at, updated_at),
+    )
+    db.commit()
+
+    cid = cur.lastrowid
+    row = db.execute("SELECT * FROM art_collections WHERE id = ?", (cid,)).fetchone()
+    return jsonify(row_to_dict(row)), 201
+
+
+# -------------------------
+# COLLECTIONS: READ (list w/ counts)
+# GET /api/collections?email=foo@bar.com
+# -------------------------
+
+@app.get("/api/collections")
+def list_collections():
+    email = request.args.get("email")
+    if not email:
+        abort(400, description="email query param required")
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT c.*,
+               COUNT(aci.art_id) AS art_count
+        FROM art_collections c
+        LEFT JOIN art_collection_items aci ON aci.collection_id = c.id
+        WHERE c.email = ?
+        GROUP BY c.id
+        ORDER BY c.created_at DESC
+        """,
+        (email.strip(),)
+    ).fetchall()
+
+    out = []
+    for r in rows:
+        d = row_to_dict(r)
+        d["art_count"] = r["art_count"]
+        out.append(d)
+    return jsonify(out)
+
+
+# -------------------------
+# COLLECTIONS: READ (single)
+# -------------------------
+
+@app.get("/api/collections/<int:collection_id>")
+def get_collection(collection_id: int):
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM art_collections WHERE id = ?",
+        (collection_id,)
+    ).fetchone()
+    if row is None:
+        abort(404, description="collection not found")
+    return jsonify(row_to_dict(row))
+
+
+# -------------------------
+# COLLECTIONS: UPDATE (PUT)
+# -------------------------
+
+@app.put("/api/collections/<int:collection_id>")
+def update_collection(collection_id: int):
+    payload = require_json()
+    name = payload.get("name")
+    email = payload.get("email")
+    description = payload.get("description")
+    metadata = payload.get("metadata")
+
+    if name is None or not isinstance(name, str) or not name.strip():
+        abort(400, description="'name' is required for PUT and must be non-empty")
+    if email is None or not isinstance(email, str) or not email.strip():
+        abort(400, description="'email' is required for PUT and must be non-empty")
+
+    md_str = None
+    if metadata is not None:
+        if isinstance(metadata, (dict, list)):
+            md_str = json.dumps(metadata, ensure_ascii=False)
+        elif isinstance(metadata, str):
+            md_str = metadata
+        else:
+            abort(400, description="'metadata' must be object/array/string if provided")
+
+    updated_at = utc_now_iso()
+    db = get_db()
+    cur = db.execute(
+        """
+        UPDATE art_collections
+        SET name = ?, email = ?, description = ?, metadata = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (name.strip(), email.strip(), description, md_str, updated_at, collection_id)
+    )
+    db.commit()
+
+    if cur.rowcount == 0:
+        abort(404, description="collection not found")
+
+    row = db.execute("SELECT * FROM art_collections WHERE id = ?", (collection_id,)).fetchone()
+    return jsonify(row_to_dict(row))
+
+
+# -------------------------
+# COLLECTIONS: UPDATE (PATCH)
+# -------------------------
+
+@app.patch("/api/collections/<int:collection_id>")
+def patch_collection(collection_id: int):
+    payload = require_json()
+    fields = []
+    params = []
+
+    if "name" in payload:
+        name = payload.get("name")
+        if not isinstance(name, str) or not name.strip():
+            abort(400, description="'name' must be non-empty string")
+        fields.append("name = ?")
+        params.append(name.strip())
+
+    if "email" in payload:
+        email = payload.get("email")
+        if email is not None and (not isinstance(email, str) or not email.strip()):
+            abort(400, description="'email' must be non-empty string if provided")
+        fields.append("email = ?")
+        params.append(email.strip() if isinstance(email, str) else email)
+
+    if "description" in payload:
+        fields.append("description = ?")
+        params.append(payload.get("description"))
+
+    if "metadata" in payload:
+        metadata = payload.get("metadata")
+        if metadata is None:
+            md_str = None
+        elif isinstance(metadata, (dict, list)):
+            md_str = json.dumps(metadata, ensure_ascii=False)
+        elif isinstance(metadata, str):
+            md_str = metadata
+        else:
+            abort(400, description="'metadata' must be object/array/string if provided")
+        fields.append("metadata = ?")
+        params.append(md_str)
+
+    if not fields:
+        abort(400, description="No valid fields to patch")
+
+    fields.append("updated_at = ?")
+    params.append(utc_now_iso())
+    params.append(collection_id)
+
+    sql = f"UPDATE art_collections SET {', '.join(fields)} WHERE id = ?"
+
+    db = get_db()
+    cur = db.execute(sql, params)
+    db.commit()
+
+    if cur.rowcount == 0:
+        abort(404, description="collection not found")
+
+    row = db.execute("SELECT * FROM art_collections WHERE id = ?", (collection_id,)).fetchone()
+    return jsonify(row_to_dict(row))
+
+
+# -------------------------
+# COLLECTIONS: DELETE
+# -------------------------
+
+@app.delete("/api/collections/<int:collection_id>")
+def delete_collection(collection_id: int):
+    db = get_db()
+    cur = db.execute("DELETE FROM art_collections WHERE id = ?", (collection_id,))
+    db.commit()
+    if cur.rowcount == 0:
+        abort(404, description="collection not found")
+    return jsonify({"deleted": True, "id": collection_id})
+
+
+# -------------------------
+# COLLECTION ITEMS: ADD ART TO COLLECTION
+# POST /api/collections/<id>/items  { art_id, position? }
+# -------------------------
+
+@app.post("/api/collections/<int:collection_id>/items")
+def add_art_to_collection(collection_id: int):
+    payload = require_json()
+    art_id = payload.get("art_id")
+    position = payload.get("position")
+
+    if art_id is None:
+        abort(400, description="'art_id' is required")
+    try:
+        art_id = int(art_id)
+    except ValueError:
+        abort(400, description="'art_id' must be int")
+
+    if position is not None:
+        try:
+            position = int(position)
+        except ValueError:
+            abort(400, description="'position' must be int if provided")
+
+    db = get_db()
+
+    # ensure collection exists
+    c = db.execute("SELECT id FROM art_collections WHERE id = ?", (collection_id,)).fetchone()
+    if c is None:
+        abort(404, description="collection not found")
+
+    # ensure art exists
+    a = db.execute("SELECT id FROM art WHERE id = ?", (art_id,)).fetchone()
+    if a is None:
+        abort(404, description="art not found")
+
+    created_at = utc_now_iso()
+
+    try:
+        db.execute(
+            """
+            INSERT INTO art_collection_items (collection_id, art_id, position, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (collection_id, art_id, position, created_at)
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        abort(400, description="art already in collection")
+
+    return jsonify({"ok": True, "collection_id": collection_id, "art_id": art_id}), 201
+
+
+# -------------------------
+# COLLECTION ITEMS: REMOVE
+# DELETE /api/collections/<id>/items/<art_id>
+# -------------------------
+
+@app.delete("/api/collections/<int:collection_id>/items/<int:art_id>")
+def remove_art_from_collection(collection_id: int, art_id: int):
+    db = get_db()
+    cur = db.execute(
+        """
+        DELETE FROM art_collection_items
+        WHERE collection_id = ? AND art_id = ?
+        """,
+        (collection_id, art_id)
+    )
+    db.commit()
+    if cur.rowcount == 0:
+        abort(404, description="collection item not found")
+    return jsonify({"deleted": True, "collection_id": collection_id, "art_id": art_id})
+
+
+# -------------------------
+# COLLECTION ITEMS: LIST ARTS IN COLLECTION
+# GET /api/collections/<id>/items
+# -------------------------
+
+@app.get("/api/collections/<int:collection_id>/items")
+def list_collection_items(collection_id: int):
+    db = get_db()
+
+    rows = db.execute(
+        """
+        SELECT a.*, aci.position, aci.created_at AS added_at
+        FROM art_collection_items aci
+        JOIN art a ON a.id = aci.art_id
+        WHERE aci.collection_id = ?
+        ORDER BY 
+            CASE WHEN aci.position IS NULL THEN 1 ELSE 0 END,
+            aci.position ASC,
+            aci.created_at DESC
+        """,
+        (collection_id,)
+    ).fetchall()
+
+    out = []
+    for r in rows:
+        d = row_to_dict(r)
+        d["position"] = r["position"]
+        d["added_at"] = r["added_at"]
+        out.append(d)
+
+    return jsonify(out)
+
+
