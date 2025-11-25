@@ -172,17 +172,19 @@
     }
 
     async function loadCollectionsForEmail() {
-      const email = getCollectionsEmailInput();
-      if (!email) { alert("Enter collections email."); return; }
-      collectionsEmail = email;
-      // also sync the main art email filter so list aligns by default
-      document.getElementById('searchEmail').value = email;
-      activeCollectionId = null;
-      activeCollectionItemSet = new Set();
-      document.getElementById('searchCollectionId').value = '';
-      await fetchCollections();
-      fetchArt();
+        const email = getCollectionsEmailInput();
+        if (!email) { alert("Enter collections email."); return; }
+        collectionsEmail = email;
+
+        activeCollectionId = null;
+        activeCollectionItemSet = new Set();
+        document.getElementById('searchCollectionId').value = '';
+
+        await fetchCollections();
+        await loadActiveCollectionItems(); // no-op unless active selected later
+        // DO NOT call fetchArt() here; collections email shouldn't affect art list
     }
+
 
     function clearCollectionsUI() {
       collectionsEmail = null;
@@ -235,20 +237,19 @@
             </div>
           `;
 
+          
+
           li.onclick = async () => {
             activeCollectionId = col.id;
             document.getElementById('searchCollectionId').value = String(col.id);
-
-            // ensure main email filter stays aligned with collections email
-            document.getElementById('searchEmail').value = collectionsEmail;
 
             document.querySelectorAll('.collection-item').forEach(x => x.classList.remove('active'));
             li.classList.add('active');
 
             showEditPanel(col);
             await loadActiveCollectionItems();
-            fetchArt();
-          };
+            fetchArt(); // uses whatever searchEmail currently is
+        };
 
           list.appendChild(li);
         });
@@ -285,7 +286,6 @@
 
       activeCollectionId = data.id;
       document.getElementById('searchCollectionId').value = String(data.id);
-      document.getElementById('searchEmail').value = collectionsEmail;
 
       await fetchCollections();
       await loadActiveCollectionItems();
