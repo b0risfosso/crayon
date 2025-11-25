@@ -142,7 +142,7 @@
       <section>
         <h2>List of Art</h2>
         <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          <input id="searchQuery" type="text" value="solar microgrid"
+          <input id="searchQuery" type="text" value="solar"
                  placeholder="Search art..." style="flex:1; min-width:220px; padding:6px;" />
           <input id="searchEmail" type="text"
                  placeholder="Email filter (optional)" style="min-width:220px; padding:6px;" />
@@ -423,6 +423,10 @@
                 Remove from Active Collection
               </button>
             ` : ``}
+
+            <button onclick="deleteArt(${item.id})">
+              Delete
+            </button>
           </div>
 
           <div class="meta">
@@ -567,6 +571,42 @@
         await new Promise(ok => setTimeout(ok, 1200));
       }
     }
+
+      async function deleteArt(id) {
+    if (!confirm(`Delete art #${id}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/art/api/art/${id}`, {
+        method: 'DELETE'
+      });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (e) {
+        // ignore JSON parse errors on empty body
+      }
+
+      if (!res.ok) {
+        alert((data && data.message) || 'Failed to delete art');
+        return;
+      }
+
+      // If this art was in the active collection, refresh that state
+      if (activeCollectionId && activeCollectionItemSet.has(String(id))) {
+        await loadActiveCollectionItems();
+        fetchCollections();
+      }
+
+      // Refresh list
+      fetchArt();
+    } catch (e) {
+      alert(`Error deleting art: ${e.message || e}`);
+    }
+  }
+
 
     function escapeHtml(str) {
       return String(str)
