@@ -438,7 +438,6 @@ def run_bridge_task(color_id, model, temperature, user_metadata, *,
         t0 = time.time()
         resp = _client.chat.completions.create(
             model=model,
-            temperature=temperature,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -902,7 +901,6 @@ def worker_loop(worker_id: int):
                     t0 = time.time()
                     resp = _client.chat.completions.create(
                         model=model,
-                        temperature=temperature,
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
