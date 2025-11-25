@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LLM Usage Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #fafafa;
+      color: #222;
+    }
+    h1 {
+      margin-top: 0;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr);
+      gap: 20px;
+      align-items: flex-start;
+    }
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+    .muted {
+      color: #777;
+      font-size: 12px;
+    }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    label {
+      font-size: 13px;
+    }
+    select, input[type="number"], input[type="text"], input[type="date"] {
+      padding: 4px 6px;
+      font-size: 13px;
+    }
+    button {
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #eee;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid #e0e0e0;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f3f3;
+      font-weight: 600;
+    }
+    .number {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .status {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #555;
+      min-height: 16px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #f3f3ff;
+      border: 1px solid #d0d0ff;
+      font-size: 11px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: #eee;
+      font-size: 11px;
+    }
+    .scroll {
+      max-height: 420px;
+      overflow: auto;
+    }
+    code {
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>LLM Usage Dashboard</h1>
+  <div class="muted">
+    Reads from <code>/read/usage</code>, <code>/read/usage/all_time</code>,
+    <code>/read/usage/models</code>, <code>/read/usage/daily</code>, and
+    <code>/read/usage/events</code>.
+  </div>
+
+  <div class="layout">
+    <!-- LEFT: SUMMARY + DAILY -->
+    <div>
+      <div class="card">
+        <h2>Summary</h2>
+        <div class="controls-row">
+          <label>
+            Model:
+            <select id="modelSelect">
+              <option value="">Loading models…</option>
+            </select>
+          </label>
+          <button id="refreshSummaryBtn">Refresh</button>
+        </div>
+        <div id="summaryStatus" class="status"></div>
+
+        <div id="summaryContent">
+          <div class="card" style="margin: 8px 0;">
+            <h3>Today (selected model)</h3>
+            <div class="muted" id="summaryTodayLabel"></div>
+            <table>
+              <tbody>
+                <tr><th>Tokens in</th><td class="number" id="todayTokensIn">-</td></tr>
+                <tr><th>Tokens out</th><td class="number" id="todayTokensOut">-</td></tr>
+                <tr><th>Total tokens</th><td class="number" id="todayTotalTokens">-</td></tr>
+                <tr><th>Calls</th><td class="number" id="todayCalls">-</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card" style="margin: 8px 0;">
+            <h3>All-time (all models)</h3>
+            <div class="muted" id="summaryAllTimeLabel">From <code>totals_all_time</code></div>
+            <table>
+              <tbody>
+                <tr><th>Tokens in</th><td class="number" id="allTokensIn">-</td></tr>
+                <tr><th>Tokens out</th><td class="number" id="allTokensOut">-</td></tr>
+                <tr><th>Total tokens</th><td class="number" id="allTotalTokens">-</td></tr>
+                <tr><th>Calls</th><td class="number" id="allCalls">-</td></tr>
+                <tr><th>Last usage</th><td id="allLastTs">-</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card" style="margin: 8px 0;">
+            <h3>Per-model all-time totals</h3>
+            <div class="muted">Sorted by total tokens (desc).</div>
+            <div class="scroll">
+              <table id="modelsTable">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th class="number">Tokens in</th>
+                    <th class="number">Tokens out</th>
+                    <th class="number">Total tokens</th>
+                    <th class="number">Calls</th>
+                    <th>First</th>
+                    <th>Last</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Daily Usage</h2>
+        <div class="controls-row">
+          <label>
+            Days:
+            <input id="dailyDays" type="number" min="1" max="365" value="30" style="width:70px;">
+          </label>
+          <label class="muted">
+            Mode:
+            <select id="dailyMode">
+              <option value="model">Selected model</option>
+              <option value="all">All models (aggregated)</option>
+            </select>
+          </label>
+          <button id="refreshDailyBtn">Refresh</button>
+        </div>
+        <div id="dailyStatus" class="status"></div>
+        <div class="scroll">
+          <table id="dailyTable">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Model</th>
+                <th class="number">Tokens in</th>
+                <th class="number">Tokens out</th>
+                <th class="number">Total tokens</th>
+                <th class="number">Calls</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: EVENTS -->
+    <div>
+      <div class="card">
+        <h2>Raw Events</h2>
+        <div class="controls-row">
+          <label>
+            App:
+            <input id="eventsApp" type="text" placeholder="jid / crayon / ..." />
+          </label>
+          <label>
+            Email:
+            <input id="eventsEmail" type="text" placeholder="user@example.com" />
+          </label>
+        </div>
+        <div class="controls-row">
+          <label>
+            Model (override):
+            <input id="eventsModel" type="text" placeholder="default: selected model" />
+          </label>
+          <label>
+            Day:
+            <input id="eventsDay" type="date" />
+          </label>
+        </div>
+        <div class="controls-row">
+          <label>
+            Limit:
+            <input id="eventsLimit" type="number" value="100" min="1" max="1000" style="width:80px;">
+          </label>
+          <button id="loadEventsBtn">Load Events</button>
+          <button id="nextEventsBtn" disabled>Next Page</button>
+        </div>
+        <div id="eventsStatus" class="status"></div>
+        <div class="scroll">
+          <table id="eventsTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>TS</th>
+                <th>App</th>
+                <th>Model</th>
+                <th>Endpoint</th>
+                <th>Email</th>
+                <th class="number">In</th>
+                <th class="number">Out</th>
+                <th class="number">Total</th>
+                <th class="number">Calls</th>
+                <th class="number">Dur (ms)</th>
+                <th class="number">Cost ($)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="muted" style="margin-top:6px;">
+          Events from <code>usage_events</code>. No calls column there, so "Calls" is always 1 per row.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- helpers -----------------------------------------------------------
+    function fmt(n) {
+      if (n === null || n === undefined) return "-";
+      const num = Number(n);
+      if (!isFinite(num)) return String(n);
+      return num.toLocaleString();
+    }
+
+    function fmtTs(ts) {
+      if (!ts) return "-";
+      try {
+        // assume ISO; show local short
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return ts;
+        return d.toLocaleString();
+      } catch (e) {
+        return ts;
+      }
+    }
+
+    async function fetchJSON(url) {
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error("HTTP " + res.status + ": " + txt);
+      }
+      return res.json();
+    }
+
+    // --- DOM refs ---------------------------------------------------------
+    const modelSelect      = document.getElementById("modelSelect");
+    const refreshSummaryBtn = document.getElementById("refreshSummaryBtn");
+    const summaryStatus    = document.getElementById("summaryStatus");
+    const summaryTodayLabel = document.getElementById("summaryTodayLabel");
+    const todayTokensIn    = document.getElementById("todayTokensIn");
+    const todayTokensOut   = document.getElementById("todayTokensOut");
+    const todayTotalTokens = document.getElementById("todayTotalTokens");
+    const todayCalls       = document.getElementById("todayCalls");
+
+    const allTokensIn      = document.getElementById("allTokensIn");
+    const allTokensOut     = document.getElementById("allTokensOut");
+    const allTotalTokens   = document.getElementById("allTotalTokens");
+    const allCalls         = document.getElementById("allCalls");
+    const allLastTs        = document.getElementById("allLastTs");
+    const modelsTableBody  = document.querySelector("#modelsTable tbody");
+
+    const dailyDays        = document.getElementById("dailyDays");
+    const dailyMode        = document.getElementById("dailyMode");
+    const dailyStatus      = document.getElementById("dailyStatus");
+    const dailyTableBody   = document.querySelector("#dailyTable tbody");
+    const refreshDailyBtn  = document.getElementById("refreshDailyBtn");
+
+    const eventsApp        = document.getElementById("eventsApp");
+    const eventsEmail      = document.getElementById("eventsEmail");
+    const eventsModel      = document.getElementById("eventsModel");
+    const eventsDay        = document.getElementById("eventsDay");
+    const eventsLimit      = document.getElementById("eventsLimit");
+    const loadEventsBtn    = document.getElementById("loadEventsBtn");
+    const nextEventsBtn    = document.getElementById("nextEventsBtn");
+    const eventsStatus     = document.getElementById("eventsStatus");
+    const eventsTableBody  = document.querySelector("#eventsTable tbody");
+
+    let eventsOffset = 0;
+    let lastEventsQuery = null;
+
+    // --- models + summary -------------------------------------------------
+    async function loadModelsAndInit() {
+      summaryStatus.textContent = "Loading models…";
+      try {
+        const data = await fetchJSON("/read/usage/models");
+        const items = data.items || [];
+        // sort by total tokens desc
+        items.sort((a, b) => (b.total_tokens || 0) - (a.total_tokens || 0));
+
+        modelSelect.innerHTML = "";
+        if (items.length === 0) {
+          modelSelect.innerHTML = '<option value="">(no models)</option>';
+        } else {
+          for (const row of items) {
+            const opt = document.createElement("option");
+            opt.value = row.model;
+            opt.textContent = row.model;
+            modelSelect.appendChild(opt);
+          }
+        }
+
+        // populate models table
+        modelsTableBody.innerHTML = "";
+        for (const row of items) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="pill">${row.model}</span></td>
+            <td class="number">${fmt(row.tokens_in)}</td>
+            <td class="number">${fmt(row.tokens_out)}</td>
+            <td class="number">${fmt(row.total_tokens)}</td>
+            <td class="number">${fmt(row.calls)}</td>
+            <td>${fmtTs(row.first_ts)}</td>
+            <td>${fmtTs(row.last_ts)}</td>
+          `;
+          modelsTableBody.appendChild(tr);
+        }
+
+        summaryStatus.textContent = "";
+        await refreshSummary();
+        await refreshDaily();
+      } catch (err) {
+        console.error(err);
+        summaryStatus.textContent = "Error loading models: " + err.message;
+      }
+    }
+
+    async function refreshSummary() {
+      const model = modelSelect.value || "";
+      summaryStatus.textContent = "Loading summary…";
+
+      try {
+        // today for selected model
+        const todayUrl = model
+          ? `/read/usage?model=${encodeURIComponent(model)}`
+          : "/read/usage";
+        const todayData = await fetchJSON(todayUrl);
+        summaryTodayLabel.textContent = `Day: ${todayData.day || "-"}, Model: ${todayData.model || model || "-"}`;
+        todayTokensIn.textContent = fmt(todayData.tokens_in);
+        todayTokensOut.textContent = fmt(todayData.tokens_out);
+        todayTotalTokens.textContent = fmt(todayData.total_tokens);
+        todayCalls.textContent = fmt(todayData.calls);
+
+        // all-time
+        const allData = await fetchJSON("/read/usage/all_time");
+        allTokensIn.textContent = fmt(allData.tokens_in);
+        allTokensOut.textContent = fmt(allData.tokens_out);
+        allTotalTokens.textContent = fmt(allData.total_tokens);
+        allCalls.textContent = fmt(allData.calls);
+        allLastTs.textContent = fmtTs(allData.last_ts);
+
+        summaryStatus.textContent = "";
+      } catch (err) {
+        console.error(err);
+        summaryStatus.textContent = "Error loading summary: " + err.message;
+      }
+    }
+
+    // --- daily -------------------------------------------------------------
+    async function refreshDaily() {
+      const model = modelSelect.value || "";
+      const mode = dailyMode.value;
+      let days = parseInt(dailyDays.value, 10);
+      if (!Number.isFinite(days) || days <= 0) days = 30;
+      if (days > 365) days = 365;
+      dailyDays.value = String(days);
+
+      dailyStatus.textContent = "Loading daily usage…";
+      dailyTableBody.innerHTML = "";
+
+      try {
+        let url = `/read/usage/daily?days=${encodeURIComponent(days)}`;
+        if (mode === "model" && model) {
+          url += `&model=${encodeURIComponent(model)}`;
+        }
+        const data = await fetchJSON(url);
+        const items = data.items || [];
+
+        for (const row of items) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${row.day}</td>
+            <td>${row.model || (mode === "all" ? "—" : model || "—")}</td>
+            <td class="number">${fmt(row.tokens_in)}</td>
+            <td class="number">${fmt(row.tokens_out)}</td>
+            <td class="number">${fmt(row.total_tokens)}</td>
+            <td class="number">${fmt(row.calls)}</td>
+          `;
+          dailyTableBody.appendChild(tr);
+        }
+
+        dailyStatus.textContent = `Loaded ${items.length} rows`;
+      } catch (err) {
+        console.error(err);
+        dailyStatus.textContent = "Error loading daily usage: " + err.message;
+      }
+    }
+
+    // --- events ------------------------------------------------------------
+    function buildEventsQuery(offsetOverride) {
+      const model = (eventsModel.value || modelSelect.value || "").trim();
+      const params = new URLSearchParams();
+      if (eventsApp.value.trim()) params.append("app", eventsApp.value.trim());
+      if (eventsEmail.value.trim()) params.append("email", eventsEmail.value.trim());
+      if (model) params.append("model", model);
+      if (eventsDay.value) params.append("day", eventsDay.value);
+      let limit = parseInt(eventsLimit.value, 10);
+      if (!Number.isFinite(limit) || limit <= 0) limit = 100;
+      if (limit > 1000) limit = 1000;
+      eventsLimit.value = String(limit);
+      params.append("limit", String(limit));
+      const offset = offsetOverride != null ? offsetOverride : eventsOffset;
+      params.append("offset", String(offset));
+      return params.toString();
+    }
+
+    async function loadEvents(resetOffset) {
+      if (resetOffset) {
+        eventsOffset = 0;
+      }
+      const qs = buildEventsQuery(eventsOffset);
+      lastEventsQuery = qs;
+      const url = "/read/usage/events?" + qs;
+
+      eventsStatus.textContent = "Loading events…";
+      if (resetOffset) {
+        eventsTableBody.innerHTML = "";
+      }
+
+      try {
+        const data = await fetchJSON(url);
+        const items = data.items || [];
+        const count = data.count || items.length;
+
+        if (resetOffset) {
+          eventsTableBody.innerHTML = "";
+        }
+
+        for (const row of items) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${row.id}</td>
+            <td>${fmtTs(row.ts)}</td>
+            <td><span class="badge">${row.app || "—"}</span></td>
+            <td><span class="badge">${row.model || "—"}</span></td>
+            <td>${row.endpoint || "—"}</td>
+            <td>${row.email || "—"}</td>
+            <td class="number">${fmt(row.tokens_in)}</td>
+            <td class="number">${fmt(row.tokens_out)}</td>
+            <td class="number">${fmt(row.total_tokens)}</td>
+            <td class="number">1</td>
+            <td class="number">${fmt(row.duration_ms)}</td>
+            <td class="number">${Number(row.cost_usd || 0).toFixed(6)}</td>
+          `;
+          eventsTableBody.appendChild(tr);
+        }
+
+        eventsStatus.textContent = `Loaded ${count} event(s) (offset ${eventsOffset})`;
+        // increment offset for "next page"
+        const limit = parseInt(eventsLimit.value, 10) || 100;
+        if (count < limit) {
+          nextEventsBtn.disabled = true;
+        } else {
+          eventsOffset += limit;
+          nextEventsBtn.disabled = false;
+        }
+      } catch (err) {
+        console.error(err);
+        eventsStatus.textContent = "Error loading events: " + err.message;
+        nextEventsBtn.disabled = true;
+      }
+    }
+
+    // --- wire up -----------------------------------------------------------
+    refreshSummaryBtn.addEventListener("click", () => {
+      refreshSummary();
+      refreshDaily();
+    });
+
+    modelSelect.addEventListener("change", () => {
+      refreshSummary();
+      refreshDaily();
+    });
+
+    refreshDailyBtn.addEventListener("click", () => {
+      refreshDaily();
+    });
+
+    loadEventsBtn.addEventListener("click", () => {
+      loadEvents(true);
+    });
+
+    nextEventsBtn.addEventListener("click", () => {
+      if (lastEventsQuery == null) return;
+      loadEvents(false);
+    });
+
+    // kick off
+    loadModelsAndInit();
+  </script>
+</body>
+</html>

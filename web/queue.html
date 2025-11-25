@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Colors Queue Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #fafafa;
+    }
+    h1, h2, h3 {
+      margin: 0 0 8px 0;
+    }
+    .page {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .sidebar {
+      width: 260px;
+      max-width: 320px;
+      min-width: 220px;
+      border-right: 1px solid #eee;
+      padding-right: 12px;
+      position: sticky;
+      top: 12px;
+      height: calc(100vh - 24px);
+      overflow: auto;
+    }
+    .main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      border: 1px solid #eee;
+    }
+
+    .muted {
+      font-size: 12px;
+      color: #777;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .stat {
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: #f5f5f5;
+      font-size: 12px;
+    }
+    .stat strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    label {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    input[type="text"],
+    select,
+    input[type="number"] {
+      font-size: 12px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    button {
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      cursor: pointer;
+      background: #fff;
+    }
+    button.primary {
+      border-color: #2563eb;
+      background: #2563eb;
+      color: #fff;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      border: 1px solid #ddd;
+    }
+
+    .pill.status-queued { background: #fefce8; border-color: #eab308; }
+    .pill.status-running { background: #eff6ff; border-color: #2563eb; }
+    .pill.status-done { background: #ecfdf3; border-color: #16a34a; }
+    .pill.status-error { background: #fef2f2; border-color: #dc2626; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+    th {
+      background: #fafafa;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td.wrap {
+      white-space: normal;
+    }
+
+    .scroll {
+      max-height: 420px;
+      overflow: auto;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      margin-right: 4px;
+      font-size: 10px;
+    }
+
+    .error-text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      max-height: 160px;
+      overflow: auto;
+      background: #fef2f2;
+      border-radius: 6px;
+      padding: 6px 8px;
+      border: 1px solid #fecaca;
+    }
+
+    .flex-between {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #e5e7eb;
+    }
+
+    .timestamp {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: #555;
+    }
+
+    .small {
+      font-size: 11px;
+    }
+
+    .workers-list {
+      font-size: 12px;
+    }
+    .worker-header {
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    .error-banner {
+      font-size: 12px;
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Colors Queue Monitor</h1>
+  <p class="muted">Live view of in-memory queue state from <code>/colors/queue/tasks</code> and <code>/colors/queue/workers</code>.</p>
+
+  <div class="page">
+    <aside class="sidebar">
+      <div class="card">
+        <h2>Queue Summary</h2>
+        <div id="summary-content" class="muted small">Loading…</div>
+      </div>
+
+      <div class="card">
+        <h2>Filters</h2>
+        <form id="filters-form">
+          <div class="controls">
+            <div class="controls-row">
+              <label>
+                Status
+                <select name="status" id="filter-status">
+                  <option value="">(any)</option>
+                  <option value="queued">queued</option>
+                  <option value="running">running</option>
+                  <option value="done">done</option>
+                  <option value="error">error</option>
+                </select>
+              </label>
+            </div>
+            <div class="controls-row">
+              <label>
+                Task type
+                <input type="text" name="task_type" id="filter-task-type" placeholder="e.g. build_thought" />
+              </label>
+            </div>
+            <div class="controls-row">
+              <label>
+                Limit
+                <input type="number" name="limit" id="filter-limit" value="200" min="1" />
+              </label>
+            </div>
+            <div class="controls-row">
+              <label>
+                <input type="checkbox" id="filter-include-error" />
+                include error text
+              </label>
+            </div>
+            <div class="controls-row">
+              <button type="submit" class="primary" id="btn-apply">Apply filters</button>
+              <button type="button" id="btn-reset">Reset</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Refresh</h2>
+        <div class="controls">
+          <div class="controls-row">
+            <button type="button" id="btn-refresh" class="primary">Refresh now</button>
+          </div>
+          <div class="controls-row">
+            <label>
+              <input type="checkbox" id="auto-refresh-toggle" />
+              auto-refresh
+            </label>
+            <label>
+              every
+              <input type="number" id="auto-refresh-interval" value="5" min="2" style="width: 48px;" />
+              sec
+            </label>
+          </div>
+          <div class="muted small" id="last-updated">
+            Last updated: never
+          </div>
+        </div>
+      </div>
+
+      <div id="global-error" style="display:none;" class="error-banner"></div>
+    </aside>
+
+    <main class="main">
+      <div class="card">
+        <div class="flex-between">
+          <h2>Workers</h2>
+          <span class="badge" id="workers-count">0 workers</span>
+        </div>
+        <div id="workers-content" class="workers-list muted small">Loading…</div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between">
+          <h2>Tasks</h2>
+          <span class="badge small" id="tasks-count">0 tasks</span>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>IDs</th>
+                <th>Timestamps</th>
+                <th class="wrap">Error / Meta</th>
+              </tr>
+            </thead>
+            <tbody id="tasks-body">
+              <tr><td colspan="6" class="muted small">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const TASKS_ENDPOINT = "/colors/queue/tasks";
+    const WORKERS_ENDPOINT = "/colors/queue/workers";
+
+    let autoRefreshTimer = null;
+
+    function formatTimestamp(ts) {
+      if (!ts) return "";
+      return ts;
+    }
+
+    function renderSummary(queue) {
+      const el = document.getElementById("summary-content");
+      if (!queue) {
+        el.textContent = "No queue stats available.";
+        return;
+      }
+      const tasks = queue.tasks || {};
+      const totalKnown =
+        (tasks.queued || 0) +
+        (tasks.running || 0) +
+        (tasks.done || 0) +
+        (tasks.error || 0);
+
+      el.innerHTML = `
+        <div class="summary-grid">
+          <div class="stat">
+            <strong>Total in queue</strong>
+            <div>${queue.queue_size ?? totalKnown}</div>
+          </div>
+          <div class="stat">
+            <strong>Queued</strong>
+            <div>${tasks.queued ?? 0}</div>
+          </div>
+          <div class="stat">
+            <strong>Running</strong>
+            <div>${tasks.running ?? 0}</div>
+          </div>
+          <div class="stat">
+            <strong>Done</strong>
+            <div>${tasks.done ?? 0}</div>
+          </div>
+          <div class="stat">
+            <strong>Error</strong>
+            <div>${tasks.error ?? 0}</div>
+          </div>
+          <div class="stat">
+            <strong>Concurrency</strong>
+            <div>${queue.concurrency ?? "n/a"}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderWorkers(data) {
+      const el = document.getElementById("workers-content");
+      const badge = document.getElementById("workers-count");
+      const workers = data.workers || {};
+      const ids = Object.keys(workers).sort((a, b) => Number(a) - Number(b));
+
+      badge.textContent = `${ids.length} worker${ids.length === 1 ? "" : "s"}`;
+
+      if (ids.length === 0) {
+        el.innerHTML = '<div class="muted small">No workers are currently running tasks.</div>';
+        return;
+      }
+
+      const parts = [];
+      ids.forEach((wid) => {
+        const tasks = workers[wid] || [];
+        parts.push(`<div class="worker-header">Worker ${wid} (${tasks.length} task${tasks.length === 1 ? "" : "s"})</div>`);
+        if (tasks.length === 0) {
+          parts.push('<div class="muted small">idle</div>');
+          return;
+        }
+        parts.push('<ul style="margin: 4px 0 8px 16px; padding: 0; list-style: disc;">');
+        tasks.forEach((t) => {
+          const status = t.status || "unknown";
+          const taskId = t.task_id || "";
+          const taskType = t.task_type || "";
+          const label = `${taskType || "task"} — ${taskId.slice(0, 8)}…`;
+          const timestamps = [];
+          if (t.created_at) timestamps.push(`created ${formatTimestamp(t.created_at)}`);
+          if (t.started_at) timestamps.push(`started ${formatTimestamp(t.started_at)}`);
+          if (t.finished_at) timestamps.push(`finished ${formatTimestamp(t.finished_at)}`);
+          const tsText = timestamps.join(" | ");
+
+          parts.push(`
+            <li class="small">
+              <span class="pill status-${status}">${status}</span>
+              <span style="margin-left:4px;">${label}</span>
+              ${tsText ? `<div class="timestamp">${tsText}</div>` : ""}
+            </li>
+          `);
+        });
+        parts.push("</ul>");
+      });
+
+      el.innerHTML = parts.join("");
+    }
+
+    function renderTasks(data) {
+      const tbody = document.getElementById("tasks-body");
+      const badge = document.getElementById("tasks-count");
+      const tasks = data.tasks || [];
+      badge.textContent = `${data.count ?? tasks.length} task${(data.count ?? tasks.length) === 1 ? "" : "s"}`;
+
+      if (!tasks.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted small">No tasks match the current filters.</td></tr>';
+        return;
+      }
+
+      const rows = tasks.map((t) => {
+        const status = t.status || "unknown";
+        const type = t.task_type || "";
+        const taskId = t.task_id || "";
+        const ids = [];
+        if (t.art_id != null) ids.push(`<span class="tag">art: ${t.art_id}</span>`);
+        if (t.color_id != null) ids.push(`<span class="tag">color: ${t.color_id}</span>`);
+        if (t.bridge_id != null) ids.push(`<span class="tag">bridge: ${t.bridge_id}</span>`);
+
+        const created = formatTimestamp(t.created_at);
+        const started = formatTimestamp(t.started_at);
+        const finished = formatTimestamp(t.finished_at);
+
+        let errorBlock = "";
+        if (t.error) {
+          errorBlock = `<div class="error-text">${String(t.error)}</div>`;
+        } else if (t.has_error) {
+          errorBlock = `<div class="small muted">Error present (hidden). Re-fetch with <code>include_error=1</code> to see details.</div>`;
+        }
+
+        const metaBits = [];
+        if (t.worker_id != null) {
+          metaBits.push(`worker ${t.worker_id}`);
+        }
+        if (t.source) {
+          metaBits.push(`source: ${t.source}`);
+        }
+
+        let link = "";
+        if (taskId) {
+          const href = `/colors/tasks/${encodeURIComponent(taskId)}`;
+          link = `<div class="small"><a href="${href}" target="_blank" rel="noopener noreferrer">open task</a></div>`;
+        }
+
+        return `
+          <tr>
+            <td class="small">
+              <div>${taskId || "<span class='muted'>n/a</span>"}</div>
+              ${link}
+            </td>
+            <td>
+              <span class="pill status-${status}">${status}</span>
+            </td>
+            <td class="small wrap">
+              ${type || "<span class='muted'>–</span>"}
+            </td>
+            <td class="small wrap">
+              ${ids.join(" ") || "<span class='muted'>–</span>"}
+            </td>
+            <td class="small wrap">
+              ${created ? `<div>created: <span class="timestamp">${created}</span></div>` : ""}
+              ${started ? `<div>started: <span class="timestamp">${started}</span></div>` : ""}
+              ${finished ? `<div>finished: <span class="timestamp">${finished}</span></div>` : ""}
+            </td>
+            <td class="wrap small">
+              ${metaBits.length ? `<div class="muted">${metaBits.join(" | ")}</div>` : ""}
+              ${errorBlock}
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = rows.join("");
+    }
+
+    function setGlobalError(msg) {
+      const el = document.getElementById("global-error");
+      if (!msg) {
+        el.style.display = "none";
+        el.textContent = "";
+      } else {
+        el.style.display = "block";
+        el.textContent = msg;
+      }
+    }
+
+    async function fetchJSON(url) {
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Request failed ${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    }
+
+    async function refreshQueue() {
+      setGlobalError("");
+      const btn = document.getElementById("btn-refresh");
+      btn.disabled = true;
+      btn.textContent = "Refreshing…";
+
+      const status = document.getElementById("filter-status").value.trim();
+      const taskType = document.getElementById("filter-task-type").value.trim();
+      const limit = document.getElementById("filter-limit").value.trim();
+      const includeError = document.getElementById("filter-include-error").checked;
+
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      if (taskType) params.set("task_type", taskType);
+      if (limit) params.set("limit", limit);
+      if (includeError) params.set("include_error", "1");
+
+      const tasksUrl = `${TASKS_ENDPOINT}?${params.toString()}`;
+      const workersUrl = WORKERS_ENDPOINT;
+
+      try {
+        const [tasksData, workersData] = await Promise.all([
+          fetchJSON(tasksUrl),
+          fetchJSON(workersUrl),
+        ]);
+
+        // Use queue summary from tasks endpoint by default,
+        // fall back to workers endpoint if missing.
+        const queue = tasksData.queue || workersData.queue || null;
+
+        renderSummary(queue);
+        renderWorkers(workersData);
+        renderTasks(tasksData);
+
+        const now = new Date();
+        document.getElementById("last-updated").textContent =
+          "Last updated: " + now.toLocaleTimeString();
+      } catch (err) {
+        console.error(err);
+        setGlobalError(String(err));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Refresh now";
+      }
+    }
+
+    function startAutoRefresh() {
+      const toggle = document.getElementById("auto-refresh-toggle");
+      const intervalInput = document.getElementById("auto-refresh-interval");
+
+      if (!toggle.checked) {
+        if (autoRefreshTimer) {
+          clearInterval(autoRefreshTimer);
+          autoRefreshTimer = null;
+        }
+        return;
+      }
+
+      let seconds = parseInt(intervalInput.value, 10);
+      if (!Number.isFinite(seconds) || seconds < 2) {
+        seconds = 5;
+        intervalInput.value = "5";
+      }
+
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      autoRefreshTimer = setInterval(refreshQueue, seconds * 1000);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("filters-form");
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        refreshQueue();
+      });
+
+      document.getElementById("btn-refresh").addEventListener("click", () => {
+        refreshQueue();
+      });
+
+      document.getElementById("btn-reset").addEventListener("click", () => {
+        document.getElementById("filter-status").value = "";
+        document.getElementById("filter-task-type").value = "";
+        document.getElementById("filter-limit").value = "200";
+        document.getElementById("filter-include-error").checked = false;
+        refreshQueue();
+      });
+
+      document.getElementById("auto-refresh-toggle").addEventListener("change", () => {
+        startAutoRefresh();
+      });
+      document.getElementById("auto-refresh-interval").addEventListener("change", () => {
+        startAutoRefresh();
+      });
+
+      // initial load
+      refreshQueue();
+    });
+  </script>
+</body>
+</html>
