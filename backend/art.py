@@ -252,7 +252,7 @@ def list_art():
             for t in tokens:
                 like_clauses.append("a.art LIKE ?")
                 cand_params.append(f"%{t}%")
-            cand_where.append("(" + " OR ".join(like_clauses) + ")")
+            cand_where.append("(" + " AND ".join(like_clauses) + ")")
         else:
             cand_where.append("a.art LIKE ?")
             cand_params.append(f"%{q}%")
