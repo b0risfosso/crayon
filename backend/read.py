@@ -22,6 +22,12 @@ app = Flask(__name__)
 # ------------------------------------------------------------------------------
 # Local helpers used by the read endpoints
 
+
+def _connect_usage():
+    """Return a sqlite3 connection to the usage DB."""
+    return connect(USAGE_DB)
+
+
 def _safe_get_picture_db_path() -> str:
     """
     Resolve the path to the picture DB. Prefer env override, else shared constant.
@@ -95,6 +101,51 @@ def usage_today():
         return jsonify(data), 200
     finally:
         conn.close()
+
+@app.get("/read/usage/all_time")
+def read_usage_all_time():
+    """
+    Overall all-time totals.
+    Response:
+      {
+        "tokens_in": int,
+        "tokens_out": int,
+        "total_tokens": int,
+        "calls": int,
+        "last_ts": str | null
+      }
+    """
+    conn = _connect_usage()
+    try:
+        row = conn.execute(
+            """
+            SELECT tokens_in, tokens_out, total_tokens, calls, last_ts
+            FROM totals_all_time
+            WHERE id = 1
+            """
+        ).fetchone()
+        if not row:
+            return jsonify({
+                "tokens_in": 0,
+                "tokens_out": 0,
+                "total_tokens": 0,
+                "calls": 0,
+                "last_ts": None,
+            })
+
+        tokens_in, tokens_out, total_tokens, calls, last_ts = row
+        return jsonify({
+            "tokens_in": tokens_in or 0,
+            "tokens_out": tokens_out or 0,
+            "total_tokens": total_tokens or 0,
+            "calls": calls or 0,
+            "last_ts": last_ts,
+        })
+    finally:
+        conn.close()
+
+
+
 
 
 @app.get("/read/architectures")

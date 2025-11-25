@@ -1199,6 +1199,90 @@ def get_task(task_id: str):
 def get_queue_stats():
     return jsonify(queue_stats())
 
+@app.get("/colors/queue/tasks")
+def list_queue_tasks():
+    """
+    Inspect in-memory TASKS.
+
+    Query params (all optional):
+      - status: queued|running|done|error
+      - task_type: e.g. build_thought, simulation_seeds, *_bridge, brush_stroke_bridge
+      - limit: max number of tasks to return (default 200)
+      - include_error: "1" to include full error text if present
+    """
+    status = request.args.get("status")
+    task_type = request.args.get("task_type")
+    include_error = request.args.get("include_error") == "1"
+
+    try:
+        limit = int(request.args.get("limit", "200"))
+    except ValueError:
+        abort(400, description="'limit' must be an integer")
+
+    with TASKS_LOCK:
+        items = []
+        for task_id, meta in TASKS.items():
+            if status and meta.get("status") != status:
+                continue
+            if task_type and meta.get("task_type") != task_type:
+                continue
+
+            # shallow copy so we can optionally strip error details
+            entry = dict(meta)
+            entry["task_id"] = task_id
+
+            if not include_error and "error" in entry:
+                # keep a small hint without full stack / message spam
+                entry["has_error"] = True
+                entry.pop("error", None)
+
+            items.append(entry)
+
+    # sort newest first by created_at if present
+    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+    if limit > 0:
+        items = items[:limit]
+
+    return jsonify({
+        "queue": queue_stats(),
+        "count": len(items),
+        "tasks": items,
+    })
+
+
+@app.get("/colors/queue/workers")
+def get_queue_workers():
+    """
+    Snapshot of what each worker is currently running,
+    derived from TASKS entries with status == 'running'.
+    """
+    with TASKS_LOCK:
+        running = [t for t in TASKS.values() if t.get("status") == "running"]
+
+    workers: dict[str, list[dict]] = {}
+    for t in running:
+        wid = t.get("worker_id")
+        if wid is None:
+            continue
+        wid_str = str(wid)
+        workers.setdefault(wid_str, []).append({
+            "task_id": t.get("task_id"),
+            "task_type": t.get("task_type"),
+            "status": t.get("status"),
+            "color_id": t.get("color_id"),
+            "art_id": t.get("art_id"),
+            "bridge_id": t.get("bridge_id"),
+            "created_at": t.get("created_at"),
+            "started_at": t.get("started_at"),
+        })
+
+    return jsonify({
+        "queue": queue_stats(),
+        "workers": workers,
+    })
+
+
 
 
 # Optional alias if you ever strip /colors/ in nginx
