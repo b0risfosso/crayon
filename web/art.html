@@ -5,7 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Art Entries</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
+    body { font-family: sans-serif; padding: 20px; margin: 0; }
+
+    /* --------- New 2-col layout --------- */
+    .page {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .sidebar {
+      width: 20%;
+      min-width: 220px;
+      max-width: 320px;
+      border-right: 1px solid #eee;
+      padding-right: 12px;
+      position: sticky;
+      top: 12px;
+      height: calc(100vh - 24px);
+      overflow: auto;
+    }
+    .main {
+      width: 80%;
+      min-width: 0;
+    }
+
+    /* Sidebar styling */
+    .sidebar h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .collection-list {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .collection-item {
+      padding: 8px 10px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      background: #fafafa;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .collection-item:hover { background: #f2f2f2; }
+    .collection-item.active {
+      background: #e9f5ff;
+      border-color: #b8ddff;
+    }
+    .collection-name { font-weight: 600; }
+    .collection-meta { font-size: 12px; color: #666; }
+
+    /* --------- Existing styles --------- */
     .entry { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
     textarea { width: 100%; height: 80px; }
     input, textarea { margin-bottom: 10px; }
@@ -20,7 +75,6 @@
       border: 1px solid #1f8f3a;
     }
 
-    /* simple read-only art display */
     .art-text {
       white-space: pre-wrap;
       background: #fafafa;
@@ -29,48 +83,127 @@
       border-radius: 6px;
       margin-top: 6px;
     }
+
+    .muted { font-size: 12px; color: #777; }
+    hr { margin: 16px 0; }
   </style>
 </head>
 <body>
-  <h1>Art Entries</h1>
+  <div class="page">
+    <!-- --------- LEFT SIDEBAR (20%) --------- -->
+    <aside class="sidebar">
+      <h2>Collections</h2>
+      <div class="muted" id="collections-hint">
+        Enter an email filter to load collections.
+      </div>
+      <ul id="collectionList" class="collection-list"></ul>
+    </aside>
 
-  <section>
-    <h2>Create New Art</h2>
-    <textarea id="newArt" placeholder="Write art text..."></textarea>
-    <input id="newEmail" type="text" placeholder="Email (optional)" />
-    <div class="controls">
-      <button onclick="createArt()">Create</button>
-      <button onclick="fetchArt()">Refresh</button>
-    </div>
-  </section>
+    <!-- --------- RIGHT MAIN (80%) --------- -->
+    <main class="main">
+      <h1>Art Entries</h1>
 
-  <hr />
+      <section>
+        <h2>Create New Art</h2>
+        <textarea id="newArt" placeholder="Write art text..."></textarea>
+        <input id="newEmail" type="text" placeholder="Email (optional)" />
+        <div class="controls">
+          <button onclick="createArt()">Create</button>
+          <button onclick="fetchArt()">Refresh</button>
+        </div>
+      </section>
 
-  <section>
-    <h2>List of Art</h2>
-    <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <input id="searchQuery" type="text" value="solar microgrid" placeholder="Search art..." style="flex:1; min-width:220px; padding:6px;" />
-      <input id="searchEmail" type="text" placeholder="Email filter (optional)" style="min-width:220px; padding:6px;" />
-      <button onclick="fetchArt()">Search</button>
-      <button onclick="randomLoad()">Random Load</button>
-      <label style="display:flex; align-items:center; gap:4px;">
-        <span>k</span>
-        <input id="k" type="number" value="20" min="1" max="500" style="width:80px; padding:6px;" />
-      </label>
-    </div>
+      <hr />
 
-    <div id="artList"></div>
-  </section>
+      <section>
+        <h2>List of Art</h2>
+        <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <input id="searchQuery" type="text" value="solar microgrid" placeholder="Search art..." style="flex:1; min-width:220px; padding:6px;" />
+          <input id="searchEmail" type="text" placeholder="Email filter (optional)" style="min-width:220px; padding:6px;" />
+          <!-- NEW: optional collection filter -->
+          <input id="searchCollectionId" type="text" placeholder="Collection ID (optional)" style="width:180px; padding:6px;" />
+          <button onclick="fetchArt()">Search</button>
+          <button onclick="randomLoad()">Random Load</button>
+          <label style="display:flex; align-items:center; gap:4px;">
+            <span>k</span>
+            <input id="k" type="number" value="20" min="1" max="500" style="width:80px; padding:6px;" />
+          </label>
+        </div>
+
+        <div id="artList"></div>
+      </section>
+    </main>
+  </div>
 
   <script>
+    let activeCollectionId = null;
+
+    async function fetchCollections() {
+      const email = document.getElementById('searchEmail').value.trim();
+      const list = document.getElementById('collectionList');
+      const hint = document.getElementById('collections-hint');
+
+      list.innerHTML = '';
+
+      if (!email) {
+        hint.style.display = 'block';
+        hint.textContent = 'Enter an email filter to load collections.';
+        return;
+      }
+
+      hint.style.display = 'block';
+      hint.textContent = 'Loading collections…';
+
+      try {
+        const res = await fetch(`/art/api/collections?email=${encodeURIComponent(email)}`);
+        if (!res.ok) throw new Error('collections fetch failed');
+
+        const rows = await res.json();
+        const collections = Array.isArray(rows) ? rows : [];
+
+        if (!collections.length) {
+          hint.textContent = 'No collections found for this email.';
+          return;
+        }
+
+        hint.style.display = 'none';
+
+        collections.forEach(col => {
+          const li = document.createElement('li');
+          li.className = 'collection-item' + (String(col.id) === String(activeCollectionId) ? ' active' : '');
+          li.innerHTML = `
+            <div class="collection-name">${escapeHtml(col.name || `Collection #${col.id}`)}</div>
+            <div class="collection-meta">
+              id: ${col.id} · arts: ${col.art_count ?? '—'}
+            </div>
+          `;
+
+          li.onclick = () => {
+            activeCollectionId = col.id;
+            document.getElementById('searchCollectionId').value = String(col.id);
+            // rerender active state quickly
+            document.querySelectorAll('.collection-item').forEach(x => x.classList.remove('active'));
+            li.classList.add('active');
+            fetchArt();
+          };
+
+          list.appendChild(li);
+        });
+      } catch (e) {
+        hint.textContent = `Error loading collections: ${e.message || e}`;
+      }
+    }
+
     async function fetchArt() {
       const q = document.getElementById('searchQuery').value.trim();
       const email = document.getElementById('searchEmail').value.trim();
+      const collectionId = document.getElementById('searchCollectionId').value.trim();
       const k = parseInt(document.getElementById('k').value || '20', 10);
 
       const params = new URLSearchParams();
       if (q) params.set('q', q);
       if (email) params.set('email', email);
+      if (collectionId) params.set('collection_id', collectionId);
       if (k) params.set('limit', String(k));
 
       const res = await fetch(`/art/api/art?${params.toString()}`);
@@ -110,15 +243,20 @@
           else btn.classList.remove('has-colors');
         });
       }
+
+      // refresh collections whenever art search runs with an email filter
+      fetchCollections();
     }
 
     async function randomLoad() {
       const email = document.getElementById('searchEmail').value.trim();
+      const collectionId = document.getElementById('searchCollectionId').value.trim();
       const k = parseInt(document.getElementById('k').value || '20', 10);
 
       const params = new URLSearchParams();
       params.set('random', '1');
       if (email) params.set('email', email);
+      if (collectionId) params.set('collection_id', collectionId);
       if (k) params.set('limit', String(k));
 
       const res = await fetch(`/art/api/art?${params.toString()}`);
@@ -144,6 +282,8 @@
         `;
         list.appendChild(div);
       });
+
+      fetchCollections();
     }
 
     async function createArt() {
@@ -210,7 +350,6 @@
       }
     }
 
-    // basic HTML escape to safely render art text
     function escapeHtml(str) {
       return String(str)
         .replaceAll('&', '&amp;')
@@ -219,6 +358,15 @@
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
     }
+
+    // Auto-update collections when email changes
+    document.addEventListener("input", (e) => {
+      if (e.target && e.target.id === "searchEmail") {
+        activeCollectionId = null;
+        document.getElementById('searchCollectionId').value = '';
+        fetchCollections();
+      }
+    });
 
     fetchArt();
   </script>
