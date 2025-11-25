@@ -145,6 +145,262 @@ def read_usage_all_time():
         conn.close()
 
 
+@app.get("/read/usage/models")
+def read_usage_by_model():
+    """
+    All-time totals by model.
+
+    Query params:
+      - app: optional, filter to a specific app ('jid', 'crayon', etc.)
+             (if you ever add app-level breakdown to a separate table,
+              for now this returns totals across apps)
+      - limit: max number of models (default 100)
+
+    Response:
+      { "items": [
+          {
+            "model": str,
+            "tokens_in": int,
+            "tokens_out": int,
+            "total_tokens": int,
+            "calls": int,
+            "first_ts": str | null,
+            "last_ts": str | null
+          }, ...
+        ],
+        "count": int
+      }
+    """
+    limit = request.args.get("limit", default=100, type=int)
+    if limit <= 0 or limit > 1000:
+        limit = 100
+
+    conn = _connect_usage()
+    try:
+        # Using v_model_totals view from the schema
+        cur = conn.execute(
+            """
+            SELECT model, tokens_in, tokens_out, total_tokens, calls, first_ts, last_ts
+            FROM v_model_totals
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        items = []
+        for row in cur.fetchall():
+            model, tokens_in, tokens_out, total_tokens, calls, first_ts, last_ts = row
+            items.append({
+                "model": model,
+                "tokens_in": tokens_in or 0,
+                "tokens_out": tokens_out or 0,
+                "total_tokens": total_tokens or 0,
+                "calls": calls or 0,
+                "first_ts": first_ts,
+                "last_ts": last_ts,
+            })
+        return jsonify({"items": items, "count": len(items)})
+    finally:
+        conn.close()
+
+
+@app.get("/read/usage/daily")
+def read_usage_daily():
+    """
+    Daily totals.
+
+    Query params:
+      - model: optional, if present shows per-day totals for that model only.
+      - days: number of most recent days to return (default 30, max 365).
+
+    Response:
+      { "items": [
+          {
+            "day": "YYYY-MM-DD",
+            "model": str | null,
+            "tokens_in": int,
+            "tokens_out": int,
+            "total_tokens": int,
+            "calls": int
+          }, ...
+        ],
+        "count": int
+      }
+    """
+    days = request.args.get("days", default=30, type=int)
+    if days <= 0 or days > 365:
+        days = 30
+
+    model = (request.args.get("model") or "").strip() or None
+
+    conn = _connect_usage()
+    try:
+        items = []
+        if model:
+            # Per-model daily totals
+            cur = conn.execute(
+                """
+                SELECT day, model, tokens_in, tokens_out, total_tokens, calls
+                FROM totals_daily
+                WHERE model = ?
+                ORDER BY day DESC
+                LIMIT ?
+                """,
+                (model, days),
+            )
+        else:
+            # Aggregated across all models (view from schema)
+            cur = conn.execute(
+                """
+                SELECT day, tokens_in, tokens_out, total_tokens, calls
+                FROM v_daily_totals
+                ORDER BY day DESC
+                LIMIT ?
+                """,
+                (days,),
+            )
+
+        for row in cur.fetchall():
+            if model:
+                day, m, tokens_in, tokens_out, total_tokens, calls = row
+            else:
+                # v_daily_totals has no model column
+                day, tokens_in, tokens_out, total_tokens, calls = row
+                m = None
+            items.append({
+                "day": day,
+                "model": m,
+                "tokens_in": tokens_in or 0,
+                "tokens_out": tokens_out or 0,
+                "total_tokens": total_tokens or 0,
+                "calls": calls or 0,
+            })
+
+        return jsonify({"items": items, "count": len(items)})
+    finally:
+        conn.close()
+
+
+@app.get("/read/usage/events")
+def read_usage_events():
+    """
+    Raw usage events log.
+
+    Query params (all optional):
+      - app: 'jid', 'crayon', etc.
+      - model: exact model name
+      - email: exact email
+      - endpoint: e.g. '/run', '/write'
+      - day: 'YYYY-MM-DD' (matches ts prefix)
+      - since: ISO timestamp (ts >= since)
+      - until: ISO timestamp (ts <= until)
+      - limit: int, default 100, max 1000
+      - offset: int, default 0
+
+    Response:
+      { "items": [
+          {
+            "id": int,
+            "ts": str,
+            "app": str,
+            "model": str,
+            "endpoint": str | null,
+            "email": str | null,
+            "request_id": str | null,
+            "tokens_in": int,
+            "tokens_out": int,
+            "total_tokens": int,
+            "duration_ms": int,
+            "cost_usd": float,
+            "meta": str | null   # raw JSON string from DB
+          }, ...
+        ],
+        "count": int
+      }
+    """
+    app_name = (request.args.get("app") or "").strip() or None
+    model = (request.args.get("model") or "").strip() or None
+    email = (request.args.get("email") or "").strip() or None
+    endpoint = (request.args.get("endpoint") or "").strip() or None
+    day = (request.args.get("day") or "").strip() or None
+    since = (request.args.get("since") or "").strip() or None
+    until = (request.args.get("until") or "").strip() or None
+
+    limit = request.args.get("limit", default=100, type=int)
+    offset = request.args.get("offset", default=0, type=int)
+    if limit <= 0 or limit > 1000:
+        limit = 100
+    if offset < 0:
+        offset = 0
+
+    clauses = []
+    params = []
+
+    if app_name:
+        clauses.append("app = ?")
+        params.append(app_name)
+    if model:
+        clauses.append("model = ?")
+        params.append(model)
+    if email:
+        clauses.append("email = ?")
+        params.append(email)
+    if endpoint:
+        clauses.append("endpoint = ?")
+        params.append(endpoint)
+    if day:
+        # ts is ISO string, day is YYYY-MM-DD
+        clauses.append("substr(ts, 1, 10) = ?")
+        params.append(day)
+    if since:
+        clauses.append("ts >= ?")
+        params.append(since)
+    if until:
+        clauses.append("ts <= ?")
+        params.append(until)
+
+    where_sql = ""
+    if clauses:
+        where_sql = "WHERE " + " AND ".join(clauses)
+
+    sql = f"""
+        SELECT id, ts, app, model, endpoint, email, request_id,
+               tokens_in, tokens_out, total_tokens, duration_ms, cost_usd, meta
+        FROM usage_events
+        {where_sql}
+        ORDER BY datetime(ts) DESC, id DESC
+        LIMIT ? OFFSET ?
+    """
+    params.extend([limit, offset])
+
+    conn = _connect_usage()
+    try:
+        cur = conn.execute(sql, tuple(params))
+        items = []
+        for row in cur.fetchall():
+            (
+                rid, ts, app_v, model_v, endpoint_v, email_v, req_id,
+                t_in, t_out, t_total, duration_ms, cost_usd, meta,
+            ) = row
+            items.append({
+                "id": rid,
+                "ts": ts,
+                "app": app_v,
+                "model": model_v,
+                "endpoint": endpoint_v,
+                "email": email_v,
+                "request_id": req_id,
+                "tokens_in": t_in or 0,
+                "tokens_out": t_out or 0,
+                "total_tokens": t_total or 0,
+                "duration_ms": duration_ms or 0,
+                "cost_usd": float(cost_usd or 0.0),
+                "meta": meta,
+            })
+        return jsonify({"items": items, "count": len(items)})
+    finally:
+        conn.close()
+
+
 
 
 
