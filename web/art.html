@@ -6,7 +6,6 @@
   <title>Art Entries</title>
   <style>
     body { font-family: sans-serif; padding: 20px; margin: 0; }
-
     .page { display: flex; gap: 16px; align-items: flex-start; }
     .sidebar {
       width: 20%;
@@ -22,6 +21,8 @@
     .main { width: 80%; min-width: 0; }
 
     .sidebar h2 { margin-top: 0; font-size: 18px; }
+    .muted { font-size: 12px; color: #777; }
+
     .collection-list {
       list-style: none; padding: 0; margin: 8px 0 0 0;
       display: flex; flex-direction: column; gap: 6px;
@@ -36,15 +37,16 @@
     .collection-name { font-weight: 600; }
     .collection-meta { font-size: 12px; color: #666; }
 
-    .create-collection {
+    .panel {
       border: 1px dashed #ddd; padding: 10px; border-radius: 8px; margin-top: 8px;
       background: #fcfcfc;
     }
-    .create-collection input {
-      width: 100%; padding: 6px; margin: 4px 0;
-      box-sizing: border-box;
+    .panel input {
+      width: 100%; padding: 6px; margin: 4px 0; box-sizing: border-box;
     }
-    .create-collection button { width: 100%; }
+    .panel button { width: 100%; }
+    .panel .row { display:flex; gap:6px; }
+    .panel .row button { width:auto; flex:1; }
 
     .entry {
       border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 8px;
@@ -56,7 +58,6 @@
     .controls { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
     .meta { font-size: 12px; color: #666; margin-top: 6px; }
     .status { font-size: 12px; color: #333; margin-top: 6px; white-space: pre-wrap; }
-    .muted { font-size: 12px; color: #777; }
     hr { margin: 16px 0; }
 
     button.has-colors {
@@ -69,11 +70,10 @@
     }
 
     .badge {
-      display: inline-block; font-size: 11px; padding: 2px 6px;
-      border-radius: 999px; background: #eee; margin-left: 6px;
+      display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px;
+      background:#eee; margin-left:6px;
     }
-    .badge.in-collection { background: #dff3e4; color: #0f5c22; }
-
+    .badge.in-collection { background:#dff3e4; color:#0f5c22; }
   </style>
 </head>
 <body>
@@ -81,16 +81,43 @@
     <!-- LEFT SIDEBAR -->
     <aside class="sidebar">
       <h2>Collections</h2>
-      <div class="muted" id="collections-hint">
-        Enter an email filter to load collections.
+
+      <!-- collections email control -->
+      <div class="panel">
+        <div class="muted" style="margin-bottom:4px;">Collections email</div>
+        <input id="collectionsEmail" type="text" placeholder="email to load collections" />
+        <div class="row">
+          <button onclick="loadCollectionsForEmail()">Load</button>
+          <button onclick="clearCollectionsUI()">Clear</button>
+        </div>
+        <div class="muted" style="margin-top:6px;">
+          This email controls which collections you see + can edit.
+        </div>
+      </div>
+
+      <div class="muted" id="collections-hint" style="margin-top:8px;">
+        Enter a collections email and hit Load.
       </div>
 
       <!-- create collection -->
-      <div class="create-collection">
-        <div class="muted" style="margin-bottom:4px;">Create collection (for current email)</div>
+      <div class="panel" id="createCollectionPanel">
+        <div class="muted" style="margin-bottom:4px;">Create collection</div>
         <input id="newCollectionName" type="text" placeholder="Collection name" />
         <input id="newCollectionDesc" type="text" placeholder="Description (optional)" />
         <button onclick="createCollection()">Create Collection</button>
+      </div>
+
+      <!-- edit active collection -->
+      <div class="panel" id="editCollectionPanel" style="display:none;">
+        <div class="muted" style="margin-bottom:4px;">
+          Edit active collection <span id="editCollectionIdLabel"></span>
+        </div>
+        <input id="editCollectionName" type="text" placeholder="New name" />
+        <input id="editCollectionDesc" type="text" placeholder="New description" />
+        <div class="row">
+          <button onclick="saveCollectionEdits()">Save</button>
+          <button onclick="cancelCollectionEdits()">Cancel</button>
+        </div>
       </div>
 
       <ul id="collectionList" class="collection-list"></ul>
@@ -137,18 +164,45 @@
 
   <script>
     let activeCollectionId = null;
-    let activeCollectionItemSet = new Set(); // art_ids in active collection
+    let activeCollectionItemSet = new Set();
+    let collectionsEmail = null; // authoritative for collections
+
+    function getCollectionsEmailInput() {
+      return document.getElementById('collectionsEmail').value.trim();
+    }
+
+    async function loadCollectionsForEmail() {
+      const email = getCollectionsEmailInput();
+      if (!email) { alert("Enter collections email."); return; }
+      collectionsEmail = email;
+      // also sync the main art email filter so list aligns by default
+      document.getElementById('searchEmail').value = email;
+      activeCollectionId = null;
+      activeCollectionItemSet = new Set();
+      document.getElementById('searchCollectionId').value = '';
+      await fetchCollections();
+      fetchArt();
+    }
+
+    function clearCollectionsUI() {
+      collectionsEmail = null;
+      activeCollectionId = null;
+      activeCollectionItemSet = new Set();
+      document.getElementById('collectionsEmail').value = '';
+      document.getElementById('collectionList').innerHTML = '';
+      document.getElementById('collections-hint').style.display = 'block';
+      document.getElementById('collections-hint').textContent = 'Enter a collections email and hit Load.';
+      hideEditPanel();
+    }
 
     async function fetchCollections() {
-      const email = document.getElementById('searchEmail').value.trim();
       const list = document.getElementById('collectionList');
       const hint = document.getElementById('collections-hint');
-
       list.innerHTML = '';
 
-      if (!email) {
+      if (!collectionsEmail) {
         hint.style.display = 'block';
-        hint.textContent = 'Enter an email filter to load collections.';
+        hint.textContent = 'Enter a collections email and hit Load.';
         return;
       }
 
@@ -156,7 +210,7 @@
       hint.textContent = 'Loading collections…';
 
       try {
-        const res = await fetch(`/art/api/collections?email=${encodeURIComponent(email)}`);
+        const res = await fetch(`/art/api/collections?email=${encodeURIComponent(collectionsEmail)}`);
         if (!res.ok) throw new Error('collections fetch failed');
 
         const rows = await res.json();
@@ -173,7 +227,9 @@
           const li = document.createElement('li');
           li.className = 'collection-item' + (String(col.id) === String(activeCollectionId) ? ' active' : '');
           li.innerHTML = `
-            <div class="collection-name">${escapeHtml(col.name || `Collection #${col.id}`)}</div>
+            <div class="collection-name">
+              ${escapeHtml(col.name || `Collection #${col.id}`)}
+            </div>
             <div class="collection-meta">
               id: ${col.id} · arts: ${col.art_count ?? '—'}
             </div>
@@ -182,8 +238,14 @@
           li.onclick = async () => {
             activeCollectionId = col.id;
             document.getElementById('searchCollectionId').value = String(col.id);
+
+            // ensure main email filter stays aligned with collections email
+            document.getElementById('searchEmail').value = collectionsEmail;
+
             document.querySelectorAll('.collection-item').forEach(x => x.classList.remove('active'));
             li.classList.add('active');
+
+            showEditPanel(col);
             await loadActiveCollectionItems();
             fetchArt();
           };
@@ -196,17 +258,21 @@
     }
 
     async function createCollection() {
-      const email = document.getElementById('searchEmail').value.trim();
+      if (!collectionsEmail) { alert("Load a collections email first."); return; }
+
       const name = document.getElementById('newCollectionName').value.trim();
       const description = document.getElementById('newCollectionDesc').value.trim();
 
-      if (!email) { alert("Set an email filter first."); return; }
       if (!name) { alert("Collection name required."); return; }
 
       const res = await fetch('/art/api/collections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, description: description || null })
+        body: JSON.stringify({
+          name,
+          email: collectionsEmail,
+          description: description || null
+        })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -219,9 +285,52 @@
 
       activeCollectionId = data.id;
       document.getElementById('searchCollectionId').value = String(data.id);
+      document.getElementById('searchEmail').value = collectionsEmail;
+
       await fetchCollections();
       await loadActiveCollectionItems();
       fetchArt();
+    }
+
+    function showEditPanel(col) {
+      const panel = document.getElementById('editCollectionPanel');
+      panel.style.display = 'block';
+      document.getElementById('editCollectionIdLabel').textContent = `(#${col.id})`;
+      document.getElementById('editCollectionName').value = col.name || '';
+      document.getElementById('editCollectionDesc').value = col.description || '';
+    }
+
+    function hideEditPanel() {
+      document.getElementById('editCollectionPanel').style.display = 'none';
+    }
+
+    function cancelCollectionEdits() {
+      hideEditPanel();
+    }
+
+    async function saveCollectionEdits() {
+      if (!activeCollectionId) return;
+
+      const name = document.getElementById('editCollectionName').value.trim();
+      const description = document.getElementById('editCollectionDesc').value.trim();
+
+      if (!name) { alert("Name required."); return; }
+
+      const res = await fetch(`/art/api/collections/${activeCollectionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description: description || null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "Failed to update collection");
+        return;
+      }
+
+      await fetchCollections();
     }
 
     async function loadActiveCollectionItems() {
@@ -297,7 +406,7 @@
           ${inActive ? `<span class="badge in-collection">in active collection</span>` : ``}
           <br />
           <strong>Email:</strong> ${item.email || ''}<br />
-          <div class="art-text" id="art-text-${item.id}">${escapeHtml(item.art || '')}</div>
+          <div class="art-text">${escapeHtml(item.art || '')}</div>
 
           <div class="controls">
             <button onclick="enqueueColors(${item.id})">Create Colors</button>
@@ -328,7 +437,6 @@
       if (ids.length) {
         const existsRes = await fetch(`/art/api/art/color_exists?art_ids=${ids.join(',')}`);
         const existsMap = await existsRes.json();
-
         ids.forEach(id => {
           const btn = document.getElementById(`open-btn-${id}`);
           if (!btn) return;
@@ -336,8 +444,6 @@
           else btn.classList.remove('has-colors');
         });
       }
-
-      fetchCollections();
     }
 
     async function randomLoad() {
@@ -366,7 +472,7 @@
           ${inActive ? `<span class="badge in-collection">in active collection</span>` : ``}
           <br />
           <strong>Email:</strong> ${item.email || ''}<br />
-          <div class="art-text" id="art-text-${item.id}">${escapeHtml(item.art || '')}</div>
+          <div class="art-text">${escapeHtml(item.art || '')}</div>
 
           <div class="controls">
             <button onclick="enqueueColors(${item.id})">Expand → Colors</button>
@@ -392,8 +498,6 @@
         `;
         list.appendChild(div);
       });
-
-      fetchCollections();
     }
 
     async function createArt() {
@@ -473,21 +577,13 @@
         .replaceAll("'", '&#039;');
     }
 
-    document.addEventListener("input", async (e) => {
-      if (e.target && e.target.id === "searchEmail") {
-        activeCollectionId = null;
-        activeCollectionItemSet = new Set();
-        document.getElementById('searchCollectionId').value = '';
-        await fetchCollections();
-        fetchArt();
-      }
+    // optional: pressing Enter in collectionsEmail loads collections
+    document.getElementById('collectionsEmail').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loadCollectionsForEmail();
     });
 
-    (async () => {
-      await fetchCollections();
-      await loadActiveCollectionItems();
-      fetchArt();
-    })();
+    // initial load: do nothing until user sets collections email
+    fetchArt();
   </script>
 </body>
 </html>
