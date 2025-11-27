@@ -15,7 +15,8 @@ import os
 import json
 import sqlite3
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
+
 
 from flask import Flask, request, jsonify, abort
 
@@ -2197,3 +2198,182 @@ def entities_by_color(color_id: int):
     db.close()
 
     return jsonify([dict(r) for r in rows])
+
+
+def fetch_art_collections(email: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Return a list of art collections (optionally filtered by owner email),
+    each with a computed item_count.
+    """
+    db = get_art_db()
+    try:
+        params: List[Any] = []
+        where_clauses: List[str] = []
+
+        sql = """
+            SELECT
+              c.id,
+              c.name,
+              c.email,
+              c.description,
+              c.metadata,
+              c.created_at,
+              c.updated_at,
+              COUNT(aci.id) AS item_count
+            FROM art_collections c
+            LEFT JOIN art_collection_items aci
+              ON aci.collection_id = c.id
+        """
+
+        if email:
+            where_clauses.append("c.email = ?")
+            params.append(email)
+
+        if where_clauses:
+            sql += " WHERE " + " AND ".join(where_clauses)
+
+        sql += """
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+        """
+
+        rows = db.execute(sql, params).fetchall()
+    finally:
+        db.close()
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        obj = dict(r)
+        # Decode metadata if possible
+        try:
+            obj["metadata"] = json.loads(obj.get("metadata") or "{}")
+        except Exception:
+            pass
+        # item_count will be an int already, but make sure
+        obj["item_count"] = int(obj.get("item_count") or 0)
+        out.append(obj)
+
+    return out
+
+
+def fetch_art_collection_items(collection_id: int) -> Dict[str, Any]:
+    """
+    Return a single collection + all items (joined with art),
+    or abort(404) if collection not found.
+    """
+    db = get_art_db()
+    try:
+        col_row = db.execute(
+            """
+            SELECT *
+            FROM art_collections
+            WHERE id = ?
+            """,
+            (collection_id,),
+        ).fetchone()
+
+        if col_row is None:
+            abort(404, description=f"collection id {collection_id} not found")
+
+        items_rows = db.execute(
+            """
+            SELECT
+              aci.id          AS item_id,
+              aci.collection_id,
+              aci.art_id,
+              aci.position,
+              aci.created_at  AS item_created_at,
+              a.art,
+              a.email         AS art_email,
+              a.metadata      AS art_metadata,
+              a.created_at    AS art_created_at,
+              a.updated_at    AS art_updated_at
+            FROM art_collection_items aci
+            JOIN art a ON a.id = aci.art_id
+            WHERE aci.collection_id = ?
+            ORDER BY
+              COALESCE(aci.position, 999999),
+              aci.art_id
+            """,
+            (collection_id,),
+        ).fetchall()
+    finally:
+        db.close()
+
+    collection = dict(col_row)
+    try:
+        collection["metadata"] = json.loads(collection.get("metadata") or "{}")
+    except Exception:
+        pass
+
+    items: List[Dict[str, Any]] = []
+    for r in items_rows:
+        obj = dict(r)
+        try:
+            obj["art_metadata"] = json.loads(obj.get("art_metadata") or "{}")
+        except Exception:
+            pass
+        items.append(obj)
+
+    return {
+        "collection": collection,
+        "items": items,
+    }
+
+@app.get("/colors/collections")
+def api_get_collections():
+    """
+    List art collections.
+
+    Query params:
+      - email: optional owner email filter.
+        If provided, only collections with this email are returned.
+    Response:
+      {
+        "collections": [
+          {
+            "id": int,
+            "name": str,
+            "email": str,
+            "description": str or null,
+            "metadata": { ... },
+            "created_at": str,
+            "updated_at": str,
+            "item_count": int
+          },
+          ...
+        ]
+      }
+    """
+    email = request.args.get("email") or None
+    collections = fetch_art_collections(email=email)
+    return jsonify({"collections": collections})
+
+
+@app.get("/colors/collections/<int:collection_id>/items")
+def api_get_collection_items(collection_id: int):
+    """
+    Get a single collection and its items.
+
+    Response:
+      {
+        "collection": { ... },
+        "items": [
+          {
+            "item_id": int,
+            "collection_id": int,
+            "art_id": int,
+            "position": int or null,
+            "item_created_at": str,
+            "art": str,
+            "art_email": str or null,
+            "art_metadata": { ... },
+            "art_created_at": str,
+            "art_updated_at": str
+          },
+          ...
+        ]
+      }
+    """
+    payload = fetch_art_collection_items(collection_id)
+    return jsonify(payload)

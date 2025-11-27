@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Art Collections Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: sans-serif; padding: 20px; margin: 0; }
+    h1 { margin-top: 0; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .controls label { font-size: 14px; }
+    .controls input[type="email"] {
+      padding: 6px 8px;
+      font-size: 14px;
+      min-width: 260px;
+    }
+    .controls button {
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .status {
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+    .collections {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .collection-block {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fafafa;
+    }
+    .collection-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .collection-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .collection-meta {
+      font-size: 12px;
+      color: #666;
+    }
+    .collection-description {
+      font-size: 13px;
+      margin-top: 4px;
+      margin-bottom: 4px;
+    }
+    .item-list {
+      margin-top: 6px;
+      padding-left: 12px;
+      border-left: 2px solid #eee;
+      font-size: 12px;
+      display: none;
+    }
+    .item-list ul {
+      margin: 4px 0 0 0;
+      padding-left: 16px;
+    }
+    .item-list li {
+      margin-bottom: 2px;
+    }
+    .toggle-items-btn {
+      font-size: 12px;
+      padding: 3px 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Art Collections</h1>
+
+  <div class="controls">
+    <label for="email">Owner email:</label>
+    <input
+      id="email"
+      type="email"
+      placeholder="owner@example.com"
+      value="boris@fantasiagenesis.com"
+    />
+    <button id="loadBtn">Load Collections</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div id="collections" class="collections"></div>
+
+  <script>
+    const API_BASE = "/colors";
+
+    function isoToLocal(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString();
+    }
+
+    function setStatus(msg) {
+      document.getElementById("status").textContent = msg || "";
+    }
+
+    async function loadCollections() {
+      const email = document.getElementById("email").value.trim();
+      const params = new URLSearchParams();
+      if (email) params.set("email", email);
+
+      const url = API_BASE + "/collections" + (params.toString() ? "?" + params.toString() : "");
+      setStatus("Loading collections from " + url + " ...");
+
+      let resp;
+      try {
+        resp = await fetch(url);
+      } catch (err) {
+        console.error(err);
+        setStatus("Error: could not reach server: " + err);
+        return;
+      }
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        setStatus("Error: " + resp.status + " " + resp.statusText + "\n" + text);
+        return;
+      }
+
+      const data = await resp.json();
+      const collections = data.collections || [];
+      renderCollections(collections);
+      setStatus("Loaded " + collections.length + " collection(s).");
+    }
+
+    function renderCollections(collections) {
+      const container = document.getElementById("collections");
+      container.innerHTML = "";
+
+      if (!collections.length) {
+        const div = document.createElement("div");
+        div.textContent = "No collections found.";
+        container.appendChild(div);
+        return;
+      }
+
+      for (const col of collections) {
+        const block = document.createElement("div");
+        block.className = "collection-block";
+
+        const header = document.createElement("div");
+        header.className = "collection-header";
+
+        const title = document.createElement("div");
+        title.className = "collection-name";
+        title.textContent = col.name + " (id " + col.id + ")";
+
+        const meta = document.createElement("div");
+        meta.className = "collection-meta";
+        meta.textContent =
+          "owner: " + (col.email || "—") +
+          " • items: " + (col.item_count ?? 0) +
+          " • created: " + isoToLocal(col.created_at);
+
+        header.appendChild(title);
+        header.appendChild(meta);
+        block.appendChild(header);
+
+        if (col.description) {
+          const desc = document.createElement("div");
+          desc.className = "collection-description";
+          desc.textContent = col.description;
+          block.appendChild(desc);
+        }
+
+        // Toggle items list
+        const toggleBtn = document.createElement("button");
+        toggleBtn.className = "toggle-items-btn";
+        toggleBtn.textContent = "Show items";
+        toggleBtn.addEventListener("click", () => toggleItems(col.id, block, toggleBtn));
+        block.appendChild(toggleBtn);
+
+        const itemList = document.createElement("div");
+        itemList.className = "item-list";
+        itemList.dataset.collectionId = String(col.id);
+        block.appendChild(itemList);
+
+        container.appendChild(block);
+      }
+    }
+
+    async function toggleItems(collectionId, block, button) {
+      const itemList = block.querySelector('.item-list[data-collection-id="' + collectionId + '"]');
+
+      if (!itemList) return;
+
+      // Already visible? Just hide.
+      if (itemList.style.display === "block") {
+        itemList.style.display = "none";
+        button.textContent = "Show items";
+        return;
+      }
+
+      // If empty, fetch from backend.
+      if (!itemList.dataset.loaded) {
+        const url = API_BASE + "/collections/" + collectionId + "/items";
+        setStatus("Loading items for collection " + collectionId + " ...");
+
+        let resp;
+        try {
+          resp = await fetch(url);
+        } catch (err) {
+          console.error(err);
+          setStatus("Error loading items: " + err);
+          return;
+        }
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          setStatus("Error " + resp.status + " loading items:\n" + text);
+          return;
+        }
+
+        const data = await resp.json();
+        const items = data.items || [];
+
+        const ul = document.createElement("ul");
+        for (const it of items) {
+          const li = document.createElement("li");
+          const snippet = (it.art || "").replace(/\s+/g, " ").slice(0, 120);
+          li.textContent =
+            "art_id " + it.art_id +
+            (it.position != null ? " (pos " + it.position + ")" : "") +
+            " — " + snippet;
+          ul.appendChild(li);
+        }
+
+        itemList.appendChild(ul);
+        itemList.dataset.loaded = "1";
+        setStatus("Loaded " + items.length + " item(s) for collection " + collectionId + ".");
+      }
+
+      itemList.style.display = "block";
+      button.textContent = "Hide items";
+    }
+
+    document.getElementById("loadBtn").addEventListener("click", loadCollections);
+
+    // Auto-load for default email on page load
+    window.addEventListener("load", loadCollections);
+  </script>
+</body>
+</html>
