@@ -2,607 +2,569 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Fantasiagenesis Collections Processor</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fantasiagenesis Subsystem Bridge Runner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    * { box-sizing: border-box; }
     body {
       font-family: sans-serif;
       margin: 0;
       padding: 0;
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
+      background: #fafafa;
     }
+
+    .page {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px;
+    }
+
     .sidebar {
-      width: 280px;
-      min-width: 240px;
-      border-right: 1px solid #ddd;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .sidebar h1 {
-      font-size: 18px;
-      margin: 0 0 4px 0;
-    }
-    .sidebar small {
-      font-size: 11px;
-      color: #666;
-    }
-    .email-row {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
-      margin-bottom: 6px;
-    }
-    .email-row input {
-      flex: 1;
-      padding: 5px 6px;
-      font-size: 13px;
-    }
-    .email-row button {
-      padding: 5px 8px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .collections-list {
-      flex: 1;
+      width: 260px;
+      min-width: 220px;
+      max-width: 320px;
+      border-right: 1px solid #eee;
+      padding-right: 12px;
+      position: sticky;
+      top: 12px;
+      height: calc(100vh - 24px);
       overflow-y: auto;
-      margin-top: 6px;
-      border-top: 1px solid #eee;
-      padding-top: 6px;
-    }
-    .collection-item {
-      padding: 6px 8px;
-      border-radius: 6px;
-      margin-bottom: 4px;
-      cursor: pointer;
-      border: 1px solid transparent;
-    }
-    .collection-item:hover {
-      background: #f5f5f5;
-    }
-    .collection-item.selected {
-      border-color: #0077ff;
-      background: #e7f1ff;
-    }
-    .collection-item-title {
-      font-size: 14px;
-      font-weight: 600;
-    }
-    .collection-item-meta {
-      font-size: 11px;
-      color: #666;
+      background: #fff;
     }
 
     .main {
       flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 12px 14px;
-      overflow: hidden;
+      min-width: 0;
+      padding-right: 8px;
     }
-    .main-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 8px;
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 8px;
     }
-    .main-title {
-      font-size: 18px;
-      font-weight: 600;
+
+    h2 {
+      font-size: 16px;
+      margin: 16px 0 8px;
     }
-    .main-subtitle {
+
+    .muted {
       font-size: 12px;
-      color: #666;
+      color: #777;
     }
-    .controls-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      font-size: 12px;
+
+    label {
+      font-size: 13px;
+      display: block;
+      margin-bottom: 4px;
     }
-    .controls-row button {
+
+    input[type="text"] {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    button {
+      font-size: 13px;
       padding: 6px 10px;
-      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
       cursor: pointer;
     }
-    .controls-row button:disabled {
+
+    button:hover:enabled {
+      background: #e8e8e8;
+    }
+
+    button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
     }
-    .controls-row input[type="number"] {
-      width: 80px;
-      padding: 4px 6px;
-      font-size: 12px;
-    }
-    .status-box {
-      margin-top: 6px;
-      padding: 6px 8px;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-      font-size: 12px;
-      background: #fafafa;
-      white-space: pre-wrap;
-    }
-    .status-line-label {
-      font-weight: 600;
+
+    .collections-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 8px 0 0;
     }
 
-    .panels {
-      display: flex;
-      flex: 1;
-      gap: 10px;
-      margin-top: 10px;
-      overflow: hidden;
-    }
-    .panel {
-      flex: 1;
-      min-width: 0;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .panel-header {
+    .collections-list li {
       padding: 6px 8px;
-      border-bottom: 1px solid #eee;
-      background: #f7f7f7;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .collections-list li:hover {
+      background: #f3f3f3;
+    }
+
+    .collections-list li.active {
+      background: #e6f3ff;
+      border-color: #9ac4ff;
+    }
+
+    .collection-name {
       font-size: 13px;
       font-weight: 600;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .panel-body {
-      padding: 6px 8px;
-      flex: 1;
-      overflow: auto;
-      font-size: 12px;
     }
 
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      font-size: 12px;
+    .collection-meta {
+      font-size: 11px;
+      color: #666;
     }
-    th, td {
+
+    .art-list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .art-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .art-card {
+      background: #fff;
+      border-radius: 8px;
       border: 1px solid #ddd;
-      padding: 4px 6px;
-      text-align: left;
-      vertical-align: top;
+      padding: 10px 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
-    th {
-      background: #f0f0f0;
-      position: sticky;
-      top: 0;
-      z-index: 1;
+
+    .art-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
     }
-    .bridge-text {
-      max-height: 200px;
+
+    .art-id {
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .art-position {
+      font-size: 11px;
+      color: #777;
+    }
+
+    .art-body {
+      font-size: 13px;
+      white-space: pre-wrap;
+      max-height: 120px;
       overflow: auto;
+      margin-bottom: 6px;
+    }
+
+    .art-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .status {
+      font-size: 11px;
+      color: #555;
       white-space: pre-wrap;
     }
+
+    .status.ok {
+      color: #1a7f3e;
+    }
+
+    .status.error {
+      color: #b00020;
+    }
+
+    .status.pending {
+      color: #88540b;
+    }
+
     .badge {
       display: inline-block;
-      padding: 2px 5px;
-      border-radius: 4px;
-      font-size: 11px;
-      background: #eee;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      border: 1px solid #ccc;
+      background: #fafafa;
+      color: #333;
     }
-    .badge.running { background: #e0f3ff; color: #005fbb; }
-    .badge.complete { background: #e1f6e1; color: #257325; }
-    .badge.stopped { background: #ffe9e0; color: #a13b1f; }
-    .badge.paused_token_limit { background: #fff6d8; color: #8a6a00; }
+
+    .badge.green {
+      border-color: #5ba76a;
+      background: #f0faf3;
+      color: #24552f;
+    }
+
+    .badge.gray {
+      border-color: #c3c3c3;
+      background: #f5f5f5;
+      color: #555;
+    }
+
+    .top-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .top-controls-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .top-controls-row button {
+      white-space: nowrap;
+    }
+
+    .small {
+      font-size: 11px;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <div class="sidebar">
-    <h1>Collections</h1>
-    <small>Owner email → select collection → process & inspect bridges.</small>
-    <div class="email-row">
-      <input id="emailInput" type="email"
-             placeholder="owner@example.com"
-             value="boris@fantasiagenesis.com" />
-      <button id="loadCollectionsBtn">Load</button>
-    </div>
-    <div class="collections-list" id="collectionsList"></div>
-  </div>
+  <div class="page">
+    <aside class="sidebar">
+      <h1>Collections</h1>
+      <div class="muted">Load collections by email</div>
 
-  <div class="main">
-    <div class="main-header">
-      <div>
-        <div class="main-title" id="collectionTitle">No collection selected</div>
-        <div class="main-subtitle" id="collectionSubtitle"></div>
-      </div>
-      <div class="controls-row">
-        <button id="startBtn" disabled>Start Processing</button>
-        <button id="stopBtn" disabled>Stop Processing</button>
-        <label>
-          Steps/call:
-          <input id="maxStepsInput" type="number" value="100" min="1" />
-        </label>
-        <label>
-          Status poll (s):
-          <input id="pollIntervalInput" type="number" value="5" min="2" />
-        </label>
-      </div>
-    </div>
-
-    <div class="status-box" id="statusBox">
-      Status: —
-    </div>
-
-    <div class="panels">
-      <div class="panel">
-        <div class="panel-header">
-          <span>Collection Progress</span>
-          <span id="progressSummary"></span>
+      <div class="top-controls">
+        <div>
+          <label for="emailInput">Email</label>
+          <input id="emailInput" type="text" placeholder="you@example.com" />
         </div>
-        <div class="panel-body" id="progressBody">
-          <em>No collection selected.</em>
+        <div class="top-controls-row">
+          <button id="loadCollectionsBtn">Load Collections</button>
+          <span id="collectionsStatus" class="small muted"></span>
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-header">
-          <span>Generated Bridges</span>
-          <span>
-            Filter:
-            <select id="bridgeTypeFilter">
-              <option value="">(all)</option>
-              <option value="fantasiagenesis_prompt1">prompt1</option>
-              <option value="fantasiagenesis_prompt2">prompt2</option>
-            </select>
-          </span>
+      <ul id="collectionsList" class="collections-list"></ul>
+    </aside>
+
+    <main class="main">
+      <div class="art-list-header">
+        <div>
+          <h2 id="artListTitle">No collection selected</h2>
+          <div id="artListSubtitle" class="muted small"></div>
         </div>
-        <div class="panel-body" id="bridgesBody">
-          <em>No collection selected.</em>
-        </div>
+        <div id="globalArtStatus" class="small muted"></div>
       </div>
-    </div>
+
+      <div id="artList" class="art-list"></div>
+    </main>
   </div>
 
   <script>
-    const API_BASE = "/colors";
+    const collectionsListEl = document.getElementById("collectionsList");
+    const collectionsStatusEl = document.getElementById("collectionsStatus");
+    const emailInputEl = document.getElementById("emailInput");
+    const loadCollectionsBtn = document.getElementById("loadCollectionsBtn");
 
-    let selectedCollectionId = null;
-    let statusPollTimer = null;
+    const artListEl = document.getElementById("artList");
+    const artListTitleEl = document.getElementById("artListTitle");
+    const artListSubtitleEl = document.getElementById("artListSubtitle");
+    const globalArtStatusEl = document.getElementById("globalArtStatus");
 
-    function isoToLocal(iso) {
-      if (!iso) return "";
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return iso;
-      return d.toLocaleString();
+    let currentCollections = [];
+    let currentCollectionId = null;
+
+    // Utility: truncate text for brief display
+    function truncate(text, maxLen) {
+      if (!text) return "";
+      if (text.length <= maxLen) return text;
+      return text.slice(0, maxLen) + "…";
     }
 
-    function setStatusBox(text) {
-      const box = document.getElementById("statusBox");
-      box.textContent = text;
-    }
-
-    function renderStatusBadge(status) {
-      if (!status) return "";
-      const span = document.createElement("span");
-      span.className = "badge " + status;
-      span.textContent = status;
-      return span.outerHTML;
-    }
-
+    // ---------------------
+    // Collections loading
+    // ---------------------
     async function loadCollections() {
-      const email = document.getElementById("emailInput").value.trim();
-      const params = new URLSearchParams();
-      if (email) params.set("email", email);
+      const email = (emailInputEl.value || "").trim();
+      if (!email) {
+        collectionsStatusEl.textContent = "enter email";
+        return;
+      }
 
-      const url = API_BASE + "/collections" + (params.toString() ? "?" + params.toString() : "");
-      setStatusBox("Loading collections from " + url + " ...");
-      let resp;
+      collectionsStatusEl.textContent = "loading…";
+      collectionsListEl.innerHTML = "";
+      currentCollections = [];
+      currentCollectionId = null;
+      artListEl.innerHTML = "";
+      artListTitleEl.textContent = "No collection selected";
+      artListSubtitleEl.textContent = "";
+
       try {
-        resp = await fetch(url);
+        const res = await fetch(`/api/collections?email=${encodeURIComponent(email)}`);
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        currentCollections = data;
+        renderCollections();
+        collectionsStatusEl.textContent = `${data.length} collection(s)`;
       } catch (err) {
         console.error(err);
-        setStatusBox("Error loading collections: " + err);
-        return;
+        collectionsStatusEl.textContent = "error loading collections";
       }
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        setStatusBox("Error " + resp.status + " from /collections:\n" + text);
-        return;
-      }
-
-      const data = await resp.json();
-      const collections = data.collections || [];
-      renderCollections(collections);
-      setStatusBox("Loaded " + collections.length + " collection(s).");
     }
 
-    function renderCollections(collections) {
-      const container = document.getElementById("collectionsList");
-      container.innerHTML = "";
-      if (!collections.length) {
-        container.textContent = "No collections found.";
-        return;
-      }
+    function renderCollections() {
+      collectionsListEl.innerHTML = "";
+      currentCollections.forEach(col => {
+        const li = document.createElement("li");
+        li.dataset.collectionId = col.id;
+        li.className = "collection-item";
 
-      for (const col of collections) {
-        const div = document.createElement("div");
-        div.className = "collection-item";
-        div.dataset.collectionId = String(col.id);
+        const nameEl = document.createElement("div");
+        nameEl.className = "collection-name";
+        nameEl.textContent = col.name;
 
-        const title = document.createElement("div");
-        title.className = "collection-item-title";
-        title.textContent = col.name;
+        const metaEl = document.createElement("div");
+        metaEl.className = "collection-meta";
+        const artCount = col.art_count != null ? ` • ${col.art_count} art` : "";
+        metaEl.textContent = `${col.email || ""}${artCount}`;
 
-        const meta = document.createElement("div");
-        meta.className = "collection-item-meta";
-        meta.textContent =
-          "id " + col.id +
-          " • items: " + (col.item_count ?? 0) +
-          " • created: " + isoToLocal(col.created_at);
+        li.appendChild(nameEl);
+        li.appendChild(metaEl);
 
-        div.appendChild(title);
-        div.appendChild(meta);
+        li.addEventListener("click", () => {
+          onSelectCollection(col.id);
+        });
 
-        div.addEventListener("click", () => selectCollection(col));
-        container.appendChild(div);
-      }
-      highlightSelectedCollection();
+        collectionsListEl.appendChild(li);
+      });
+
+      updateActiveCollectionUI();
     }
 
-    function highlightSelectedCollection() {
-      const list = document.getElementById("collectionsList");
-      Array.from(list.querySelectorAll(".collection-item")).forEach(el => {
-        const id = parseInt(el.dataset.collectionId, 10);
-        if (selectedCollectionId && id === selectedCollectionId) {
-          el.classList.add("selected");
+    function updateActiveCollectionUI() {
+      const lis = collectionsListEl.querySelectorAll("li");
+      lis.forEach(li => {
+        const cid = parseInt(li.dataset.collectionId, 10);
+        if (cid === currentCollectionId) {
+          li.classList.add("active");
         } else {
-          el.classList.remove("selected");
+          li.classList.remove("active");
         }
       });
     }
 
-    function selectCollection(col) {
-      selectedCollectionId = col.id;
-      highlightSelectedCollection();
+    async function onSelectCollection(collectionId) {
+      currentCollectionId = collectionId;
+      updateActiveCollectionUI();
 
-      document.getElementById("collectionTitle").textContent =
-        col.name + " (id " + col.id + ")";
-      document.getElementById("collectionSubtitle").textContent =
-        "Owner: " + (col.email || "—") +
-        " • Items: " + (col.item_count ?? 0) +
-        " • Created: " + isoToLocal(col.created_at);
-
-      document.getElementById("progressBody").innerHTML = "<em>Loading status...</em>";
-      document.getElementById("bridgesBody").innerHTML = "<em>Loading bridges...</em>";
-
-      // enable buttons conditionally after we get status
-      updateButtons(null);
-
-      // clear old polling and start new one
-      if (statusPollTimer) {
-        clearInterval(statusPollTimer);
-        statusPollTimer = null;
-      }
-      pollStatusOnce();
-      pollBridges();
-
-      const pollIntervalSec = parseInt(document.getElementById("pollIntervalInput").value || "5", 10);
-      statusPollTimer = setInterval(() => {
-        if (selectedCollectionId === col.id) {
-          pollStatusOnce();
-          pollBridges();
-        }
-      }, Math.max(pollIntervalSec, 2) * 1000);
-    }
-
-    function updateButtons(status) {
-      const startBtn = document.getElementById("startBtn");
-      const stopBtn = document.getElementById("stopBtn");
-
-      if (!selectedCollectionId) {
-        startBtn.disabled = true;
-        stopBtn.disabled = true;
-        return;
-      }
-
-      const st = status || "idle";
-      if (st === "running") {
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-      } else if (st === "complete") {
-        startBtn.disabled = false; // you might want to keep this disabled if "done means done"
-        stopBtn.disabled = true;
-      } else if (st === "paused_token_limit") {
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-      } else if (st === "stopped" || st === "idle" || st === "error") {
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
+      const col = currentCollections.find(c => c.id === collectionId);
+      if (col) {
+        artListTitleEl.textContent = `Collection: ${col.name}`;
+        const artCount = col.art_count != null ? `${col.art_count} item(s)` : "";
+        artListSubtitleEl.textContent = `${col.email || ""} ${artCount}`.trim();
       } else {
-        startBtn.disabled = false;
-        stopBtn.disabled = false;
+        artListTitleEl.textContent = "Collection";
+        artListSubtitleEl.textContent = "";
       }
+
+      await loadCollectionItems(collectionId);
     }
 
-    async function pollStatusOnce() {
-      if (!selectedCollectionId) return;
-      const url = API_BASE + "/collections/" + selectedCollectionId + "/status";
+    // ---------------------
+    // Collection items
+    // ---------------------
+    async function loadCollectionItems(collectionId) {
+      artListEl.innerHTML = "";
+      globalArtStatusEl.textContent = "loading art…";
       try {
-        const resp = await fetch(url);
-        if (!resp.ok) {
-          const text = await resp.text();
-          setStatusBox("Error " + resp.status + " from /status:\n" + text);
-          return;
+        const res = await fetch(`/api/collections/${collectionId}/items`);
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || `HTTP ${res.status}`);
         }
-        const data = await resp.json();
-        const state = data.processing_state || {};
-        const stats = data.collection_stats || {};
-
-        const status = state.status || "idle";
-        updateButtons(status);
-
-        const progressSummary = document.getElementById("progressSummary");
-        progressSummary.textContent =
-          (stats.processed_art ?? 0) + "/" + (stats.total_art ?? 0) +
-          (stats.complete ? " (complete)" : "");
-
-        const progressBody = document.getElementById("progressBody");
-        let html = "";
-        html += "<div><span class='status-line-label'>Status:</span> " +
-                renderStatusBadge(status) + "</div>";
-        html += "<div><span class='status-line-label'>Last message:</span> " +
-                (state.last_message || "—") + "</div>";
-        html += "<div><span class='status-line-label'>Stop requested:</span> " +
-                (String(state.stop_requested) || "false") + "</div>";
-        html += "<div><span class='status-line-label'>Last updated:</span> " +
-                isoToLocal(state.last_updated) + "</div>";
-        html += "<div style='margin-top:6px;'><span class='status-line-label'>Stats:</span> " +
-                (stats.processed_art ?? 0) + " / " + (stats.total_art ?? 0) +
-                (stats.complete ? " (complete)" : "") + "</div>";
-        progressBody.innerHTML = html;
-
-        setStatusBox("Status: " + status + " | Processed " +
-                     (stats.processed_art ?? 0) + "/" + (stats.total_art ?? 0));
-
+        const items = await res.json();
+        renderCollectionItems(items);
+        globalArtStatusEl.textContent = `${items.length} art item(s)`;
       } catch (err) {
         console.error(err);
-        setStatusBox("Error polling status: " + err);
+        globalArtStatusEl.textContent = "error loading art";
       }
     }
 
-    async function pollBridges() {
-      if (!selectedCollectionId) return;
-      const url = API_BASE + "/collections/" + selectedCollectionId + "/bridges";
+    function renderCollectionItems(items) {
+      artListEl.innerHTML = "";
+      items.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "art-card";
+        card.dataset.artId = item.id;
+
+        const header = document.createElement("div");
+        header.className = "art-header";
+
+        const idEl = document.createElement("div");
+        idEl.className = "art-id";
+        idEl.textContent = `Art #${item.id}`;
+
+        const posEl = document.createElement("div");
+        posEl.className = "art-position";
+        const pos = item.position != null ? `position ${item.position}` : "no position";
+        posEl.textContent = pos;
+
+        header.appendChild(idEl);
+        header.appendChild(posEl);
+
+        const body = document.createElement("div");
+        body.className = "art-body";
+        body.textContent = item.art || "";
+
+        const controls = document.createElement("div");
+        controls.className = "art-controls";
+
+        const runBtn = document.createElement("button");
+        runBtn.textContent = "Run Subsystem Bridge";
+
+        const badge = document.createElement("span");
+        badge.className = "badge gray";
+        badge.textContent = "unknown";
+
+        const status = document.createElement("div");
+        status.className = "status";
+
+        controls.appendChild(runBtn);
+        controls.appendChild(badge);
+        controls.appendChild(status);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        card.appendChild(controls);
+
+        artListEl.appendChild(card);
+
+        // Wire button
+        runBtn.addEventListener("click", () => {
+          runSubsystemBridgeForArt(item.id, status, runBtn, badge);
+        });
+
+        // Initial status: check if bridge exists
+        checkBridgeStatusForArt(item.id, status, badge);
+      });
+    }
+
+    // ---------------------
+    // Bridge status check
+    // ---------------------
+    async function checkBridgeStatusForArt(artId, statusEl, badgeEl) {
+      statusEl.textContent = "checking bridge status…";
+      statusEl.className = "status pending";
+
       try {
-        const resp = await fetch(url);
-        if (!resp.ok) {
-          const text = await resp.text();
-          document.getElementById("bridgesBody").innerHTML =
-            "<div style='color:#a33;'>Error " + resp.status +
-            " loading bridges:<br><pre>" + text + "</pre></div>";
-          return;
+        const res = await fetch(
+          `/colors/bridges/by_type/fantasiagenesis_subsystem_bridge?art_id=${artId}`
+        );
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || `HTTP ${res.status}`);
         }
-        const data = await resp.json();
-        const bridges = data.bridges || [];
-        renderBridges(bridges);
+        const rows = await res.json();
+        if (rows.length === 0) {
+          badgeEl.className = "badge gray";
+          badgeEl.textContent = "no bridge";
+          statusEl.textContent = "";
+          statusEl.className = "status";
+        } else {
+          const latest = rows[0];
+          badgeEl.className = "badge green";
+          badgeEl.textContent = "bridge exists";
+          const when = latest.created_at || "";
+          statusEl.textContent = `existing bridge (latest at ${when})`;
+          statusEl.className = "status ok";
+        }
       } catch (err) {
         console.error(err);
-        document.getElementById("bridgesBody").innerHTML =
-          "<div style='color:#a33;'>Error loading bridges: " + err + "</div>";
+        badgeEl.className = "badge gray";
+        badgeEl.textContent = "unknown";
+        statusEl.textContent = "error checking bridge";
+        statusEl.className = "status error";
       }
     }
 
-    function renderBridges(bridges) {
-      const body = document.getElementById("bridgesBody");
-      const filterType = document.getElementById("bridgeTypeFilter").value;
+    // ---------------------
+    // Run subsystem bridge
+    // ---------------------
+    async function runSubsystemBridgeForArt(artId, statusEl, buttonEl, badgeEl) {
+      statusEl.textContent = "queueing subsystem bridge…";
+      statusEl.className = "status pending";
+      buttonEl.disabled = true;
 
-      const filtered = filterType
-        ? bridges.filter(b => b.bridge_type === filterType)
-        : bridges.slice();
-
-      if (!filtered.length) {
-        body.innerHTML = "<em>No bridges yet for this collection (or none matching filter).</em>";
-        return;
-      }
-
-      let html = "<table><thead><tr>" +
-                 "<th>ID</th><th>Type</th><th>Art ID</th><th>Color ID</th>" +
-                 "<th>Created</th><th>Text</th></tr></thead><tbody>";
-
-      for (const b of filtered) {
-        html += "<tr>";
-        html += "<td>" + b.id + "</td>";
-        html += "<td><span class='badge'>" + (b.bridge_type || "") + "</span></td>";
-        html += "<td>" + (b.art_id ?? "") + "</td>";
-        html += "<td>" + (b.color_id ?? "") + "</td>";
-        html += "<td>" + isoToLocal(b.created_at) + "</td>";
-        const txt = (b.bridge_text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        html += "<td><div class='bridge-text'>" + txt + "</div></td>";
-        html += "</tr>";
-      }
-      html += "</tbody></table>";
-      body.innerHTML = html;
-    }
-
-    async function startProcessing() {
-      if (!selectedCollectionId) return;
-      const maxSteps = parseInt(document.getElementById("maxStepsInput").value || "100", 10);
-      const payload = {
-        fantasiagenesis_email: document.getElementById("emailInput").value.trim() || "boris@fantasiagenesis.com",
-        fantasiagenesis_collection: "fantasiagenesis",
-        max_steps: maxSteps,
-      };
-      const url = API_BASE + "/collections/" + selectedCollectionId + "/process_run";
-      setStatusBox("Starting processing via " + url + " ...");
       try {
-        const resp = await fetch(url, {
+        const res = await fetch("/colors/fantasiagenesis_subsystem_bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            art_id: artId
+          })
         });
-        const text = await resp.text();
+
+        const text = await res.text();
         let data;
         try {
           data = JSON.parse(text);
         } catch {
           data = null;
         }
-        if (!resp.ok) {
-          setStatusBox("Error " + resp.status + " from /process_run:\n" + text);
-        } else {
-          setStatusBox("Process_run finished. steps_done=" +
-                       (data && data.steps_done != null ? data.steps_done : "?"));
-          // refresh status and bridges
-          pollStatusOnce();
-          pollBridges();
+
+        if (!res.ok) {
+          const msg = (data && data.description) || text || `HTTP ${res.status}`;
+          throw new Error(msg);
         }
+
+        statusEl.textContent = `queued task ${data.task_id || ""}`.trim();
+        statusEl.className = "status pending";
+
+        // We only know it's queued. The worker will run build_thought (if needed)
+        // and then the bridge. We can re-check status after a delay if you like;
+        // for now just re-hit the bridge list once after a short pause.
+        setTimeout(() => {
+          checkBridgeStatusForArt(artId, statusEl, badgeEl);
+          buttonEl.disabled = false;
+        }, 3000);
       } catch (err) {
         console.error(err);
-        setStatusBox("Error starting processing: " + err);
+        statusEl.textContent = `error: ${err.message || err}`;
+        statusEl.className = "status error";
+        buttonEl.disabled = false;
       }
     }
 
-    async function stopProcessing() {
-      if (!selectedCollectionId) return;
-      const url = API_BASE + "/collections/" + selectedCollectionId + "/stop";
-      setStatusBox("Requesting stop via " + url + " ...");
-      try {
-        const resp = await fetch(url, { method: "POST" });
-        const text = await resp.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = null;
-        }
-        if (!resp.ok) {
-          setStatusBox("Error " + resp.status + " from /stop:\n" + text);
-        } else {
-          setStatusBox("Stop requested.");
-          pollStatusOnce();
-        }
-      } catch (err) {
-        console.error(err);
-        setStatusBox("Error stopping processing: " + err);
-      }
-    }
-
-    // Event wiring
-    document.getElementById("loadCollectionsBtn").addEventListener("click", loadCollections);
-    document.getElementById("startBtn").addEventListener("click", startProcessing);
-    document.getElementById("stopBtn").addEventListener("click", stopProcessing);
-    document.getElementById("bridgeTypeFilter").addEventListener("change", () => {
-      if (selectedCollectionId) pollBridges();
+    // Wire UI
+    loadCollectionsBtn.addEventListener("click", () => {
+      loadCollections();
     });
 
-    // Initial load
-    window.addEventListener("load", loadCollections);
+    emailInputEl.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        loadCollections();
+      }
+    });
   </script>
 </body>
 </html>
