@@ -35,7 +35,16 @@ from prompts import information_bridge_prompt  # type: ignore
 from prompts import poetry_bridge_prompt  # type: ignore
 from prompts import metaphysics_bridge_prompt  # type: ignore
 from prompts import entity_bridge_relationship_prompt  # type: ignore
+from prompts import (
+    fantasiagenesis_collection_prompt1_sys,
+    fantasiagenesis_collection_prompt1_user,
+    fantasiagenesis_collection_prompt2_sys,
+    fantasiagenesis_collection_prompt2_user,
+)
 
+
+
+import random
 
 
 try:
@@ -246,6 +255,83 @@ def log_llm_usage(
     finally:
         db.close()
 
+def get_collection_processing_state(collection_id: int) -> Dict[str, Any]:
+    """
+    Read processing state from art_collections.metadata.
+
+    Returns:
+      {
+        "status": "idle" | "running" | "complete" | "paused_token_limit" | "stopped",
+        "last_updated": iso_str,
+        "last_message": str,
+        "stop_requested": bool,
+        ...
+      }
+    Unknown/missing is treated as status="idle".
+    """
+    db = get_art_db()
+    try:
+        row = db.execute(
+            "SELECT metadata FROM art_collections WHERE id = ?",
+            (collection_id,),
+        ).fetchone()
+    finally:
+        db.close()
+
+    if row is None:
+        abort(404, description=f"collection id {collection_id} not found")
+
+    md_raw = row["metadata"]
+    try:
+        md = json.loads(md_raw) if md_raw else {}
+    except Exception:
+        md = {}
+
+    state = md.get("processing_state") or {}
+    if "status" not in state:
+        state["status"] = "idle"
+    if "stop_requested" not in state:
+        state["stop_requested"] = False
+    return state
+
+
+def update_collection_processing_state(collection_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Merge updates into processing_state in art_collections.metadata and save.
+    Returns the full new state.
+    """
+    db = get_art_db()
+    try:
+        row = db.execute(
+            "SELECT metadata FROM art_collections WHERE id = ?",
+            (collection_id,),
+        ).fetchone()
+        if row is None:
+            abort(404, description=f"collection id {collection_id} not found")
+
+        md_raw = row["metadata"]
+        try:
+            md = json.loads(md_raw) if md_raw else {}
+        except Exception:
+            md = {}
+
+        state = md.get("processing_state") or {}
+        state.update(updates)
+        # always bump last_updated
+        state["last_updated"] = utc_now_iso()
+        md["processing_state"] = state
+
+        db.execute(
+            "UPDATE art_collections SET metadata = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(md, ensure_ascii=False), utc_now_iso(), collection_id),
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    return state
+
+
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
@@ -309,6 +395,286 @@ def normalize_entities_json(parsed: dict) -> dict:
                 continue
         parsed[k] = new_list
     return parsed
+
+def run_llm_chat(model: str, messages: List[Dict[str, str]], temperature: float = 0.7) -> Tuple[str, Dict[str, Any], str]:
+    """
+    Placeholder: replace with your actual LLM call.
+    Should return (output_text, usage_dict, actual_model_name).
+    """
+    raise NotImplementedError("wire run_llm_chat to your existing OpenAI / LLM client")
+
+
+def ensure_color_for_art(
+    art_id: int,
+    *,
+    model: str = "gpt-5-mini-2025-08-07",
+    temperature: float = 0.7,
+    user_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Ensure there is a colors row for the given art_id.
+    If one exists, return it; if not, create it via the build_thought-style LLM prompt.
+    """
+    db = get_art_db()
+    try:
+        row = db.execute(
+            """
+            SELECT *
+            FROM colors
+            WHERE art_id = ?
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            (art_id,),
+        ).fetchone()
+    finally:
+        db.close()
+
+    if row is not None:
+        return dict(row)
+
+    # No color yet: create one.
+    art_row = fetch_art_text(art_id)  # your existing helper
+    thought_text = art_row["art"]
+
+    sys_content = build_thought_sys(thought_text)
+    user_content = build_thought_user(thought_text)
+
+    messages = [
+        {"role": "system", "content": sys_content},
+        {"role": "user", "content": user_content},
+    ]
+
+    output_text, usage, used_model = run_llm_chat(model, messages, temperature=temperature)
+
+    md = {
+        "source": "collections.ensure_color_for_art",
+        "original_art_id": art_id,
+    }
+    if user_metadata:
+        md["user_metadata"] = user_metadata
+
+    color_row = insert_color_row(
+        art_id=art_id,
+        input_art=thought_text,
+        output_text=output_text,
+        model=used_model,
+        usage=usage,
+        user_metadata=md,
+    )
+    return color_row
+
+
+def insert_bridge_row_simple(
+    *,
+    color_id: int,
+    art_id: int,
+    input_text: str,
+    bridge_text: str,
+    bridge_type: str,
+    model: Optional[str] = None,
+    entity: Optional[str] = None,
+    entity_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    now = utc_now_iso()
+    db = get_art_db()
+    try:
+        cur = db.execute(
+            """
+            INSERT INTO bridges
+              (color_id, art_id, input_text, bridge_text, model, created_at, bridge_type, entity, entity_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (color_id, art_id, input_text, bridge_text, model, now, bridge_type, entity, entity_id),
+        )
+        bridge_id = cur.lastrowid
+        row = db.execute("SELECT * FROM bridges WHERE id = ?", (bridge_id,)).fetchone()
+        db.commit()
+    finally:
+        db.close()
+    return dict(row)
+
+def pick_next_art_for_collection(collection_id: int) -> Optional[int]:
+    """
+    Pick the next art from this collection that has NOT yet been processed
+    by prompt 2 (no bridges with bridge_type='fantasiagenesis_prompt2').
+    Returns None if all are processed.
+    """
+    db = get_art_db()
+    try:
+        row = db.execute(
+            """
+            SELECT a.id AS art_id
+            FROM art_collection_items aci
+            JOIN art a
+              ON a.id = aci.art_id
+            LEFT JOIN bridges b
+              ON b.art_id = a.id
+             AND b.bridge_type = 'fantasiagenesis_prompt2'
+            WHERE aci.collection_id = ?
+            GROUP BY a.id
+            HAVING COUNT(b.id) = 0
+            ORDER BY a.created_at ASC
+            LIMIT 1
+            """,
+            (collection_id,),
+        ).fetchone()
+    finally:
+        db.close()
+
+    if row is None:
+        return None
+    return row["art_id"]
+
+def compute_collection_stats(collection_id: int) -> Dict[str, Any]:
+    """
+    Compute how many arts in this collection have been processed by prompt 2.
+    """
+    db = get_art_db()
+    try:
+        total_row = db.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM art_collection_items
+            WHERE collection_id = ?
+            """,
+            (collection_id,),
+        ).fetchone()
+        total = int(total_row["cnt"] or 0)
+
+        processed_row = db.execute(
+            """
+            SELECT COUNT(DISTINCT aci.art_id) AS cnt
+            FROM art_collection_items aci
+            JOIN bridges b
+              ON b.art_id = aci.art_id
+             AND b.bridge_type = 'fantasiagenesis_prompt2'
+            WHERE aci.collection_id = ?
+            """,
+            (collection_id,),
+        ).fetchone()
+        processed = int(processed_row["cnt"] or 0)
+    finally:
+        db.close()
+
+    return {
+        "total_art": total,
+        "processed_art": processed,
+        "complete": (total > 0 and processed >= total),
+    }
+
+def run_collection_prompt1(
+    color_fant: Dict[str, Any],
+    *,
+    model: str = "gpt-5-mini-2025-08-07",
+    temperature: float = 0.7,
+) -> Dict[str, Any]:
+    """
+    LLM prompt 1 for color-fantasiagenesis, with caching in bridges.
+
+    Behavior:
+      - Check if a bridge already exists for (art_id, color_id, bridge_type='fantasiagenesis_prompt1').
+      - If exists, return that bridge row (no LLM call).
+      - If not, run LLM, insert a new bridge row, and return it.
+
+    Returns a bridges-row dict:
+      {
+        "id": ...,
+        "color_id": ...,
+        "art_id": ...,
+        "bridge_text": ...,
+        "model": ...,
+        "bridge_type": "fantasiagenesis_prompt1",
+        ...
+      }
+    """
+    art_id = color_fant["art_id"]
+    color_id = color_fant["id"]
+
+    # 1. Check for existing bridge
+    db = get_art_db()
+    try:
+        row = db.execute(
+            """
+            SELECT *
+            FROM bridges
+            WHERE art_id = ?
+              AND color_id = ?
+              AND bridge_type = 'fantasiagenesis_prompt1'
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (art_id, color_id),
+        ).fetchone()
+    finally:
+        db.close()
+
+    if row is not None:
+        return dict(row)  # reuse existing: bridge_text is row["bridge_text"]
+
+    # 2. No existing bridge: run LLM
+    color_text = color_fant["output_text"]
+
+    sys_content = fantasiagenesis_collection_prompt1_sys(color_text)
+    user_content = fantasiagenesis_collection_prompt1_user(color_text)
+
+    messages = [
+        {"role": "system", "content": sys_content},
+        {"role": "user", "content": user_content},
+    ]
+
+    output_text, usage, used_model = run_llm_chat(model, messages, temperature=temperature)
+
+    # 3. Store in bridges
+    bridge_row = insert_bridge_row_simple(
+        color_id=color_id,
+        art_id=art_id,
+        input_text=color_text,
+        bridge_text=output_text,
+        bridge_type="fantasiagenesis_prompt1",
+        model=used_model,
+    )
+
+    # Optional: log usage if you have a logging helper
+    # log_llm_usage("fantasiagenesis_prompt1", used_model, usage, ...)
+
+    return bridge_row
+
+
+
+def run_collection_prompt2(
+    color_fant: Dict[str, Any],
+    color_fant_llm_output: str,
+    color_selection: Dict[str, Any],
+    *,
+    model: str = "gpt-5-mini-2025-08-07",
+    temperature: float = 0.7,
+) -> Tuple[str, str]:
+    """
+    Run LLM prompt 2 with:
+      - color-fantasiagenesis
+      - color-fantasiagenesis-llm-output
+      - color-selection (the chosen art's color)
+    Returns (output_text, used_model).
+    """
+    color_fant_text = color_fant["output_text"]
+    color_sel_text = color_selection["output_text"]
+
+    sys_content = fantasiagenesis_collection_prompt2_sys(
+        color_fant_text, color_fant_llm_output, color_sel_text
+    )
+    user_content = fantasiagenesis_collection_prompt2_user(
+        color_fant_text, color_fant_llm_output, color_sel_text
+    )
+
+    messages = [
+        {"role": "system", "content": sys_content},
+        {"role": "user", "content": user_content},
+    ]
+
+    output_text, usage, used_model = run_llm_chat(model, messages, temperature=temperature)
+    return output_text, used_model
+
 
 
 
@@ -1055,6 +1421,145 @@ def fetch_art_text(art_id: int) -> Dict[str, Any]:
         abort(404, description=f"art id {art_id} not found")
 
     return dict(row)
+
+
+ART_DB_PATH = "/var/www/site/data/art.db"  # if not already defined
+
+
+def fetch_art_collections(email: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Return a list of art collections (optionally filtered by owner email),
+    each with item_count.
+    """
+    db = get_art_db()
+    try:
+        params: List[Any] = []
+        where_clauses: List[str] = []
+
+        sql = """
+            SELECT
+              c.id,
+              c.name,
+              c.email,
+              c.description,
+              c.metadata,
+              c.created_at,
+              c.updated_at,
+              COUNT(aci.id) AS item_count
+            FROM art_collections c
+            LEFT JOIN art_collection_items aci
+              ON aci.collection_id = c.id
+        """
+
+        if email:
+            where_clauses.append("c.email = ?")
+            params.append(email)
+
+        if where_clauses:
+            sql += " WHERE " + " AND ".join(where_clauses)
+
+        sql += """
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+        """
+
+        rows = db.execute(sql, params).fetchall()
+    finally:
+        db.close()
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        obj = dict(r)
+        # decode metadata if present
+        try:
+            obj["metadata"] = json.loads(obj.get("metadata") or "{}")
+        except Exception:
+            pass
+        obj["item_count"] = int(obj.get("item_count") or 0)
+        out.append(obj)
+
+    return out
+
+
+def fetch_art_collection_items(collection_id: int) -> List[Dict[str, Any]]:
+    """
+    Return all items in a given collection, joined with art.
+    """
+    db = get_art_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT
+              aci.id          AS item_id,
+              aci.collection_id,
+              aci.art_id,
+              aci.position,
+              aci.created_at  AS item_created_at,
+              a.art,
+              a.email         AS art_email,
+              a.metadata      AS art_metadata,
+              a.created_at    AS art_created_at,
+              a.updated_at    AS art_updated_at
+            FROM art_collection_items aci
+            JOIN art a ON a.id = aci.art_id
+            WHERE aci.collection_id = ?
+            ORDER BY
+              COALESCE(aci.position, 999999),
+              aci.art_id
+            """,
+            (collection_id,),
+        ).fetchall()
+    finally:
+        db.close()
+
+    items: List[Dict[str, Any]] = []
+    for r in rows:
+        obj = dict(r)
+        try:
+            obj["art_metadata"] = json.loads(obj.get("art_metadata") or "{}")
+        except Exception:
+            pass
+        items.append(obj)
+    return items
+
+
+def pick_random_art_from_named_collection(owner_email: str, name: str) -> Optional[int]:
+    """
+    Pick a random art_id from the (owner_email, name) collection.
+    Returns None if collection not found or empty.
+    """
+    db = get_art_db()
+    try:
+        col_row = db.execute(
+            """
+            SELECT id
+            FROM art_collections
+            WHERE email = ?
+              AND name  = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (owner_email, name),
+        ).fetchone()
+        if col_row is None:
+            return None
+
+        collection_id = col_row["id"]
+        rows = db.execute(
+            """
+            SELECT art_id
+            FROM art_collection_items
+            WHERE collection_id = ?
+            """,
+            (collection_id,),
+        ).fetchall()
+    finally:
+        db.close()
+
+    art_ids = [r["art_id"] for r in rows]
+    if not art_ids:
+        return None
+    return random.choice(art_ids)
 
 
 
@@ -2378,3 +2883,279 @@ def api_get_collection_items(collection_id: int):
     payload = fetch_art_collection_items(collection_id)
     return jsonify(payload)
 
+def get_bridges_for_pair(art_id: int, color_id: int, bridge_type: str) -> List[Dict[str, Any]]:
+    db = get_art_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT *
+            FROM bridges
+            WHERE art_id = ?
+              AND color_id = ?
+              AND bridge_type = ?
+            """,
+            (art_id, color_id, bridge_type),
+        ).fetchall()
+    finally:
+        db.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/colors/collections/<int:collection_id>/process_run")
+def api_process_collection_run(collection_id: int):
+    """
+    Looping processor for a collection.
+
+    Backend behavior:
+      - While token budget is OK,
+      - While not stop_requested,
+      - While there remain arts in this collection without prompt2,
+        do processing steps:
+
+        a) Pick random art from Fantasiagenesis collection (boris@fantasiagenesis.com, "fantasiagenesis").
+        b) Ensure it has a color.
+        c) Run LLM prompt1 *with caching*: reuse existing bridge if present.
+        d) Pick next art from this collection without 'fantasiagenesis_prompt2'.
+        e) Ensure that art has a color.
+        f) Run LLM prompt2 and store bridge.
+
+    This call may run many steps in one HTTP request.
+    Frontend does not need to loop; it can periodically query /status.
+    """
+    body = request.get_json(silent=True) or {}
+    fant_email = body.get("fantasiagenesis_email") or "boris@fantasiagenesis.com"
+    fant_name = body.get("fantasiagenesis_collection") or "fantasiagenesis"
+
+    # mark as running & clear stop flag
+    state = update_collection_processing_state(
+        collection_id,
+        {"status": "running", "stop_requested": False, "last_message": "Processing started."},
+    )
+
+    steps_done = 0
+    prompt1_hits_cached = 0
+    prompt1_runs = 0
+    prompt2_runs = 0
+
+    # Hard cap per call to avoid absurdly long HTTP responses if you want
+    max_steps_this_call = int(body.get("max_steps", 100))
+
+    while steps_done < max_steps_this_call:
+        # check stop flag
+        state = get_collection_processing_state(collection_id)
+        if state.get("stop_requested"):
+            update_collection_processing_state(
+                collection_id,
+                {"status": "stopped", "last_message": "Processing stopped by request."},
+            )
+            break
+
+        # check token budget
+        if not token_budget_ok():
+            update_collection_processing_state(
+                collection_id,
+                {"status": "paused_token_limit", "last_message": "Paused due to token limit."},
+            )
+            break
+
+        # check if collection already fully processed
+        stats = compute_collection_stats(collection_id)
+        if stats["complete"]:
+            update_collection_processing_state(
+                collection_id,
+                {"status": "complete", "last_message": "All arts processed by prompt2."},
+            )
+            break
+
+        # 1. Pick random Fantasiagenesis art
+        fant_art_id = pick_random_art_from_named_collection(fant_email, fant_name)
+        if fant_art_id is None:
+            update_collection_processing_state(
+                collection_id,
+                {"status": "error", "last_message": "Fantasiagenesis collection not found or empty."},
+            )
+            break
+
+        # 2. Ensure color for Fantasiagenesis art
+        color_fant = ensure_color_for_art(
+            fant_art_id,
+            user_metadata={
+                "context": "collections",
+                "role": "fantasiagenesis_reference",
+                "fantasiagenesis_collection": fant_name,
+                "fantasiagenesis_email": fant_email,
+            },
+        )
+
+        # 3. Run prompt1 with caching
+        bridge1_before = get_bridges_for_pair(
+            art_id=color_fant["art_id"],
+            color_id=color_fant["id"],
+            bridge_type="fantasiagenesis_prompt1",
+        )
+
+        bridge1 = run_collection_prompt1(color_fant)
+
+        if bridge1_before:
+            prompt1_hits_cached += 1
+        else:
+            prompt1_runs += 1
+
+        color_fant_llm_output = bridge1["bridge_text"]
+
+        # 4. Pick next art in selected collection that hasn't been processed by prompt2
+        target_art_id = pick_next_art_for_collection(collection_id)
+        if target_art_id is None:
+            # everything processed between last stats check and now
+            update_collection_processing_state(
+                collection_id,
+                {"status": "complete", "last_message": "All arts processed by prompt2."},
+            )
+            break
+
+        # 5. Ensure color for target art
+        color_target = ensure_color_for_art(
+            target_art_id,
+            user_metadata={
+                "context": "collections",
+                "role": "collection_selection",
+                "collection_id": collection_id,
+            },
+        )
+
+        # 6. Run prompt2 and store bridge
+        sel_llm_output, sel_llm_model = run_collection_prompt2(
+            color_fant, color_fant_llm_output, color_target
+        )
+
+        bridge2_input = {
+            "color_fantasiagenesis_id": color_fant["id"],
+            "color_selection_id": color_target["id"],
+            "fantasiagenesis_prompt1_bridge_id": bridge1["id"],
+        }
+        insert_bridge_row_simple(
+            color_id=color_target["id"],
+            art_id=color_target["art_id"],
+            input_text=json.dumps(bridge2_input, ensure_ascii=False),
+            bridge_text=sel_llm_output,
+            bridge_type="fantasiagenesis_prompt2",
+            model=sel_llm_model,
+        )
+        prompt2_runs += 1
+        steps_done += 1
+
+        # update status message for visibility
+        update_collection_processing_state(
+            collection_id,
+            {
+                "status": "running",
+                "last_message": f"Last step: fant_art_id={fant_art_id}, target_art_id={target_art_id}, total_steps={steps_done}",
+            },
+        )
+
+    # final stats for this call
+    final_stats = compute_collection_stats(collection_id)
+    final_state = get_collection_processing_state(collection_id)
+
+    return jsonify(
+        {
+            "collection_id": collection_id,
+            "steps_done": steps_done,
+            "prompt1_runs": prompt1_runs,
+            "prompt1_hits_cached": prompt1_hits_cached,
+            "prompt2_runs": prompt2_runs,
+            "processing_state": final_state,
+            "collection_stats": final_stats,
+        }
+    )
+
+@app.get("/colors/collections/<int:collection_id>/status")
+def api_collection_status(collection_id: int):
+    """
+    Status endpoint per collection.
+
+    Returns:
+      {
+        "collection_id": ...,
+        "processing_state": {...},
+        "collection_stats": {...}
+      }
+    """
+    state = get_collection_processing_state(collection_id)
+    stats = compute_collection_stats(collection_id)
+    return jsonify(
+        {
+            "collection_id": collection_id,
+            "processing_state": state,
+            "collection_stats": stats,
+        }
+    )
+
+
+@app.post("/colors/collections/<int:collection_id>/stop")
+def api_collection_stop(collection_id: int):
+    """
+    Request that processing for this collection stop.
+
+    The loop will see stop_requested=True and exit cleanly.
+    """
+    state = update_collection_processing_state(
+        collection_id,
+        {"stop_requested": True, "status": "stopped", "last_message": "Stop requested by frontend."},
+    )
+    stats = compute_collection_stats(collection_id)
+    return jsonify(
+        {
+            "collection_id": collection_id,
+            "processing_state": state,
+            "collection_stats": stats,
+        }
+    )
+
+
+@app.get("/colors/collections/<int:collection_id>/bridges")
+def api_collection_bridges(collection_id: int):
+    """
+    Return bridges for all art in a collection.
+
+    Response:
+      {
+        "collection_id": ...,
+        "bridges": [
+          {
+            "id": int,
+            "color_id": int,
+            "art_id": int,
+            "bridge_text": str,
+            "bridge_type": str,
+            "model": str or null,
+            "created_at": str,
+          },
+          ...
+        ]
+      }
+    """
+    db = get_art_db()
+    try:
+      rows = db.execute(
+          """
+          SELECT b.id,
+                 b.color_id,
+                 b.art_id,
+                 b.bridge_text,
+                 b.bridge_type,
+                 b.model,
+                 b.created_at
+          FROM bridges b
+          JOIN art_collection_items aci
+            ON aci.art_id = b.art_id
+          WHERE aci.collection_id = ?
+          ORDER BY b.created_at DESC, b.id DESC
+          """,
+          (collection_id,),
+      ).fetchall()
+    finally:
+      db.close()
+
+    bridges = [dict(r) for r in rows]
+    return jsonify({"collection_id": collection_id, "bridges": bridges})

@@ -2,107 +2,277 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Art Collections Viewer</title>
+  <title>Fantasiagenesis Collections Processor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: sans-serif; padding: 20px; margin: 0; }
-    h1 { margin-top: 0; }
-    .controls {
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 16px;
-      align-items: center;
+      height: 100vh;
+      overflow: hidden;
     }
-    .controls label { font-size: 14px; }
-    .controls input[type="email"] {
-      padding: 6px 8px;
-      font-size: 14px;
-      min-width: 260px;
-    }
-    .controls button {
-      padding: 6px 10px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .status {
-      font-size: 13px;
-      color: #555;
-      margin-bottom: 12px;
-      white-space: pre-wrap;
-    }
-    .collections {
+    .sidebar {
+      width: 280px;
+      min-width: 240px;
+      border-right: 1px solid #ddd;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
-    .collection-block {
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 10px 12px;
-      background: #fafafa;
+    .sidebar h1 {
+      font-size: 18px;
+      margin: 0 0 4px 0;
     }
-    .collection-header {
+    .sidebar small {
+      font-size: 11px;
+      color: #666;
+    }
+    .email-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      margin-bottom: 6px;
+    }
+    .email-row input {
+      flex: 1;
+      padding: 5px 6px;
+      font-size: 13px;
+    }
+    .email-row button {
+      padding: 5px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .collections-list {
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 6px;
+      border-top: 1px solid #eee;
+      padding-top: 6px;
+    }
+    .collection-item {
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .collection-item:hover {
+      background: #f5f5f5;
+    }
+    .collection-item.selected {
+      border-color: #0077ff;
+      background: #e7f1ff;
+    }
+    .collection-item-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .collection-item-meta {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 14px;
+      overflow: hidden;
+    }
+    .main-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 8px;
     }
-    .collection-name {
+    .main-title {
+      font-size: 18px;
       font-weight: 600;
-      font-size: 15px;
     }
-    .collection-meta {
+    .main-subtitle {
       font-size: 12px;
       color: #666;
     }
-    .collection-description {
-      font-size: 13px;
-      margin-top: 4px;
-      margin-bottom: 4px;
-    }
-    .item-list {
-      margin-top: 6px;
-      padding-left: 12px;
-      border-left: 2px solid #eee;
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
       font-size: 12px;
-      display: none;
     }
-    .item-list ul {
-      margin: 4px 0 0 0;
-      padding-left: 16px;
-    }
-    .item-list li {
-      margin-bottom: 2px;
-    }
-    .toggle-items-btn {
+    .controls-row button {
+      padding: 6px 10px;
       font-size: 12px;
-      padding: 3px 6px;
       cursor: pointer;
     }
+    .controls-row button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .controls-row input[type="number"] {
+      width: 80px;
+      padding: 4px 6px;
+      font-size: 12px;
+    }
+    .status-box {
+      margin-top: 6px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 12px;
+      background: #fafafa;
+      white-space: pre-wrap;
+    }
+    .status-line-label {
+      font-weight: 600;
+    }
+
+    .panels {
+      display: flex;
+      flex: 1;
+      gap: 10px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .panel {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 6px 8px;
+      border-bottom: 1px solid #eee;
+      background: #f7f7f7;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .panel-body {
+      padding: 6px 8px;
+      flex: 1;
+      overflow: auto;
+      font-size: 12px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f0f0f0;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .bridge-text {
+      max-height: 200px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+      background: #eee;
+    }
+    .badge.running { background: #e0f3ff; color: #005fbb; }
+    .badge.complete { background: #e1f6e1; color: #257325; }
+    .badge.stopped { background: #ffe9e0; color: #a13b1f; }
+    .badge.paused_token_limit { background: #fff6d8; color: #8a6a00; }
   </style>
 </head>
 <body>
-  <h1>Art Collections</h1>
-
-  <div class="controls">
-    <label for="email">Owner email:</label>
-    <input
-      id="email"
-      type="email"
-      placeholder="owner@example.com"
-      value="boris@fantasiagenesis.com"
-    />
-    <button id="loadBtn">Load Collections</button>
+  <div class="sidebar">
+    <h1>Collections</h1>
+    <small>Owner email → select collection → process & inspect bridges.</small>
+    <div class="email-row">
+      <input id="emailInput" type="email"
+             placeholder="owner@example.com"
+             value="boris@fantasiagenesis.com" />
+      <button id="loadCollectionsBtn">Load</button>
+    </div>
+    <div class="collections-list" id="collectionsList"></div>
   </div>
 
-  <div id="status" class="status"></div>
+  <div class="main">
+    <div class="main-header">
+      <div>
+        <div class="main-title" id="collectionTitle">No collection selected</div>
+        <div class="main-subtitle" id="collectionSubtitle"></div>
+      </div>
+      <div class="controls-row">
+        <button id="startBtn" disabled>Start Processing</button>
+        <button id="stopBtn" disabled>Stop Processing</button>
+        <label>
+          Steps/call:
+          <input id="maxStepsInput" type="number" value="100" min="1" />
+        </label>
+        <label>
+          Status poll (s):
+          <input id="pollIntervalInput" type="number" value="5" min="2" />
+        </label>
+      </div>
+    </div>
 
-  <div id="collections" class="collections"></div>
+    <div class="status-box" id="statusBox">
+      Status: —
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-header">
+          <span>Collection Progress</span>
+          <span id="progressSummary"></span>
+        </div>
+        <div class="panel-body" id="progressBody">
+          <em>No collection selected.</em>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span>Generated Bridges</span>
+          <span>
+            Filter:
+            <select id="bridgeTypeFilter">
+              <option value="">(all)</option>
+              <option value="fantasiagenesis_prompt1">prompt1</option>
+              <option value="fantasiagenesis_prompt2">prompt2</option>
+            </select>
+          </span>
+        </div>
+        <div class="panel-body" id="bridgesBody">
+          <em>No collection selected.</em>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     const API_BASE = "/colors";
+
+    let selectedCollectionId = null;
+    let statusPollTimer = null;
 
     function isoToLocal(iso) {
       if (!iso) return "";
@@ -111,153 +281,327 @@
       return d.toLocaleString();
     }
 
-    function setStatus(msg) {
-      document.getElementById("status").textContent = msg || "";
+    function setStatusBox(text) {
+      const box = document.getElementById("statusBox");
+      box.textContent = text;
+    }
+
+    function renderStatusBadge(status) {
+      if (!status) return "";
+      const span = document.createElement("span");
+      span.className = "badge " + status;
+      span.textContent = status;
+      return span.outerHTML;
     }
 
     async function loadCollections() {
-      const email = document.getElementById("email").value.trim();
+      const email = document.getElementById("emailInput").value.trim();
       const params = new URLSearchParams();
       if (email) params.set("email", email);
 
       const url = API_BASE + "/collections" + (params.toString() ? "?" + params.toString() : "");
-      setStatus("Loading collections from " + url + " ...");
-
+      setStatusBox("Loading collections from " + url + " ...");
       let resp;
       try {
         resp = await fetch(url);
       } catch (err) {
         console.error(err);
-        setStatus("Error: could not reach server: " + err);
+        setStatusBox("Error loading collections: " + err);
         return;
       }
 
       if (!resp.ok) {
         const text = await resp.text();
-        setStatus("Error: " + resp.status + " " + resp.statusText + "\n" + text);
+        setStatusBox("Error " + resp.status + " from /collections:\n" + text);
         return;
       }
 
       const data = await resp.json();
       const collections = data.collections || [];
       renderCollections(collections);
-      setStatus("Loaded " + collections.length + " collection(s).");
+      setStatusBox("Loaded " + collections.length + " collection(s).");
     }
 
     function renderCollections(collections) {
-      const container = document.getElementById("collections");
+      const container = document.getElementById("collectionsList");
       container.innerHTML = "";
-
       if (!collections.length) {
-        const div = document.createElement("div");
-        div.textContent = "No collections found.";
-        container.appendChild(div);
+        container.textContent = "No collections found.";
         return;
       }
 
       for (const col of collections) {
-        const block = document.createElement("div");
-        block.className = "collection-block";
-
-        const header = document.createElement("div");
-        header.className = "collection-header";
+        const div = document.createElement("div");
+        div.className = "collection-item";
+        div.dataset.collectionId = String(col.id);
 
         const title = document.createElement("div");
-        title.className = "collection-name";
-        title.textContent = col.name + " (id " + col.id + ")";
+        title.className = "collection-item-title";
+        title.textContent = col.name;
 
         const meta = document.createElement("div");
-        meta.className = "collection-meta";
+        meta.className = "collection-item-meta";
         meta.textContent =
-          "owner: " + (col.email || "—") +
+          "id " + col.id +
           " • items: " + (col.item_count ?? 0) +
           " • created: " + isoToLocal(col.created_at);
 
-        header.appendChild(title);
-        header.appendChild(meta);
-        block.appendChild(header);
+        div.appendChild(title);
+        div.appendChild(meta);
 
-        if (col.description) {
-          const desc = document.createElement("div");
-          desc.className = "collection-description";
-          desc.textContent = col.description;
-          block.appendChild(desc);
-        }
-
-        // Toggle items list
-        const toggleBtn = document.createElement("button");
-        toggleBtn.className = "toggle-items-btn";
-        toggleBtn.textContent = "Show items";
-        toggleBtn.addEventListener("click", () => toggleItems(col.id, block, toggleBtn));
-        block.appendChild(toggleBtn);
-
-        const itemList = document.createElement("div");
-        itemList.className = "item-list";
-        itemList.dataset.collectionId = String(col.id);
-        block.appendChild(itemList);
-
-        container.appendChild(block);
+        div.addEventListener("click", () => selectCollection(col));
+        container.appendChild(div);
       }
+      highlightSelectedCollection();
     }
 
-    async function toggleItems(collectionId, block, button) {
-      const itemList = block.querySelector('.item-list[data-collection-id="' + collectionId + '"]');
+    function highlightSelectedCollection() {
+      const list = document.getElementById("collectionsList");
+      Array.from(list.querySelectorAll(".collection-item")).forEach(el => {
+        const id = parseInt(el.dataset.collectionId, 10);
+        if (selectedCollectionId && id === selectedCollectionId) {
+          el.classList.add("selected");
+        } else {
+          el.classList.remove("selected");
+        }
+      });
+    }
 
-      if (!itemList) return;
+    function selectCollection(col) {
+      selectedCollectionId = col.id;
+      highlightSelectedCollection();
 
-      // Already visible? Just hide.
-      if (itemList.style.display === "block") {
-        itemList.style.display = "none";
-        button.textContent = "Show items";
+      document.getElementById("collectionTitle").textContent =
+        col.name + " (id " + col.id + ")";
+      document.getElementById("collectionSubtitle").textContent =
+        "Owner: " + (col.email || "—") +
+        " • Items: " + (col.item_count ?? 0) +
+        " • Created: " + isoToLocal(col.created_at);
+
+      document.getElementById("progressBody").innerHTML = "<em>Loading status...</em>";
+      document.getElementById("bridgesBody").innerHTML = "<em>Loading bridges...</em>";
+
+      // enable buttons conditionally after we get status
+      updateButtons(null);
+
+      // clear old polling and start new one
+      if (statusPollTimer) {
+        clearInterval(statusPollTimer);
+        statusPollTimer = null;
+      }
+      pollStatusOnce();
+      pollBridges();
+
+      const pollIntervalSec = parseInt(document.getElementById("pollIntervalInput").value || "5", 10);
+      statusPollTimer = setInterval(() => {
+        if (selectedCollectionId === col.id) {
+          pollStatusOnce();
+          pollBridges();
+        }
+      }, Math.max(pollIntervalSec, 2) * 1000);
+    }
+
+    function updateButtons(status) {
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+
+      if (!selectedCollectionId) {
+        startBtn.disabled = true;
+        stopBtn.disabled = true;
         return;
       }
 
-      // If empty, fetch from backend.
-      if (!itemList.dataset.loaded) {
-        const url = API_BASE + "/collections/" + collectionId + "/items";
-        setStatus("Loading items for collection " + collectionId + " ...");
-
-        let resp;
-        try {
-          resp = await fetch(url);
-        } catch (err) {
-          console.error(err);
-          setStatus("Error loading items: " + err);
-          return;
-        }
-
-        if (!resp.ok) {
-          const text = await resp.text();
-          setStatus("Error " + resp.status + " loading items:\n" + text);
-          return;
-        }
-
-        const data = await resp.json();
-        const items = data.items || [];
-
-        const ul = document.createElement("ul");
-        for (const it of items) {
-          const li = document.createElement("li");
-          const snippet = (it.art || "").replace(/\s+/g, " ").slice(0, 120);
-          li.textContent =
-            "art_id " + it.art_id +
-            (it.position != null ? " (pos " + it.position + ")" : "") +
-            " — " + snippet;
-          ul.appendChild(li);
-        }
-
-        itemList.appendChild(ul);
-        itemList.dataset.loaded = "1";
-        setStatus("Loaded " + items.length + " item(s) for collection " + collectionId + ".");
+      const st = status || "idle";
+      if (st === "running") {
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } else if (st === "complete") {
+        startBtn.disabled = false; // you might want to keep this disabled if "done means done"
+        stopBtn.disabled = true;
+      } else if (st === "paused_token_limit") {
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      } else if (st === "stopped" || st === "idle" || st === "error") {
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      } else {
+        startBtn.disabled = false;
+        stopBtn.disabled = false;
       }
-
-      itemList.style.display = "block";
-      button.textContent = "Hide items";
     }
 
-    document.getElementById("loadBtn").addEventListener("click", loadCollections);
+    async function pollStatusOnce() {
+      if (!selectedCollectionId) return;
+      const url = API_BASE + "/collections/" + selectedCollectionId + "/status";
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          const text = await resp.text();
+          setStatusBox("Error " + resp.status + " from /status:\n" + text);
+          return;
+        }
+        const data = await resp.json();
+        const state = data.processing_state || {};
+        const stats = data.collection_stats || {};
 
-    // Auto-load for default email on page load
+        const status = state.status || "idle";
+        updateButtons(status);
+
+        const progressSummary = document.getElementById("progressSummary");
+        progressSummary.textContent =
+          (stats.processed_art ?? 0) + "/" + (stats.total_art ?? 0) +
+          (stats.complete ? " (complete)" : "");
+
+        const progressBody = document.getElementById("progressBody");
+        let html = "";
+        html += "<div><span class='status-line-label'>Status:</span> " +
+                renderStatusBadge(status) + "</div>";
+        html += "<div><span class='status-line-label'>Last message:</span> " +
+                (state.last_message || "—") + "</div>";
+        html += "<div><span class='status-line-label'>Stop requested:</span> " +
+                (String(state.stop_requested) || "false") + "</div>";
+        html += "<div><span class='status-line-label'>Last updated:</span> " +
+                isoToLocal(state.last_updated) + "</div>";
+        html += "<div style='margin-top:6px;'><span class='status-line-label'>Stats:</span> " +
+                (stats.processed_art ?? 0) + " / " + (stats.total_art ?? 0) +
+                (stats.complete ? " (complete)" : "") + "</div>";
+        progressBody.innerHTML = html;
+
+        setStatusBox("Status: " + status + " | Processed " +
+                     (stats.processed_art ?? 0) + "/" + (stats.total_art ?? 0));
+
+      } catch (err) {
+        console.error(err);
+        setStatusBox("Error polling status: " + err);
+      }
+    }
+
+    async function pollBridges() {
+      if (!selectedCollectionId) return;
+      const url = API_BASE + "/collections/" + selectedCollectionId + "/bridges";
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          const text = await resp.text();
+          document.getElementById("bridgesBody").innerHTML =
+            "<div style='color:#a33;'>Error " + resp.status +
+            " loading bridges:<br><pre>" + text + "</pre></div>";
+          return;
+        }
+        const data = await resp.json();
+        const bridges = data.bridges || [];
+        renderBridges(bridges);
+      } catch (err) {
+        console.error(err);
+        document.getElementById("bridgesBody").innerHTML =
+          "<div style='color:#a33;'>Error loading bridges: " + err + "</div>";
+      }
+    }
+
+    function renderBridges(bridges) {
+      const body = document.getElementById("bridgesBody");
+      const filterType = document.getElementById("bridgeTypeFilter").value;
+
+      const filtered = filterType
+        ? bridges.filter(b => b.bridge_type === filterType)
+        : bridges.slice();
+
+      if (!filtered.length) {
+        body.innerHTML = "<em>No bridges yet for this collection (or none matching filter).</em>";
+        return;
+      }
+
+      let html = "<table><thead><tr>" +
+                 "<th>ID</th><th>Type</th><th>Art ID</th><th>Color ID</th>" +
+                 "<th>Created</th><th>Text</th></tr></thead><tbody>";
+
+      for (const b of filtered) {
+        html += "<tr>";
+        html += "<td>" + b.id + "</td>";
+        html += "<td><span class='badge'>" + (b.bridge_type || "") + "</span></td>";
+        html += "<td>" + (b.art_id ?? "") + "</td>";
+        html += "<td>" + (b.color_id ?? "") + "</td>";
+        html += "<td>" + isoToLocal(b.created_at) + "</td>";
+        const txt = (b.bridge_text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        html += "<td><div class='bridge-text'>" + txt + "</div></td>";
+        html += "</tr>";
+      }
+      html += "</tbody></table>";
+      body.innerHTML = html;
+    }
+
+    async function startProcessing() {
+      if (!selectedCollectionId) return;
+      const maxSteps = parseInt(document.getElementById("maxStepsInput").value || "100", 10);
+      const payload = {
+        fantasiagenesis_email: document.getElementById("emailInput").value.trim() || "boris@fantasiagenesis.com",
+        fantasiagenesis_collection: "fantasiagenesis",
+        max_steps: maxSteps,
+      };
+      const url = API_BASE + "/collections/" + selectedCollectionId + "/process_run";
+      setStatusBox("Starting processing via " + url + " ...");
+      try {
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const text = await resp.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+        if (!resp.ok) {
+          setStatusBox("Error " + resp.status + " from /process_run:\n" + text);
+        } else {
+          setStatusBox("Process_run finished. steps_done=" +
+                       (data && data.steps_done != null ? data.steps_done : "?"));
+          // refresh status and bridges
+          pollStatusOnce();
+          pollBridges();
+        }
+      } catch (err) {
+        console.error(err);
+        setStatusBox("Error starting processing: " + err);
+      }
+    }
+
+    async function stopProcessing() {
+      if (!selectedCollectionId) return;
+      const url = API_BASE + "/collections/" + selectedCollectionId + "/stop";
+      setStatusBox("Requesting stop via " + url + " ...");
+      try {
+        const resp = await fetch(url, { method: "POST" });
+        const text = await resp.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+        if (!resp.ok) {
+          setStatusBox("Error " + resp.status + " from /stop:\n" + text);
+        } else {
+          setStatusBox("Stop requested.");
+          pollStatusOnce();
+        }
+      } catch (err) {
+        console.error(err);
+        setStatusBox("Error stopping processing: " + err);
+      }
+    }
+
+    // Event wiring
+    document.getElementById("loadCollectionsBtn").addEventListener("click", loadCollections);
+    document.getElementById("startBtn").addEventListener("click", startProcessing);
+    document.getElementById("stopBtn").addEventListener("click", stopProcessing);
+    document.getElementById("bridgeTypeFilter").addEventListener("change", () => {
+      if (selectedCollectionId) pollBridges();
+    });
+
+    // Initial load
     window.addEventListener("load", loadCollections);
   </script>
 </body>
