@@ -453,7 +453,7 @@
       resetDetailPanel();
 
       try {
-        const res = await fetch(`/api/collections?email=${encodeURIComponent(email)}`);
+        const res = await fetch(`/art/api/collections?email=${encodeURIComponent(email)}`);
         if (!res.ok) {
           const msg = await res.text();
           throw new Error(msg || `HTTP ${res.status}`);
@@ -535,7 +535,7 @@
       artListEl.innerHTML = "";
       globalArtStatusEl.textContent = "loading art…";
       try {
-        const res = await fetch(`/api/collections/${collectionId}/items`);
+        const res = await fetch(`/art/api/collections/${collectionId}/items`);
         if (!res.ok) {
           const msg = await res.text();
           throw new Error(msg || `HTTP ${res.status}`);
