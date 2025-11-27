@@ -1455,6 +1455,7 @@ def insert_color_row(
                 model,
                 "openai",
                 md_str,
+                origin,
                 created_at,
                 updated_at,
             ),
