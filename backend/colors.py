@@ -36,11 +36,11 @@ from prompts import poetry_bridge_prompt  # type: ignore
 from prompts import metaphysics_bridge_prompt  # type: ignore
 from prompts import entity_bridge_relationship_prompt  # type: ignore
 from prompts import (
-    fantasiagenesis_collection_prompt1_sys,
-    fantasiagenesis_collection_prompt1_user,
-    fantasiagenesis_collection_prompt2_sys,
-    fantasiagenesis_collection_prompt2_user,
+    fantasiagenesis_subsystem_bridge_function,
+    fantasiagenesis_subsystem_realization,
 )
+from werkzeug.exceptions import HTTPException
+
 
 
 
@@ -397,11 +397,13 @@ def normalize_entities_json(parsed: dict) -> dict:
     return parsed
 
 def run_llm_chat(model: str, messages: List[Dict[str, str]], temperature: float = 0.7) -> Tuple[str, Dict[str, Any], str]:
-    """
-    Placeholder: replace with your actual LLM call.
-    Should return (output_text, usage_dict, actual_model_name).
-    """
-    raise NotImplementedError("wire run_llm_chat to your existing OpenAI / LLM client")
+    resp = _client.chat.completions.create(
+            model=model,
+            messages=messages,
+        )
+
+    output_text = (resp.choices[0].message.content or "").strip()
+    return output_text, getattr(resp, "usage", None).model_dump() if getattr(resp, "usage", None) else {}, model
 
 
 def ensure_color_for_art(
@@ -437,15 +439,19 @@ def ensure_color_for_art(
     art_row = fetch_art_text(art_id)  # your existing helper
     thought_text = art_row["art"]
 
-    sys_content = build_thought_sys(thought_text)
-    user_content = build_thought_user(thought_text)
+    sys_content = build_thought_sys
+    user_prompt = build_thought_user.format(thought=thought_text)
 
     messages = [
         {"role": "system", "content": sys_content},
-        {"role": "user", "content": user_content},
+        {"role": "user", "content": user_prompt},
     ]
 
-    output_text, usage, used_model = run_llm_chat(model, messages, temperature=temperature)
+    prompt_chars = len(sys_content) + len(user_prompt)
+    projected_tokens = prompt_chars // 4 + 1500
+    enforce_daily_cap_or_429(model, projected_tokens)
+
+    output_text, usage, used_model = run_llm_chat(model, messages)
 
     md = {
         "source": "collections.ensure_color_for_art",
@@ -570,76 +576,62 @@ def run_collection_prompt1(
     temperature: float = 0.7,
 ) -> Dict[str, Any]:
     """
-    LLM prompt 1 for color-fantasiagenesis, with caching in bridges.
+    Prompt 1: Fantasiagenesis Subsystem Interpreter.
 
     Behavior:
-      - Check if a bridge already exists for (art_id, color_id, bridge_type='fantasiagenesis_prompt1').
-      - If exists, return that bridge row (no LLM call).
-      - If not, run LLM, insert a new bridge row, and return it.
+      - Uses fantasiagenesis_subsystem_bridge_function_prompt(text_input=color_fant.output_text).
+      - Caches per (art_id, color_id) in bridges with bridge_type='fantasiagenesis_prompt1'.
+      - If a bridge already exists, returns that row (no LLM call).
+      - Otherwise, runs LLM once, stores bridge, returns bridge row.
 
-    Returns a bridges-row dict:
-      {
-        "id": ...,
-        "color_id": ...,
-        "art_id": ...,
-        "bridge_text": ...,
-        "model": ...,
-        "bridge_type": "fantasiagenesis_prompt1",
-        ...
-      }
+    Returns a bridges-row dict.
     """
     art_id = color_fant["art_id"]
     color_id = color_fant["id"]
 
-    # 1. Check for existing bridge
-    db = get_art_db()
-    try:
-        row = db.execute(
-            """
-            SELECT *
-            FROM bridges
-            WHERE art_id = ?
-              AND color_id = ?
-              AND bridge_type = 'fantasiagenesis_prompt1'
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (art_id, color_id),
-        ).fetchone()
-    finally:
-        db.close()
+    # 1) Check cache
+    existing = get_bridges_for_pair(
+        art_id=art_id,
+        color_id=color_id,
+        bridge_type="fantasiagenesis_prompt1",
+    )
+    if existing:
+        # Latest bridge for this pair
+        existing.sort(key=lambda r: r["id"], reverse=True)
+        return existing[0]
 
-    if row is not None:
-        return dict(row)  # reuse existing: bridge_text is row["bridge_text"]
+    # 2) No cached bridge: build prompt and call LLM
+    text_input = color_fant["output_text"]
+    full_prompt = fantasiagenesis_subsystem_bridge_function.format(text_input=text_input)
 
-    # 2. No existing bridge: run LLM
-    color_text = color_fant["output_text"]
-
-    sys_content = fantasiagenesis_collection_prompt1_sys(color_text)
-    user_content = fantasiagenesis_collection_prompt1_user(color_text)
-
+    # You can send this as a single user message; no extra wrapper needed.
     messages = [
-        {"role": "system", "content": sys_content},
-        {"role": "user", "content": user_content},
+        {"role": "user", "content": full_prompt},
     ]
 
-    output_text, usage, used_model = run_llm_chat(model, messages, temperature=temperature)
+    prompt_chars = len(full_prompt)
+    projected_tokens = prompt_chars // 4 + 1500
+    enforce_daily_cap_or_429(model, projected_tokens)
 
-    # 3. Store in bridges
+    output_text, usage, used_model = run_llm_chat(
+        model,
+        messages,
+    )
+
+    # 3) Store in bridges
     bridge_row = insert_bridge_row_simple(
         color_id=color_id,
         art_id=art_id,
-        input_text=color_text,
-        bridge_text=output_text,
+        input_text=text_input,   # raw subsystem text
+        bridge_text=output_text, # full bridge explanation
         bridge_type="fantasiagenesis_prompt1",
         model=used_model,
     )
 
-    # Optional: log usage if you have a logging helper
+    # Optional: log usage with your existing logger
     # log_llm_usage("fantasiagenesis_prompt1", used_model, usage, ...)
 
     return bridge_row
-
 
 
 def run_collection_prompt2(
@@ -651,29 +643,44 @@ def run_collection_prompt2(
     temperature: float = 0.7,
 ) -> Tuple[str, str]:
     """
-    Run LLM prompt 2 with:
-      - color-fantasiagenesis
-      - color-fantasiagenesis-llm-output
-      - color-selection (the chosen art's color)
-    Returns (output_text, used_model).
-    """
-    color_fant_text = color_fant["output_text"]
-    color_sel_text = color_selection["output_text"]
+    Prompt 2: Fantasiagenesis Subsystem Realization Planner.
 
-    sys_content = fantasiagenesis_collection_prompt2_sys(
-        color_fant_text, color_fant_llm_output, color_sel_text
-    )
-    user_content = fantasiagenesis_collection_prompt2_user(
-        color_fant_text, color_fant_llm_output, color_sel_text
+    Inputs:
+      - color_fant["output_text"]            -> SUBSYSTEM_TEXT_INPUT
+      - color_fant_llm_output                -> SUBSYSTEM_BRIDGE_FUNCTION
+      - color_selection["output_text"]       -> TARGET_THOUGHT
+
+    Returns:
+      (output_text, used_model)
+    """
+    subsystem_text_input = color_fant["output_text"]
+    subsystem_bridge_function = color_fant_llm_output
+    target_thought = color_selection["output_text"]
+
+    full_prompt = fantasiagenesis_subsystem_realization.format(
+        subsystem_text_input=subsystem_text_input,
+        subsystem_bridge_function=subsystem_bridge_function,
+        target_thought=target_thought,
     )
 
     messages = [
-        {"role": "system", "content": sys_content},
-        {"role": "user", "content": user_content},
+        {"role": "user", "content": full_prompt},
     ]
 
-    output_text, usage, used_model = run_llm_chat(model, messages, temperature=temperature)
+    prompt_chars = len(full_prompt)
+    projected_tokens = prompt_chars // 4 + 1500
+    enforce_daily_cap_or_429(model, projected_tokens)
+
+    output_text, usage, used_model = run_llm_chat(
+        model,
+        messages,
+    )
+
+    # Optional: log usage if you track it
+    # log_llm_usage("fantasiagenesis_prompt2", used_model, usage, ...)
+
     return output_text, used_model
+
 
 
 
@@ -2940,118 +2947,128 @@ def api_process_collection_run(collection_id: int):
     # Hard cap per call to avoid absurdly long HTTP responses if you want
     max_steps_this_call = int(body.get("max_steps", 100))
 
-    while steps_done < max_steps_this_call:
-        # check stop flag
-        state = get_collection_processing_state(collection_id)
-        if state.get("stop_requested"):
+    try:
+        while steps_done < max_steps_this_call:
+            # check stop flag
+            state = get_collection_processing_state(collection_id)
+            if state.get("stop_requested"):
+                update_collection_processing_state(
+                    collection_id,
+                    {"status": "stopped", "last_message": "Processing stopped by request."},
+                )
+                break
+
+            # check if collection already fully processed
+            stats = compute_collection_stats(collection_id)
+            if stats["complete"]:
+                update_collection_processing_state(
+                    collection_id,
+                    {"status": "complete", "last_message": "All arts processed by prompt2."},
+                )
+                break
+
+            # 1. Pick random Fantasiagenesis art
+            fant_art_id = pick_random_art_from_named_collection(fant_email, fant_name)
+            if fant_art_id is None:
+                update_collection_processing_state(
+                    collection_id,
+                    {"status": "error", "last_message": "Fantasiagenesis collection not found or empty."},
+                )
+                break
+
+            # 2. Ensure color for Fantasiagenesis art
+            color_fant = ensure_color_for_art(
+                fant_art_id,
+                user_metadata={
+                    "context": "collections",
+                    "role": "fantasiagenesis_reference",
+                    "fantasiagenesis_collection": fant_name,
+                    "fantasiagenesis_email": fant_email,
+                },
+            )
+
+            # 3. Run prompt1 with caching
+            bridge1_before = get_bridges_for_pair(
+                art_id=color_fant["art_id"],
+                color_id=color_fant["id"],
+                bridge_type="fantasiagenesis_prompt1",
+            )
+
+            bridge1 = run_collection_prompt1(color_fant)
+
+            if bridge1_before:
+                prompt1_hits_cached += 1
+            else:
+                prompt1_runs += 1
+
+            color_fant_llm_output = bridge1["bridge_text"]
+
+            # 4. Pick next art in selected collection that hasn't been processed by prompt2
+            target_art_id = pick_next_art_for_collection(collection_id)
+            if target_art_id is None:
+                update_collection_processing_state(
+                    collection_id,
+                    {"status": "complete", "last_message": "All arts processed by prompt2."},
+                )
+                break
+
+            # 5. Ensure color for target art
+            color_target = ensure_color_for_art(
+                target_art_id,
+                user_metadata={
+                    "context": "collections",
+                    "role": "collection_selection",
+                    "collection_id": collection_id,
+                },
+            )
+
+            # 6. Run prompt2 and store bridge
+            sel_llm_output, sel_llm_model = run_collection_prompt2(
+                color_fant, color_fant_llm_output, color_target
+            )
+
+            bridge2_input = {
+                "fantasiagenesis_art_id": color_fant["art_id"],
+                "fantasiagenesis_color_id": color_fant["id"],
+                "target_art_id": color_target["art_id"],
+                "target_color_id": color_target["id"],
+                "fantasiagenesis_prompt1_bridge_id": bridge1["id"],
+            }
+            insert_bridge_row_simple(
+                color_id=color_target["id"],
+                art_id=color_target["art_id"],
+                input_text=json.dumps(bridge2_input, ensure_ascii=False),
+                bridge_text=sel_llm_output,
+                bridge_type="fantasiagenesis_prompt2",
+                model=sel_llm_model,
+            )
+            prompt2_runs += 1
+            steps_done += 1
+
+            # update status message for visibility
             update_collection_processing_state(
                 collection_id,
-                {"status": "stopped", "last_message": "Processing stopped by request."},
+                {
+                    "status": "running",
+                    "last_message": (
+                        f"Last step: fant_art_id={fant_art_id}, "
+                        f"target_art_id={target_art_id}, total_steps={steps_done}"
+                    ),
+                },
             )
-            break
 
-        # check token budget
-        if not token_budget_ok():
+    except HTTPException as exc:
+        # If we hit the daily cap, mark collection as paused due to limit
+        if exc.code == 429:
             update_collection_processing_state(
                 collection_id,
-                {"status": "paused_token_limit", "last_message": "Paused due to token limit."},
+                {
+                    "status": "paused_token_limit",
+                    "last_message": f"Paused due to daily token cap: {exc.description}",
+                },
             )
-            break
-
-        # check if collection already fully processed
-        stats = compute_collection_stats(collection_id)
-        if stats["complete"]:
-            update_collection_processing_state(
-                collection_id,
-                {"status": "complete", "last_message": "All arts processed by prompt2."},
-            )
-            break
-
-        # 1. Pick random Fantasiagenesis art
-        fant_art_id = pick_random_art_from_named_collection(fant_email, fant_name)
-        if fant_art_id is None:
-            update_collection_processing_state(
-                collection_id,
-                {"status": "error", "last_message": "Fantasiagenesis collection not found or empty."},
-            )
-            break
-
-        # 2. Ensure color for Fantasiagenesis art
-        color_fant = ensure_color_for_art(
-            fant_art_id,
-            user_metadata={
-                "context": "collections",
-                "role": "fantasiagenesis_reference",
-                "fantasiagenesis_collection": fant_name,
-                "fantasiagenesis_email": fant_email,
-            },
-        )
-
-        # 3. Run prompt1 with caching
-        bridge1_before = get_bridges_for_pair(
-            art_id=color_fant["art_id"],
-            color_id=color_fant["id"],
-            bridge_type="fantasiagenesis_prompt1",
-        )
-
-        bridge1 = run_collection_prompt1(color_fant)
-
-        if bridge1_before:
-            prompt1_hits_cached += 1
-        else:
-            prompt1_runs += 1
-
-        color_fant_llm_output = bridge1["bridge_text"]
-
-        # 4. Pick next art in selected collection that hasn't been processed by prompt2
-        target_art_id = pick_next_art_for_collection(collection_id)
-        if target_art_id is None:
-            # everything processed between last stats check and now
-            update_collection_processing_state(
-                collection_id,
-                {"status": "complete", "last_message": "All arts processed by prompt2."},
-            )
-            break
-
-        # 5. Ensure color for target art
-        color_target = ensure_color_for_art(
-            target_art_id,
-            user_metadata={
-                "context": "collections",
-                "role": "collection_selection",
-                "collection_id": collection_id,
-            },
-        )
-
-        # 6. Run prompt2 and store bridge
-        sel_llm_output, sel_llm_model = run_collection_prompt2(
-            color_fant, color_fant_llm_output, color_target
-        )
-
-        bridge2_input = {
-            "color_fantasiagenesis_id": color_fant["id"],
-            "color_selection_id": color_target["id"],
-            "fantasiagenesis_prompt1_bridge_id": bridge1["id"],
-        }
-        insert_bridge_row_simple(
-            color_id=color_target["id"],
-            art_id=color_target["art_id"],
-            input_text=json.dumps(bridge2_input, ensure_ascii=False),
-            bridge_text=sel_llm_output,
-            bridge_type="fantasiagenesis_prompt2",
-            model=sel_llm_model,
-        )
-        prompt2_runs += 1
-        steps_done += 1
-
-        # update status message for visibility
-        update_collection_processing_state(
-            collection_id,
-            {
-                "status": "running",
-                "last_message": f"Last step: fant_art_id={fant_art_id}, target_art_id={target_art_id}, total_steps={steps_done}",
-            },
-        )
+        # Re-raise so Flask returns proper 429 to the client
+        raise
 
     # final stats for this call
     final_stats = compute_collection_stats(collection_id)
@@ -3068,6 +3085,7 @@ def api_process_collection_run(collection_id: int):
             "collection_stats": final_stats,
         }
     )
+
 
 @app.get("/colors/collections/<int:collection_id>/status")
 def api_collection_status(collection_id: int):
