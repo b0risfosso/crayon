@@ -342,7 +342,7 @@
       }
 
       try {
-        const res = await fetch(`/colors/by_art/${artId}`);
+        const res = await fetch(`/colors/by_art/${artId}?origin=colors.build_thought`);
         const data = await res.json();
         const container = document.getElementById('content');
         container.innerHTML = '';

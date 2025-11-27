@@ -651,7 +651,7 @@
 
       // 1) Load colors
       try {
-        const res = await fetch(`/colors/by_art/${artId}`);
+        const res = await fetch(`/colors/by_art/${artId}?origin=colors.build_thought`);
         if (!res.ok) {
           const txt = await res.text();
           throw new Error(txt || `HTTP ${res.status}`);

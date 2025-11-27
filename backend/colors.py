@@ -35,7 +35,7 @@ from prompts import poetry_bridge_prompt  # type: ignore
 from prompts import metaphysics_bridge_prompt  # type: ignore
 from prompts import entity_bridge_relationship_prompt  # type: ignore
 from prompts import fantasiagenesis_subsystem_bridge_function  # type: ignore
-
+from prompts import fantasiagenesis_subsystem_operation  # type: ignore        # <-- NEW
 
 
 try:
@@ -1109,6 +1109,251 @@ def worker_loop(worker_id: int):
                     }
 
             # ============================================================
+            #  TYPE: fantasiagenesis_subsystem_operation (NEW)
+            # ============================================================
+            elif task_type == "fantasiagenesis_subsystem_operation":
+                fant_art_id = task["fantasiagenesis_art_id"]
+                target_art_id = task["target_art_id"]
+                model = task["model"]
+                temperature = float(task["temperature"])
+                user_metadata = task.get("user_metadata") or {}
+
+                # Helper: ensure there is a colors row for a given art_id
+                def _ensure_color_for_art(art_id: int, source_tag: str) -> Dict[str, Any]:
+                    # Try latest color
+                    color_row = fetch_one(
+                        """
+                        SELECT *
+                        FROM colors
+                        WHERE art_id = ?
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                        """,
+                        (art_id,),
+                    )
+                    if color_row and (color_row.get("output_text") or "").strip():
+                        return color_row
+
+                    # Need to run build_thought
+                    art_row = fetch_art_text(art_id)
+                    thought_text = (art_row.get("art") or "").strip()
+                    if not thought_text:
+                        raise ValueError(f"art id {art_id} has empty art text")
+
+                    user_prompt = build_thought_user.format(thought=thought_text)
+                    projected_tokens = 2000
+                    enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                    with LLM_LOCK:
+                        t0 = time.time()
+                        resp = _client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": build_thought_sys},
+                                {"role": "user", "content": user_prompt},
+                            ],
+                        )
+
+                    expanded = (resp.choices[0].message.content or "").strip()
+
+                    usage = getattr(resp, "usage", None)
+                    usage_dict = usage.model_dump() if usage else None
+                    tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+                    tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+                    total_tokens = int(
+                        (usage_dict or {}).get("total_tokens", tokens_in + tokens_out)
+                    )
+                    duration_ms = int((time.time() - t0) * 1000)
+
+                    # Log usage for this build_thought
+                    log_llm_usage(
+                        ts=utc_now_iso(),
+                        app_name="colors",
+                        model=model,
+                        endpoint="/colors/build_thought",
+                        email=None,
+                        request_id=task_id,
+                        tokens_in=tokens_in,
+                        tokens_out=tokens_out,
+                        total_tokens=total_tokens,
+                        duration_ms=duration_ms,
+                        cost_usd=0.0,
+                        meta_obj={
+                            "art_id": art_id,
+                            "worker_id": worker_id,
+                            "source": source_tag,
+                        },
+                    )
+
+                    # Save into colors
+                    colors_row = insert_color_row(
+                        art_id=art_id,
+                        input_art=thought_text,
+                        output_text=expanded,
+                        model=model,
+                        usage=usage_dict,
+                        user_metadata=user_metadata,
+                    )
+                    return colors_row
+
+                # ---- PHASE 1: ensure subsystem color + bridge exist ----
+                subsystem_color_row = _ensure_color_for_art(
+                    fant_art_id,
+                    source_tag="fantasiagenesis_subsystem_operation.subsystem",
+                )
+                subsystem_color_id = subsystem_color_row["id"]
+
+                # Try to find existing subsystem bridge for this art
+                bridge_row = fetch_one(
+                    """
+                    SELECT *
+                    FROM bridges
+                    WHERE art_id = ?
+                      AND bridge_type = 'fantasiagenesis_subsystem_bridge'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """,
+                    (fant_art_id,),
+                )
+
+                if bridge_row:
+                    subsystem_bridge_id = bridge_row["id"]
+                    subsystem_text = (bridge_row.get("bridge_text") or "").strip()
+                else:
+                    # Need to generate subsystem bridge now
+                    bridge_result = run_bridge_task(
+                        color_id=subsystem_color_id,
+                        model=model,
+                        temperature=temperature,
+                        user_metadata=user_metadata,
+                        system_prompt_tmpl=fantasiagenesis_subsystem_bridge_function,
+                        bridge_type="fantasiagenesis_subsystem_bridge",
+                        projected_tokens=5000,
+                        endpoint="/colors/fantasiagenesis_subsystem_bridge",
+                    )
+                    bridge_row = bridge_result["saved_bridge"]
+                    subsystem_bridge_id = bridge_row["id"]
+                    subsystem_text = (bridge_row.get("bridge_text") or "").strip()
+
+                if not subsystem_text:
+                    raise ValueError(
+                        f"fantasiagenesis_subsystem_bridge for art {fant_art_id} has empty bridge_text"
+                    )
+
+                # ---- PHASE 2: ensure target color exists ----
+                target_color_row = _ensure_color_for_art(
+                    target_art_id,
+                    source_tag="fantasiagenesis_subsystem_operation.thought",
+                )
+                target_color_id = target_color_row["id"]
+                thought_text = (target_color_row.get("output_text") or "").strip()
+                if not thought_text:
+                    raise ValueError(
+                        f"target art {target_art_id} has color {target_color_id} with empty output_text"
+                    )
+
+                # ---- PHASE 3: run subsystem operation prompt ----
+                system_prompt = fantasiagenesis_subsystem_operation.format(
+                    subsystem=subsystem_text,
+                    thought=thought_text,
+                )
+                user_prompt = ""
+
+                projected_tokens = 5000
+                enforce_daily_cap_or_429(model=model, projected_tokens=projected_tokens)
+
+                with LLM_LOCK:
+                    t0 = time.time()
+                    resp = _client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+
+                output_text = (resp.choices[0].message.content or "").strip()
+
+                usage = getattr(resp, "usage", None)
+                usage_dict = usage.model_dump() if usage else None
+                tokens_in = int((usage_dict or {}).get("prompt_tokens", 0))
+                tokens_out = int((usage_dict or {}).get("completion_tokens", 0))
+                total_tokens = int(
+                    (usage_dict or {}).get("total_tokens", tokens_in + tokens_out)
+                )
+                duration_ms = int((time.time() - t0) * 1000)
+
+                created_at = utc_now_iso()
+
+                # Log usage for the subsystem operation itself
+                log_llm_usage(
+                    ts=created_at,
+                    app_name="colors",
+                    model=model,
+                    endpoint="/colors/fantasiagenesis_subsystem_operation",
+                    email=None,
+                    request_id=task_id,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cost_usd=0.0,
+                    meta_obj={
+                        "fantasiagenesis_art_id": fant_art_id,
+                        "fantasiagenesis_color_id": subsystem_color_id,
+                        "fantasiagenesis_bridge_id": subsystem_bridge_id,
+                        "target_art_id": target_art_id,
+                        "target_color_id": target_color_id,
+                        "worker_id": worker_id,
+                        "user_metadata": user_metadata,
+                    },
+                )
+
+                # ---- PHASE 4: save output into colors with art_id = -1 ----
+                input_art_obj = {
+                    "fantasiagenesis_art_id": fant_art_id,
+                    "fantasiagenesis_color_id": subsystem_color_id,
+                    "fantasiagenesis_bridge_id": subsystem_bridge_id,
+                    "target_art_id": target_art_id,
+                    "target_color_id": target_color_id,
+                }
+                input_art_text = json.dumps(input_art_obj, ensure_ascii=False)
+
+                # NOTE: art_id = -1 per your spec (ensure FK config matches this)
+                op_color_row = insert_color_row(
+                    art_id=target_art_id,
+                    input_art=input_art_text,
+                    output_text=output_text,
+                    model=model,
+                    usage=usage_dict,
+                    user_metadata={
+                        **user_metadata,
+                        "fantasiagenesis_art_id": fant_art_id,
+                        "fantasiagenesis_color_id": subsystem_color_id,
+                        "fantasiagenesis_bridge_id": subsystem_bridge_id,
+                        "target_art_id": target_art_id,
+                        "target_color_id": target_color_id,
+                    },
+                    origin="colors.fantasiagenesis_subsystem_operation",
+                )
+
+                # ---- PHASE 5: mark task done ----
+                with TASKS_LOCK:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = {
+                        "task_type": "fantasiagenesis_subsystem_operation",
+                        "fantasiagenesis_art_id": fant_art_id,
+                        "target_art_id": target_art_id,
+                        "fantasiagenesis_color_id": subsystem_color_id,
+                        "fantasiagenesis_bridge_id": subsystem_bridge_id,
+                        "target_color_id": target_color_id,
+                        "saved_color": op_color_row,
+                        "usage": usage_dict,
+                        "duration_ms": duration_ms,
+                    }
+
+            # ============================================================
             # Unsupported task type
             # ============================================================
             else:
@@ -1180,12 +1425,13 @@ def insert_color_row(
     model: str,
     usage: Optional[Dict[str, Any]],
     user_metadata: Dict[str, Any],
+    origin: str = "build_thought",
 ) -> Dict[str, Any]:
     created_at = utc_now_iso()
     updated_at = created_at
 
     md_obj = {
-        "source": "colors.build_thought",
+        "source": origin,
         "original_art_id": art_id,
         "usage": usage,
         "user_metadata": user_metadata,
@@ -1198,8 +1444,8 @@ def insert_color_row(
         row = db.execute(
             """
             INSERT INTO colors
-              (art_id, input_art, output_text, model, provider, metadata, created_at, updated_at)
-            VALUES (?,      ?,         ?,          ?,        ?,        ?,        ?,          ?)
+              (art_id, input_art, output_text, model, provider, metadata, origin, created_at, updated_at)
+            VALUES (?,      ?,         ?,          ?,        ?,        ?,      ?,          ?,          ?)
             RETURNING *
             """,
             (
@@ -1424,36 +1670,44 @@ def json_error(err):
 def colors_by_art(art_id: int):
     """
     Return all color expansions for a given art_id.
-    Output:
-      [
-        {
-          "id": ...,
-          "art_id": ...,
-          "input_art": "...",
-          "output_text": "...",
-          "model": "...",
-          "metadata": {...},
-          "created_at": "...",
-          "updated_at": "..."
-        },
-        ...
-      ]
+    Optional query param:
+        ?origin=colors.build_thought
+        ?origin=colors.fantasiagenesis_subsystem_operation
     """
+    origin = request.args.get("origin", type=str)
+
     db = get_art_db()
-    rows = db.execute(
-        """
-        SELECT * FROM colors
-        WHERE art_id = ?
-        ORDER BY created_at DESC
-        """,
-        (art_id,)
-    ).fetchall()
+
+    if origin:
+        # Filter by origin
+        rows = db.execute(
+            """
+            SELECT *
+            FROM colors
+            WHERE art_id = ?
+              AND origin = ?
+            ORDER BY created_at DESC
+            """,
+            (art_id, origin),
+        ).fetchall()
+    else:
+        # No filtering
+        rows = db.execute(
+            """
+            SELECT *
+            FROM colors
+            WHERE art_id = ?
+            ORDER BY created_at DESC
+            """,
+            (art_id,),
+        ).fetchall()
+
     db.close()
 
     out = []
     for r in rows:
         row = dict(r)
-        # parse metadata back to JSON
+        # Parse metadata JSON
         try:
             row["metadata"] = json.loads(row.get("metadata") or "{}")
         except Exception:
@@ -1461,6 +1715,7 @@ def colors_by_art(art_id: int):
         out.append(row)
 
     return jsonify(out)
+
 
 
 @app.post("/colors/simulation_seeds")
@@ -2422,3 +2677,75 @@ def bridges_by_type_fantasiagenesis_subsystem_bridge():
 
     db.close()
     return jsonify([dict(r) for r in rows])
+
+
+@app.post("/colors/fantasiagenesis_subsystem_operation")
+def enqueue_fantasiagenesis_subsystem_operation():
+    """
+    Queue a Fantasiagenesis subsystem operation:
+
+    Body:
+      {
+        "fantasiagenesis_art_id": 111,   # art whose subsystem bridge is the subsystem spec
+        "target_art_id": 222,            # art whose color text is the THOUGHT
+        "model": "...optional...",
+        "temperature": 0.2,              # optional
+        "metadata": { ... }              # optional
+      }
+
+    Behavior:
+      - Ensure a colors row exists for fantasiagenesis_art_id (build_thought if needed).
+      - Ensure a fantasiagenesis_subsystem_bridge row exists for that art (create if needed).
+      - Ensure a colors row exists for target_art_id (build_thought if needed).
+      - Run fantasiagenesis_subsystem_operation(subsystem, thought).
+      - Save result into colors with art_id = -1.
+    """
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+
+    fant_art_id = payload.get("fantasiagenesis_art_id")
+    target_art_id = payload.get("target_art_id")
+
+    if not isinstance(fant_art_id, int):
+        abort(400, description="'fantasiagenesis_art_id' must be an integer")
+    if not isinstance(target_art_id, int):
+        abort(400, description="'target_art_id' must be an integer")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    temperature = float(payload.get("temperature", 0.2))
+    user_metadata = payload.get("metadata") or {}
+
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "fantasiagenesis_subsystem_operation",
+            "fantasiagenesis_art_id": fant_art_id,
+            "target_art_id": target_art_id,
+            "status": "queued",
+            "created_at": utc_now_iso(),
+            "model": model,
+            "temperature": temperature,
+            "user_metadata": user_metadata,
+        }
+
+    TASK_QUEUE.put({
+        "task_id": task_id,
+        "task_type": "fantasiagenesis_subsystem_operation",
+        "fantasiagenesis_art_id": fant_art_id,
+        "target_art_id": target_art_id,
+        "model": model,
+        "temperature": temperature,
+        "user_metadata": user_metadata,
+    })
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "queued",
+        "task_type": "fantasiagenesis_subsystem_operation",
+        "fantasiagenesis_art_id": fant_art_id,
+        "target_art_id": target_art_id,
+    }), 202

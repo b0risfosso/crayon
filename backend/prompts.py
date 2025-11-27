@@ -3053,125 +3053,107 @@ Use the following fixed structure:
 - No praise.
 """
 
+fantasiagenesis_subsystem_operation = r"""
+You are operating inside Fantasiagenesis.
 
-fantasiagenesis_subsystem_realization = r"""
-You are Fantasiagenesis’s Subsystem Realization Planner.
+Your task: Given (1) a Fantasiagenesis subsystem specification and (2) a thought, produce a precise, subsystem-faithful explanation of **how that subsystem would operate on that thought**.
 
-Your task:
-Given:
-1) a raw description of a Fantasiagenesis subsystem,
-2) a structured explanation of its bridge function (imagination→reality role),
-3) a target thought that should be realized,
+Follow this exact procedure:
 
-you must specify how this subsystem will operate on the target thought to move it toward reality. Treat the subsystem as an active, concrete component in the Fantasiagenesis architecture.
+============================================================
+INPUTS PROVIDED TO YOU:
+1. SUBSYSTEM_DESCRIPTION: A full technical description of a Fantasiagenesis subsystem,
+   including identity, purpose, mechanisms, data structures, operators, constraints,
+   pipelines, failure modes, and outputs.
 
---- INPUTS ---
+2. THOUGHT: A free-form idea (textual, conceptual, political, scientific, artistic,
+   or hybrid) that the subsystem must operate on.
 
-SUBSYSTEM_TEXT_INPUT
-A free-form text describing the subsystem of Fantasiagenesis.
-{subsystem_text_input}
+============================================================
+YOUR JOB:
+Interpret the subsystem as a computational, cognitive, physical, or conceptual engine
+according to its specification. Then describe *step-by-step* how it processes, transforms,
+and acts upon the thought.
 
-SUBSYSTEM_BRIDGE_FUNCTION
-A structured description of how this subsystem builds bridges between imagination and reality
-(the output of the previous “Subsystem Interpreter” prompt).
-{subsystem_bridge_function}
+Do NOT rewrite or summarize the subsystem or the thought.  
+Instead, **simulate the subsystem executing its role on the thought**, using the subsystem’s
+specific machinery.
 
-TARGET_THOUGHT
-The thought that this subsystem should operate on. This is the idea that must be moved from imagination toward reality.
-{target_thought}
+============================================================
+OUTPUT STRUCTURE (REQUIRED):
 
---- OUTPUT FORMAT ---
+**1. Input Interpretation**
+- How the subsystem parses, ingests, and normalizes the given thought.
+- What signals, structures, or variables it detects in the thought.
+- Which parts of the thought map to the subsystem’s domain.
 
-Use the following fixed structure.
+**2. Internal Processing Using Subsystem Mechanisms**
+Use the actual mechanisms listed in SUBSYSTEM_DESCRIPTION:
+- operators
+- data structures
+- pipelines
+- constraints
+- evaluations
+- pruning, optimization, perturbation, translation, or grounding steps
+Show in detail how each mechanism handles this thought.
 
-1. Subsystem Operational Snapshot
-   - Summarize, in 3–5 sentences, what this subsystem does in general.
-   - State clearly which part(s) of imagination→reality it is responsible for (e.g., representation, constraint extraction, simulation, evaluation, physical-world interface, workflow design).
+**3. Core Transformations**
+Explain the specific transformations the subsystem performs on the thought:
+- conversions
+- reductions
+- expansions
+- mappings
+- decompositions
+- robustness checks
+- scenario generation
+- constraint extraction
+- invariance detection
+- physical-world grounding
+- novelty perturbation
+(choose according to subsystem identity)
 
-2. Target Thought Decomposition
-   Break the TARGET_THOUGHT into:
-   - core entities (things, actors, components)
-   - key relationships (how entities interact or depend on one another)
-   - main goals / intended outcomes
-   - key uncertainties or open degrees of freedom
-   - relevant constraints (technical, physical, cognitive, social, economic, ethical) that are visible from the description
+**4. Resulting Artifacts**
+Describe the concrete outputs the subsystem produces for this thought:
+- structured primitives
+- parameter sets
+- constraint maps
+- simulation seeds
+- transformation graphs
+- minimal cores
+- device primitives
+- operator sequences
+- robustness profiles
+(choose those relevant to the subsystem)
 
-3. Alignment Between Subsystem and Target Thought
-   Describe:
-   - which aspects of the TARGET_THOUGHT are within this subsystem’s scope
-   - which aspects are out of scope and must be handled by other subsystems
-   - the precise contract: “Given a thought like this, this subsystem guarantees to produce X, Y, Z as outputs.”
+**5. Subsystem-Specific Insights**
+Explain what this subsystem uniquely reveals, extracts, or enables
+for this particular thought—insights that no other subsystem would
+produce.
 
-4. Operational Phases of the Subsystem on This Thought
-   Describe the concrete phases by which the subsystem acts on the TARGET_THOUGHT.
-   Use numbered phases, for example:
+**6. Limitations or Boundary Conditions**
+If the thought falls partially outside the subsystem’s domain,
+explain how the subsystem handles that mismatch.
 
-   Phase 1 — Ingestion and Typing
-   - How the subsystem parses and classifies the TARGET_THOUGHT.
-   - What internal types, tags, or schemas are assigned.
+============================================================
 
-   Phase 2 — Representation Construction
-   - What internal representations are built (symbols, graphs, vectors, maps, blueprints, scenarios).
-   - How ambiguity and missing detail are handled.
+RULES:
+- Stay faithful to the subsystem description.
+- Use subsystem-specific technical vocabulary for mechanisms and artifacts.
+- Avoid summarizing the thought; focus on subsystem behavior on the thought.
+- Be explicit, mechanistic, and structural.
+- No generalities, no metaphors unless subsystem is metaphorical.
+- Do not add capabilities not present in the subsystem description.
 
-   Phase 3 — Constraint and Possibility Shaping
-   - Which constraints are extracted or imposed.
-   - How feasible regions / design spaces are carved out for this thought.
+============================================================
 
-   Phase 4 — Bridge Path Design
-   - How the subsystem chooses concrete paths from imagination to reality.
-   - Examples: simulation pathways, data structures, code modules, experimental protocols, prototypes, institutional designs, workflows.
+Now wait for input in this format:
 
-   Phase 5 — Output Packaging
-   - In what exact forms this subsystem outputs its results (e.g., simulation seeds, schemas, task graphs, specs for other subsystems, checklists, protocols).
+SUBSYSTEM_DESCRIPTION:
+{subsystem}
 
-   Adapt the content of each phase to the specific subsystem. Rename or split phases if needed, but preserve clear stepwise logic.
+THOUGHT:
+{thought}
 
-5. Interfaces and Hand-offs
-   For this specific TARGET_THOUGHT, describe:
-   - which upstream subsystems must feed this subsystem (and what they provide)
-   - which downstream subsystems will receive its outputs (and what they receive)
-   - what information or artifacts move across these interfaces
-   - any feedback loops where downstream evaluation updates this subsystem’s state or outputs
-
-6. Concrete Realization Channels
-   For this TARGET_THOUGHT, specify the concrete channels through which realization progresses, such as:
-
-   - Digital / computational:
-     - code artifacts, data models, simulation scenarios, dashboards, database schemas.
-   - Physical:
-     - experiments, hardware prototypes, fabrication steps, lab setups, field pilots.
-   - Cognitive:
-     - mental models, checklists, training curricula, practice routines, decision frameworks.
-   - Social / institutional:
-     - roles, processes, contracts, governance mechanisms, agreements, norms.
-
-   For each channel:
-   - explain what the subsystem contributes
-   - give 2–5 example artifacts or actions that would plausibly be generated for this TARGET_THOUGHT.
-
-7. Risk, Failure Modes, and Safeguards
-   For this TARGET_THOUGHT:
-   - identify how the subsystem could mis-handle the thought (e.g., over-abstraction, under-specification, unrealistic assumptions).
-   - describe safeguards: checks, evaluations, constraints, or human-in-the-loop steps the subsystem should enforce.
-   - specify how the subsystem maintains alignment with the originating intention and with physical/economic/ethical plausibility.
-
-8. Minimal Initial Action Set (First Activation Cycle)
-   Define a concrete “first activation cycle” for this specific TARGET_THOUGHT:
-   - List 5–10 specific actions, transformations, or artifacts the subsystem would produce in its *first* pass.
-   - Each item should be operational (e.g., “Generate a state-space schema for X”, “Produce a 3-layer constraint map for Y”, “Emit an experimental protocol outline for Z”).
-
-9. Operational Summary
-   Provide a final 3–6 sentence summary that explains:
-   - how this subsystem, in practice, moved the TARGET_THOUGHT closer to reality
-   - what new structures or artifacts now exist that did not exist before
-   - what the next major dependency is (which subsystem or external step must act next)
-
---- REQUIREMENTS ---
-- Stay mechanistic and concrete.
-- Describe actual work performed on the TARGET_THOUGHT.
-- Avoid metaphors and poetic language.
-- Assume Fantasiagenesis is a real system with hardware, memory, compute, evaluators, and interfaces.
-- Do not use “not … but …” rhetorical structures.
-- Do not begin with praise or affirmations.
+============================================================
+Return your output in the required structure.
 """
