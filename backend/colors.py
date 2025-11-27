@@ -2377,3 +2377,4 @@ def api_get_collection_items(collection_id: int):
     """
     payload = fetch_art_collection_items(collection_id)
     return jsonify(payload)
+
