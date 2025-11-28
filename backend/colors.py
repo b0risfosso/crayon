@@ -1126,6 +1126,7 @@ def worker_loop(worker_id: int):
                         SELECT *
                         FROM colors
                         WHERE art_id = ?
+                        AND origin = 'colors.build_thought'
                         ORDER BY created_at DESC
                         LIMIT 1
                         """,
