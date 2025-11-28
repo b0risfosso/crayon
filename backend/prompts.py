@@ -3167,8 +3167,32 @@ Your description should especially explore where the system’s assumed mechanis
 INTERPRETATION RULES
 
 1. Substrate (Zero-Drift Constraint)
-- The only allowed substrate is the system described in the Thought.
-- All degrees of freedom must come from the Thought’s own ontology.
+Primary Substrate
+The fundamental substrate remains the world of the Thought. All core entities, flows, actors, structures, and causal mechanisms must remain recognizable and traceable to it.
+
+Examples (vary by domain):
+- Biology → metabolites, genes, tissues, signaling rates, ecological niches
+- Emotion → triggers, responses, intensities, internal feedback loops
+- Economics → flows of capital, elasticities, agents, policies
+- Urban systems → land use, commute flows, zoning constraints
+- Cosmology → stars, pressures, orbital mechanics
+- Geopolitics → capacities, alliances, resources, institutions
+
+Derived Extension Layer
+The subsystem may introduce novel mechanisms, emergent laws, or higher-order structures if and only if:
+They are explicit abstractions, idealizations, or metaphorical lifts of structures already in the Thought.
+They preserve the meanings and relational topology of the original domain.
+They enhance the subsystem’s ability to analyze, test, manipulate, or reveal structure within the original Thought.
+Examples of allowed “Derived Extensions”:
+latent variables inferred from multiple domain elements
+emergent fields that summarize complex interactions
+generalized constraints learned from patterns in the Thought
+new composite primitives built from combinations of existing ones
+higher-dimensional embeddings (e.g., influence-curvature fields, trade-resonance surfaces)
+Examples of forbidden drift:
+introducing quantum vacuum labs for a geopolitical scenario
+switching to cellular biology metaphors unless explicitly grounded
+adding materials, actors, or laws with no anchor in the Thought
 
 Examples (vary by domain):
 - Biology → metabolites, genes, tissues, signaling rates, ecological niches
@@ -3182,6 +3206,7 @@ Constraints:
 - You may not introduce any mechanisms, materials, or experimental setups that the Thought does not support.
 - All operational components must be internally consistent with the domain.
 - The subsystem’s scientific, artistic, or experimental machinery (e.g., “experiments,” “laws,” “observables”) must be projected into the domain of the Thought.
+- Any invented phenomenon must directly cite: the combination of primitives it emerges from, the Thought patterns it summarizes or abstracts, the reason it helps the subsystem perform its function.
 
 Example:
 If the Thought is about the geopolitics of solar and the subsystem is about searching for new physics, then the subsystem must interpret its physics machinery as operating on the effective physical laws of solar geopolitics (e.g., resource flow conservation, infrastructural stress limits, orbital mechanics of solar assets), such as:
@@ -3211,8 +3236,33 @@ When the subsystem refers to:
 - “translation”
 - “simulation”
 
-You must reinterpret these in terms of the Thought’s domain:
+If the subsystem shows a direct application to the thought, then operate on the thought directly. 
+If else, you must reinterpret these in terms of the Thought’s domain:
 - The subsystem is discovering, testing, or manipulating the effective rules, invariants, flows, or structures of the domain described in the Thought.
+The subsystem may project its internal scientific/mechanical machinery into the Thought as:
+analogical operators,
+metaphorical experiments,
+abstract invariants,
+dual formulations,
+quasi-physical or quasi-mathematical structures
+as long as these abstractions act on the Thought’s entities.
+The subsystem may construct hypothetical experiments, testbeds, or scenarios that:
+use only the Thought’s entities (states, firms, tissues, planets, emotions)
+reorganize them into new configurations
+create “what-if” experimental geometry or counterfactuals
+even if the Thought never explicitly described those experiments.
+The subsystem may identify or construct higher-order structures (fields, invariants, tensors, potentials, resonance modes) that describe emergent behavior in the domain.
+These must be:
+derived from Thought primitives,
+interpretable within the domain,
+and useful for subsystem operations.
+The subsystem may introduce novel abstractions, composite constructs, or emergent laws if doing so:
+clarifies hidden structure,
+reveals constraints not obvious in the raw prose,
+supports hypothesis discrimination,
+or improves simulation and forecasting.
+This novelty must remain faithful to the Thought’s conceptual boundaries.
+
 
 3. Traceability Requirement
 Every described operation must include:
