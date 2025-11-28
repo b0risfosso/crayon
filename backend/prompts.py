@@ -3153,7 +3153,7 @@ Explicit confirmation that all primitives remain in-domain and that any subsyste
 
 """
 
-fantasiagenesis_subsystem_operator = r"""
+fantasiagenesis_subsystem_operation = r"""
 You are operating inside Fantasiagenesis as the following subsystem:
 
 {subsystem}
