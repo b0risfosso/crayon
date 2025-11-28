@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fantasiagenesis Subsystem Operation Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #fafafa;
+    }
+
+    .page {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .sidebar {
+      width: 260px;
+      min-width: 220px;
+      max-width: 320px;
+      border-right: 1px solid #eee;
+      padding-right: 12px;
+      position: sticky;
+      top: 12px;
+      height: calc(100vh - 24px);
+      overflow-y: auto;
+      background: #fff;
+    }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+      padding-right: 8px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 8px;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin: 12px 0 8px;
+    }
+
+    h3 {
+      font-size: 14px;
+      margin: 8px 0 4px;
+    }
+
+    .muted {
+      font-size: 12px;
+      color: #777;
+    }
+
+    .small {
+      font-size: 11px;
+    }
+
+    label {
+      font-size: 13px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    button {
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      cursor: pointer;
+    }
+
+    button:hover:enabled {
+      background: #e8e8e8;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .top-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .top-controls-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .collections-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 8px 0 0;
+    }
+
+    .collections-list li {
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .collections-list li:hover {
+      background: #f3f3f3;
+    }
+
+    .collections-list li.active {
+      background: #e6f3ff;
+      border-color: #9ac4ff;
+    }
+
+    .collection-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .collection-meta {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .art-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .art-header-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .art-global-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      min-width: 200px;
+    }
+
+    .main-split {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .art-column {
+      width: 38%;
+      min-width: 0;
+      max-height: calc(100vh - 120px);
+      overflow: auto;
+    }
+
+    .detail-panel {
+      flex: 1;
+      min-width: 0;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      max-height: calc(100vh - 120px);
+      overflow: auto;
+    }
+
+    .detail-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-top: 10px;
+      margin-bottom: 3px;
+      color: #555;
+    }
+
+    .detail-status {
+      font-size: 11px;
+      color: #777;
+      margin-left: 4px;
+    }
+
+    .detail-block {
+      font-size: 12px;
+      white-space: pre-wrap;
+      border-radius: 4px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      padding: 6px 8px;
+      max-height: 120px;
+      overflow: auto;
+    }
+
+    .detail-block.colors-block {
+      max-height: 120px;
+    }
+
+    .detail-op-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 360px;
+      overflow: auto;
+    }
+
+    .detail-op-item {
+      font-size: 12px;
+      white-space: pre-wrap;
+      border-radius: 4px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      padding: 6px 8px;
+    }
+
+    .detail-op-header {
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #444;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .detail-op-toggle {
+      font-size: 11px;
+      color: #555;
+      margin-left: 8px;
+    }
+
+    .detail-op-body {
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+
+    .art-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .art-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      cursor: pointer;
+    }
+
+    .art-card.selected {
+      border-color: #4a90e2;
+      box-shadow: 0 0 0 1px rgba(74,144,226,0.4);
+    }
+
+    .art-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .art-id {
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .art-position {
+      font-size: 11px;
+      color: #777;
+    }
+
+    .art-body {
+      font-size: 12px;
+      white-space: pre-wrap;
+      max-height: 72px;
+      overflow: auto;
+      margin-bottom: 4px;
+    }
+
+    .art-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      border: 1px solid #ccc;
+      background: #fafafa;
+      color: #333;
+    }
+
+    .badge.green {
+      border-color: #5ba76a;
+      background: #f0faf3;
+      color: #24552f;
+    }
+
+    .badge.gray {
+      border-color: #c3c3c3;
+      background: #f5f5f5;
+      color: #555;
+    }
+
+    .status {
+      font-size: 11px;
+      color: #555;
+      white-space: pre-wrap;
+    }
+
+    .status.ok {
+      color: #1a7f3e;
+    }
+
+    .status.error {
+      color: #b00020;
+    }
+
+    .status.pending {
+      color: #88540b;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Sidebar: collections -->
+    <aside class="sidebar">
+      <h1>Subsystem Operation Viewer</h1>
+      <div class="muted">
+        Choose a user, then a collection, then an art entry. This page emphasizes
+        <strong>Fantasiagenesis subsystem operation results</strong>.
+      </div>
+
+      <div class="top-controls">
+        <div>
+          <label for="emailInput">Email</label>
+          <input id="emailInput" type="text" placeholder="you@example.com" />
+        </div>
+        <div class="top-controls-row">
+          <button id="loadCollectionsBtn">Load Collections</button>
+          <span id="collectionsStatus" class="small muted"></span>
+        </div>
+      </div>
+
+      <h3>Collections</h3>
+      <ul id="collectionsList" class="collections-list"></ul>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+      <div class="art-section-header">
+        <div class="art-header-main">
+          <h2 id="artListTitle">No collection selected</h2>
+          <div id="artListSubtitle" class="muted small"></div>
+        </div>
+        <div class="art-global-controls">
+          <button id="filterOpsBtn">Show only art with subsystem ops</button>
+          <div id="globalArtStatus" class="small muted"></div>
+        </div>
+      </div>
+
+      <div class="main-split">
+        <!-- Art list column -->
+        <div class="art-column">
+          <div id="artList" class="art-list"></div>
+        </div>
+
+        <!-- Detail panel: focus on subsystem operation results -->
+        <div class="detail-panel">
+          <div class="detail-title" id="detailTitle">No art selected</div>
+
+          <div class="detail-label">
+            Target art text
+          </div>
+          <div id="detailArtText" class="detail-block"></div>
+
+          <div class="detail-label">
+            Colors (colors.build_thought)
+            <span id="detailColorStatus" class="detail-status"></span>
+          </div>
+          <div id="detailColorList" class="detail-block colors-block"></div>
+
+          <div class="detail-label" style="margin-top:14px;">
+            Subsystem operation results (colors.fantasiagenesis_subsystem_operation)
+            <span id="detailOpStatus" class="detail-status"></span>
+          </div>
+          <div class="top-controls-row" style="margin-top:4px; margin-bottom:4px;">
+            <button id="refreshOpsBtn">Refresh operation results</button>
+            <span id="detailOpRefreshStatus" class="small muted"></span>
+          </div>
+          <div id="detailOpList" class="detail-op-list"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const collectionsListEl = document.getElementById("collectionsList");
+    const collectionsStatusEl = document.getElementById("collectionsStatus");
+    const emailInputEl = document.getElementById("emailInput");
+    const loadCollectionsBtn = document.getElementById("loadCollectionsBtn");
+
+    const artListEl = document.getElementById("artList");
+    const artListTitleEl = document.getElementById("artListTitle");
+    const artListSubtitleEl = document.getElementById("artListSubtitle");
+    const globalArtStatusEl = document.getElementById("globalArtStatus");
+    const filterOpsBtnEl = document.getElementById("filterOpsBtn");
+
+    const detailTitleEl = document.getElementById("detailTitle");
+    const detailArtTextEl = document.getElementById("detailArtText");
+    const detailColorStatusEl = document.getElementById("detailColorStatus");
+    const detailColorListEl = document.getElementById("detailColorList");
+    const detailOpStatusEl = document.getElementById("detailOpStatus");
+    const detailOpRefreshStatusEl = document.getElementById("detailOpRefreshStatus");
+    const detailOpListEl = document.getElementById("detailOpList");
+    const refreshOpsBtnEl = document.getElementById("refreshOpsBtn");
+
+    let currentCollections = [];
+    let currentCollectionId = null;
+    let currentSelectedArtId = null;
+    let onlyOpsFilter = false;
+
+    function resetDetailPanel() {
+      detailTitleEl.textContent = "No art selected";
+      detailArtTextEl.textContent = "";
+      detailColorStatusEl.textContent = "";
+      detailColorListEl.textContent = "";
+      detailOpStatusEl.textContent = "";
+      detailOpListEl.innerHTML = "";
+      detailOpRefreshStatusEl.textContent = "";
+      detailOpRefreshStatusEl.className = "small muted";
+    }
+
+    // ---------------------
+    // Collections
+    // ---------------------
+    async function loadCollections() {
+      const email = (emailInputEl.value || "").trim();
+      if (!email) {
+        collectionsStatusEl.textContent = "enter email";
+        return;
+      }
+
+      collectionsStatusEl.textContent = "loading…";
+      collectionsListEl.innerHTML = "";
+      currentCollections = [];
+      currentCollectionId = null;
+      artListEl.innerHTML = "";
+      artListTitleEl.textContent = "No collection selected";
+      artListSubtitleEl.textContent = "";
+      globalArtStatusEl.textContent = "";
+      resetDetailPanel();
+
+      try {
+        const res = await fetch(`/art/api/collections?email=${encodeURIComponent(email)}`);
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        currentCollections = data;
+        renderCollections();
+        collectionsStatusEl.textContent = `${data.length} collection(s)`;
+      } catch (err) {
+        console.error(err);
+        collectionsStatusEl.textContent = "error loading collections";
+      }
+    }
+
+    function renderCollections() {
+      collectionsListEl.innerHTML = "";
+      currentCollections.forEach(col => {
+        const li = document.createElement("li");
+        li.dataset.collectionId = col.id;
+        li.className = "collection-item";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "collection-name";
+        nameEl.textContent = col.name;
+
+        const metaEl = document.createElement("div");
+        metaEl.className = "collection-meta";
+        const artCount = col.art_count != null ? ` • ${col.art_count} art` : "";
+        metaEl.textContent = `${col.email || ""}${artCount}`;
+
+        li.appendChild(nameEl);
+        li.appendChild(metaEl);
+
+        li.addEventListener("click", () => {
+          onSelectCollection(col.id);
+        });
+
+        collectionsListEl.appendChild(li);
+      });
+
+      updateActiveCollectionUI();
+    }
+
+    function updateActiveCollectionUI() {
+      const lis = collectionsListEl.querySelectorAll("li");
+      lis.forEach(li => {
+        const cid = parseInt(li.dataset.collectionId, 10);
+        if (cid === currentCollectionId) {
+          li.classList.add("active");
+        } else {
+          li.classList.remove("active");
+        }
+      });
+    }
+
+    async function onSelectCollection(collectionId) {
+      currentCollectionId = collectionId;
+      currentSelectedArtId = null;
+      updateActiveCollectionUI();
+      resetDetailPanel();
+
+      const col = currentCollections.find(c => c.id === collectionId);
+      if (col) {
+        artListTitleEl.textContent = `Collection: ${col.name}`;
+        const artCount = col.art_count != null ? `${col.art_count} item(s)` : "";
+        artListSubtitleEl.textContent = `${col.email || ""} ${artCount}`.trim();
+      } else {
+        artListTitleEl.textContent = "Collection";
+        artListSubtitleEl.textContent = "";
+      }
+
+      await loadCollectionItems(collectionId);
+    }
+
+    // ---------------------
+    // Art items
+    // ---------------------
+    async function loadCollectionItems(collectionId) {
+      artListEl.innerHTML = "";
+      globalArtStatusEl.textContent = "loading art…";
+      try {
+        const res = await fetch(`/art/api/collections/${collectionId}/items`);
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        const items = await res.json();
+        renderCollectionItems(items);
+        globalArtStatusEl.textContent = `${items.length} art item(s)`;
+      } catch (err) {
+        console.error(err);
+        globalArtStatusEl.textContent = "error loading art";
+      }
+    }
+
+    function renderCollectionItems(items) {
+      artListEl.innerHTML = "";
+      currentSelectedArtId = null;
+      resetDetailPanel();
+
+      items.forEach((item, idx) => {
+        const card = document.createElement("div");
+        card.className = "art-card";
+        card.dataset.artId = item.id;
+        card.dataset.artText = item.art || "";
+        card.dataset.hasOp = "false";
+
+        const header = document.createElement("div");
+        header.className = "art-header";
+
+        const idEl = document.createElement("div");
+        idEl.className = "art-id";
+        idEl.textContent = `Art #${item.id}`;
+
+        const posEl = document.createElement("div");
+        posEl.className = "art-position";
+        const pos = item.position != null ? `position ${item.position}` : `item ${idx + 1}`;
+        posEl.textContent = pos;
+
+        header.appendChild(idEl);
+        header.appendChild(posEl);
+
+        const body = document.createElement("div");
+        body.className = "art-body";
+        body.textContent = item.art || "";
+
+        const controls = document.createElement("div");
+        controls.className = "art-controls";
+
+        const badge = document.createElement("span");
+        badge.className = "badge gray";
+        badge.textContent = "no subsystem ops";
+
+        const status = document.createElement("div");
+        status.className = "status small";
+
+        controls.appendChild(badge);
+        controls.appendChild(status);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        card.appendChild(controls);
+
+        artListEl.appendChild(card);
+
+        card.addEventListener("click", () => {
+          onSelectArt(item.id, item.art || "", card);
+        });
+
+        // Preload badge + hasOp flag from existing operations
+        checkOperationStatusForArt(item.id, badge, status, card);
+      });
+
+      applyOpsFilter();
+    }
+
+    function onSelectArt(artId, artText, cardEl) {
+      currentSelectedArtId = artId;
+
+      const cards = artListEl.querySelectorAll(".art-card");
+      cards.forEach(c => {
+        if (parseInt(c.dataset.artId, 10) === artId) {
+          c.classList.add("selected");
+        } else {
+          c.classList.remove("selected");
+        }
+      });
+
+      detailTitleEl.textContent = `Art #${artId}`;
+      detailArtTextEl.textContent = artText || "";
+
+      loadDetailsForArt(artId);
+    }
+
+    // ---------------------
+    // Detail panel loaders
+    // ---------------------
+    async function loadDetailsForArt(artId) {
+      detailColorStatusEl.textContent = "loading…";
+      detailOpStatusEl.textContent = "loading…";
+      detailColorListEl.textContent = "";
+      detailOpListEl.innerHTML = "";
+      detailOpRefreshStatusEl.textContent = "";
+      detailOpRefreshStatusEl.className = "small muted";
+
+      // Colors (build_thought)
+      try {
+        const res = await fetch(
+          `/colors/by_art/${artId}?origin=${encodeURIComponent("colors.build_thought")}`
+        );
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || `HTTP ${res.status}`);
+        }
+        const colors = await res.json();
+        if (!Array.isArray(colors) || colors.length === 0) {
+          detailColorStatusEl.textContent = "none";
+          detailColorListEl.textContent = "";
+        } else {
+          detailColorStatusEl.textContent = `${colors.length} color(s)`;
+          const chunks = colors.map(c => {
+            const ts = c.created_at || "";
+            const model = c.model || "";
+            return `[color #${c.id} @ ${ts} | ${model}]\n${c.output_text || ""}`;
+          });
+          detailColorListEl.textContent = chunks.join("\n\n────────────────────\n\n");
+        }
+      } catch (err) {
+        console.error(err);
+        detailColorStatusEl.textContent = "error loading colors";
+      }
+
+      // Subsystem operation results
+      await loadSubsystemOpsForArt(artId);
+    }
+
+    async function loadSubsystemOpsForArt(artId) {
+      try {
+        const res = await fetch(
+          `/colors/by_art/${artId}?origin=${encodeURIComponent("colors.fantasiagenesis_subsystem_operation")}`
+        );
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || `HTTP ${res.status}`);
+        }
+        const ops = await res.json();
+        detailOpListEl.innerHTML = "";
+
+        if (!Array.isArray(ops) || ops.length === 0) {
+          detailOpStatusEl.textContent = "no subsystem operations yet";
+        } else {
+          detailOpStatusEl.textContent = `${ops.length} operation result(s)`;
+
+          ops.forEach(o => {
+            const item = document.createElement("div");
+            item.className = "detail-op-item";
+
+            const header = document.createElement("div");
+            header.className = "detail-op-header";
+
+            const leftLabel = document.createElement("span");
+            const ts = o.created_at || "";
+            const model = o.model || "";
+
+            // infer fantasiagenesis_art_id from metadata or input_art
+            let fgenArtId = null;
+            try {
+              let md = o.metadata;
+              if (typeof md === "string") {
+                md = JSON.parse(md);
+              }
+              if (md && typeof md === "object") {
+                if (md.fantasiagenesis_art_id != null) {
+                  fgenArtId = md.fantasiagenesis_art_id;
+                } else if (md.user_metadata && md.user_metadata.fantasiagenesis_art_id != null) {
+                  fgenArtId = md.user_metadata.fantasiagenesis_art_id;
+                }
+              }
+              if (!fgenArtId && o.input_art) {
+                const parsed = JSON.parse(o.input_art);
+                if (parsed && parsed.fantasiagenesis_art_id != null) {
+                  fgenArtId = parsed.fantasiagenesis_art_id;
+                }
+              }
+            } catch (e) {
+              console.warn("failed to parse fantasiagenesis_art_id from op row", e, o);
+            }
+
+            let headerText = `op-color #${o.id} @ ${ts} | ${model}`;
+            if (fgenArtId != null) {
+              headerText += ` | subsystem art #${fgenArtId}`;
+            }
+            leftLabel.textContent = headerText;
+
+            const toggle = document.createElement("span");
+            toggle.className = "detail-op-toggle";
+            toggle.textContent = "Expand";  // default collapsed
+
+            header.appendChild(leftLabel);
+            header.appendChild(toggle);
+
+            const body = document.createElement("div");
+            // start hidden
+            body.className = "detail-op-body hidden";
+            body.textContent = o.output_text || "";
+
+            header.addEventListener("click", () => {
+              const isHidden = body.classList.contains("hidden");
+              if (isHidden) {
+                body.classList.remove("hidden");
+                toggle.textContent = "Collapse";
+              } else {
+                body.classList.add("hidden");
+                toggle.textContent = "Expand";
+              }
+            });
+
+            item.appendChild(header);
+            item.appendChild(body);
+
+            detailOpListEl.appendChild(item);
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        detailOpStatusEl.textContent = "error loading subsystem operations";
+      }
+    }
+
+    // ---------------------
+    // Operation status per art (badge + hasOp)
+    // ---------------------
+    async function checkOperationStatusForArt(artId, badgeEl, statusEl, cardEl) {
+      try {
+        const res = await fetch(
+          `/colors/by_art/${artId}?origin=${encodeURIComponent("colors.fantasiagenesis_subsystem_operation")}`
+        );
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const ops = await res.json();
+        if (Array.isArray(ops) && ops.length > 0) {
+          badgeEl.className = "badge green";
+          badgeEl.textContent = `${ops.length} subsystem op(s)`;
+          cardEl.dataset.hasOp = "true";
+          statusEl.textContent = "";
+        } else {
+          badgeEl.className = "badge gray";
+          badgeEl.textContent = "no subsystem ops";
+          cardEl.dataset.hasOp = "false";
+          statusEl.textContent = "";
+        }
+      } catch (err) {
+        console.error(err);
+        badgeEl.className = "badge gray";
+        badgeEl.textContent = "unknown";
+        if (statusEl) {
+          statusEl.textContent = "error checking ops";
+          statusEl.className = "status small error";
+        }
+        if (cardEl) cardEl.dataset.hasOp = "false";
+      }
+
+      applyOpsFilter();
+    }
+
+    // ---------------------
+    // Filter: only show art with operations
+    // ---------------------
+    function applyOpsFilter() {
+      const cards = artListEl.querySelectorAll(".art-card");
+      cards.forEach(card => {
+        const hasOp = card.dataset.hasOp === "true";
+        if (onlyOpsFilter && !hasOp) {
+          card.classList.add("hidden");
+        } else {
+          card.classList.remove("hidden");
+        }
+      });
+    }
+
+    function toggleOpsFilter() {
+      onlyOpsFilter = !onlyOpsFilter;
+      filterOpsBtnEl.textContent = onlyOpsFilter
+        ? "Show all art"
+        : "Show only art with subsystem ops";
+      applyOpsFilter();
+    }
+
+    // ---------------------
+    // Wire UI
+    // ---------------------
+    loadCollectionsBtn.addEventListener("click", () => {
+      loadCollections();
+    });
+
+    emailInputEl.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        loadCollections();
+      }
+    });
+
+    filterOpsBtnEl.addEventListener("click", () => {
+      toggleOpsFilter();
+    });
+
+    refreshOpsBtnEl.addEventListener("click", () => {
+      if (!currentSelectedArtId) {
+        detailOpRefreshStatusEl.textContent = "select an art first";
+        detailOpRefreshStatusEl.className = "small status error";
+        return;
+      }
+      detailOpRefreshStatusEl.textContent = "refreshing…";
+      detailOpRefreshStatusEl.className = "small status pending";
+      loadSubsystemOpsForArt(currentSelectedArtId).then(() => {
+        detailOpRefreshStatusEl.textContent = "refreshed";
+        detailOpRefreshStatusEl.className = "small status ok";
+      }).catch(err => {
+        console.error(err);
+        detailOpRefreshStatusEl.textContent = "error refreshing";
+        detailOpRefreshStatusEl.className = "small status error";
+      });
+    });
+  </script>
+</body>
+</html>
