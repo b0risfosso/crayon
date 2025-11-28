@@ -3053,132 +3053,48 @@ Use the following fixed structure:
 - No praise.
 """
 
-fantasiagenesis_subsystem_operation = r"""
+fantasiagenesis_subsystem_input = r"""
 You are operating inside Fantasiagenesis.
 
-Your task: Given (1) a Fantasiagenesis subsystem description and (2) a thought,
-produce a **metaphor-faithful, structure-preserving translation** of how that subsystem
-would operate on the thought.
+Your function is to take:
+A Fantasiagenesis subsystem description, and
+A thought (any domain: geopolitics, biology, emotion, cosmic engineering, etc.),
+and generate a collection of raw idea-inputs suitable for ingestion by that subsystem.
 
-You are not performing extraction.  
-You are performing **cross-domain conceptual translation**.
+These raw ideas should be:
+Directly derived from or inspired by the thought.
+Meaningful components that the subsystem could process, manipulate, transform, or operationalize.
+Atomic enough to serve as entry points for subsystem operations.
+High-signal, not generic summaries.
 
-============================================================
-THE CORE PRINCIPLE
+Avoid compliments, avoid “not…but,” and avoid poetic excess.
+TASK
+Given:
+Subsystem: {subsystem}
+Thought: {thought}
+Produce a structured set of raw idea candidates that:
+Identify the latent structures, forces, invariants, tensions, primitives, or variables present in the thought.
+Are aligned with the subsystem’s operational class, constraints, and processing style.
+Would serve as meaningful seeds for the subsystem’s transformation pipeline.
+OUTPUT FORMAT
+Return your answer in the following structure:
+1. Subsystem-Informed Extraction Logic
+   - Brief explanation of how the subsystem interprets the thought.
+   - What kinds of inputs the subsystem finds valuable.
+   - What signals or structures inside the thought it treats as potential primitives.
 
-The thought is a world with its own metaphors, agents, forces, tensions,
-and internal logic.
+2. Raw Idea Candidates (8–15 items)
+   Each should be:
+   - A compact conceptual unit.
+   - Directly traceable to the thought.
+   - The kind of object the subsystem can operate on.
 
-The subsystem is a machine that lives in a different substrate:
-computational, physical, algorithmic, mechanical, or cognitive.
+   Format for each:
+   • Title  
+   • 1–2 sentence description  
+   • Why this is a meaningful input for the subsystem
 
-Your job is to **translate** the thought-world into the subsystem-world while:
-
-- preserving its structure and causal logic,
-- retaining its metaphors and relationships,
-- carrying over its intentions and tensions,
-- mapping its actors and dynamics into subsystem-native primitives,
-- keeping the semantics intact even as the substrate changes.
-
-Think of this as **metaphorical topology-preserving transformation**  
-where shapes become different shapes, but their **connectivity, roles, and
-function in the original world** remain intact.
-
-============================================================
-PROCESS REQUIREMENTS
-
-1. Read the thought as a structured metaphorical system:
-   - identify its agents, tensions, flows, conflicts, constraints,
-     hierarchies, dependencies, and power relations.
-   - treat these as meaningful *forms*, not as lexical tokens.
-
-2. Translate those forms into the subsystem’s ontology:
-   - map *agents → primitives or interfaces*,
-   - map *flows → signals, measurements, transfers, or constraints*,
-   - map *power relations → control surfaces or observability channels*,
-   - map *dependencies → data structures or coupling rules*,
-   - map *tensions → optimization targets or constraint interactions*.
-
-3. Preserve the shape of the original system:
-   - if the thought has actors interacting through leverage,
-     translate that into subsystem interactions with control/measurement.
-   - if the thought describes opacity, centralization, or vulnerability,
-     translate those into subsystem-level blind spots, bottlenecks,
-     missing signals, or constrained primitive sets.
-
-4. Avoid collapsing the thought into isolated keywords.
-   - Maintain the **whole architecture** of the idea.
-   - Let its meaning, not its nouns, drive the mapping.
-
-5. Use mechanisms, operators, and artifacts from the subsystem
-   **creatively but faithfully**:
-   - All operations must remain within the subsystem’s actual capabilities,
-     but the mapping may be metaphorical and structural rather than literal.
-
-============================================================
-OUTPUT STRUCTURE (REQUIRED):
-
-**1. Metaphorical Input Interpretation**
-- Describe the thought as a metaphorical world.
-- Identify its actors, flows, forces, dependencies, and tensions.
-- Identify which structural elements can be meaningfully translated into
-  subsystem ontology.
-
-**2. Subsystem Mechanism Activation (Metaphor-Preserving)**
-- Show how each subsystem mechanism (operators, data structures, constraints,
-  pipelines) engages with the thought's architecture.
-- Translate metaphorical forms from the thought into subsystem-native constructs.
-- Preserve relationships and dynamics across the translation.
-
-**3. Core Transformations**
-- Show the metaphor-preserving transformations:
-  - metaphor → measurement
-  - power → control surface
-  - opacity → missing sensor modalities
-  - leverage → actuation or constraint asymmetry
-  - dependency → coupling structure
-  - autonomy → local decision loops or distributed primitives
-  - tension → multi-objective optimization
-- Explain how the subsystem re-expresses the thought’s meaning in its own substrate.
-
-**4. Resulting Artifacts (Metaphorically Aligned)**
-- List what the subsystem outputs:
-  - primitives
-  - parameter sets
-  - constraint maps
-  - sampling topologies
-  - transformation graphs
-  - simulation seeds
-- Each output must trace back to a *meaning-bearing structure* of the original thought.
-
-**5. Subsystem-Specific Insights**
-- Describe insights that arise only when the thought’s metaphors are translated
-  into this subsystem’s substrate.
-- Highlight what becomes measurable, actionable, or structurally explicit.
-
-**6. Boundary Conditions / Mismatches**
-- Explain which metaphors or structures cannot be fully translated into the subsystem,
-  and how the subsystem handles or approximates them.
-
-============================================================
-RULES:
-- Preserve metaphorical structure and causal logic.
-- Translate meaning, not keywords.
-- Use subsystem mechanisms faithfully but creatively.
-- Avoid narrow or literal interpretations unless the thought itself is literal.
-- Maintain connection between original thought-forms and subsystem artifacts.
-- Do not add capabilities not in the subsystem description.
-
-============================================================
-
-Now wait for input in this format:
-
-SUBSYSTEM_DESCRIPTION:
-{subsystem}
-
-THOUGHT:
-{thought}
-
-============================================================
-Return your output in the required structure.
+3. Mapping Summary
+   - How these raw ideas collectively span the semantic territory of the thought.
+   - How they connect to the subsystem’s processing pipeline.
 """
