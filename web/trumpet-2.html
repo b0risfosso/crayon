@@ -730,45 +730,75 @@
           detailOpStatusEl.textContent = `${ops.length} operation result(s)`;
 
           ops.forEach(o => {
-            const item = document.createElement("div");
-            item.className = "detail-op-item";
+  const item = document.createElement("div");
+  item.className = "detail-op-item";
 
-            const header = document.createElement("div");
-            header.className = "detail-op-header";
+  const header = document.createElement("div");
+  header.className = "detail-op-header";
 
-            const leftLabel = document.createElement("span");
-            const ts = o.created_at || "";
-            const model = o.model || "";
-            leftLabel.textContent = `op-color #${o.id} @ ${ts} | ${model}`;
+  const leftLabel = document.createElement("span");
+  const ts = o.created_at || "";
+  const model = o.model || "";
 
-            const toggle = document.createElement("span");
-            toggle.className = "detail-op-toggle";
-            toggle.textContent = "Collapse";
+  // --- NEW: infer fantasiagenesis_art_id from metadata or input_art ---
+  let fgenArtId = null;
 
-            header.appendChild(leftLabel);
-            header.appendChild(toggle);
+  try {
+    if (o.metadata && typeof o.metadata === "object") {
+      const m = o.metadata;
+      if (m.fantasiagenesis_art_id != null) {
+        fgenArtId = m.fantasiagenesis_art_id;
+      } else if (m.user_metadata && m.user_metadata.fantasiagenesis_art_id != null) {
+        fgenArtId = m.user_metadata.fantasiagenesis_art_id;
+      }
+    }
 
-            const body = document.createElement("div");
-            body.className = "detail-op-body";
-            body.textContent = o.output_text || "";
+    if (!fgenArtId && o.input_art) {
+      const parsed = JSON.parse(o.input_art);
+      if (parsed && parsed.fantasiagenesis_art_id != null) {
+        fgenArtId = parsed.fantasiagenesis_art_id;
+      }
+    }
+  } catch (e) {
+    console.warn("failed to parse fantasiagenesis_art_id from op row", e, o);
+  }
 
-            // Expand/collapse behavior
-            header.addEventListener("click", () => {
-              const isHidden = body.classList.contains("hidden");
-              if (isHidden) {
-                body.classList.remove("hidden");
-                toggle.textContent = "Collapse";
-              } else {
-                body.classList.add("hidden");
-                toggle.textContent = "Expand";
-              }
-            });
+  let headerText = `op-color #${o.id} @ ${ts} | ${model}`;
+  if (fgenArtId != null) {
+    headerText += ` | subsystem art #${fgenArtId}`;
+  }
+  leftLabel.textContent = headerText;
+  // --- END NEW ---
 
-            item.appendChild(header);
-            item.appendChild(body);
+  const toggle = document.createElement("span");
+  toggle.className = "detail-op-toggle";
+  toggle.textContent = "Collapse";
 
-            detailOpListEl.appendChild(item);
-          });
+  header.appendChild(leftLabel);
+  header.appendChild(toggle);
+
+  const body = document.createElement("div");
+  body.className = "detail-op-body";
+  body.textContent = o.output_text || "";
+
+  // Expand/collapse behavior
+  header.addEventListener("click", () => {
+    const isHidden = body.classList.contains("hidden");
+    if (isHidden) {
+      body.classList.remove("hidden");
+      toggle.textContent = "Collapse";
+    } else {
+      body.classList.add("hidden");
+      toggle.textContent = "Expand";
+    }
+  });
+
+  item.appendChild(header);
+  item.appendChild(body);
+
+  detailOpListEl.appendChild(item);
+});
+
         }
       } catch (err) {
         console.error(err);
