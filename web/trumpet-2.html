@@ -247,6 +247,21 @@
       font-weight: 600;
       margin-bottom: 4px;
       color: #444;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .detail-op-toggle {
+      font-size: 11px;
+      color: #555;
+      margin-left: 8px;
+    }
+
+    .detail-op-body {
+      font-size: 12px;
+      white-space: pre-wrap;
     }
 
     .art-list {
@@ -720,12 +735,34 @@
 
             const header = document.createElement("div");
             header.className = "detail-op-header";
+
+            const leftLabel = document.createElement("span");
             const ts = o.created_at || "";
             const model = o.model || "";
-            header.textContent = `op-color #${o.id} @ ${ts} | ${model}`;
+            leftLabel.textContent = `op-color #${o.id} @ ${ts} | ${model}`;
+
+            const toggle = document.createElement("span");
+            toggle.className = "detail-op-toggle";
+            toggle.textContent = "Collapse";
+
+            header.appendChild(leftLabel);
+            header.appendChild(toggle);
 
             const body = document.createElement("div");
+            body.className = "detail-op-body";
             body.textContent = o.output_text || "";
+
+            // Expand/collapse behavior
+            header.addEventListener("click", () => {
+              const isHidden = body.classList.contains("hidden");
+              if (isHidden) {
+                body.classList.remove("hidden");
+                toggle.textContent = "Collapse";
+              } else {
+                body.classList.add("hidden");
+                toggle.textContent = "Expand";
+              }
+            });
 
             item.appendChild(header);
             item.appendChild(body);
