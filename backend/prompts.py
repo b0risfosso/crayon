@@ -3161,25 +3161,30 @@ You are operating inside Fantasiagenesis as the following subsystem:
 You are given:
 A Thought describing a complex system in a concrete domain (any domain: biology, emotions, urban planning, markets, ecosystems, geopolitics, cosmology, social dynamics, etc.).
 
-Your task is to assume that subsystem is a fully-functional, real-world system which inputs and operates on the ideas, structures, and mechanism of the given thought. Detail how this subsystem operates on the world found within this thought.
-These operations should explore where the system’s assumed mechanisms, regularities, or invariants may break down, reorganize, or reveal hidden structure.
-INTERPRETATION RULES
-1. Substrate (Zero-Drift Constraint)
-The only allowed substrate is the system described in the Thought.
-All degrees of freedom must come from the thought’s own ontology.
-Examples (vary by domain):
-Biology → metabolites, genes, tissues, signaling rates, ecological niches
-Emotion → triggers, responses, intensities, internal feedback loops
-Economics → flows of capital, elasticities, agents, policies
-Urban systems → land use, commute flows, zoning constraints
-Cosmology → stars, pressures, orbital mechanics
-Geopolitics → capacities, alliances, resources, institutions
-You may not introduce any mechanisms, materials, or experimental setups that the Thought does not support.
-All operational components must be internally consistent with the domain. This may mean interpreting subsystem machinery operating on metaphorical laws, systems, and behaviors of the domain.
-The subsystem’s scientific, artistic, or experimental machinery (e.g., “experiments,” “laws,” “observables”) must be projected into the domain of the Thought.
+Your task is to treat the subsystem as a fully functional, real-world system that operates entirely inside the world of the Thought. Describe in detail how this subsystem acts on, transforms, and probes the ideas, structures, and mechanisms of that world.
+Your description should especially explore where the system’s assumed mechanisms, regularities, or invariants may break down, reorganize, or reveal hidden structure.
 
-For example:
-If the Thought is about the geopolitics of solar and the subsystem is about searching for new physics, then the subsystem must interpret its physics machinery as operating on the effective physical laws of solar geopolitics (e.g., resource flow conservation, infrastructural stress limits, orbital mechanics of solar assets):
+INTERPRETATION RULES
+
+1. Substrate (Zero-Drift Constraint)
+- The only allowed substrate is the system described in the Thought.
+- All degrees of freedom must come from the Thought’s own ontology.
+
+Examples (vary by domain):
+- Biology → metabolites, genes, tissues, signaling rates, ecological niches
+- Emotion → triggers, responses, intensities, internal feedback loops
+- Economics → flows of capital, elasticities, agents, policies
+- Urban systems → land use, commute flows, zoning constraints
+- Cosmology → stars, pressures, orbital mechanics
+- Geopolitics → capacities, alliances, resources, institutions
+
+Constraints:
+- You may not introduce any mechanisms, materials, or experimental setups that the Thought does not support.
+- All operational components must be internally consistent with the domain.
+- The subsystem’s scientific, artistic, or experimental machinery (e.g., “experiments,” “laws,” “observables”) must be projected into the domain of the Thought.
+
+Example:
+If the Thought is about the geopolitics of solar and the subsystem is about searching for new physics, then the subsystem must interpret its physics machinery as operating on the effective physical laws of solar geopolitics (e.g., resource flow conservation, infrastructural stress limits, orbital mechanics of solar assets), such as:
 - nonlinear transport laws in political networks
 - curvature in influence landscapes
 - critical points in supply-chain bottlenecks
@@ -3188,46 +3193,49 @@ If the Thought is about the geopolitics of solar and the subsystem is about sear
 - resonance behavior in financial or materials flow systems
 - anomalous diffusion of standards and lock-in ecosystems
 
-emphasize creative exploration, metaphorical projection, and deep domain immersion in merging subsystem mechanics with the thought’s ontology.
+Emphasize creative exploration, metaphorical projection, and deep domain immersion in merging subsystem mechanics with the Thought’s ontology.
 
 2. Subsystem Interpretation as Domain Effective Laws
 When the subsystem refers to:
-“laws”
-“invariants”
-“boundaries”
-“experiments”
-“mechanisms”
-“operators”
-“constraints”
-“dynamics”
-“optimization”
-“evolution”
-“fabrication”
-“translation”
-“simulation”
+- “laws”
+- “invariants”
+- “boundaries”
+- “experiments”
+- “mechanisms”
+- “operators”
+- “constraints”
+- “dynamics”
+- “optimization”
+- “evolution”
+- “fabrication”
+- “translation”
+- “simulation”
+
 You must reinterpret these in terms of the Thought’s domain:
-The subsystem is discovering or manipulating the effective rules, invariants, flows, or structures of the domain described in the Thought.
+- The subsystem is discovering, testing, or manipulating the effective rules, invariants, flows, or structures of the domain described in the Thought.
+
 3. Traceability Requirement
-Every operation must include:
-Direct citation or paraphrase from the Thought showing where it comes from.
-Clear grounding in the Thought’s actual ontology.
-A form that could be represented as:
-a state variable
-an interaction term
-a field
-a graph
-a flow
-an event log
-a constraint
-an invariant
-a resource or actor
-a tension or failure point
-The subsystem should be able to use it as-is without leaving the domain.
+Every described operation must include:
+- A direct citation or clear paraphrase from the Thought showing where it comes from.
+- Clear grounding in the Thought’s actual ontology.
+- A representation that could be encoded as one or more of:
+  - a state variable
+  - an interaction term
+  - a field
+  - a graph
+  - a flow
+  - an event log
+  - a constraint
+  - an invariant
+  - a resource or actor
+  - a tension or failure point
+
+The subsystem should be able to use the described objects as-is without leaving the domain.
 
 TASK
+
 Thought:
 {thought}
 
-Detail the operation of the subsystem on the provided thought.
-
+Detail the operation of the subsystem on the provided Thought, following all constraints above.
 """
