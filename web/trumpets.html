@@ -306,11 +306,19 @@
       padding: 8px 10px;
       box-shadow: 0 1px 2px rgba(0,0,0,0.03);
       cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .fgen-art-card.selected {
       border-color: #c27cff;
       box-shadow: 0 0 0 1px rgba(158,103,255,0.4);
+    }
+
+    .fgen-art-card.multichosen {
+      background: #f7f0ff;
+      border-color: #c27cff;
     }
 
     .fgen-art-header {
@@ -331,6 +339,26 @@
       max-height: 72px;
       overflow: auto;
       white-space: pre-wrap;
+    }
+
+    .fgen-card-topline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: space-between;
+    }
+
+    .fgen-select-box {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      color: #555;
+      cursor: default;
+    }
+
+    .fgen-select-box input[type="checkbox"] {
+      cursor: pointer;
     }
 
     .fgen-detail-panel {
@@ -542,13 +570,14 @@
             <span id="detailOpStatus" class="detail-status"></span>
           </div>
 
-          <!-- NEW: random N runs from Fantasiagenesis source panel -->
+          <!-- Controls for multi-run from Fantasiagenesis panel -->
           <div class="top-controls-row" style="margin-top:4px; margin-bottom:6px;">
             <label class="small" style="margin:0;">
               Random runs (from Fantasiagenesis panel):
               <input id="randomOpsCountInput" type="number" min="1" value="3" style="width:60px; margin-left:4px;" />
             </label>
             <button id="runRandomOpsBtn">Run random subsystem operations</button>
+            <button id="runSelectedOpsBtn">Run selected subsystem operations</button>
             <span id="randomOpsStatus" class="small muted"></span>
           </div>
 
@@ -561,7 +590,7 @@
           <div>
             <h2>Fantasiagenesis subsystem art (boris@fantasiagenesis.com)</h2>
             <div class="muted small">
-              Browse Fantasiagenesis collection and inspect its art, colors, and subsystem bridges.
+              Browse Fantasiagenesis collection, inspect art / colors / bridges, and multi-select subsystem source art.
             </div>
           </div>
           <div class="small muted" id="fgenStatus"></div>
@@ -630,6 +659,7 @@
 
     const randomOpsCountInputEl = document.getElementById("randomOpsCountInput");
     const runRandomOpsBtnEl = document.getElementById("runRandomOpsBtn");
+    const runSelectedOpsBtnEl = document.getElementById("runSelectedOpsBtn");
     const randomOpsStatusEl = document.getElementById("randomOpsStatus");
 
     let currentCollections = [];
@@ -639,6 +669,7 @@
 
     let fgenArtItems = [];
     let currentFgenArtId = null;
+    let selectedFgenArtIds = new Set(); // MULTI-SELECT STATE
 
     function resetDetailPanel() {
       detailTitleEl.textContent = "No art selected";
@@ -660,6 +691,15 @@
       if (fgenColorsListEl) fgenColorsListEl.textContent = "";
       if (fgenBridgesStatusEl) fgenBridgesStatusEl.textContent = "";
       if (fgenBridgesListEl) fgenBridgesListEl.innerHTML = "";
+      selectedFgenArtIds.clear();
+      // clear multi-select visual state
+      if (fgenArtListEl) {
+        fgenArtListEl.querySelectorAll(".fgen-art-card").forEach(c => {
+          c.classList.remove("multichosen");
+          const cb = c.querySelector(".fgen-select-checkbox");
+          if (cb) cb.checked = false;
+        });
+      }
     }
 
     // ---------------------
@@ -713,11 +753,26 @@
     function renderFgenArtList(items) {
       if (!fgenArtListEl) return;
       fgenArtListEl.innerHTML = "";
+      selectedFgenArtIds.clear();
 
       items.forEach((item, idx) => {
         const card = document.createElement("div");
         card.className = "fgen-art-card";
         card.dataset.artId = item.id;
+
+        // Top line with checkbox + header
+        const topLine = document.createElement("div");
+        topLine.className = "fgen-card-topline";
+
+        const checkboxBox = document.createElement("label");
+        checkboxBox.className = "fgen-select-box";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "fgen-select-checkbox";
+        const cbLabelText = document.createElement("span");
+        cbLabelText.textContent = "use";
+        checkboxBox.appendChild(cb);
+        checkboxBox.appendChild(cbLabelText);
 
         const header = document.createElement("div");
         header.className = "fgen-art-header";
@@ -734,14 +789,31 @@
         header.appendChild(idEl);
         header.appendChild(posEl);
 
+        topLine.appendChild(checkboxBox);
+        topLine.appendChild(header);
+
         const body = document.createElement("div");
         body.className = "fgen-art-body";
         body.textContent = item.art || "";
 
-        card.appendChild(header);
+        card.appendChild(topLine);
         card.appendChild(body);
 
-        card.addEventListener("click", () => {
+        // Checkbox change = multi-select toggle
+        cb.addEventListener("change", (ev) => {
+          ev.stopPropagation();
+          if (cb.checked) {
+            selectedFgenArtIds.add(item.id);
+            card.classList.add("multichosen");
+          } else {
+            selectedFgenArtIds.delete(item.id);
+            card.classList.remove("multichosen");
+          }
+        });
+
+        // Card click (excluding checkbox) = single "current" selection
+        card.addEventListener("click", (ev) => {
+          if (ev.target === cb) return;
           onSelectFgenArt(item, card);
         });
 
@@ -1164,12 +1236,15 @@ ${c.output_text || ""}`;
             let fgenArtId = null;
 
             try {
-              if (o.metadata && typeof o.metadata === "object") {
-                const m = o.metadata;
-                if (m.fantasiagenesis_art_id != null) {
-                  fgenArtId = m.fantasiagenesis_art_id;
-                } else if (m.user_metadata && m.user_metadata.fantasiagenesis_art_id != null) {
-                  fgenArtId = m.user_metadata.fantasiagenesis_art_id;
+              let md = o.metadata;
+              if (typeof md === "string") {
+                md = JSON.parse(md);
+              }
+              if (md && typeof md === "object") {
+                if (md.fantasiagenesis_art_id != null) {
+                  fgenArtId = md.fantasiagenesis_art_id;
+                } else if (md.user_metadata && md.user_metadata.fantasiagenesis_art_id != null) {
+                  fgenArtId = md.user_metadata.fantasiagenesis_art_id;
                 }
               }
 
@@ -1426,6 +1501,95 @@ ${c.output_text || ""}`;
     }
 
     // ---------------------
+    // Run subsystem operations for all *selected* Fantasiagenesis art
+    // ---------------------
+    async function runSelectedSubsystemOpsForCurrentArt() {
+      if (!currentSelectedArtId) {
+        randomOpsStatusEl.textContent = "select a target art first";
+        randomOpsStatusEl.className = "small status error";
+        return;
+      }
+
+      const ids = Array.from(selectedFgenArtIds);
+      if (ids.length === 0) {
+        randomOpsStatusEl.textContent = "select one or more Fantasiagenesis art (checkboxes) in the panel";
+        randomOpsStatusEl.className = "small status error";
+        return;
+      }
+
+      randomOpsStatusEl.textContent = `queueing ${ids.length} selected subsystem operation(s)…`;
+      randomOpsStatusEl.className = "small status pending";
+
+      const targetArtId = currentSelectedArtId;
+
+      const promises = ids.map(fgenId => {
+        return fetch("/colors/fantasiagenesis_subsystem_operation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fantasiagenesis_art_id: fgenId,
+            target_art_id: targetArtId
+          })
+        })
+          .then(async (res) => {
+            const text = await res.text();
+            let data;
+            try {
+              data = JSON.parse(text);
+            } catch {
+              data = null;
+            }
+            if (!res.ok) {
+              const msg = (data && data.description) || text || `HTTP ${res.status}`;
+              throw new Error(msg);
+            }
+            return data;
+          });
+      });
+
+      try {
+        const results = await Promise.allSettled(promises);
+        let okCount = 0;
+        let errCount = 0;
+        const taskIds = [];
+        results.forEach(r => {
+          if (r.status === "fulfilled") {
+            okCount += 1;
+            if (r.value && r.value.task_id) {
+              taskIds.push(r.value.task_id);
+            }
+          } else {
+            errCount += 1;
+          }
+        });
+
+        let msg = `queued ${okCount} selected op(s)`;
+        if (errCount) msg += `, ${errCount} error(s)`;
+        if (taskIds.length) msg += ` | tasks: ${taskIds.join(", ")}`;
+        randomOpsStatusEl.textContent = msg;
+        randomOpsStatusEl.className = "small status pending";
+
+        // Refresh badge + details for that art
+        const cardEl = artListEl.querySelector(`.art-card[data-art-id="${targetArtId}"]`);
+        const badgeEl = cardEl ? cardEl.querySelector(".badge") : null;
+        const statusEl = cardEl ? cardEl.querySelector(".status") : null;
+
+        setTimeout(() => {
+          if (badgeEl) {
+            checkOperationStatusForArt(targetArtId, badgeEl, statusEl, cardEl);
+          }
+          if (currentSelectedArtId === targetArtId) {
+            loadDetailsForArt(targetArtId);
+          }
+        }, 3000);
+      } catch (err) {
+        console.error(err);
+        randomOpsStatusEl.textContent = `error: ${err.message || err}`;
+        randomOpsStatusEl.className = "small status error";
+      }
+    }
+
+    // ---------------------
     // Filter: only show art with operations
     // ---------------------
     function applyOpsFilter() {
@@ -1469,6 +1633,12 @@ ${c.output_text || ""}`;
     if (runRandomOpsBtnEl) {
       runRandomOpsBtnEl.addEventListener("click", () => {
         runRandomSubsystemOpsForCurrentArt();
+      });
+    }
+
+    if (runSelectedOpsBtnEl) {
+      runSelectedOpsBtnEl.addEventListener("click", () => {
+        runSelectedSubsystemOpsForCurrentArt();
       });
     }
 
