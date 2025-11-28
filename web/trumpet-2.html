@@ -219,18 +219,34 @@
       overflow: auto;
     }
 
-    .detail-item-header {
-      font-size: 11px;
-      font-weight: 600;
-      margin-top: 4px;
-      margin-bottom: 2px;
-      color: #444;
-    }
-
     .detail-status {
       font-size: 11px;
       color: #777;
       margin-left: 4px;
+    }
+
+    .detail-op-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    .detail-op-item {
+      font-size: 12px;
+      white-space: pre-wrap;
+      border-radius: 4px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      padding: 6px 8px;
+    }
+
+    .detail-op-header {
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #444;
     }
 
     .art-list {
@@ -327,6 +343,10 @@
       background: #f5f5f5;
       color: #555;
     }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -363,6 +383,7 @@
             <input id="fantArtIdInput" type="number" placeholder="enter art id" />
           </div>
           <div class="small muted" id="fantArtStatus"></div>
+          <button id="filterOpsBtn">Show only operated art</button>
           <div id="globalArtStatus" class="small muted"></div>
         </div>
       </div>
@@ -392,7 +413,7 @@
             Subsystem operation results
             <span id="detailOpStatus" class="detail-status"></span>
           </div>
-          <div id="detailOpList" class="detail-block"></div>
+          <div id="detailOpList" class="detail-op-list"></div>
         </div>
       </div>
     </main>
@@ -411,6 +432,7 @@
 
     const fantArtIdInputEl = document.getElementById("fantArtIdInput");
     const fantArtStatusEl = document.getElementById("fantArtStatus");
+    const filterOpsBtnEl = document.getElementById("filterOpsBtn");
 
     const detailTitleEl = document.getElementById("detailTitle");
     const detailArtTextEl = document.getElementById("detailArtText");
@@ -422,6 +444,7 @@
     let currentCollections = [];
     let currentCollectionId = null;
     let currentSelectedArtId = null;
+    let onlyOpsFilter = false;
 
     function resetDetailPanel() {
       detailTitleEl.textContent = "No art selected";
@@ -429,7 +452,7 @@
       detailColorStatusEl.textContent = "";
       detailOpStatusEl.textContent = "";
       detailColorListEl.textContent = "";
-      detailOpListEl.textContent = "";
+      detailOpListEl.innerHTML = "";
     }
 
     // ---------------------
@@ -453,7 +476,7 @@
       resetDetailPanel();
 
       try {
-        const res = await fetch(`/art/api/collections?email=${encodeURIComponent(email)}`);
+        const res = await fetch(`/api/collections?email=${encodeURIComponent(email)}`);
         if (!res.ok) {
           const msg = await res.text();
           throw new Error(msg || `HTTP ${res.status}`);
@@ -535,7 +558,7 @@
       artListEl.innerHTML = "";
       globalArtStatusEl.textContent = "loading art…";
       try {
-        const res = await fetch(`/art/api/collections/${collectionId}/items`);
+        const res = await fetch(`/api/collections/${collectionId}/items`);
         if (!res.ok) {
           const msg = await res.text();
           throw new Error(msg || `HTTP ${res.status}`);
@@ -559,6 +582,7 @@
         card.className = "art-card";
         card.dataset.artId = item.id;
         card.dataset.artText = item.art || "";
+        card.dataset.hasOp = "false";
 
         const header = document.createElement("div");
         header.className = "art-header";
@@ -609,12 +633,14 @@
 
         runBtn.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          runSubsystemOperationForArt(item.id, status, runBtn, badge);
+          runSubsystemOperationForArt(item.id, status, runBtn, badge, card);
         });
 
-        // Preload badge from existing operations
-        checkOperationStatusForArt(item.id, badge, status);
+        // Preload badge and hasOp flag from existing operations
+        checkOperationStatusForArt(item.id, badge, status, card);
       });
+
+      applyOpsFilter();
     }
 
     function onSelectArt(artId, artText, cardEl) {
@@ -642,7 +668,7 @@
       detailColorStatusEl.textContent = "loading…";
       detailOpStatusEl.textContent = "loading…";
       detailColorListEl.textContent = "";
-      detailOpListEl.textContent = "";
+      detailOpListEl.innerHTML = "";
 
       // Build-thought colors
       try {
@@ -681,17 +707,31 @@
           throw new Error(txt || `HTTP ${res.status}`);
         }
         const ops = await res.json();
+        detailOpListEl.innerHTML = "";
+
         if (!Array.isArray(ops) || ops.length === 0) {
           detailOpStatusEl.textContent = "no subsystem operations yet";
-          detailOpListEl.textContent = "";
         } else {
           detailOpStatusEl.textContent = `${ops.length} operation result(s)`;
-          const chunks = ops.map(o => {
+
+          ops.forEach(o => {
+            const item = document.createElement("div");
+            item.className = "detail-op-item";
+
+            const header = document.createElement("div");
+            header.className = "detail-op-header";
             const ts = o.created_at || "";
             const model = o.model || "";
-            return `[op-color #${o.id} @ ${ts} | ${model}]\n${o.output_text || ""}`;
+            header.textContent = `op-color #${o.id} @ ${ts} | ${model}`;
+
+            const body = document.createElement("div");
+            body.textContent = o.output_text || "";
+
+            item.appendChild(header);
+            item.appendChild(body);
+
+            detailOpListEl.appendChild(item);
           });
-          detailOpListEl.textContent = chunks.join("\n\n────────────────────\n\n");
         }
       } catch (err) {
         console.error(err);
@@ -700,9 +740,9 @@
     }
 
     // ---------------------
-    // Operation status badge per art
+    // Operation status per art (badge + hasOp)
     // ---------------------
-    async function checkOperationStatusForArt(artId, badgeEl, statusEl) {
+    async function checkOperationStatusForArt(artId, badgeEl, statusEl, cardEl) {
       try {
         const res = await fetch(
           `/colors/by_art/${artId}?origin=${encodeURIComponent("colors.fantasiagenesis_subsystem_operation")}`
@@ -714,9 +754,11 @@
         if (Array.isArray(ops) && ops.length > 0) {
           badgeEl.className = "badge green";
           badgeEl.textContent = `${ops.length} op(s)`;
+          if (cardEl) cardEl.dataset.hasOp = "true";
         } else {
           badgeEl.className = "badge gray";
           badgeEl.textContent = "no ops";
+          if (cardEl) cardEl.dataset.hasOp = "false";
         }
       } catch (err) {
         console.error(err);
@@ -726,13 +768,16 @@
           statusEl.textContent = "error checking ops";
           statusEl.className = "status error";
         }
+        if (cardEl) cardEl.dataset.hasOp = "false";
       }
+
+      applyOpsFilter();
     }
 
     // ---------------------
     // Run subsystem operation
     // ---------------------
-    async function runSubsystemOperationForArt(artId, statusEl, buttonEl, badgeEl) {
+    async function runSubsystemOperationForArt(artId, statusEl, buttonEl, badgeEl, cardEl) {
       const fantIdStr = (fantArtIdInputEl.value || "").trim();
       if (!fantIdStr) {
         fantArtStatusEl.textContent = "enter fantasiagenesis art id";
@@ -777,7 +822,7 @@
 
         // Refresh status + detail after a short delay
         setTimeout(() => {
-          checkOperationStatusForArt(artId, badgeEl, statusEl);
+          checkOperationStatusForArt(artId, badgeEl, statusEl, cardEl);
           if (currentSelectedArtId === artId) {
             loadDetailsForArt(artId);
           }
@@ -792,6 +837,29 @@
     }
 
     // ---------------------
+    // Filter: only show art with operations
+    // ---------------------
+    function applyOpsFilter() {
+      const cards = artListEl.querySelectorAll(".art-card");
+      cards.forEach(card => {
+        const hasOp = card.dataset.hasOp === "true";
+        if (onlyOpsFilter && !hasOp) {
+          card.classList.add("hidden");
+        } else {
+          card.classList.remove("hidden");
+        }
+      });
+    }
+
+    function toggleOpsFilter() {
+      onlyOpsFilter = !onlyOpsFilter;
+      filterOpsBtnEl.textContent = onlyOpsFilter
+        ? "Show all art"
+        : "Show only operated art";
+      applyOpsFilter();
+    }
+
+    // ---------------------
     // Wire UI
     // ---------------------
     loadCollectionsBtn.addEventListener("click", () => {
@@ -803,6 +871,10 @@
         ev.preventDefault();
         loadCollections();
       }
+    });
+
+    filterOpsBtnEl.addEventListener("click", () => {
+      toggleOpsFilter();
     });
   </script>
 </body>
