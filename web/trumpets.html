@@ -137,6 +137,7 @@
       display: flex;
       gap: 6px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .top-controls-row button {
@@ -540,6 +541,17 @@
             Subsystem operation results
             <span id="detailOpStatus" class="detail-status"></span>
           </div>
+
+          <!-- NEW: random N runs from Fantasiagenesis source panel -->
+          <div class="top-controls-row" style="margin-top:4px; margin-bottom:6px;">
+            <label class="small" style="margin:0;">
+              Random runs (from Fantasiagenesis panel):
+              <input id="randomOpsCountInput" type="number" min="1" value="3" style="width:60px; margin-left:4px;" />
+            </label>
+            <button id="runRandomOpsBtn">Run random subsystem operations</button>
+            <span id="randomOpsStatus" class="small muted"></span>
+          </div>
+
           <div id="detailOpList" class="detail-op-list"></div>
         </div>
       </div>
@@ -616,6 +628,10 @@
     const detailOpStatusEl = document.getElementById("detailOpStatus");
     const detailOpListEl = document.getElementById("detailOpList");
 
+    const randomOpsCountInputEl = document.getElementById("randomOpsCountInput");
+    const runRandomOpsBtnEl = document.getElementById("runRandomOpsBtn");
+    const randomOpsStatusEl = document.getElementById("randomOpsStatus");
+
     let currentCollections = [];
     let currentCollectionId = null;
     let currentSelectedArtId = null;
@@ -631,6 +647,10 @@
       detailOpStatusEl.textContent = "";
       detailColorListEl.textContent = "";
       detailOpListEl.innerHTML = "";
+      if (randomOpsStatusEl) {
+        randomOpsStatusEl.textContent = "";
+        randomOpsStatusEl.className = "small muted";
+      }
     }
 
     function resetFgenPanel() {
@@ -836,12 +856,13 @@ ${c.output_text || ""}`;
 
             const toggle = document.createElement("span");
             toggle.className = "fgen-bridge-toggle";
-            toggle.textContent = "Expand";
+            toggle.textContent = "Expand";  // default collapsed
 
             header.appendChild(left);
             header.appendChild(toggle);
 
             const body = document.createElement("div");
+            // start hidden
             body.className = "fgen-bridge-body hidden";
             const text = b.output_text || b.bridge_text || JSON.stringify(b, null, 2);
             body.textContent = text;
@@ -1170,12 +1191,13 @@ ${c.output_text || ""}`;
 
             const toggle = document.createElement("span");
             toggle.className = "detail-op-toggle";
-            toggle.textContent = "Expand";
+            toggle.textContent = "Expand";  // default collapsed
 
             header.appendChild(leftLabel);
             header.appendChild(toggle);
 
             const body = document.createElement("div");
+            // start hidden
             body.className = "detail-op-body hidden";
             body.textContent = o.output_text || "";
 
@@ -1240,7 +1262,7 @@ ${c.output_text || ""}`;
     }
 
     // ---------------------
-    // Run subsystem operation
+    // Run single subsystem operation (with currently selected Fantasiagenesis art)
     // ---------------------
     async function runSubsystemOperationForArt(artId, statusEl, buttonEl, badgeEl, cardEl) {
       const fantIdStr = (fantArtIdInputEl.value || "").trim();
@@ -1302,6 +1324,108 @@ ${c.output_text || ""}`;
     }
 
     // ---------------------
+    // Run N random subsystem operations from Fantasiagenesis for current target art
+    // ---------------------
+    async function runRandomSubsystemOpsForCurrentArt() {
+      if (!currentSelectedArtId) {
+        randomOpsStatusEl.textContent = "select a target art first";
+        randomOpsStatusEl.className = "small status error";
+        return;
+      }
+
+      if (!Array.isArray(fgenArtItems) || fgenArtItems.length === 0) {
+        randomOpsStatusEl.textContent = "Fantasiagenesis art not loaded";
+        randomOpsStatusEl.className = "small status error";
+        return;
+      }
+
+      let n = parseInt((randomOpsCountInputEl.value || "").trim(), 10);
+      if (!Number.isInteger(n) || n <= 0) n = 1;
+      if (n > fgenArtItems.length) n = fgenArtItems.length;
+
+      // shuffle copy and take first n
+      const pool = fgenArtItems.slice();
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = pool[i];
+        pool[i] = pool[j];
+        pool[j] = tmp;
+      }
+      const chosen = pool.slice(0, n);
+
+      randomOpsStatusEl.textContent = `queueing ${n} subsystem operation(s)…`;
+      randomOpsStatusEl.className = "small status pending";
+
+      const targetArtId = currentSelectedArtId;
+
+      const promises = chosen.map(item => {
+        return fetch("/colors/fantasiagenesis_subsystem_operation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fantasiagenesis_art_id: item.id,
+            target_art_id: targetArtId
+          })
+        })
+          .then(async (res) => {
+            const text = await res.text();
+            let data;
+            try {
+              data = JSON.parse(text);
+            } catch {
+              data = null;
+            }
+            if (!res.ok) {
+              const msg = (data && data.description) || text || `HTTP ${res.status}`;
+              throw new Error(msg);
+            }
+            return data;
+          });
+      });
+
+      try {
+        const results = await Promise.allSettled(promises);
+        let okCount = 0;
+        let errCount = 0;
+        const taskIds = [];
+        results.forEach(r => {
+          if (r.status === "fulfilled") {
+            okCount += 1;
+            if (r.value && r.value.task_id) {
+              taskIds.push(r.value.task_id);
+            }
+          } else {
+            errCount += 1;
+          }
+        });
+
+        let msg = `queued ${okCount} op(s)`;
+        if (errCount) msg += `, ${errCount} error(s)`;
+        if (taskIds.length) msg += ` | tasks: ${taskIds.join(", ")}`;
+        randomOpsStatusEl.textContent = msg;
+        randomOpsStatusEl.className = "small status pending";
+
+        // Refresh badge + details for that art
+        const cardEl = artListEl.querySelector(`.art-card[data-art-id="${targetArtId}"]`);
+        const badgeEl = cardEl ? cardEl.querySelector(".badge") : null;
+        const statusEl = cardEl ? cardEl.querySelector(".status") : null;
+
+        setTimeout(() => {
+          if (badgeEl) {
+            checkOperationStatusForArt(targetArtId, badgeEl, statusEl, cardEl);
+          }
+          if (currentSelectedArtId === targetArtId) {
+            loadDetailsForArt(targetArtId);
+          }
+        }, 3000);
+      } catch (err) {
+        console.error(err);
+        randomOpsStatusEl.textContent = `error: ${err.message || err}`;
+        randomOpsStatusEl.className = "small status error";
+      }
+    }
+
+    // ---------------------
     // Filter: only show art with operations
     // ---------------------
     function applyOpsFilter() {
@@ -1341,6 +1465,12 @@ ${c.output_text || ""}`;
     filterOpsBtnEl.addEventListener("click", () => {
       toggleOpsFilter();
     });
+
+    if (runRandomOpsBtnEl) {
+      runRandomOpsBtnEl.addEventListener("click", () => {
+        runRandomSubsystemOpsForCurrentArt();
+      });
+    }
 
     // Auto-load Fantasiagenesis source art panel on page load
     loadFantasiagenesisSourceArt();
