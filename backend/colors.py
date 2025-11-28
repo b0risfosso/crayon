@@ -1247,6 +1247,7 @@ def worker_loop(worker_id: int):
                 )
                 target_color_id = target_color_row["id"]
                 thought_text = (target_color_row.get("output_text") or "").strip()
+                print(thought_text)
                 if not thought_text:
                     raise ValueError(
                         f"target art {target_art_id} has color {target_color_id} with empty output_text"
