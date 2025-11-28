@@ -3057,46 +3057,98 @@ Use the following fixed structure:
 
 fantasiagenesis_subsystem_operation = r"""
 You are operating inside Fantasiagenesis.
-
 Your function is to take:
-A Fantasiagenesis subsystem description, and
-A thought (any domain: geopolitics, biology, emotion, cosmic engineering, etc.),
-and generate a collection of raw idea-inputs suitable for ingestion by that subsystem.
-
-These raw ideas should be:
-Directly derived from or inspired by the thought.
-Meaningful components that the subsystem could process, manipulate, transform, or operationalize.
-Atomic enough to serve as entry points for subsystem operations.
-High-signal, not generic summaries.
-
-Avoid compliments, avoid “not…but,” and avoid poetic excess.
+A Fantasiagenesis Subsystem Description, and
+A Thought (any domain: geopolitics, biology, emotion, economics, cosmic engineering, art, psychology, etc.),
+and generate a collection of raw idea–inputs suitable for ingestion by that subsystem.
+Raw ideas are the domain-grounded, subsystem-ready building blocks that allow Fantasiagenesis to transform the thought into structured operations.
+CRITICAL CONSTRAINTS (GENERALIZED)
+1. Substrate Lock (Zero Drift Rule)
+You must remain entirely inside the concrete domain of the Thought.
+You may not introduce entities, mechanisms, substrates, or ontologies that are absent from the Thought.
+Raw ideas must:
+Reference explicit entities, forces, flows, relationships, or structures appearing in the Thought.
+Be describable as measurable, manipulable, or observable constructs within that same domain.
+Be reconstructable from data or structured observation about that domain.
+Examples of allowed substrates:
+If the Thought is about an organism → genes, signals, organs, environments, behaviors.
+If the Thought is about emotions → triggers, intensities, modulations, social feedback loops.
+If the Thought is about cosmic engineering → pressures, stars, orbital structures, resource fields.
+If the Thought is about solar geopolitics → states, grids, minerals, alliances, flows.
+Forbidden:
+Introducing alien substrates (“vacuum chambers,” “quantum lattices,” “software agents,” etc.) unless the Thought mentions or implies them.
+2. Subsystem Interpretation as “Effective Laws of This Domain”
+For any subsystem—physics, biology, cognition, ethics, engineering—interpret its operations as working inside the domain of the Thought.
+When the subsystem refers to:
+“laws”
+“invariants”
+“boundaries”
+“experiments”
+“mechanisms”
+“operators”
+“constraints”
+“dynamics”
+“optimization”
+“evolution”
+“fabrication”
+“translation”
+“simulation”
+You must reinterpret these in terms of the Thought’s domain:
+The subsystem is discovering or manipulating the effective rules, invariants, flows, or structures of the domain described in the Thought.
+Example interpretations:
+A biological subsystem interprets an economic thought as “organism-like flows” in that economic system.
+A cognitive subsystem interprets a political thought as “decision nodes and inference pathways” in political actors.
+A physics subsystem interprets an emotional thought as “energy landscapes, attractors, thresholds” in emotional dynamics.
+No subsystem gets to import its own physical machinery unless the Thought provides the substrate.
+3. Traceability Requirement
+Every raw idea must include:
+Direct citation or paraphrase from the Thought showing where it comes from.
+Clear grounding in the Thought’s actual ontology.
+A form that could be represented as:
+a state variable
+an interaction term
+a field
+a graph
+a flow
+an event log
+a constraint
+an invariant
+a resource or actor
+a tension or failure point
+The subsystem should be able to use it as-is without leaving the domain.
 TASK
 Given:
-Subsystem: {subsystem}
-Thought: {thought}
+Subsystem:
+{subsystem}
+
+Thought:
+{thought}
+
 Produce a structured set of raw idea candidates that:
-Identify the latent structures, forces, invariants, tensions, primitives, or variables present in the thought.
-Are aligned with the subsystem’s operational class, constraints, and processing style.
-Would serve as meaningful seeds for the subsystem’s transformation pipeline.
+Identify the latent structures, forces, tensions, primitives, variables, or invariants present in the Thought.
+Are aligned with the Subsystem’s operations, constraints, ontologies, and processing style.
+Serve as meaningful seeds for the Subsystem’s transformation pipeline.
+Remain fully inside the domain ontology of the Thought.
 OUTPUT FORMAT
-Return your answer in the following structure:
 1. Subsystem-Informed Extraction Logic
-   - Brief explanation of how the subsystem interprets the thought.
-   - What kinds of inputs the subsystem finds valuable.
-   - What signals or structures inside the thought it treats as potential primitives.
-
+Explain:
+How the subsystem interprets the Thought while staying in-domain.
+What kinds of inputs the subsystem finds valuable, expressed in the Thought’s own ontology.
+Which signals, structures, or patterns inside the Thought the subsystem treats as potential primitives.
 2. Raw Idea Candidates (8–15 items)
-   Each should be:
-   - A compact conceptual unit.
-   - Directly traceable to the thought.
-   - The kind of object the subsystem can operate on.
-
-   Format for each:
-   • Title  
-   • 1–2 sentence description  
-   • Why this is a meaningful input for the subsystem
-
+For each candidate:
+Title
+1–2 sentence description of the object as a field, flow, store, operator, structure, tension, or event in this domain.
+Why it is meaningful for the subsystem.
+Source snippet: short quote or paraphrase from the Thought.
+Requirements:
+Each candidate must use the Thought’s own ontology.
+No candidate may import new substrates, actors, or mechanisms.
+Each object must be something the subsystem could manipulate, model, transform, or test.
 3. Mapping Summary
-   - How these raw ideas collectively span the semantic territory of the thought.
-   - How they connect to the subsystem’s processing pipeline.
+Explain:
+How the raw ideas collectively span the semantic and structural territory of the Thought.
+How they connect to the subsystem’s processing pipeline (e.g., hypothesis parameters, operators, experiment nodes, simulation variables, constraint fields).
+Explicit confirmation that all primitives remain in-domain and that any subsystem-level abstractions were projected into the Thought’s domain.
+
 """
