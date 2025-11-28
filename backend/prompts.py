@@ -3029,12 +3029,14 @@ Use the following fixed structure:
    Specify exactly what the subsystem outputs into the Fantasiagenesis pipeline. Examples:
    - structured primitives
    - simulation seeds
-   - constraint maps
-   - physical-world bridge components
-   - domain schemas
-   - cognitive scaffolds
-   - operator sets
-   - transformation graphs
+   - Fabrication, Engineering, and Actuation Pipelines
+   - Fabrication planners, Robotic execution controllers, Construction schedules and physical-world playbooks
+   - Policy, Governance, and Operational Decision Systems
+   - Policy analysis engines, Regulatory compliance engines, Market and economic optimization engines
+   - Scientific, Experimental, and Empirical Loops
+   - Experimental planning, Sensor integration, Data collection/analysis, Closed-loop learning
+   - Cognitive, Conceptual, and Collaborative Reality
+   - Human-in-the-loop co-design, Visualization engines, Knowledge integration
 
 8. **Operational Summary**
    Provide a 3–5 sentence summary clarifying:
