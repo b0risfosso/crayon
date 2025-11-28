@@ -3079,6 +3079,24 @@ Do NOT rewrite or summarize the subsystem or the thought.
 Instead, **simulate the subsystem executing its role on the thought**, using the subsystem’s
 specific machinery.
 
+Your simulation must preserve the structure and logic of the thought.
+
+⭐ Treat the thought as a structured system with its own causal relations,
+   semantic invariants, actors, dependencies, and internal topology.
+
+⭐ Before applying subsystem mechanisms, reconstruct the thought’s internal
+   structure (causal graph, actors, dependencies, flows, constraints).
+
+⭐ When mapping the thought into the subsystem’s primitives, preserve these
+   structural and causal relationships wherever possible.
+
+⭐ Do not select a narrow fragment of the thought; operate on all elements
+   that are structurally or causally significant.
+
+⭐ Translate high-level meanings, forces, or relationships into subsystem-
+   interpretable primitives, constraints, or observables.
+
+
 ============================================================
 OUTPUT STRUCTURE (REQUIRED):
 
@@ -3086,6 +3104,13 @@ OUTPUT STRUCTURE (REQUIRED):
 - How the subsystem parses, ingests, and normalizes the given thought.
 - What signals, structures, or variables it detects in the thought.
 - Which parts of the thought map to the subsystem’s domain.
+
+⭐ Identify the thought’s internal structure: actors, flows, relationships,
+   causal dependencies, invariants, conflicts, levers, and constraints.
+
+⭐ Map these structures (not just keywords) into the subsystem’s domain.
+
+
 
 **2. Internal Processing Using Subsystem Mechanisms**
 Use the actual mechanisms listed in SUBSYSTEM_DESCRIPTION:
@@ -3096,6 +3121,14 @@ Use the actual mechanisms listed in SUBSYSTEM_DESCRIPTION:
 - evaluations
 - pruning, optimization, perturbation, translation, or grounding steps
 Show in detail how each mechanism handles this thought.
+
+⭐ Use subsystem mechanisms to transform the thought’s entire structural
+   topology into subsystem-level data structures (Intent Graph, Constraint
+   Tensor, Sampling Topology, etc.).
+
+⭐ When selecting primitives, constraints, or mappings, reflect the thought’s
+   original semantics and causal logic, not isolated lexical tokens.
+
 
 **3. Core Transformations**
 Explain the specific transformations the subsystem performs on the thought:
@@ -3111,6 +3144,13 @@ Explain the specific transformations the subsystem performs on the thought:
 - physical-world grounding
 - novelty perturbation
 (choose according to subsystem identity)
+
+⭐ Ensure transformations preserve the thought’s core logic, relationships,
+   and meaning as they are converted into subsystem-compatible forms.
+
+⭐ Show how the subsystem grounds the high-level structure of the thought
+   into its primitives, observables, constraints, and operational artefacts.
+
 
 **4. Resulting Artifacts**
 Describe the concrete outputs the subsystem produces for this thought:
@@ -3129,6 +3169,10 @@ Describe the concrete outputs the subsystem produces for this thought:
 Explain what this subsystem uniquely reveals, extracts, or enables
 for this particular thought—insights that no other subsystem would
 produce.
+
+⭐ Emphasize what the subsystem reveals about the thought’s structural and
+   causal organization once expressed in subsystem primitives.
+
 
 **6. Limitations or Boundary Conditions**
 If the thought falls partially outside the subsystem’s domain,
