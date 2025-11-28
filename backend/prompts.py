@@ -2970,147 +2970,54 @@ Now perform the entity × bridge interaction search.
 """
 
 
-fantasiagenesis_subsystem_bridge_function = r"""
-You are Fantasiagenesis’s Subsystem Interpreter.
-
-Your task:
-Given a raw TEXT_INPUT describing a subsystem of Fantasiagenesis, produce a full explanation of how this subsystem functions as a bridge between imagination and reality. You must treat the subsystem as a real component inside the architecture, operating on raw ideas and converting them into structured, manipulable, testable artifacts.
-
---- INPUT ---
-{text_input}
-
---- OUTPUT FORMAT ---
-Use the following fixed structure:
-
-1. **Subsystem Identity and Purpose**
-   - Extract the essence of the subsystem.
-   - Define what class of operations it governs (e.g., translation, simulation, constraint extraction, physical world grounding, topology management, fabrication alignment).
-   - State what aspect of imagination→reality conversion it anchors.
-
-2. **Input Model of a Raw Idea**
-   Describe:
-   - What form a raw idea arrives in.
-   - What signals, properties, or ambiguity the subsystem detects.
-   - What transformations or pre-processing steps the subsystem performs.
-
-3. **Internal Mechanisms**
-   Break into explicit mechanics:
-   - data structures it builds
-   - operators it applies
-   - constraints it enforces
-   - pipelines it triggers
-   - representations it extracts
-   - links it establishes with other Fantasiagenesis subsystems
-
-   Present these as physical, computational, and cognitive operations.
-
-4. **Bridge Construction Logic**
-   Explain how the subsystem performs imagination→reality bridging. Include:
-   - how it converts imaginative content into structured primitives
-   - how it selects what becomes “realizable”
-   - how it forms continuity between abstract thought and executable form
-   - how it handles uncertainty, ambiguity, or infinite spaces
-   - what becomes measurable, manipulable, or testable
-
-5. **Interfaces With Other Subsystems**
-   Identify:
-   - upstream subsystems providing input
-   - downstream subsystems receiving its output
-   - feedback channels
-   - stability or coherence requirements
-
-6. **Failure Modes and Safeguards**
-   Describe:
-   - what goes wrong when the subsystem misinterprets an idea
-   - what overconstraint/underconstraint looks like
-   - how the subsystem maintains alignment with intention and physical-world plausibility
-
-7. **Resulting Artifacts**
-   Specify exactly what the subsystem outputs into the Fantasiagenesis pipeline. Examples:
-   - structured primitives
-   - simulation seeds
-   - constraint maps
-   - physical-world bridge components
-   - domain schemas
-   - cognitive scaffolds
-   - operator sets
-   - transformation graphs
-
-8. **Operational Summary**
-   Provide a 3–5 sentence summary clarifying:
-   - how this subsystem advances an idea toward reality formation
-   - what bottlenecks it resolves
-   - what unique role it plays in Fantasiagenesis
-
---- REQUIREMENTS ---
-- Stay descriptive, mechanistic, and concrete.
-- Avoid metaphors.
-- Avoid poetic language.
-- Show how the subsystem *performs work* on ideas.
-- Assume Fantasiagenesis is a real system with hardware, memory, computation layers, evaluators, feedback loops, and world interfaces.
-- No affirmations at the start of the response.
-- No “not… but…” rhetorical structures.
-- No praise.
-"""
-
-fantasiagenesis_subsystem_operation = r"""
+fantasiagenesis_subsystem_bridge_function = rfantasiagenesis_subsystem_operation = r"""
 You are operating inside Fantasiagenesis.
 
-Your task: Given (1) a Fantasiagenesis subsystem specification and (2) a thought, produce a precise, subsystem-faithful explanation of **how that subsystem would operate on that thought**.
+Your task: Given (1) a Fantasiagenesis subsystem specification and (2) a thought,
+produce a precise, subsystem-faithful explanation of **how that subsystem would operate
+on that thought**.
 
 Follow this exact procedure:
 
 ============================================================
 INPUTS PROVIDED TO YOU:
-1. SUBSYSTEM_DESCRIPTION: A full technical description of a Fantasiagenesis subsystem,
-   including identity, purpose, mechanisms, data structures, operators, constraints,
-   pipelines, failure modes, and outputs.
+1. SUBSYSTEM_DESCRIPTION:
+   A full technical description of a Fantasiagenesis subsystem, including identity,
+   purpose, mechanisms, data structures, operators, constraints, pipelines,
+   failure modes, and outputs.
 
-2. THOUGHT: A free-form idea (textual, conceptual, political, scientific, artistic,
-   or hybrid) that the subsystem must operate on.
+2. THOUGHT:
+   A free-form idea (textual, conceptual, political, scientific, artistic, or hybrid)
+   that the subsystem must operate on.
 
 ============================================================
 YOUR JOB:
+
 Interpret the subsystem as a computational, cognitive, physical, or conceptual engine
-according to its specification. Then describe *step-by-step* how it processes, transforms,
-and acts upon the thought.
+according to its specification. Then describe *step-by-step* how it processes,
+transforms, and acts upon the thought.
 
-Do NOT rewrite or summarize the subsystem or the thought.  
-Instead, **simulate the subsystem executing its role on the thought**, using the subsystem’s
-specific machinery.
+Do NOT rewrite or summarize the subsystem or the thought.
+Instead, **simulate the subsystem executing its role on the thought**, using the
+subsystem’s specific machinery.
 
-Your simulation must preserve the structure and logic of the thought.
-
-⭐ Treat the thought as a structured system with its own causal relations,
-   semantic invariants, actors, dependencies, and internal topology.
-
-⭐ Before applying subsystem mechanisms, reconstruct the thought’s internal
-   structure (causal graph, actors, dependencies, flows, constraints).
-
-⭐ When mapping the thought into the subsystem’s primitives, preserve these
-   structural and causal relationships wherever possible.
-
-⭐ Do not select a narrow fragment of the thought; operate on all elements
-   that are structurally or causally significant.
-
-⭐ Translate high-level meanings, forces, or relationships into subsystem-
-   interpretable primitives, constraints, or observables.
-
+⭐ Your simulation must preserve the structure, logic, and meaning of the thought.  
+⭐ Treat the thought as a structured system with its own actors, variables, flows,  
+   causal dependencies, constraints, and internal topology.  
+⭐ Before applying subsystem mechanisms, reconstruct this internal structure.  
+⭐ Translate high-level forces, intentions, relationships, and semantics into  
+   subsystem-level primitives and observables.  
+⭐ Do not limit processing to isolated keywords—operate on all structurally or  
+   causally significant elements of the thought.  
 
 ============================================================
 OUTPUT STRUCTURE (REQUIRED):
 
 **1. Input Interpretation**
-- How the subsystem parses, ingests, and normalizes the given thought.
-- What signals, structures, or variables it detects in the thought.
-- Which parts of the thought map to the subsystem’s domain.
-
-⭐ Identify the thought’s internal structure: actors, flows, relationships,
-   causal dependencies, invariants, conflicts, levers, and constraints.
-
-⭐ Map these structures (not just keywords) into the subsystem’s domain.
-
-
+- How the subsystem parses, ingests, and normalizes the thought.
+- What signals, structures, actors, relationships, flows, or constraints it detects.
+- ⭐ Identify the thought’s internal structure (causal graph, actors, dependencies,
+  invariants, levers) and map these to the subsystem’s domain.
 
 **2. Internal Processing Using Subsystem Mechanisms**
 Use the actual mechanisms listed in SUBSYSTEM_DESCRIPTION:
@@ -3120,15 +3027,18 @@ Use the actual mechanisms listed in SUBSYSTEM_DESCRIPTION:
 - constraints
 - evaluations
 - pruning, optimization, perturbation, translation, or grounding steps
-Show in detail how each mechanism handles this thought.
 
-⭐ Use subsystem mechanisms to transform the thought’s entire structural
-   topology into subsystem-level data structures (Intent Graph, Constraint
-   Tensor, Sampling Topology, etc.).
+Describe in detail how each subsystem mechanism acts on the:
+  - reconstructed structure of the thought,
+  - its causal relationships,
+  - its semantic invariants,
+  - its agents and dependencies.
 
-⭐ When selecting primitives, constraints, or mappings, reflect the thought’s
-   original semantics and causal logic, not isolated lexical tokens.
+⭐ When applying subsystem mechanisms, preserve the thought’s causal logic and internal
+  topology as they are transformed into subsystem-level constructs (Intent Graph,
+  Constraint Tensor, Sampling Topology, Traceability Log, etc.).
 
+⭐ Ensure subsystem operations reflect the meaning and purpose of the thought.
 
 **3. Core Transformations**
 Explain the specific transformations the subsystem performs on the thought:
@@ -3145,12 +3055,8 @@ Explain the specific transformations the subsystem performs on the thought:
 - novelty perturbation
 (choose according to subsystem identity)
 
-⭐ Ensure transformations preserve the thought’s core logic, relationships,
-   and meaning as they are converted into subsystem-compatible forms.
-
-⭐ Show how the subsystem grounds the high-level structure of the thought
-   into its primitives, observables, constraints, and operational artefacts.
-
+⭐ Show how these transformations preserve and translate the thought’s causal and
+  semantic structure into subsystem-compatible primitives, constraints, and artifacts.
 
 **4. Resulting Artifacts**
 Describe the concrete outputs the subsystem produces for this thought:
@@ -3163,20 +3069,22 @@ Describe the concrete outputs the subsystem produces for this thought:
 - device primitives
 - operator sequences
 - robustness profiles
-(choose those relevant to the subsystem)
+(choose those appropriate for the subsystem)
+
+Ensure each artifact retains traceability back to the thought’s structural elements
+and original meaning.
 
 **5. Subsystem-Specific Insights**
-Explain what this subsystem uniquely reveals, extracts, or enables
-for this particular thought—insights that no other subsystem would
-produce.
-
-⭐ Emphasize what the subsystem reveals about the thought’s structural and
-   causal organization once expressed in subsystem primitives.
-
+Explain what this subsystem uniquely reveals, extracts, or enables for this thought:
+- insights arising from how the thought’s internal structure looks when expressed
+  in the subsystem’s primitives and constraints.
+- distinctions that only this subsystem can make.
 
 **6. Limitations or Boundary Conditions**
-If the thought falls partially outside the subsystem’s domain,
-explain how the subsystem handles that mismatch.
+If parts of the thought fall outside the subsystem’s domain:
+- explain the mismatch,
+- show how the subsystem handles or bounds it,
+- preserve structural fidelity wherever possible.
 
 ============================================================
 
@@ -3185,7 +3093,8 @@ RULES:
 - Use subsystem-specific technical vocabulary for mechanisms and artifacts.
 - Avoid summarizing the thought; focus on subsystem behavior on the thought.
 - Be explicit, mechanistic, and structural.
-- No generalities, no metaphors unless subsystem is metaphorical.
+- Preserve the thought’s internal causal logic and semantic topology.
+- Translate meaning, not just lexical tokens.
 - Do not add capabilities not present in the subsystem description.
 
 ============================================================
