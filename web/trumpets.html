@@ -265,6 +265,117 @@
       white-space: pre-wrap;
     }
 
+    .fgen-section {
+      margin-top: 18px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e2e2;
+    }
+
+    .fgen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .fgen-split {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .fgen-list-column {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .fgen-art-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .fgen-art-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      cursor: pointer;
+    }
+
+    .fgen-art-card.selected {
+      border-color: #c27cff;
+      box-shadow: 0 0 0 1px rgba(158,103,255,0.4);
+    }
+
+    .fgen-art-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+
+    .fgen-art-id {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .fgen-art-body {
+      font-size: 12px;
+      max-height: 72px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .fgen-detail-panel {
+      flex: 1.1;
+      min-width: 260px;
+      max-width: 640px;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      max-height: 320px;
+      overflow: auto;
+    }
+
+    .fgen-bridge-item {
+      font-size: 12px;
+      white-space: pre-wrap;
+      border-radius: 4px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      padding: 6px 8px;
+    }
+
+    .fgen-bridge-header {
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #444;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .fgen-bridge-toggle {
+      font-size: 11px;
+      color: #555;
+      margin-left: 8px;
+    }
+
+    .fgen-bridge-body {
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+
     .art-list {
       display: flex;
       flex-direction: column;
@@ -394,14 +505,9 @@
           <div id="artListSubtitle" class="muted small"></div>
         </div>
         <div class="art-global-controls">
-          <!-- NEW: Fantasiagenesis art selector -->
-          <div style="width:100%;">
-            <label for="fantArtSelect">Fantasiagenesis subsystem art</label>
-            <select id="fantArtSelect">
-              <option value="">loading Fantasiagenesis art…</option>
-            </select>
-            <!-- Hidden input used internally by JS -->
-            <input id="fantArtIdInput" type="hidden" />
+          <div>
+            <label for="fantArtIdInput">Current Fantasiagenesis subsystem art id</label>
+            <input id="fantArtIdInput" type="number" placeholder="select from panel below" readonly />
           </div>
           <div class="small muted" id="fantArtStatus"></div>
           <button id="filterOpsBtn">Show only operated art</button>
@@ -437,6 +543,45 @@
           <div id="detailOpList" class="detail-op-list"></div>
         </div>
       </div>
+
+      <section class="fgen-section">
+        <div class="fgen-header">
+          <div>
+            <h2>Fantasiagenesis subsystem art (boris@fantasiagenesis.com)</h2>
+            <div class="muted small">
+              Browse Fantasiagenesis collection and inspect its art, colors, and subsystem bridges.
+            </div>
+          </div>
+          <div class="small muted" id="fgenStatus"></div>
+        </div>
+
+        <div class="fgen-split">
+          <div class="fgen-list-column">
+            <div id="fgenArtList" class="fgen-art-list"></div>
+          </div>
+
+          <div class="fgen-detail-panel">
+            <div class="detail-title" id="fgenDetailTitle">No Fantasiagenesis art selected</div>
+
+            <div class="detail-label">
+              Fantasiagenesis art text
+            </div>
+            <div id="fgenArtText" class="detail-block"></div>
+
+            <div class="detail-label">
+              Colors for this Fantasiagenesis art
+              <span id="fgenColorsStatus" class="detail-status"></span>
+            </div>
+            <div id="fgenColorsList" class="detail-block"></div>
+
+            <div class="detail-label">
+              Fantasiagenesis subsystem bridges
+              <span id="fgenBridgesStatus" class="detail-status"></span>
+            </div>
+            <div id="fgenBridgesList" class="detail-op-list"></div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -451,10 +596,18 @@
     const artListSubtitleEl = document.getElementById("artListSubtitle");
     const globalArtStatusEl = document.getElementById("globalArtStatus");
 
-    const fantArtSelectEl = document.getElementById("fantArtSelect");
     const fantArtIdInputEl = document.getElementById("fantArtIdInput");
     const fantArtStatusEl = document.getElementById("fantArtStatus");
     const filterOpsBtnEl = document.getElementById("filterOpsBtn");
+
+    const fgenStatusEl = document.getElementById("fgenStatus");
+    const fgenArtListEl = document.getElementById("fgenArtList");
+    const fgenDetailTitleEl = document.getElementById("fgenDetailTitle");
+    const fgenArtTextEl = document.getElementById("fgenArtText");
+    const fgenColorsStatusEl = document.getElementById("fgenColorsStatus");
+    const fgenColorsListEl = document.getElementById("fgenColorsList");
+    const fgenBridgesStatusEl = document.getElementById("fgenBridgesStatus");
+    const fgenBridgesListEl = document.getElementById("fgenBridgesList");
 
     const detailTitleEl = document.getElementById("detailTitle");
     const detailArtTextEl = document.getElementById("detailArtText");
@@ -468,6 +621,9 @@
     let currentSelectedArtId = null;
     let onlyOpsFilter = false;
 
+    let fgenArtItems = [];
+    let currentFgenArtId = null;
+
     function resetDetailPanel() {
       detailTitleEl.textContent = "No art selected";
       detailArtTextEl.textContent = "";
@@ -477,83 +633,241 @@
       detailOpListEl.innerHTML = "";
     }
 
+    function resetFgenPanel() {
+      if (fgenDetailTitleEl) fgenDetailTitleEl.textContent = "No Fantasiagenesis art selected";
+      if (fgenArtTextEl) fgenArtTextEl.textContent = "";
+      if (fgenColorsStatusEl) fgenColorsStatusEl.textContent = "";
+      if (fgenColorsListEl) fgenColorsListEl.textContent = "";
+      if (fgenBridgesStatusEl) fgenBridgesStatusEl.textContent = "";
+      if (fgenBridgesListEl) fgenBridgesListEl.innerHTML = "";
+    }
+
     // ---------------------
-    // Load Fantasiagenesis collection for subsystem art
+    // Fantasiagenesis source art panel
     // ---------------------
-    async function loadFantasiagenesisArt() {
+    async function loadFantasiagenesisSourceArt() {
+      if (!fgenStatusEl) return;
       const fixedEmail = "boris@fantasiagenesis.com";
-      fantArtStatusEl.textContent = "loading Fantasiagenesis collection…";
-      fantArtSelectEl.innerHTML = `<option value="">loading…</option>`;
+
+      fgenStatusEl.textContent = "loading Fantasiagenesis collection…";
+      if (fgenArtListEl) fgenArtListEl.innerHTML = "";
+      resetFgenPanel();
 
       try {
-        // Fetch collections for fixed Fantasiagenesis email
         const res = await fetch(`/art/api/collections?email=${encodeURIComponent(fixedEmail)}`);
         if (!res.ok) {
           const msg = await res.text();
           throw new Error(msg || `HTTP ${res.status}`);
         }
         const collections = await res.json();
-
-        // Find the "fantasiagenesis" collection
         const fgenCollection = collections.find(c =>
           (c.name || "").toLowerCase().trim() === "fantasiagenesis"
         );
 
         if (!fgenCollection) {
-          fantArtSelectEl.innerHTML = `<option value="">no "fantasiagenesis" collection found</option>`;
-          fantArtStatusEl.textContent = `no Fantasiagenesis collection for ${fixedEmail}`;
+          fgenStatusEl.textContent = `no "fantasiagenesis" collection found for ${fixedEmail}`;
           return;
         }
 
-        // Load art items for that collection
         const itemsRes = await fetch(`/art/api/collections/${fgenCollection.id}/items`);
         if (!itemsRes.ok) {
           const msg = await itemsRes.text();
           throw new Error(msg || `HTTP ${itemsRes.status}`);
         }
         const items = await itemsRes.json();
+        fgenArtItems = items || [];
 
-        fantArtSelectEl.innerHTML = "";
         if (!items.length) {
-          fantArtSelectEl.innerHTML = `<option value="">no art in Fantasiagenesis collection</option>`;
-          fantArtStatusEl.textContent = "Fantasiagenesis collection is empty";
+          fgenStatusEl.textContent = `Fantasiagenesis collection "${fgenCollection.name}" is empty`;
           return;
         }
 
-        // Default option
-        const defaultOpt = document.createElement("option");
-        defaultOpt.value = "";
-        defaultOpt.textContent = `Select Fantasiagenesis art (${items.length} item(s))`;
-        fantArtSelectEl.appendChild(defaultOpt);
-
-        // Populate options
-        items.forEach(item => {
-          const opt = document.createElement("option");
-          opt.value = item.id;
-          const textPreview = (item.art || "").replace(/\s+/g, " ").slice(0, 80);
-          opt.textContent = `#${item.id} — ${textPreview}${textPreview.length === 80 ? "…" : ""}`;
-          fantArtSelectEl.appendChild(opt);
-        });
-
-        fantArtStatusEl.textContent = `Fantasiagenesis collection "${fgenCollection.name}" loaded (${items.length} art)`;
+        fgenStatusEl.textContent = `Fantasiagenesis collection "${fgenCollection.name}" loaded (${items.length} art)`;
+        renderFgenArtList(items);
       } catch (err) {
         console.error(err);
-        fantArtSelectEl.innerHTML = `<option value="">error loading Fantasiagenesis art</option>`;
-        fantArtStatusEl.textContent = `error loading Fantasiagenesis art: ${err.message || err}`;
+        fgenStatusEl.textContent = `error loading Fantasiagenesis art: ${err.message || err}`;
       }
     }
 
-    fantArtSelectEl.addEventListener("change", () => {
-      const val = fantArtSelectEl.value;
-      if (!val) {
-        fantArtIdInputEl.value = "";
-        fantArtStatusEl.textContent = "no Fantasiagenesis art selected";
-      } else {
-        fantArtIdInputEl.value = val;
-        const opt = fantArtSelectEl.options[fantArtSelectEl.selectedIndex];
-        fantArtStatusEl.textContent = `using Fantasiagenesis art ${opt.textContent}`;
+    function renderFgenArtList(items) {
+      if (!fgenArtListEl) return;
+      fgenArtListEl.innerHTML = "";
+
+      items.forEach((item, idx) => {
+        const card = document.createElement("div");
+        card.className = "fgen-art-card";
+        card.dataset.artId = item.id;
+
+        const header = document.createElement("div");
+        header.className = "fgen-art-header";
+
+        const idEl = document.createElement("div");
+        idEl.className = "fgen-art-id";
+        idEl.textContent = `Art #${item.id}`;
+
+        const posEl = document.createElement("div");
+        posEl.className = "art-position";
+        const pos = item.position != null ? `position ${item.position}` : `item ${idx + 1}`;
+        posEl.textContent = pos;
+
+        header.appendChild(idEl);
+        header.appendChild(posEl);
+
+        const body = document.createElement("div");
+        body.className = "fgen-art-body";
+        body.textContent = item.art || "";
+
+        card.appendChild(header);
+        card.appendChild(body);
+
+        card.addEventListener("click", () => {
+          onSelectFgenArt(item, card);
+        });
+
+        fgenArtListEl.appendChild(card);
+      });
+    }
+
+    function onSelectFgenArt(item, cardEl) {
+      currentFgenArtId = item.id;
+
+      if (fgenArtListEl) {
+        const cards = fgenArtListEl.querySelectorAll(".fgen-art-card");
+        cards.forEach(c => {
+          c.classList.toggle("selected", c === cardEl);
+        });
       }
-    });
+
+      if (fantArtIdInputEl) {
+        fantArtIdInputEl.value = String(item.id);
+        if (fantArtStatusEl) {
+          fantArtStatusEl.textContent = `using Fantasiagenesis art #${item.id}`;
+        }
+      }
+
+      if (fgenDetailTitleEl) fgenDetailTitleEl.textContent = `Fantasiagenesis art #${item.id}`;
+      if (fgenArtTextEl) fgenArtTextEl.textContent = item.art || "";
+
+      loadFgenDetailsForArt(item.id);
+    }
+
+    async function loadFgenDetailsForArt(artId) {
+      if (fgenColorsStatusEl) fgenColorsStatusEl.textContent = "loading…";
+      if (fgenBridgesStatusEl) fgenBridgesStatusEl.textContent = "loading…";
+      if (fgenColorsListEl) fgenColorsListEl.textContent = "";
+      if (fgenBridgesListEl) fgenBridgesListEl.innerHTML = "";
+
+      // Load all colors for this Fantasiagenesis art
+      try {
+        const res = await fetch(`/colors/by_art/${artId}`);
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || `HTTP ${res.status}`);
+        }
+        const colors = await res.json();
+
+        if (!Array.isArray(colors) || colors.length === 0) {
+          if (fgenColorsStatusEl) fgenColorsStatusEl.textContent = "no colors yet";
+          if (fgenColorsListEl) fgenColorsListEl.textContent = "";
+        } else {
+          if (fgenColorsStatusEl) fgenColorsStatusEl.textContent = `${colors.length} color(s)`;
+
+          const chunks = colors.map(c => {
+            const ts = c.created_at || "";
+            const model = c.model || "";
+            let sourceLabel = "";
+
+            try {
+              let md = c.metadata;
+              if (typeof md === "string") {
+                md = JSON.parse(md);
+              }
+              if (md && typeof md === "object" && md.source) {
+                sourceLabel = ` | ${md.source}`;
+              }
+            } catch (e) {
+              // ignore parsing errors
+            }
+
+            return `[color #${c.id} @ ${ts} | ${model}${sourceLabel}]
+${c.output_text || ""}`;
+          });
+
+          if (fgenColorsListEl) {
+            fgenColorsListEl.textContent = chunks.join("\n\n────────────────────\n\n");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        if (fgenColorsStatusEl) fgenColorsStatusEl.textContent = "error loading colors";
+      }
+
+      // Load subsystem bridges for this Fantasiagenesis art
+      try {
+        const res2 = await fetch(`/colors/bridges/by_type/fantasiagenesis_subsystem_bridge?art_id=${encodeURIComponent(artId)}`);
+        if (!res2.ok) {
+          const txt = await res2.text();
+          throw new Error(txt || `HTTP ${res2.status}`);
+        }
+        const bridges = await res2.json();
+
+        if (!Array.isArray(bridges) || bridges.length === 0) {
+          if (fgenBridgesStatusEl) fgenBridgesStatusEl.textContent = "no subsystem bridges yet";
+          if (fgenBridgesListEl) fgenBridgesListEl.innerHTML = "";
+        } else {
+          if (fgenBridgesStatusEl) fgenBridgesStatusEl.textContent = `${bridges.length} bridge(s)`;
+          if (fgenBridgesListEl) fgenBridgesListEl.innerHTML = "";
+
+          bridges.forEach(b => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "fgen-bridge-item";
+
+            const header = document.createElement("div");
+            header.className = "fgen-bridge-header";
+
+            const left = document.createElement("span");
+            const ts = b.created_at || "";
+            let label = `bridge #${b.id || ""} @ ${ts}`;
+            if (b.bridge_type) {
+              label += ` | ${b.bridge_type}`;
+            }
+            left.textContent = label;
+
+            const toggle = document.createElement("span");
+            toggle.className = "fgen-bridge-toggle";
+            toggle.textContent = "Collapse";
+
+            header.appendChild(left);
+            header.appendChild(toggle);
+
+            const body = document.createElement("div");
+            body.className = "fgen-bridge-body";
+            const text = b.output_text || b.bridge_text || JSON.stringify(b, null, 2);
+            body.textContent = text;
+
+            header.addEventListener("click", () => {
+              const isHidden = body.classList.contains("hidden");
+              if (isHidden) {
+                body.classList.remove("hidden");
+                toggle.textContent = "Collapse";
+              } else {
+                body.classList.add("hidden");
+                toggle.textContent = "Expand";
+              }
+            });
+
+            itemEl.appendChild(header);
+            itemEl.appendChild(body);
+
+            if (fgenBridgesListEl) fgenBridgesListEl.appendChild(itemEl);
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        if (fgenBridgesStatusEl) fgenBridgesStatusEl.textContent = "error loading subsystem bridges";
+      }
+    }
 
     // ---------------------
     // Collections
@@ -931,12 +1245,12 @@
     async function runSubsystemOperationForArt(artId, statusEl, buttonEl, badgeEl, cardEl) {
       const fantIdStr = (fantArtIdInputEl.value || "").trim();
       if (!fantIdStr) {
-        fantArtStatusEl.textContent = "select Fantasiagenesis art first";
+        fantArtStatusEl.textContent = "select Fantasiagenesis art from panel below";
         return;
       }
       const fantId = parseInt(fantIdStr, 10);
       if (!Number.isInteger(fantId)) {
-        fantArtStatusEl.textContent = "invalid Fantasiagenesis art selection";
+        fantArtStatusEl.textContent = "invalid Fantasiagenesis art id";
         return;
       }
       fantArtStatusEl.textContent = `using fantasiagenesis_art_id=${fantId}`;
@@ -1028,8 +1342,8 @@
       toggleOpsFilter();
     });
 
-    // Auto-load Fantasiagenesis source art on page load
-    loadFantasiagenesisArt();
+    // Auto-load Fantasiagenesis source art panel on page load
+    loadFantasiagenesisSourceArt();
   </script>
 </body>
 </html>
