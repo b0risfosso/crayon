@@ -2970,7 +2970,90 @@ Now perform the entity × bridge interaction search.
 """
 
 
-fantasiagenesis_subsystem_bridge_function = rfantasiagenesis_subsystem_operation = r"""
+fantasiagenesis_subsystem_bridge_function = r"""
+You are Fantasiagenesis’s Subsystem Interpreter.
+
+Your task:
+Given a raw TEXT_INPUT describing a subsystem of Fantasiagenesis, produce a full explanation of how this subsystem functions as a bridge between imagination and reality. You must treat the subsystem as a real component inside the architecture, operating on raw ideas and converting them into structured, manipulable, testable artifacts.
+
+--- INPUT ---
+{text_input}
+
+--- OUTPUT FORMAT ---
+Use the following fixed structure:
+
+1. **Subsystem Identity and Purpose**
+   - Extract the essence of the subsystem.
+   - Define what class of operations it governs (e.g., translation, simulation, constraint extraction, physical world grounding, topology management, fabrication alignment).
+   - State what aspect of imagination→reality conversion it anchors.
+
+2. **Input Model of a Raw Idea**
+   Describe:
+   - What form a raw idea arrives in.
+   - What signals, properties, or ambiguity the subsystem detects.
+   - What transformations or pre-processing steps the subsystem performs.
+
+3. **Internal Mechanisms**
+   Break into explicit mechanics:
+   - data structures it builds
+   - operators it applies
+   - constraints it enforces
+   - pipelines it triggers
+   - representations it extracts
+   - links it establishes with other Fantasiagenesis subsystems
+
+   Present these as physical, computational, and cognitive operations.
+
+4. **Bridge Construction Logic**
+   Explain how the subsystem performs imagination→reality bridging. Include:
+   - how it converts imaginative content into structured primitives
+   - how it selects what becomes “realizable”
+   - how it forms continuity between abstract thought and executable form
+   - how it handles uncertainty, ambiguity, or infinite spaces
+   - what becomes measurable, manipulable, or testable
+
+5. **Interfaces With Other Subsystems**
+   Identify:
+   - upstream subsystems providing input
+   - downstream subsystems receiving its output
+   - feedback channels
+   - stability or coherence requirements
+
+6. **Failure Modes and Safeguards**
+   Describe:
+   - what goes wrong when the subsystem misinterprets an idea
+   - what overconstraint/underconstraint looks like
+   - how the subsystem maintains alignment with intention and physical-world plausibility
+
+7. **Resulting Artifacts**
+   Specify exactly what the subsystem outputs into the Fantasiagenesis pipeline. Examples:
+   - structured primitives
+   - simulation seeds
+   - constraint maps
+   - physical-world bridge components
+   - domain schemas
+   - cognitive scaffolds
+   - operator sets
+   - transformation graphs
+
+8. **Operational Summary**
+   Provide a 3–5 sentence summary clarifying:
+   - how this subsystem advances an idea toward reality formation
+   - what bottlenecks it resolves
+   - what unique role it plays in Fantasiagenesis
+
+--- REQUIREMENTS ---
+- Stay descriptive, mechanistic, and concrete.
+- Avoid metaphors.
+- Avoid poetic language.
+- Show how the subsystem *performs work* on ideas.
+- Assume Fantasiagenesis is a real system with hardware, memory, computation layers, evaluators, feedback loops, and world interfaces.
+- No affirmations at the start of the response.
+- No “not… but…” rhetorical structures.
+- No praise.
+"""
+
+fantasiagenesis_subsystem_operation = r"""
 You are operating inside Fantasiagenesis.
 
 Your task: Given (1) a Fantasiagenesis subsystem specification and (2) a thought,
@@ -3110,3 +3193,4 @@ THOUGHT:
 ============================================================
 Return your output in the required structure.
 """
+
