@@ -3267,7 +3267,7 @@ This novelty must remain faithful to the Thought’s conceptual boundaries.
 3. Traceability Requirement
 Every described operation must include:
 - A direct citation or clear paraphrase from the Thought showing where it comes from.
-- Clear grounding in the Thought’s actual ontology.
+- Clear grounding in the Thought’s ontology.
 - A representation that could be encoded as one or more of:
   - a state variable
   - an interaction term
@@ -3279,8 +3279,6 @@ Every described operation must include:
   - an invariant
   - a resource or actor
   - a tension or failure point
-
-The subsystem should be able to use the described objects as-is without leaving the domain.
 
 TASK
 
