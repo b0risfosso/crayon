@@ -3053,7 +3053,7 @@ Use the following fixed structure:
 - No praise.
 """
 
-fantasiagenesis_subsystem_input = r"""
+fantasiagenesis_subsystem_operation = r"""
 You are operating inside Fantasiagenesis.
 
 Your function is to take:
