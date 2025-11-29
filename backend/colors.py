@@ -1433,7 +1433,7 @@ def insert_color_row(
     model: str,
     usage: Optional[Dict[str, Any]],
     user_metadata: Dict[str, Any],
-    origin: str = "build_thought",
+    origin: str = "colors.build_thought",
 ) -> Dict[str, Any]:
     created_at = utc_now_iso()
     updated_at = created_at
