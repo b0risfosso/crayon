@@ -1222,6 +1222,7 @@ def worker_loop(worker_id: int):
                     subsystem_text = (bridge_row.get("bridge_text") or "").strip()
                 else:
                     # Need to generate subsystem bridge now
+                    print("running fantasiagenesis_subsystem_bridge...")
                     bridge_result = run_bridge_task(
                         color_id=subsystem_color_id,
                         model=model,
@@ -1235,6 +1236,7 @@ def worker_loop(worker_id: int):
                     bridge_row = bridge_result["saved_bridge"]
                     subsystem_bridge_id = bridge_row["id"]
                     subsystem_text = (bridge_row.get("bridge_text") or "").strip()
+                    print("done fantasiagenesis_subsystem_bridge.")
 
                 if not subsystem_text:
                     raise ValueError(

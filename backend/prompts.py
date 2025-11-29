@@ -3194,16 +3194,10 @@ introducing quantum vacuum labs for a geopolitical scenario
 switching to cellular biology metaphors unless explicitly grounded
 adding materials, actors, or laws with no anchor in the Thought
 
-Examples (vary by domain):
-- Biology → metabolites, genes, tissues, signaling rates, ecological niches
-- Emotion → triggers, responses, intensities, internal feedback loops
-- Economics → flows of capital, elasticities, agents, policies
-- Urban systems → land use, commute flows, zoning constraints
-- Cosmology → stars, pressures, orbital mechanics
-- Geopolitics → capacities, alliances, resources, institutions
-
 Constraints:
-- You may not introduce any mechanisms, materials, or experimental setups that the Thought does not support.
+- You may introduce new mechanisms, materials, or experimental setups as extrapolations or extensions of the Thought, as long as you:
+-- Explicitly tie them to combinations of primitives in the Thought, and
+-- Explain how they enhance understanding or operation within the Thought’s world.
 - All operational components must be internally consistent with the domain.
 - The subsystem’s scientific, artistic, or experimental machinery (e.g., “experiments,” “laws,” “observables”) must be projected into the domain of the Thought.
 - Any invented phenomenon must directly cite: the combination of primitives it emerges from, the Thought patterns it summarizes or abstracts, the reason it helps the subsystem perform its function.
@@ -3237,7 +3231,7 @@ When the subsystem refers to:
 - “simulation”
 
 If the subsystem shows a direct application to the thought, then operate on the thought directly. 
-If else, you must reinterpret these in terms of the Thought’s domain:
+Otherwise, you must reinterpret these in terms of the Thought’s domain:
 - The subsystem is discovering, testing, or manipulating the effective rules, invariants, flows, or structures of the domain described in the Thought.
 The subsystem may project its internal scientific/mechanical machinery into the Thought as:
 analogical operators,
