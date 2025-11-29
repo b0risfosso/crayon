@@ -1132,14 +1132,17 @@ def worker_loop(worker_id: int):
                         """,
                         (art_id,),
                     )
+                    print(f"_ensure_color_for_art: art_id={art_id} found color_row={color_row}")
                     if color_row and (color_row.get("output_text") or "").strip():
                         return color_row
-
+                    
                     # Need to run build_thought
                     art_row = fetch_art_text(art_id)
                     thought_text = (art_row.get("art") or "").strip()
                     if not thought_text:
                         raise ValueError(f"art id {art_id} has empty art text")
+                    
+                    print(f"_ensure_color_for_art: running build_thought for art_id={art_id}")
 
                     user_prompt = build_thought_user.format(thought=thought_text)
                     projected_tokens = 2000
@@ -1165,6 +1168,8 @@ def worker_loop(worker_id: int):
                         (usage_dict or {}).get("total_tokens", tokens_in + tokens_out)
                     )
                     duration_ms = int((time.time() - t0) * 1000)
+
+                    print(f"_ensure_color_for_art: build_thought done for art_id={art_id}")
 
                     # Log usage for this build_thought
                     log_llm_usage(
@@ -1197,16 +1202,12 @@ def worker_loop(worker_id: int):
                     )
                     return colors_row
 
-                print(f"Starting fantasiagenesis_subsystem_operation for fant_art_id={fant_art_id}, target_art_id={target_art_id}")
-
                 # ---- PHASE 1: ensure subsystem color + bridge exist ----
                 subsystem_color_row = _ensure_color_for_art(
                     fant_art_id,
                     source_tag="fantasiagenesis_subsystem_operation.subsystem",
                 )
                 subsystem_color_id = subsystem_color_row["id"]
-
-                print(f"subsystem_color_id={subsystem_color_id}")
 
                 # Try to find existing subsystem bridge for this art
                 bridge_row = fetch_one(
@@ -1221,15 +1222,11 @@ def worker_loop(worker_id: int):
                     (fant_art_id,),
                 )
 
-                print(f"subsystem_color_id={subsystem_color_id}, bridge_row={bridge_row}")
-
                 if bridge_row:
-                    print("found existing fantasiagenesis_subsystem_bridge.")
                     subsystem_bridge_id = bridge_row["id"]
                     subsystem_text = (bridge_row.get("bridge_text") or "").strip()
                 else:
                     # Need to generate subsystem bridge now
-                    print("running fantasiagenesis_subsystem_bridge...")
                     bridge_result = run_bridge_task(
                         color_id=subsystem_color_id,
                         model=model,
@@ -1258,7 +1255,6 @@ def worker_loop(worker_id: int):
                 )
                 target_color_id = target_color_row["id"]
                 thought_text = (target_color_row.get("output_text") or "").strip()
-                print(thought_text)
                 if not thought_text:
                     raise ValueError(
                         f"target art {target_art_id} has color {target_color_id} with empty output_text"
