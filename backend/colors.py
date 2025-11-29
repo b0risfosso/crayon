@@ -1206,6 +1206,8 @@ def worker_loop(worker_id: int):
                 )
                 subsystem_color_id = subsystem_color_row["id"]
 
+                print(f"subsystem_color_id={subsystem_color_id}")
+
                 # Try to find existing subsystem bridge for this art
                 bridge_row = fetch_one(
                     """
