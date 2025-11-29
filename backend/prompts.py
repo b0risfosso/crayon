@@ -3163,6 +3163,7 @@ A Thought describing a complex system in a concrete domain (any domain: biology,
 
 Your task is to treat the subsystem as a fully functional, real-world system that operates entirely inside the world of the Thought. Describe in detail how this subsystem acts on, transforms, and probes the ideas, structures, and mechanisms of that world.
 Your description should especially explore where the system’s assumed mechanisms, regularities, or invariants may break down, reorganize, or reveal hidden structure.
+Explain how this subsystem helps bridge the thought into physical reality.
 
 INTERPRETATION RULES
 
