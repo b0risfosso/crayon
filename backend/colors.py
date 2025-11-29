@@ -1197,6 +1197,8 @@ def worker_loop(worker_id: int):
                     )
                     return colors_row
 
+                print(f"Starting fantasiagenesis_subsystem_operation for fant_art_id={fant_art_id}, target_art_id={target_art_id}")
+
                 # ---- PHASE 1: ensure subsystem color + bridge exist ----
                 subsystem_color_row = _ensure_color_for_art(
                     fant_art_id,
@@ -1217,7 +1219,10 @@ def worker_loop(worker_id: int):
                     (fant_art_id,),
                 )
 
+                print(f"subsystem_color_id={subsystem_color_id}, bridge_row={bridge_row}")
+
                 if bridge_row:
+                    print("found existing fantasiagenesis_subsystem_bridge.")
                     subsystem_bridge_id = bridge_row["id"]
                     subsystem_text = (bridge_row.get("bridge_text") or "").strip()
                 else:
@@ -1242,6 +1247,7 @@ def worker_loop(worker_id: int):
                     raise ValueError(
                         f"fantasiagenesis_subsystem_bridge for art {fant_art_id} has empty bridge_text"
                     )
+
 
                 # ---- PHASE 2: ensure target color exists ----
                 target_color_row = _ensure_color_for_art(
