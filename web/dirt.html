@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dirt Builder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #fafafa;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .page {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .sidebar {
+      width: 22%;
+      min-width: 240px;
+      max-width: 320px;
+      border-right: 1px solid #eee;
+      padding-right: 12px;
+      position: sticky;
+      top: 12px;
+      height: calc(100vh - 24px);
+      overflow-y: auto;
+      background: #fff;
+    }
+
+    .main {
+      width: 78%;
+      min-width: 0;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      background: #fff;
+      padding: 12px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .muted {
+      font-size: 12px;
+      color: #777;
+    }
+
+    label {
+      font-size: 13px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input[type="number"],
+    input[type="text"],
+    textarea,
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      margin-bottom: 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    button {
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    button:hover {
+      background: #eaeaea;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 6px 0;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 13px;
+      margin: 0;
+      padding: 8px;
+      background: #f8f8f8;
+      border-radius: 4px;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .dirt-block {
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      background: #fafafa;
+    }
+
+    .dirt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
+      gap: 8px;
+    }
+
+    .status {
+      font-size: 12px;
+      color: #555;
+      margin-top: 4px;
+      white-space: pre-wrap;
+    }
+
+    .small {
+      font-size: 12px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      margin-top: 0;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid #ddd;
+      font-size: 11px;
+      background: #fafafa;
+      margin-left: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dirt Builder</h1>
+  <div class="page">
+    <aside class="sidebar">
+      <div class="card">
+        <h2 class="section-title">Load Colors</h2>
+        <label for="artIdInput">Art ID</label>
+        <input type="number" id="artIdInput" placeholder="e.g. 123" />
+        <button id="loadColorsBtn">Load colors for Art</button>
+        <div id="sidebarStatus" class="status"></div>
+
+        <hr />
+
+        <div class="small">
+          <strong>Notes</strong>
+          <ul>
+            <li>Colors are fetched from <code>/colors/by_art/&lt;art_id&gt;</code> with <code>origin=colors.build_thought</code>.</li>
+            <li>Dirt is built from a color’s <code>output_text</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="colorsContainer"></div>
+    </main>
+  </div>
+
+  <script>
+    const colorsContainer = document.getElementById("colorsContainer");
+    const loadColorsBtn = document.getElementById("loadColorsBtn");
+    const artIdInput = document.getElementById("artIdInput");
+    const sidebarStatus = document.getElementById("sidebarStatus");
+
+    function setSidebarStatus(msg, isError = false) {
+      sidebarStatus.textContent = msg || "";
+      sidebarStatus.style.color = isError ? "#b00020" : "#555";
+    }
+
+    async function loadColors() {
+      const artId = parseInt(artIdInput.value, 10);
+      if (!artId) {
+        setSidebarStatus("Please enter a valid art_id.", true);
+        return;
+      }
+
+      setSidebarStatus("Loading colors...");
+      colorsContainer.innerHTML = "";
+
+      try {
+        const res = await fetch(`/colors/by_art/${artId}?origin=colors.build_thought`);
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}: ${txt}`);
+        }
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          setSidebarStatus(`No colors found for art_id ${artId}.`);
+          colorsContainer.innerHTML = "";
+          return;
+        }
+
+        setSidebarStatus(`Loaded ${data.length} color(s) for art_id ${artId}.`);
+        renderColors(data);
+      } catch (err) {
+        console.error(err);
+        setSidebarStatus(`Error loading colors: ${err.message}`, true);
+      }
+    }
+
+    function renderColors(colors) {
+      colorsContainer.innerHTML = "";
+
+      colors.forEach((row) => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const header = document.createElement("div");
+        header.className = "card-header";
+
+        const title = document.createElement("div");
+        title.className = "card-title";
+        title.textContent = `Color #${row.id}`;
+        const originPill = document.createElement("span");
+        originPill.className = "pill";
+        originPill.textContent = row.origin || "colors.build_thought";
+        title.appendChild(originPill);
+
+        const meta = document.createElement("div");
+        meta.className = "muted";
+        meta.textContent = `${row.model || "model?"} · ${row.created_at || ""}`;
+
+        header.appendChild(title);
+        header.appendChild(meta);
+        card.appendChild(header);
+
+        const pre = document.createElement("pre");
+        pre.textContent = row.output_text || "";
+        card.appendChild(pre);
+
+        // Controls for this color
+        const controls = document.createElement("div");
+        controls.className = "controls";
+
+        const promptSelect = document.createElement("select");
+        promptSelect.className = "prompt-key";
+        [
+          {
+            value: "entities_processes_phenomena",
+            label: "Entities / Processes / Phenomena"
+          },
+          {
+            value: "abstractions_metaphors",
+            label: "Abstractions / Metaphors"
+          },
+          {
+            value: "processes_forces_interactions",
+            label: "Processes / Forces / Interactions"
+          }
+        ].forEach((opt) => {
+          const o = document.createElement("option");
+          o.value = opt.value;
+          o.textContent = opt.label;
+          promptSelect.appendChild(o);
+        });
+
+        const modelInput = document.createElement("input");
+        modelInput.type = "text";
+        modelInput.className = "model-input";
+        modelInput.placeholder = `Model (optional, default ${row.model || ""})`;
+
+        const metaInput = document.createElement("textarea");
+        metaInput.className = "metadata-input";
+        metaInput.placeholder = "Metadata JSON (optional)";
+
+        const createBtn = document.createElement("button");
+        createBtn.textContent = "Create Dirt";
+        createBtn.onclick = () => createDirtForColor(row.id, card);
+
+        const viewBtn = document.createElement("button");
+        viewBtn.textContent = "View Dirt";
+        viewBtn.onclick = () => loadDirtForColor(row.id, card);
+
+        controls.appendChild(promptSelect);
+        controls.appendChild(createBtn);
+        controls.appendChild(viewBtn);
+
+        card.appendChild(controls);
+        card.appendChild(modelInput);
+        card.appendChild(metaInput);
+
+        const status = document.createElement("div");
+        status.className = "status";
+        card.appendChild(status);
+
+        const dirtContainer = document.createElement("div");
+        dirtContainer.className = "dirt-container";
+        card.appendChild(dirtContainer);
+
+        colorsContainer.appendChild(card);
+      });
+    }
+
+    async function createDirtForColor(colorId, card) {
+      const status = card.querySelector(".status");
+      const promptSelect = card.querySelector(".prompt-key");
+      const modelInput = card.querySelector(".model-input");
+      const metaInput = card.querySelector(".metadata-input");
+
+      const promptKey = promptSelect.value;
+      const model = (modelInput.value || "").trim();
+      const metaText = (metaInput.value || "").trim();
+
+      const body = {
+        color_id: colorId,
+        prompt_key: promptKey
+      };
+
+      if (model) {
+        body.model = model;
+      }
+
+      if (metaText) {
+        try {
+          body.metadata = JSON.parse(metaText);
+        } catch (err) {
+          // if invalid JSON, still send something so it isn't lost
+          body.metadata = { raw: metaText, parse_error: true };
+        }
+      }
+
+      status.textContent = "Enqueuing create_dirt task...";
+
+      try {
+        const res = await fetch("/colors/create_dirt", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        });
+
+        const resText = await res.text();
+        let data;
+        try {
+          data = JSON.parse(resText);
+        } catch {
+          data = null;
+        }
+
+        if (!res.ok) {
+          throw new Error(data && data.message ? data.message : resText);
+        }
+
+        const taskId = data.task_id || "(unknown)";
+        status.textContent = `create_dirt queued. task_id=${taskId}
+Use "View Dirt" after the worker finishes to see results.`;
+      } catch (err) {
+        console.error(err);
+        status.textContent = `Error creating dirt: ${err.message}`;
+      }
+    }
+
+    async function loadDirtForColor(colorId, card) {
+      const status = card.querySelector(".status");
+      const dirtContainer = card.querySelector(".dirt-container");
+      status.textContent = "Loading dirt...";
+      dirtContainer.innerHTML = "";
+
+      try {
+        const res = await fetch(`/dirt/by_color/${colorId}`);
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}: ${txt}`);
+        }
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          status.textContent = "No dirt found for this color.";
+          dirtContainer.innerHTML = "";
+          return;
+        }
+
+        status.textContent = `Loaded ${data.length} dirt row(s).`;
+
+        data.forEach((row) => {
+          const block = document.createElement("div");
+          block.className = "dirt-block";
+
+          const header = document.createElement("div");
+          header.className = "dirt-header";
+
+          const left = document.createElement("div");
+          left.innerHTML = `<strong>Dirt #${row.id}</strong> &nbsp;<span class="pill">${(row.metadata && row.metadata.prompt_key) || "prompt?"}</span>`;
+
+          const right = document.createElement("div");
+          right.className = "muted";
+          right.textContent = `${row.model || ""} · ${row.created_at || ""}`;
+
+          header.appendChild(left);
+          header.appendChild(right);
+
+          const pre = document.createElement("pre");
+          pre.textContent = row.output_text || "";
+
+          block.appendChild(header);
+          block.appendChild(pre);
+
+          dirtContainer.appendChild(block);
+        });
+      } catch (err) {
+        console.error(err);
+        status.textContent = `Error loading dirt: ${err.message}`;
+      }
+    }
+
+    loadColorsBtn.addEventListener("click", loadColors);
+  </script>
+</body>
+</html>

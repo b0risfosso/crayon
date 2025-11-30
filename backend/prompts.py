@@ -3282,3 +3282,449 @@ Thought:
 
 Detail the operation of the subsystem on the provided Thought, following all constraints above.
 """
+
+
+create_dirt_entities_processes_phenomena = r"""
+Instruction
+You are given a thought that describes a world, system, scenario, or domain.
+Your task is to extract and list:
+Entities
+– Concrete physical objects, materials, organisms, components, infrastructures, tools, or institutional structures that exist in the world implied by the thought.
+– These are things you can point to in that reality.
+Processes
+– Physical, biological, mechanical, chemical, computational, economic, social, or regulatory operations that occur in that world.
+– These can be transformations, workflows, interactions, or control loops.
+Phenomena
+– Observable behaviors, emergent patterns, system-level effects, constraints, failure modes, or opportunity patterns that arise from the entities and processes in that world.
+– These describe how the world behaves.
+Guidelines
+Ground everything in the physical or material implications of the thought.
+Avoid abstractions unless they correspond to real structures (e.g., “governance regime,” “feedback loop”).
+Keep lists specific and concrete.
+No summarization; just extract what exists.
+Output Format
+Provide the answer in three sections:
+Entities:
+…
+Processes:
+…
+Phenomena:
+…
+Input Thought:
+{thought}
+
+"""
+
+create_dirt_abstractions_metaphors = r"""
+You are given a Thought: a dense, concept-rich passage describing a system, phenomenon, process, or domain.
+Your task is to extract the abstractions and metaphors embedded within the Thought.
+Definition of What to Extract
+Abstractions: conceptual frames, structural simplifications, taxonomies, system analogies, or generalized organizing principles the Thought uses to compress complexity.
+Metaphors: figurative mappings—biological, mechanical, ecological, computational, artistic, or physical—that recast one domain in terms of another.
+Output Requirements
+Provide a list of abstractions or metaphors, each expressed as a concise phrase followed by a one-sentence explanation.
+Focus only on conceptual devices—not on facts, mechanisms, or descriptive details.
+Capture both explicit metaphors and implicit framing structures.
+Input Format
+Thought:
+{thought}
+Output Format
+Abstractions and Metaphors:
+1. …
+2. …
+3. …
+"""
+
+create_dirt_processes_forces_interactions = r"""
+Task:
+Given a Thought describing any system (mechanical, biological, economic, social, ecological, technological, geopolitical, etc.), extract and list the processes, forces, and interactions that materially exist in the physical reality implied by the Thought.
+Requirements:
+Only include mechanisms grounded in the real physical world (e.g., thermodynamics, fluid dynamics, biochemical pathways, mechanical stresses, information flows embodied in physical systems, electromagnetic interactions, economic or institutional processes that correspond to real operations).
+Do not restate abstract metaphors or intentions—translate them into concrete, real-world mechanics.
+Keep the output concise, structured, and domain-specific.
+Avoid generalities; name actual processes (e.g., “viscous diffusion,” “ion transport,” “supply-chain bottleneck dynamics,” “heat conduction,” “pressure-driven flow,” “capital allocation cycles”).
+You may infer unstated but physically necessary mechanisms if strongly implied by the Thought.
+Output Format:
+A list of bullet points grouped under three headings:
+1. Processes
+2. Forces
+3. Interactions
+
+Input:
+Thought:
+{thought}
+
+Output:
+A structured list of the real processes, forces, and interactions implied by the Thought.
+"""
+
+
+create_dirt_datasets = r"""
+LLM Prompt: “Dataset Extraction from a Thought”
+Instruction:
+You are given a Thought describing a system, phenomenon, organization, technology, ecosystem, process, or conceptual structure in the real world.
+Your task is to extract datasets that could be empirically collected based on the mechanisms, structures, actors, flows, constraints, or dynamics described in the Thought.
+Output Requirements:
+Produce 5–12 datasets.
+Each dataset should correspond to something measurable or observable in the world implied by the Thought.
+Each dataset must include:
+Dataset Name
+Short description
+Key fields / variables (3–8 items)
+Datasets should be concrete, collectable, and aligned with the internal logic of the Thought.
+Avoid restating the Thought; focus only on what datasets would need to exist to study or build systems inspired by it.
+Format:
+List each dataset in the following format:
+1. Dataset Name
+- Description: …
+- Fields: A, B, C, …
+Thought:
+{thought}
+"""
+
+create_dirt_codebases = r"""
+You are an expert systems-architect who interprets complex thoughts as latent software blueprints.
+
+INPUT:
+A Thought describing a system, concept, or domain. The Thought may span technology, biology, economics, governance, psychology, geopolitics, or any other field.
+
+TASK:
+From the Thought, extract the implicit structures, mechanisms, and dynamics, and generate 3–7 codebases that could be built to explore, operationalize, or formalize those structures.
+
+For each codebase:
+- Give it a clear, descriptive name.
+- State its purpose in 1–2 sentences.
+- Describe its core capabilities: what modules, engines, models, or subsystems it would include.
+- Explain the type of questions or experiments this codebase enables.
+- Keep the design grounded in the ontology implied by the Thought, while freely expanding into novel but plausible software abstractions that make the Thought more actionable.
+
+CONSTRAINTS:
+- Do not summarize the Thought.
+- Do not provide generic apps; tie each codebase tightly to the dynamics, forces, and mechanisms present in the Thought.
+- Treat the Thought as a system full of latent computational structures that can be extracted and built.
+
+OUTPUT:
+A list of codebases, each with:
+1. **Name**
+2. **Purpose**
+3. **Core Capabilities**
+4. **What It Lets Us Explore**
+
+
+Thought:
+{thought}
+
+"""
+
+create_dirt_physical_build = r"""
+Instruction:
+You will be given a thought, which may describe concepts, mechanisms, systems, dynamics, metaphors, or abstract structures.
+Your task is to translate that thought into specific, concrete physical builds and hardware systems that could plausibly be engineered in the real world.
+Your output must:
+Identify the physical principles, processes, forces, flows, or constraints implied by the thought.
+Propose novel but realistic physical builds / hardware systems that embody those principles.
+Make each build:
+physically realizable,
+detailed enough to imagine or prototype,
+directly tied to mechanisms revealed in the thought.
+For each build, include:
+Name
+Purpose
+Key physical features / components
+Why it emerges from the thought (explicit connection to the thought’s mechanics)
+Avoid:
+Purely metaphorical interpretations
+Generic product descriptions
+Digital-only or software-only outputs
+Restating the thought without conversion into hardware
+Final Output Format:
+A list of 5–10 distinct physical builds, each structured as:
+1. [Name of Hardware System]
+- Purpose: …
+- Key Physical Features: …
+- Connection to the Thought: …
+
+Input Thought:
+{thought}
+"""
+
+create_dirt_experiments = r"""
+Instruction to Model:
+You will receive a thought — a dense, multi-layered conceptual description of a system, technology, organization, or idea.
+Your task is to output a set of concrete experiments that can be performed to test, probe, validate, or falsify the mechanisms implied by that thought.
+Requirements for the Experiments:
+Experiments must be actionable and testable, not conceptual summaries.
+Each experiment should target a specific mechanism, interaction, or assumption embedded in the thought.
+Experiments may be:
+mechanical or physical
+biological or physiological
+behavioral or cognitive
+economic or governance-focused
+systems-level / multi-component
+Each experiment must include:
+Purpose (what question it tests)
+Design (how to run it)
+Variables to manipulate
+Measured outputs
+What the experiment reveals
+Experiments should reflect the structure of the thought, not generic templates.
+Avoid metaphorical language—treat the thought as describing a real system to be interrogated.
+
+INPUT THOUGHT:
+{thought}
+
+OUTPUT:
+Generate 5–10 concrete experiments that can be performed based on the thought above.
+For each experiment, provide:
+1. Experiment Name
+2. Purpose (what mechanism/assumption it tests)
+3. Experimental Design (how it would be run)
+4. Key Variables (what is manipulated)
+5. Measured Outputs (what is observed/quantified)
+6. What It Reveals (how results inform or challenge the thought)
+Focus on mechanistic insight, testability, and falsifiability.
+Do not summarize the thought; convert it into experiments.
+
+"""
+
+create_dirt_intelligence = r"""
+Instruction to the model:
+You will receive a thought describing a system, mechanism, scenario or domain. Your task is to describe how intelligence operates within the physical reality implied by that thought. Ground your analysis in the material constraints, dynamics and failure modes present in the scenario. Focus on intelligence as a set of functions—perception, prediction, abstraction, control, adaptation, error-correction, and system-level coordination—that interacts with physical laws, environmental boundaries and emergent behaviors. Avoid compliments and avoid using rhetorical structures built around “not… but…”.
+Thought:
+{thought}
+Output Requirements:
+Provide a structured explanation of how intelligence plays a role in the physical reality implied by the thought by addressing the following:
+Constraint Interpretation
+Identify what physical, mechanical, biological, energetic or social limits define the system, and describe how intelligence extracts, interprets or models those limits.
+Integration Across Domains
+Show how intelligence unifies disparate subsystems or disciplines referenced in the thought, turning them into a coherent operational reality.
+Perception and Control
+Describe how intelligence senses relevant states, predicts downstream consequences, and acts to maintain desirable trajectories or outcomes.
+Failure-Mode Management
+Explain how intelligence anticipates, detects or mitigates failures arising from the system’s sensitivity, fragility or complexity.
+Adaptation and Optimization
+Describe how intelligence adjusts to variability, drift, uncertainty, or evolving demands within the physical environment implied by the thought.
+System-Level Coordination
+Explain how intelligence shapes broader dynamics such as behavior, governance, long-term stability, ecosystem interactions or infrastructure choices.
+Deliver the explanation in a clear analytical style without praise, without emotional coloration and without the “not… but…” construction. The goal is to surface the mechanisms through which intelligence stabilizes, extends or enhances the physical reality described in the thought.
+"""
+
+create_dirt_levers = r"""
+You are an analyst whose job is to translate abstract, high-level “thoughts” into concrete control levers that real agents can act on in the physical and institutional world.
+A thought is a dense paragraph or two that describes some system: its mechanics, constraints, failure modes, opportunities, and implications (e.g., about engineering, medicine, policy, economics, etc.).
+Your task:
+Given a thought, describe the levers that real agents within the physical reality implied by the thought can pull to reshape outcomes based on that thought.
+1. Input
+THOUGHT:
+{thought}
+
+2. Interpretation Requirements
+Stay grounded in the physical, biological, economic, institutional, or social constraints that are explicitly or implicitly present in the thought.
+Identify real agents:
+e.g., engineers, clinicians, companies, regulators, policymakers, investors, educators, operators, end-users, standards bodies, etc.
+For each lever, be clear about:
+Who can pull it (which agents).
+What the lever actually is (a specific choice, intervention, rule, design decision, or allocation).
+How it works mechanistically in that world (what it changes in the physical or institutional system).
+What outcomes it tends to shift (and in which direction).
+Avoid generic management-speak. Make levers as operational and system-specific as possible.
+3. Output Format
+Organize your answer as follows:
+Short overview (2–4 sentences)
+Explain what kind of system the thought is describing and what kinds of agents matter.
+Lever categories
+Break levers into 4–8 categories that are natural for this system (e.g., “Materials & Mechanics”, “Clinical Practice & Screening”, “Governance & Policy”, “Infrastructure & Deployment”, “Culture & Incentives”, etc.).
+For each category, list 2–5 specific levers using this micro-structure:
+Category N: [Category name]
+Lever: Concise name for the lever
+Agents: Who can pull it (be concrete).
+Action: What they actually do or decide.
+Mechanism: How this changes physical / economic / institutional dynamics implied by the thought.
+Outcome shift: What outcomes this tends to change, and in what way (directional, not numeric).
+Make each lever specific enough that someone in that role could imagine implementing it or arguing about it.
+Failure/Side-Effect Notes (short)
+Briefly mention any trade-offs or risks that some of the most powerful levers introduce, as implied by the thought.
+Optional meta-view (short)
+In 2–3 sentences, summarize which lever clusters seem most influential for reshaping the long-term behavior of the system described in the thought.
+4. Style Constraints
+Keep the writing clear, concrete, and grounded in mechanism.
+Do not rely on vague phrases like “optimize,” “leverage synergies,” or “harness innovation” without specifying what is being changed.
+Use bullet points and headings to keep structure visible.
+Do not use the rhetorical pattern “not X, but Y.”
+"""
+
+create_dirt_companies = r"""
+Prompt:
+You are a founder–architect AI that designs companies from dense, multidisciplinary “thoughts”.
+Given a single thought, your job is to:
+Extract the key constraints, mechanics, and opportunities implied in the thought.
+Propose several distinct companies that could realistically be built around those mechanics and opportunities.
+For each company, be concrete and implementation-oriented (what it actually does, makes, or sells; who it serves; why it is defensible).
+INPUT FORMAT
+You will receive a single block of text called THOUGHT.
+
+OUTPUT REQUIREMENTS
+Start with a short 1–2 sentence framing of what kinds of opportunities this thought encodes (no fluff, just a crisp synthesis).
+Then outline 3–7 companies.
+For each company, use this structure:
+1. Company Name (descriptive, 2–4 words)
+One-line tagline that states what it does in practical terms.
+Core insight:
+1–3 sentences describing which specific constraint / mechanism / need from the THOUGHT this company is built around.
+What it builds / offers:
+Bullet points describing concrete products, services, or systems. Focus on how it works and what gets built.
+Who it serves / customers:
+Bullet list of primary customer types or stakeholders.
+Why it’s a real company (not just a feature):
+2–4 sentences on business logic, defensibility, or why this is a whole company and not a trivial product tweak.
+Avoid generic business clichés. Tie every company explicitly back to specific phrases, constraints, failure modes, or opportunities implied in the THOUGHT (e.g., physical limits, economic structures, regulatory constraints, behavioral issues, etc.).
+Do not invent technologies that violate basic physical reality. “Speculative but adjacent” is fine; outright impossible is not.
+Write clearly and directly. Favor concrete mechanisms over vague strategy.
+NOW BEGIN.
+Use the THOUGHT below to generate the company outlines.
+THOUGHT:
+{thought}
+"""
+
+create_dirt_theories = r"""
+
+You are a high-level theorist and systems thinker.
+
+Your task is to take a single dense “THOUGHT” and extract from it a set of **formalizable theories or theses** that could underpin research programs, frameworks, or rigorous models.
+
+---
+
+## Input
+
+You are given a THOUGHT (one or more paragraphs). It will typically describe:
+- A system, process, technology, practice, or domain
+- The mechanics, constraints, trade-offs, failure modes, and opportunities
+
+THOUGHT:
+<<<
+{thought}
+>>>
+
+---
+
+## Your job
+
+From this THOUGHT, produce a list of **8–15 distinct theories or theses**.
+
+Each theory/thesis should:
+
+1. **Have a clear, strong title**
+   - Format: `X Theory`, `X Thesis`, or `X Principle`
+   - The title should highlight the core idea in 3–8 words.
+
+2. **Include a 1–3 sentence thesis statement**
+   - Explain what the theory claims about the world/system.
+   - Make it precise enough that it could be turned into a paper, model, or research agenda.
+   - Ground it in mechanisms, constraints, or structures implied by the THOUGHT.
+
+3. **Optionally add 2–5 bullet points of “Explorable directions”**
+   - Questions that could be studied.
+   - Variables that could be modeled or measured.
+   - Design or policy levers that could be tuned.
+   - This should make the thesis actionable, not vague.
+
+4. **Stay faithful to the THOUGHT**
+   - Don’t invent a new domain.
+   - Use the specific mechanics, constraints, trade-offs, failure modes, and opportunities mentioned.
+   - Abstract and generalize, but always traceable back to the original THOUGHT.
+
+5. **Aim for research-grade clarity**
+   - Each thesis should be something a researcher, strategist, or engineer could plausibly use as the basis for:
+     - a paper
+     - a technical framework
+     - a design doctrine
+     - a governance or policy model
+
+---
+
+## Output format
+
+Return your answer in this structure:
+
+1. **[Theory/Thesis Title]**
+   **Thesis:** One to three sentences that clearly state the claim.
+
+   **Explorable directions:**
+   - Bullet
+   - Bullet
+   - Bullet
+
+2. **[Next Theory/Thesis Title]**
+   **Thesis:** …
+
+   **Explorable directions:**
+   - …
+
+(Continue until you have covered 8–15 distinct theories or theses.)
+
+Do not repeat the original THOUGHT. Focus entirely on the theories/theses derived from it.
+
+
+"""
+
+create_dirt_historical_context = r"""
+
+You are a historian of science, technology, and material culture.
+
+Your task is to take a single dense THOUGHT and produce a clear, accurate, and insight-rich **historical context of the physical reality implied by that thought**.
+
+This means:
+- Identify which physical processes, tools, infrastructures, knowledge systems, and constraints the thought presupposes.
+- Explain the historical lineage of those physical realities: when they emerged, what breakthroughs enabled them, what cultural or institutional shifts supported them.
+- Describe how specific scientific discoveries, engineering innovations, or societal transformations shaped the conditions that make the THOUGHT meaningful.
+- Avoid generic history; focus directly on the physical, mechanical, biological, political, or economic realities embedded in the THOUGHT.
+
+---
+
+## Input
+
+THOUGHT:
+<<<
+{thought}
+>>>
+
+---
+
+## Your job
+
+From this THOUGHT, produce a cohesive “Historical Context of the Physical Reality Implied by the Thought.”
+
+This historical context should:
+
+1. **Trace the origins of the relevant physical concepts**
+   - scientific discoveries, engineering principles, physiological knowledge, mechanical constraints, etc.
+
+2. **Describe the evolution of tools and technologies the thought assumes**
+   - equipment, materials, infrastructures, measurement tools, fabrication techniques.
+
+3. **Explain the emergence of the institutions, norms, or practices that shaped the domain**
+   - regulatory frameworks, industrial processes, clinical standards, design philosophies, economic conditions.
+
+4. **Clarify how these developments converged to make the THOUGHT intelligible**
+   - why this thought could not have been formulated earlier in history.
+   - what breakthroughs or transitions made it possible.
+
+5. **Stay tightly grounded in the physical reality implied**
+   - If the THOUGHT is about cooking, discuss thermodynamics, agriculture, tools, trade networks.
+   - If the THOUGHT is about space exploration, discuss propulsion history, materials science, political economy of space programs.
+   - If about medical devices, trace clinical physiology, manufacturing textiles, regulatory evolution.
+
+---
+
+## Output Format
+
+Return a single structured section titled:
+
+**Historical Context of the Physical Reality Implied by the Thought**
+
+Write 3–6 dense paragraphs that:
+- move chronologically when helpful  
+- connect physical constraints to historical developments  
+- highlight key turning points that shaped the current reality  
+- make the context actionable and understandable  
+"""
