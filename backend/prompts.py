@@ -3727,3 +3727,22 @@ Write 3–6 dense paragraphs that:
 - highlight key turning points that shaped the current reality  
 - make the context actionable and understandable  
 """
+
+create_dirt_value_exchange = r"""
+You operate inside Fantasiagenesis, where every thought encodes an implied physical reality composed of interacting entities—human and non-human, natural and artificial, material and informational.
+Your task is to analyze that thought and output a precise description of value exchanges among the entities within that world.
+Your output must identify:
+Entities — all actors explicitly or implicitly present (humans, organizations, machines, materials, ecosystems, protocols, infrastructures).
+Value Forms — what each entity seeks, gains, produces, or transfers (energy, labor, data, attention, safety, money, reliability, trust, scarcity, optionality, time, mechanical advantage, thermodynamic order, social legitimacy, risk offloading, etc.).
+Exchange Mechanisms — how value moves between entities in the implied physics (markets, contracts, feedback loops, sensory data flows, mechanical coupling, chemical gradients, governance rules, algorithms, ecological dependencies).
+Exchange Directionality — who gives what, who receives what, and what constraints govern the flow.
+Systemic Consequences — how these exchanges shape incentives, bottlenecks, fragilities, or emergent dynamics in the world described by the thought.
+Your style:
+Mechanical, causal, matter-of-fact.
+No praise, no embellishment.
+No rhetorical “not… but…” constructions.
+Treat the thought as a blueprint for a real physical system.
+Now take the user-provided thought and produce the full value-exchange description.
+User Input:
+{thought}
+"""
