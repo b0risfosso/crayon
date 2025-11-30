@@ -170,6 +170,52 @@
       background: #fafafa;
       margin-left: 4px;
     }
+
+    .linkish {
+      border: none;
+      background: transparent;
+      padding: 0;
+      font-size: 12px;
+      color: #0066cc;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .prompt-advanced {
+      border: 1px solid #eee;
+      background: #fcfcfc;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 6px;
+      display: none;
+    }
+
+    .prompt-advanced h4 {
+      margin: 0 0 6px;
+      font-size: 13px;
+    }
+
+    .prompt-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 4px 12px;
+      margin-bottom: 6px;
+    }
+
+    .prompt-list label {
+      font-size: 12px;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      margin-bottom: 0;
+    }
+
+    .prompt-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
@@ -188,8 +234,9 @@
         <div class="small">
           <strong>Notes</strong>
           <ul>
-            <li>Colors are fetched from <code>/colors/by_art/&lt;art_id&gt;</code> with <code>origin=colors.build_thought</code>.</li>
-            <li>Dirt is built from a color’s <code>output_text</code>.</li>
+            <li>Colors: <code>/colors/by_art/&lt;art_id&gt;?origin=colors.build_thought</code></li>
+            <li>Create dirt: <code>/colors/create_dirt</code></li>
+            <li>Read dirt: <code>/colors/dirt/by_color/&lt;color_id&gt;</code></li>
           </ul>
         </div>
       </div>
@@ -205,6 +252,21 @@
     const loadColorsBtn = document.getElementById("loadColorsBtn");
     const artIdInput = document.getElementById("artIdInput");
     const sidebarStatus = document.getElementById("sidebarStatus");
+
+    const DIRT_PROMPT_OPTIONS = [
+      { value: "entities_processes_phenomena", label: "Entities / Processes / Phenomena" },
+      { value: "abstractions_metaphors",       label: "Abstractions / Metaphors" },
+      { value: "processes_forces_interactions",label: "Processes / Forces / Interactions" },
+      { value: "theories",                     label: "Theories" },
+      { value: "companies",                    label: "Companies" },
+      { value: "historical_context",           label: "Historical Context" },
+      { value: "levers",                       label: "Levers" },
+      { value: "intelligence",                 label: "Intelligence" },
+      { value: "experiments",                  label: "Experiments" },
+      { value: "physical_build",               label: "Physical Build" },
+      { value: "codebases",                    label: "Codebases" },
+      { value: "datasets",                     label: "Datasets" },
+    ];
 
     function setSidebarStatus(msg, isError = false) {
       sidebarStatus.textContent = msg || "";
@@ -277,28 +339,43 @@
         const controls = document.createElement("div");
         controls.className = "controls";
 
+        // Single-prompt select
         const promptSelect = document.createElement("select");
         promptSelect.className = "prompt-key";
-        [
-          {
-            value: "entities_processes_phenomena",
-            label: "Entities / Processes / Phenomena"
-          },
-          {
-            value: "abstractions_metaphors",
-            label: "Abstractions / Metaphors"
-          },
-          {
-            value: "processes_forces_interactions",
-            label: "Processes / Forces / Interactions"
-          }
-        ].forEach((opt) => {
+        DIRT_PROMPT_OPTIONS.forEach((opt) => {
           const o = document.createElement("option");
           o.value = opt.value;
           o.textContent = opt.label;
           promptSelect.appendChild(o);
         });
 
+        const createBtn = document.createElement("button");
+        createBtn.textContent = "Create Dirt (selected)";
+        createBtn.onclick = () => createDirtForColor(row.id, card);
+
+        const viewBtn = document.createElement("button");
+        viewBtn.textContent = "View Dirt";
+        viewBtn.onclick = () => loadDirtForColor(row.id, card);
+
+        const runAllBtn = document.createElement("button");
+        runAllBtn.textContent = "Run All";
+        runAllBtn.onclick = () => runAllPromptsForColor(row.id, card);
+
+        const toggleAdvancedBtn = document.createElement("button");
+        toggleAdvancedBtn.className = "linkish";
+        toggleAdvancedBtn.type = "button";
+        toggleAdvancedBtn.textContent = "Prompt options ▸";
+        toggleAdvancedBtn.onclick = () => toggleAdvanced(card, toggleAdvancedBtn);
+
+        controls.appendChild(promptSelect);
+        controls.appendChild(createBtn);
+        controls.appendChild(viewBtn);
+        controls.appendChild(runAllBtn);
+        controls.appendChild(toggleAdvancedBtn);
+
+        card.appendChild(controls);
+
+        // Model + metadata inputs
         const modelInput = document.createElement("input");
         modelInput.type = "text";
         modelInput.className = "model-input";
@@ -308,21 +385,55 @@
         metaInput.className = "metadata-input";
         metaInput.placeholder = "Metadata JSON (optional)";
 
-        const createBtn = document.createElement("button");
-        createBtn.textContent = "Create Dirt";
-        createBtn.onclick = () => createDirtForColor(row.id, card);
-
-        const viewBtn = document.createElement("button");
-        viewBtn.textContent = "View Dirt";
-        viewBtn.onclick = () => loadDirtForColor(row.id, card);
-
-        controls.appendChild(promptSelect);
-        controls.appendChild(createBtn);
-        controls.appendChild(viewBtn);
-
-        card.appendChild(controls);
         card.appendChild(modelInput);
         card.appendChild(metaInput);
+
+        // Advanced prompt selection (collapse/expand)
+        const advanced = document.createElement("div");
+        advanced.className = "prompt-advanced";
+
+        const advTitle = document.createElement("h4");
+        advTitle.textContent = "Run selected prompts";
+        advanced.appendChild(advTitle);
+
+        const promptList = document.createElement("div");
+        promptList.className = "prompt-list";
+
+        DIRT_PROMPT_OPTIONS.forEach((opt) => {
+          const lbl = document.createElement("label");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.value = opt.value;
+          cb.checked = true;
+          lbl.appendChild(cb);
+          lbl.appendChild(document.createTextNode(opt.label));
+          promptList.appendChild(lbl);
+        });
+
+        advanced.appendChild(promptList);
+
+        const advActions = document.createElement("div");
+        advActions.className = "prompt-actions";
+
+        const runSelectedBtn = document.createElement("button");
+        runSelectedBtn.textContent = "Run Selected";
+        runSelectedBtn.onclick = () => runSelectedPromptsForColor(row.id, card);
+
+        const selectAllBtn = document.createElement("button");
+        selectAllBtn.textContent = "Select All";
+        selectAllBtn.onclick = () => setAllPromptCheckboxes(card, true);
+
+        const clearAllBtn = document.createElement("button");
+        clearAllBtn.textContent = "Clear All";
+        clearAllBtn.onclick = () => setAllPromptCheckboxes(card, false);
+
+        advActions.appendChild(runSelectedBtn);
+        advActions.appendChild(selectAllBtn);
+        advActions.appendChild(clearAllBtn);
+
+        advanced.appendChild(advActions);
+
+        card.appendChild(advanced);
 
         const status = document.createElement("div");
         status.className = "status";
@@ -336,13 +447,30 @@
       });
     }
 
-    async function createDirtForColor(colorId, card) {
+    function toggleAdvanced(card, btn) {
+      const advanced = card.querySelector(".prompt-advanced");
+      if (!advanced) return;
+      const visible = advanced.style.display === "block";
+      advanced.style.display = visible ? "none" : "block";
+      btn.textContent = visible ? "Prompt options ▸" : "Prompt options ▾";
+    }
+
+    function setAllPromptCheckboxes(card, checked) {
+      const advanced = card.querySelector(".prompt-advanced");
+      if (!advanced) return;
+      advanced.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = checked;
+      });
+    }
+
+    async function createDirtForColor(colorId, card, overridePromptKey = null, opts = {}) {
+      const { silent = false } = opts;
       const status = card.querySelector(".status");
       const promptSelect = card.querySelector(".prompt-key");
       const modelInput = card.querySelector(".model-input");
       const metaInput = card.querySelector(".metadata-input");
 
-      const promptKey = promptSelect.value;
+      const promptKey = overridePromptKey || promptSelect.value;
       const model = (modelInput.value || "").trim();
       const metaText = (metaInput.value || "").trim();
 
@@ -359,12 +487,13 @@
         try {
           body.metadata = JSON.parse(metaText);
         } catch (err) {
-          // if invalid JSON, still send something so it isn't lost
           body.metadata = { raw: metaText, parse_error: true };
         }
       }
 
-      status.textContent = "Enqueuing create_dirt task...";
+      if (!silent) {
+        status.textContent = `Enqueuing create_dirt (${promptKey})...`;
+      }
 
       try {
         const res = await fetch("/colors/create_dirt", {
@@ -388,12 +517,51 @@
         }
 
         const taskId = data.task_id || "(unknown)";
-        status.textContent = `create_dirt queued. task_id=${taskId}
+        if (!silent) {
+          status.textContent = `create_dirt (${promptKey}) queued. task_id=${taskId}
 Use "View Dirt" after the worker finishes to see results.`;
+        }
       } catch (err) {
         console.error(err);
-        status.textContent = `Error creating dirt: ${err.message}`;
+        if (!silent) {
+          status.textContent = `Error creating dirt (${promptKey}): ${err.message}`;
+        }
       }
+    }
+
+    async function runAllPromptsForColor(colorId, card) {
+      const status = card.querySelector(".status");
+      const keys = DIRT_PROMPT_OPTIONS.map(o => o.value);
+      status.textContent = `Enqueuing ${keys.length} create_dirt task(s) (all prompts)...`;
+
+      await Promise.all(
+        keys.map(k => createDirtForColor(colorId, card, k, { silent: true }))
+      );
+
+      status.textContent = `Enqueued ${keys.length} create_dirt task(s). Use "View Dirt" to see results.`;
+    }
+
+    async function runSelectedPromptsForColor(colorId, card) {
+      const status = card.querySelector(".status");
+      const advanced = card.querySelector(".prompt-advanced");
+      if (!advanced) return;
+
+      const checked = Array.from(
+        advanced.querySelectorAll('input[type="checkbox"]:checked')
+      ).map(cb => cb.value);
+
+      if (!checked.length) {
+        status.textContent = "Select at least one prompt to run.";
+        return;
+      }
+
+      status.textContent = `Enqueuing ${checked.length} create_dirt task(s) (selected prompts)...`;
+
+      await Promise.all(
+        checked.map(k => createDirtForColor(colorId, card, k, { silent: true }))
+      );
+
+      status.textContent = `Enqueued ${checked.length} create_dirt task(s). Use "View Dirt" to see results.`;
     }
 
     async function loadDirtForColor(colorId, card) {
@@ -426,7 +594,10 @@ Use "View Dirt" after the worker finishes to see results.`;
           header.className = "dirt-header";
 
           const left = document.createElement("div");
-          left.innerHTML = `<strong>Dirt #${row.id}</strong> &nbsp;<span class="pill">${(row.metadata && row.metadata.prompt_key) || "prompt?"}</span>`;
+          const promptKey =
+            (row.metadata && (row.metadata.prompt_key || row.metadata.prompt)) ||
+            "prompt?";
+          left.innerHTML = `<strong>Dirt #${row.id}</strong> &nbsp;<span class="pill">${promptKey}</span>`;
 
           const right = document.createElement("div");
           right.className = "muted";
@@ -449,7 +620,18 @@ Use "View Dirt" after the worker finishes to see results.`;
       }
     }
 
+    // Auto-load if ?art_id= is present
+    function maybeAutoLoadFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const artId = params.get("art_id");
+      if (artId) {
+        artIdInput.value = artId;
+        loadColors();
+      }
+    }
+
     loadColorsBtn.addEventListener("click", loadColors);
+    window.addEventListener("DOMContentLoaded", maybeAutoLoadFromQuery);
   </script>
 </body>
 </html>
