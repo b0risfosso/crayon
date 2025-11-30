@@ -188,7 +188,7 @@
         <div class="small">
           <strong>Notes</strong>
           <ul>
-            <li>Colors are fetched from <code>/colors/by_art/&lt;art_id&gt;</code> with <code>origin=colors.build_thought</code>.</li>
+            <li>Colors are fetched from <code>/colors/dirt/by_art/&lt;art_id&gt;</code> with <code>origin=colors.build_thought</code>.</li>
             <li>Dirt is built from a color’s <code>output_text</code>.</li>
           </ul>
         </div>
@@ -222,7 +222,7 @@
       colorsContainer.innerHTML = "";
 
       try {
-        const res = await fetch(`/colors/by_art/${artId}?origin=colors.build_thought`);
+        const res = await fetch(`/colors/dirt/by_art/${artId}?origin=colors.build_thought`);
         if (!res.ok) {
           const txt = await res.text();
           throw new Error(`HTTP ${res.status}: ${txt}`);
