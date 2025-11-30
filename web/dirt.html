@@ -403,7 +403,7 @@ Use "View Dirt" after the worker finishes to see results.`;
       dirtContainer.innerHTML = "";
 
       try {
-        const res = await fetch(`/dirt/by_color/${colorId}`);
+        const res = await fetch(`/colors/by_color/${colorId}`);
         if (!res.ok) {
           const txt = await res.text();
           throw new Error(`HTTP ${res.status}: ${txt}`);
