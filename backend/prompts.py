@@ -3664,7 +3664,6 @@ Return your answer in this structure:
 
 Do not repeat the original THOUGHT. Focus entirely on the theories/theses derived from it.
 
-
 """
 
 create_dirt_historical_context = r"""

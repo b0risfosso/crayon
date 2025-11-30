@@ -357,7 +357,7 @@ def log_llm_usage(
     total_tokens: int,
     duration_ms: int,
     cost_usd: float = 0.0,
-    meta_obj: Optional[Dict[str, Any]] = None,
+    meta_obj: Optional[Dict[str, Any]] = None
 ):
     """
     Inserts a usage_events row and upserts totals_* tables
@@ -370,43 +370,70 @@ def log_llm_usage(
     try:
         db.execute("BEGIN")
 
-        # usage_events
+        # 1) usage_events
         db.execute(
             """
             INSERT INTO usage_events
-              (ts_utc, app_name, model, endpoint, email, request_id,
+              (ts, app, model, endpoint, email, request_id,
                tokens_in, tokens_out, total_tokens, duration_ms, cost_usd, meta)
-            VALUES (?,      ?,        ?,     ?,        ?,     ?,
-                    ?,        ?,          ?,            ?,         ?,       ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                ts,
-                app_name,
-                model,
-                endpoint,
-                email,
-                request_id,
-                tokens_in,
-                tokens_out,
-                total_tokens,
-                duration_ms,
-                cost_usd,
-                meta_str,
-            ),
+                ts, app_name, model, endpoint, email, request_id,
+                tokens_in, tokens_out, total_tokens, duration_ms, cost_usd, meta_str
+            )
         )
 
-        # totals_daily
+        # 2) totals_all_time (single row id=1)
         db.execute(
             """
-            INSERT INTO totals_daily (day, app_name, model, total_tokens)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(day, app_name, model)
-            DO UPDATE SET total_tokens = total_tokens + EXCLUDED.total_tokens
+            INSERT INTO totals_all_time (id, tokens_in, tokens_out, total_tokens, calls, last_ts)
+            VALUES (1, ?, ?, ?, 1, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                tokens_in    = tokens_in + excluded.tokens_in,
+                tokens_out   = tokens_out + excluded.tokens_out,
+                total_tokens = total_tokens + excluded.total_tokens,
+                calls        = calls + 1,
+                last_ts      = excluded.last_ts
             """,
-            (day, app_name, model, total_tokens),
+            (tokens_in, tokens_out, total_tokens, ts)
         )
 
-        db.commit()
+        # 3) totals_by_model
+        db.execute(
+            """
+            INSERT INTO totals_by_model
+              (model, tokens_in, tokens_out, total_tokens, calls, first_ts, last_ts)
+            VALUES (?, ?, ?, ?, 1, ?, ?)
+            ON CONFLICT(model) DO UPDATE SET
+                tokens_in    = tokens_in + excluded.tokens_in,
+                tokens_out   = tokens_out + excluded.tokens_out,
+                total_tokens = total_tokens + excluded.total_tokens,
+                calls        = calls + 1,
+                last_ts      = excluded.last_ts
+            """,
+            (model, tokens_in, tokens_out, total_tokens, ts, ts)
+        )
+
+        # 4) totals_daily
+        db.execute(
+            """
+            INSERT INTO totals_daily
+              (day, model, tokens_in, tokens_out, total_tokens, calls)
+            VALUES (?, ?, ?, ?, ?, 1)
+            ON CONFLICT(day, model) DO UPDATE SET
+                tokens_in    = tokens_in + excluded.tokens_in,
+                tokens_out   = tokens_out + excluded.tokens_out,
+                total_tokens = total_tokens + excluded.total_tokens,
+                calls        = calls + 1
+            """,
+            (day, model, tokens_in, tokens_out, total_tokens)
+        )
+
+        db.execute("COMMIT")
+    except Exception:
+        db.execute("ROLLBACK")
+        raise
     finally:
         db.close()
 
