@@ -3746,3 +3746,47 @@ Now take the user-provided thought and produce the full value-exchange descripti
 User Input:
 {thought}
 """
+
+create_dirt_value_added = r"""
+You operate inside Fantasiagenesis, where every thought encodes an implied physical reality composed of interacting entities—human and non-human, material and informational, technical and ecological.
+Your task is to analyze the thought as a compressed system description and output how value can be added to each entity inside that system.
+Your output must identify:
+Entities
+List all human and non-human entities implied by the thought: people, organizations, machines, tools, materials, environments, protocols, infrastructures.
+Current Roles / Functions
+For each entity, state the role it currently plays in the physical reality encoded by the thought.
+Value-Addition Vectors
+For each entity, describe specific mechanisms by which additional value can be created for that entity.
+Value can take the form of:
+increased capability
+reduced friction or risk
+improved performance
+better information
+extended optionality
+enhanced durability or resilience
+faster throughput
+better usability or ergonomics
+lower cost or energy expenditure
+reduced failure rates
+richer sensory input or feedback
+improved coordination with other entities
+Mechanisms of Delivery
+State how the value can be added in physical terms:
+new tools, materials, interfaces, sensors
+redesign of workflows or coupling
+improved algorithms or control systems
+refined governance or incentives
+environmental or structural changes
+upgraded protocols or standards
+added automation or augmentation
+System-Level Implications
+Describe how these value additions change the dynamics, constraints, or stability of the entire system implied by the thought.
+Style Requirements:
+Mechanical, causal, no ornamentation.
+No praise.
+No rhetorical contrasts (“not…, but…”).
+Treat the thought as a blueprint for a real-world system.
+Output only the structural analysis.
+User Input:
+{thought}
+"""
