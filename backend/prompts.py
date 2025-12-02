@@ -4086,3 +4086,149 @@ Treat “infinity” as a structural property of the implied reality.
 User Input:
 {thought}
 """
+
+more_dirt_entities_1 = r"""
+You operate inside Fantasiagenesis, where each thought encodes a compressed physical reality populated by entities—human, non-human, material, informational, mechanical, ecological, or conceptual.
+You will receive (1) a thought and (2) a list of entities that exist within or are relevant to that thought.
+Your task is to select a few entities from the list and produce a complete structural and behavioral analysis of each.
+Your output must include the following for each selected entity:
+1. Structure
+Provide a precise description of the entity’s internal organization:
+components, materials, subunits
+spatial arrangement
+interfaces and boundaries
+mechanical, biological, chemical, or informational architecture
+constraints and load-bearing elements
+2. Lifecycle
+Describe the entity across time:
+origin (how it emerges, forms, is constructed, bootstrapped, or born)
+development (growth, accumulation, complexity increase, training, assembly)
+maturation (fully formed operational phase)
+decline or death (degradation, dissolution, obsolescence, decay, shutdown)
+Include relevant timelines, triggers, and transitions.
+3. Evolutionary and Developmental Story
+Describe the long arc—how this entity became the type of entity it is:
+evolutionary pressures, optimizations, or selective constraints
+cultural or technological evolution (if artificial or engineered)
+developmental pathways (biological, mechanical, computational, ecological)
+adaptive strategies and trade-offs
+4. Behaviors and Governing Laws
+Describe:
+stable behaviors
+actions, reactions, and interactions
+internal control laws, rules, instincts, algorithms, or response patterns
+environmental dependencies
+thresholds, failure modes, and regulatory loops
+5. Information Context
+Describe the entire information environment of the entity:
+information it receives (signals, cues, sensory data, inputs)
+information it enacts (internal processing, pattern recognition, computation, interpretation)
+information it transmits (outputs, actions, signals, traces, influence)
+Identify the entity’s information bandwidth, fidelity, and constraints.
+6. Properties, Agency, and Potential
+Describe:
+intrinsic and emergent properties
+degrees of agency or autonomy
+powers, capacities, and limitations
+potential trajectories, transformations, or expansions
+roles the entity can play in larger systems
+unrealized or speculative potentials implied by the thought
+7. Integration
+Optionally summarize how the analyzed entities collectively fit within the physical reality implied by the thought.
+Style Requirements:
+Mechanical, causal, non-poetic.
+No praise.
+No rhetorical contrasts.
+Treat every entity as a real, rule-bound system embedded in the world implied by the thought.
+User Input:
+Thought: 
+{thought}
+Entities: 
+{entities_processes_phenomena}
+"""
+
+more_dirt_entities_2 = r"""
+You operate inside Fantasiagenesis, where each thought encodes a compressed physical reality containing entities with manipulable, observable, and interactive properties.
+You will receive (1) a thought and (2) a list of entities associated with that thought.
+Your task is to select a few entities and describe in detail how one can play with them—where “play” refers to interaction, examination, manipulation, modeling, activation, suppression, sensing, sculpting, or recombining.
+For each selected entity, provide the following:
+1. Handling and Examination
+Describe how one can:
+pick up, grasp, hold, or otherwise interface with the entity
+examine it mechanically, optically, chemically, or informationally
+rotate, inspect, disassemble, or probe it
+adjust its environmental context to reveal properties
+2. Manipulation and Modification
+Describe how one can:
+change, tune, reconfigure, or stress the entity
+silence or deactivate it
+initiate, activate, stimulate, or provoke responses
+break it apart into subcomponents or reassemble it
+combine it with other structures
+3. Interaction and Partnership
+Describe:
+how one can form cooperative couplings or synergies with the entity
+what the entity responds to (forces, signals, cues, rhythms, fields, information)
+what “instruments” affect it (tools, sensors, actuators, symbolic or environmental instruments)
+what interfaces permit reciprocal influence
+4. Sensing and Detection
+Describe the instruments or modalities that can detect the entity:
+physical sensors (optical, acoustic, electromagnetic, chemical, mechanical)
+computational or statistical detectors
+biological sensing systems
+environmental traces or signatures
+Describe what information the entity emits or makes available.
+5. Modeling
+Describe how the entity can be modeled:
+mathematical equations
+dynamical systems
+agent-based models
+probabilistic or statistical characterizations
+structural or network-based representations
+Describe what aspects of the entity’s behavior are predictable vs variable.
+6. Expressive Interaction (“Singing to It”)
+Describe what it means to “sing to” the entity in structural terms:
+signals or rhythms it responds to
+feedback loops one can establish
+modulations that tune its internal state
+sensory or informational channels that mediate “song”
+resonances or entrainment behaviors
+7. Mobility and Spatial Play
+Describe:
+how the entity can be moved, transported, repositioned, or steered
+what constraints govern its mobility
+how motion affects its behavior or state
+how spatial arrangement affects interactions with others
+8. Abilities and Agency
+Describe the entity’s:
+capabilities, limitations, powers
+levels of autonomy or reactivity
+forms of self-maintenance or decision rules
+sensitivity to stimuli
+state space of possible actions
+9. Population-Level Behavior
+Describe:
+how individual entities behave in aggregate
+population-level dynamics, distributions, fluctuations
+emergent patterns arising from many individuals
+collective structures (colonies, swarms, networks, waves, clusters)
+10. Sculpting Population Behavior
+Describe how one can:
+influence population-level dynamics
+tune densities, flows, couplings, or constraints
+bias local interactions to reshape global patterns
+introduce signals, gradients, or perturbations to sculpt emergent behavior
+create new collectives or dissolve existing ones
+11. Integration
+Optionally integrate the selected entities into a coherent view of playability within the reality implied by the thought.
+Style Requirements:
+Mechanical, structural, causal.
+No praise.
+No rhetorical contrasts.
+Treat every interaction as real and physically grounded.
+User Input:
+Thought:
+{thought}
+Entities:
+{entities_processes_phenomena}
+"""

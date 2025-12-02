@@ -452,6 +452,8 @@
         card.appendChild(dirtContainer);
 
         colorsContainer.appendChild(card);
+
+        autoLoadDirt(card, row.id);
       });
     }
 
@@ -627,6 +629,61 @@ Use "View Dirt" after the worker finishes to see results.`;
         status.textContent = `Error loading dirt: ${err.message}`;
       }
     }
+
+    async function autoLoadDirt(card, colorId) {
+  const status = card.querySelector(".status");
+
+  try {
+    const res = await fetch(`/colors/dirt/by_color/${colorId}`);
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}: ${txt}`);
+    }
+
+    const data = await res.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      status.textContent = "No dirt found. Click 'Create Dirt' to generate.";
+      return;
+    }
+
+    status.textContent = `Loaded ${data.length} dirt row(s).`;
+    const dirtContainer = card.querySelector(".dirt-container");
+
+    data.forEach((row) => {
+      const block = document.createElement("div");
+      block.className = "dirt-block";
+
+      const header = document.createElement("div");
+      header.className = "dirt-header";
+
+      const left = document.createElement("div");
+      const promptKey =
+        (row.metadata && (row.metadata.prompt_key || row.metadata.prompt)) ||
+        "prompt?";
+      left.innerHTML = `<strong>Dirt #${row.id}</strong> &nbsp;<span class="pill">${promptKey}</span>`;
+
+      const right = document.createElement("div");
+      right.className = "muted";
+      right.textContent = `${row.model || ""} · ${row.created_at || ""}`;
+
+      header.appendChild(left);
+      header.appendChild(right);
+
+      const pre = document.createElement("pre");
+      pre.textContent = row.output_text || "";
+
+      block.appendChild(header);
+      block.appendChild(pre);
+
+      dirtContainer.appendChild(block);
+    });
+  } catch (err) {
+    console.error(err);
+    status.textContent = `Error auto-loading dirt: ${err.message}`;
+  }
+}
+
 
     // Auto-load if ?art_id= is present
     function maybeAutoLoadFromQuery() {
