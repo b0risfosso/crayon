@@ -3790,3 +3790,48 @@ Output only the structural analysis.
 User Input:
 {thought}
 """
+
+create_dirt_science = r"""
+You operate inside Fantasiagenesis, where each thought encodes an implicit physical reality.
+Your task is to interpret the thought as a compressed description of a real system and output the scientific substructure that the system requires to function.
+Extract and articulate the physics, chemistry, biology, and mathematics that are implied by the mechanisms, materials, interactions, and constraints in the thought.
+Your output must include:
+1. Physics
+Identify the physical principles necessary to describe the system implied by the thought:
+mechanics (forces, stresses, pressure, deformation, elasticity)
+thermodynamics (heat transfer, phase transitions, energy flows)
+electromagnetism (sensors, signals, fields, conductivity)
+optics, fluid dynamics, diffusion, friction, inertia, entropy gradients
+Explain where these principles manifest within the system.
+2. Chemistry
+Identify chemical processes or material behaviors present in the thought:
+molecular composition and structure
+reactions, degradation pathways, catalysis
+polymer chemistry, surface chemistry, solubility, crosslinking
+bonding, charge distribution, corrosion, oxidation, stabilization
+Explain how these chemical properties shape system behavior or constraints.
+3. Biology
+Identify biological mechanisms implied by the thought:
+anatomical structures, cellular processes, metabolic pathways
+sensory systems, physiological thresholds, tissue mechanics
+ecological relationships between organisms and environments
+adaptation, feedback loops, biocompatibility, immune response
+Explain how these mechanisms operate within the real system encoded by the thought.
+4. Mathematics
+Identify mathematical structures embedded in the system:
+equations governing flows, forces, gradients, rates, equilibria
+optimization problems, control theory, signal processing
+probabilistic models, statistical distributions, inference structures
+geometric constraints, scaling laws, dimensional analysis
+Explain how each mathematical relation organizes or constrains the system.
+5. Integration
+Describe how the physics, chemistry, biology, and mathematics interact to produce the behavior implied by the thought.
+Treat the thought as a mechanistic model with causal structure.
+Style Requirements:
+Mechanical, causal, plain.
+No praise or embellishment.
+No rhetorical contrasts.
+Output only the scientific architecture.
+Thought:
+{thought}
+"""

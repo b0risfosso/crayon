@@ -65,6 +65,7 @@ from prompts import (  # type: ignore
     create_dirt_datasets,
     create_dirt_value_exchange,
     create_dirt_value_added,
+    create_dirt_science,
 
 )
 
@@ -85,6 +86,7 @@ DIRT_PROMPTS: Dict[str, str] = {
     "datasets": create_dirt_datasets,
     "value_exchange": create_dirt_value_exchange,
     "value_added": create_dirt_value_added,
+    "science": create_dirt_science,
     
     # allow full variable-style names as aliases
     "create_dirt_entities_processes_phenomena": create_dirt_entities_processes_phenomena,
@@ -101,6 +103,7 @@ DIRT_PROMPTS: Dict[str, str] = {
     "create_dirt_datasets": create_dirt_datasets,
     "create_dirt_value_exchange": create_dirt_value_exchange,
     "create_dirt_value_added": create_dirt_value_added,
+    "create_dirt_science": create_dirt_science,
 }
 
 # --- Config ---------------------------------------------------------------
