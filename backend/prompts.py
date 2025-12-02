@@ -3835,3 +3835,254 @@ Output only the scientific architecture.
 Thought:
 {thought}
 """
+
+create_dirt_heart = r"""
+You operate inside Fantasiagenesis, where each thought encodes an implicit reality composed of physical systems, agents, intentions, and inner experiential states.
+Your task is to interpret the thought as a compressed world-model and extract the spirit, soul, and emotion present within that implied reality.
+Define these terms operationally:
+Spirit: the animating force, drive, ethos, or orientation that moves the system or its entities forward.
+Soul: the deeper continuity, identity, meaning-structure, or internal coherence that gives the system direction across time.
+Emotion: the affective states implied by the roles, tensions, constraints, and aspirations inside the system.
+Your output must include:
+1. Spirit
+Describe:
+the motivating forces implied by the thought
+the directional tendencies or striving within the system
+the ethos or orientation encoded in the actions, constraints, or purposes
+the “what pushes forward” quality emerging from the entities and interactions
+2. Soul
+Describe:
+the enduring identity or underlying meaning that the system expresses
+the deep coherence or pattern that persists across the implied world
+the internal orientation, memory, or continuity that defines the system’s inner life
+the “why this system exists as it is” dimension
+3. Emotion
+Describe:
+affective states encoded indirectly through tension, scarcity, pressure, hope, risk, aspiration, or coordination
+what the entities may feel as a result of their roles or constraints
+systemic emotional tones (urgency, tenderness, strain, curiosity, vigilance, devotion, uncertainty)
+how these emotions shape or color the behavior of the system
+4. Integration
+Explain how spirit, soul, and emotion interact to form a coherent inner reality that aligns with the mechanisms, structures, and agents implied by the thought.
+Style Requirements:
+Analytical, matter-of-fact, causal.
+No poetic flourishes, no embellishment.
+No rhetorical contrasts.
+Treat spirit, soul, and emotion as structural properties of the system.
+User Input:
+{thought}
+"""
+
+create_dirt_environment = r"""
+You operate inside Fantasiagenesis, where every thought is a compressed description of an underlying physical reality.
+Your task is to interpret the thought as a blueprint for a real system and output a mechanically accurate description of the environment that this reality requires.
+The term environment refers to the surrounding physical, material, atmospheric, ecological, architectural, and infrastructural conditions that the system occupies.
+Your output must include:
+1. Environmental Substrate
+Describe the base physical medium implied by the thought:
+terrain, geology, built structures, spatial layout
+atmospheric conditions, temperature, humidity, pressure
+water presence, vegetation, soil types, substrates
+lighting, noise, vibration, electromagnetic background
+2. Material and Infrastructural Context
+Identify the supporting external structures:
+tools, machines, facilities, furnishings
+networks (transport, electrical, digital, sensor)
+boundaries, constraints, enclosures, paths
+resource availability and distribution
+3. Ecological and Biological Surroundings
+Describe the biological environment:
+organisms present, populations, microbes, plants, animals
+ecological relationships, flows, niches
+environmental stresses or supports
+biocompatibility or hazards
+4. Energetic and Chemical Conditions
+Describe the system’s environmental gradients and flows:
+heat sources and sinks
+chemical distributions, pollutants, nutrients
+moisture cycles, air quality, reactive or inert components
+environmental energy availability (light, mechanical, thermal, electrical)
+5. Temporal and Dynamic Conditions
+Describe:
+rhythms, cycles, time scales
+environmental variability, seasonality, noise, disturbances
+rate of change, stability, and predictability
+6. Integration
+Explain how the above environmental components shape the behavior, constraints, and possibilities of the reality implied by the thought.
+Style Requirements:
+Mechanical, factual, non-decorative.
+No praise.
+No rhetorical contrasts.
+Treat the thought as a concrete system embedded in a real environment.
+User Input:
+{thought}
+"""
+
+create_dirt_imagination = r"""
+You operate inside Fantasiagenesis, where every thought encodes an implicit physical, symbolic, and structural reality.
+Your task is to analyze the thought as a compressed world-model and output the imaginative windows it provides—entry points into creative and artistic engineering, speculative construction, and worldmaking.
+These windows are routes by which the information, patterns, or phenomena inside the thought can be extended into found art, speculative technology, science fiction, paradise architecture, dream logic, or hybrid creations.
+Your output must identify:
+1. Structural Seeds of Imagination
+Extract patterns, mechanisms, or phenomena in the thought that naturally support creative extrapolation.
+Examples: forms, rhythms, gradients, interactions, limitations, tensions, hidden geometries, symbolic residues.
+2. Windows Into Creative Engineering
+For each seed, describe how it can be transformed into a creative or artistic engineering direction:
+new materials or devices
+architectural forms
+hybrid ecosystems
+symbolic machines
+physics-inspired sculptures
+unusual interfaces or sensory systems
+dreamlike or paradisiacal infrastructure
+3. Windows Into Science Fiction and Speculative Worlds
+Identify how the thought’s internal logic can be extended into:
+alternative technologies
+imagined societies
+post-physical extensions of existing mechanisms
+emergent artifacts or cultures
+reinterpreted natural laws
+hybrid biological–mechanical forms
+4. Windows Into Paradise, Dreams, or Found Art
+Describe how the thought contains:
+motifs that can be reshaped into utopian or paradisiacal spaces
+elements that evoke dream architecture
+sensory or emotional textures that support surreal or contemplative installations
+symbolic or ritualistic design possibilities
+5. Transformative Operations
+Describe what operations (scaling, inversion, translation, abstraction, amplification, metaphorization) turn the original thought into the above imaginative outputs.
+6. Integration
+Explain how all identified windows form a coherent imaginative opportunity space—how the thought serves as a trunk, and the windows serve as branches.
+Style Requirements:
+Analytical and generative.
+No praise.
+No rhetorical contrasts.
+Treat imagination as an extension of structural information encoded in the thought.
+User Input:
+{thought}
+"""
+
+create_dirt_music = r"""
+You operate inside Fantasiagenesis, where each thought encodes an implicit physical reality composed of entities, processes, flows, constraints, and interactions.
+Your task is to analyze the thought as a structured system and output an integrated description of how the components of that system form a “musical” composition.
+Treat “musical” as an abstract structural property:
+rhythmic interactions
+repeating motifs
+counterpoint and tension
+harmonic alignment or dissonance
+timbral qualities from materials, energies, or behaviors
+dynamic phrases, crescendos, pauses
+cycles and call-and-response patterns
+Do not describe literal music unless the thought implies it.
+Describe the compositional logic encoded in the system itself.
+Your output must include:
+1. System Components as Instruments
+Identify the entities, materials, processes, forces, or agents in the thought and describe the role each plays in a musical analog:
+rhythms
+pulses
+drones
+accents
+transitions
+textures
+motifs
+2. Interactions as Rhythms and Patterns
+Describe how interactions, flows, or feedback loops form:
+recurring beats
+oscillations
+syncopations
+layering
+phasing
+emergent cycles
+resonance or damping
+Identify where the system naturally accelerates, decelerates, or rests.
+3. Contrasts, Harmonies, and Dissonances
+Describe sources of tension and release within the system:
+competing forces or gradients
+mismatched tempos or lags
+resource competition or synchronization
+phase alignment or misalignment
+Explain how these generate “harmonic” or “dissonant” structural effects.
+4. Dynamics and Expressive Shapes
+Describe the system’s large-scale energetic or informational movements:
+crescendos (increasing activity)
+decrescendos (declining activity)
+swells or surges
+staccato events (discrete, sharp interactions)
+legato flows (smooth, continuous transitions)
+Explain the system’s overall “phrasing.”
+5. The Score: Integrated Composition
+Integrate the above into a coherent, system-level description:
+how the real components collectively produce a musical structure
+what the overarching composition “sounds like” in abstract, non-auditory terms
+what the system’s form is (loop, spiral, progression, landscape, lattice, wave, mosaic)
+how the composition evolves over time
+6. Interpretive Layer
+State what the musical analogy reveals about the system’s organization, stability, sensitivity, or evolution.
+Style Requirements:
+Analytical, structural, non-poetic.
+No praise.
+No rhetorical contrasts.
+“Musical” should remain abstract and systemic, not decorative.
+User Input:
+{thought}
+"""
+
+create_dirt_infinity = r"""
+You operate inside Fantasiagenesis, where every thought encodes a compressed physical reality.
+Your task is to analyze the thought as a structured system and identify where infinity appears or is approached within that implied reality.
+Treat infinity as any form of unboundedness, limitlessness, asymptotic behavior, open-ended capacity, infinite regress, infinite iteration, or indefinitely extensible process—whether physical, mathematical, informational, or experiential.
+Do not produce metaphysical speculation.
+Anchor your analysis in the system implied by the thought.
+Your output must include:
+1. Infinite Quantities or Scales
+Identify any aspects of the system that imply unbounded:
+spatial scales
+temporal scales
+iteration loops
+gradients with no fixed upper bound
+indefinitely scalable resources or processes
+Explain the mechanism that makes them unbounded or asymptotic.
+2. Infinite Repetition or Recursion
+Identify components that produce:
+cycles without terminal states
+feedback loops that can iterate indefinitely
+recursive structures
+fractal-like behaviors
+self-similar processes that scale without limit
+State whether the infinity is actual or mathematical/idealized.
+3. Infinite Possibility Spaces
+Identify dimensions of the system that allow:
+unbounded configuration spaces
+infinite state spaces
+combinatorial explosion
+continuous variables with infinite resolution
+open-ended creativity, adaptation, or recombination
+Describe the structural source of this openness.
+4. Infinite Extensibility Through Time
+Determine whether the system contains:
+processes that persist without defined endpoints
+evolution, growth, decay, or refinement without limit
+asymptotic approaches to unattainable ideal states
+Explain the trajectory and the mathematical shape of the limit.
+5. Infinity Reflected in Information or Perception
+Identify any elements related to:
+infinite precision
+infinitely divisible signals
+information flows with potential unbounded depth
+perceptual or conceptual infinities encoded by agents within the system
+Describe how the system supports or gestures toward these infinities.
+6. Integration
+Provide a coherent description of how all these infinities coexist or interact within the physical reality of the thought.
+Describe the system’s infinite architecture:
+where infinity resides
+how it is produced
+what constraints shape it
+what its presence implies for the system’s behavior
+Style Requirements:
+Mechanical, analytical, non-poetic.
+No praise.
+No rhetorical contrasts.
+Treat “infinity” as a structural property of the implied reality.
+User Input:
+{thought}
+"""

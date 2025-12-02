@@ -66,7 +66,11 @@ from prompts import (  # type: ignore
     create_dirt_value_exchange,
     create_dirt_value_added,
     create_dirt_science,
-
+    create_dirt_heart,
+    create_dirt_environment,
+    create_dirt_imagination,
+    create_dirt_music,
+    create_dirt_infinity,
 )
 
 # Map prompt_key -> template string
@@ -87,6 +91,11 @@ DIRT_PROMPTS: Dict[str, str] = {
     "value_exchange": create_dirt_value_exchange,
     "value_added": create_dirt_value_added,
     "science": create_dirt_science,
+    "heart": create_dirt_heart,
+    "environment": create_dirt_environment,
+    "imagination": create_dirt_imagination,
+    "music": create_dirt_music,
+    "infinity": create_dirt_infinity,
     
     # allow full variable-style names as aliases
     "create_dirt_entities_processes_phenomena": create_dirt_entities_processes_phenomena,
@@ -104,6 +113,11 @@ DIRT_PROMPTS: Dict[str, str] = {
     "create_dirt_value_exchange": create_dirt_value_exchange,
     "create_dirt_value_added": create_dirt_value_added,
     "create_dirt_science": create_dirt_science,
+    "create_dirt_heart": create_dirt_heart,
+    "create_dirt_environment": create_dirt_environment,
+    "create_dirt_imagination": create_dirt_imagination,
+    "create_dirt_music": create_dirt_music,
+    "create_dirt_infinity": create_dirt_infinity,
 }
 
 # --- Config ---------------------------------------------------------------
@@ -742,8 +756,8 @@ def worker_loop(worker_id: int):
             TASK_QUEUE.task_done()
 
 
-# start 2 background workers when module loads
-for wid in range(2):
+# start 3 background workers when module loads
+for wid in range(3):
     t = threading.Thread(target=worker_loop, args=(wid,), daemon=True)
     t.start()
 
