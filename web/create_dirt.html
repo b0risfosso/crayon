@@ -224,19 +224,20 @@ function buildTree(nodes) {
         map[n.id] = { ...n, children: [] };
     });
 
-    let rootNode = null;
+    const roots = [];
 
     nodes.forEach(n => {
-        if (n.parent_id === null) return;
+        const wrapped = map[n.id];
 
-        if (map[n.parent_id]) {
-            map[n.parent_id].children.push(map[n.id]);
+        if (n.parent_id != null && map[n.parent_id]) {
+            map[n.parent_id].children.push(wrapped);
+        } else {
+            // no parent -> considered root
+            roots.push(wrapped);
         }
     });
 
-    // find box_root
-    rootNode = nodes.find(n => n.kind === "box_root");
-    return map[rootNode.id]; // return the root tree node
+    return roots;
 }
 
 function renderTreeNode(node, container, depth = 0) {
@@ -247,8 +248,13 @@ function renderTreeNode(node, container, depth = 0) {
     const hasChildren = node.children && node.children.length > 0;
     const label = node.name || node.rel_path || "(root)";
 
+    // default expand root & first-level chunks
+    if (expanded[node.id] === undefined) {
+        expanded[node.id] = node.kind === "box_root" || node.parent_id === null;
+    }
+
     let toggle = "";
-    if (hasChildren && node.kind === "chunk") {
+    if (hasChildren && (node.kind === "chunk" || node.kind === "box_root")) {
         toggle = expanded[node.id] ? "[-]" : "[+]";
     }
 
@@ -261,16 +267,17 @@ function renderTreeNode(node, container, depth = 0) {
         ` : ""}
     `;
 
-    // clicking toggle expands/collapses
-    div.querySelector(".toggle")?.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        expanded[node.id] = !expanded[node.id];
-        renderNodes(currentNodes);
-    });
+    const toggleEl = div.querySelector(".toggle");
+    if (toggleEl && toggleEl.textContent.trim() !== "") {
+        toggleEl.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            expanded[node.id] = !expanded[node.id];
+            renderNodes(currentNodes);
+        });
+    }
 
     container.appendChild(div);
 
-    // render children only if expanded
     if (hasChildren && expanded[node.id]) {
         node.children.forEach(child => {
             renderTreeNode(child, container, depth + 1);
@@ -287,9 +294,21 @@ function renderNodes(nodes) {
         return;
     }
 
-    const root = buildTree(nodes);
-    renderTreeNode(root, tree, 0);
+    // Uncomment this if you want to debug what’s coming back:
+    // console.log("nodes from API:", nodes);
+
+    const roots = buildTree(nodes);
+
+    if (!roots.length) {
+        tree.innerHTML = "<p>No root nodes found.</p>";
+        return;
+    }
+
+    roots.forEach(root => {
+        renderTreeNode(root, tree, 0);
+    });
 }
+
 
 
 async function refreshAll() {
