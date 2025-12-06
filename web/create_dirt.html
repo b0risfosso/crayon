@@ -216,38 +216,82 @@ function populateParentDropdown() {
   }
 }
 
-function renderNodes(nodes) {
-  const tree = document.getElementById("tree");
-  if (!nodes.length) {
-      tree.innerHTML = "<p>No chunks or particles yet.</p>";
-      return;
-  }
+// Track expanded/collapsed state
+let expanded = {};
 
-  tree.innerHTML = "";
-  nodes.forEach(n => {
-      const div = document.createElement("div");
-      div.className = `node ${n.kind}`;
-      const indent = (n.depth || 0) * 18;
-      div.style.paddingLeft = indent + "px";
+function buildTree(nodes) {
+    const map = {};
+    nodes.forEach(n => {
+        map[n.id] = { ...n, children: [] };
+    });
 
-      const label = n.name || n.rel_path || "(root)";
-      let deleteButtonHtml = "";
-      if (n.kind !== "box_root") {
-          deleteButtonHtml = `
-            <button onclick="deleteNode(${n.id}, '${n.kind}')">
-              Delete
-            </button>
-          `;
-      }
+    let rootNode = null;
 
-      div.innerHTML = `
-        <span class="kind">[${n.kind}]</span>
-        ${label}
-        ${deleteButtonHtml}
-      `;
-      tree.appendChild(div);
-  });
+    nodes.forEach(n => {
+        if (n.parent_id === null) return;
+
+        if (map[n.parent_id]) {
+            map[n.parent_id].children.push(map[n.id]);
+        }
+    });
+
+    // find box_root
+    rootNode = nodes.find(n => n.kind === "box_root");
+    return map[rootNode.id]; // return the root tree node
 }
+
+function renderTreeNode(node, container, depth = 0) {
+    const div = document.createElement("div");
+    div.className = `node ${node.kind}`;
+    div.style.paddingLeft = (depth * 16) + "px";
+
+    const hasChildren = node.children && node.children.length > 0;
+    const label = node.name || node.rel_path || "(root)";
+
+    let toggle = "";
+    if (hasChildren && node.kind === "chunk") {
+        toggle = expanded[node.id] ? "[-]" : "[+]";
+    }
+
+    div.innerHTML = `
+        <span class="kind">[${node.kind}]</span>
+        <span class="toggle" style="cursor:pointer; margin-right:6px;">${toggle}</span>
+        ${label}
+        ${node.kind !== "box_root" ? `
+        <button onclick="deleteNode(${node.id}, '${node.kind}')">Delete</button>
+        ` : ""}
+    `;
+
+    // clicking toggle expands/collapses
+    div.querySelector(".toggle")?.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        expanded[node.id] = !expanded[node.id];
+        renderNodes(currentNodes);
+    });
+
+    container.appendChild(div);
+
+    // render children only if expanded
+    if (hasChildren && expanded[node.id]) {
+        node.children.forEach(child => {
+            renderTreeNode(child, container, depth + 1);
+        });
+    }
+}
+
+function renderNodes(nodes) {
+    const tree = document.getElementById("tree");
+    tree.innerHTML = "";
+
+    if (!nodes.length) {
+        tree.innerHTML = "<p>No chunks or particles yet.</p>";
+        return;
+    }
+
+    const root = buildTree(nodes);
+    renderTreeNode(root, tree, 0);
+}
+
 
 async function refreshAll() {
   setMessage("", "");
