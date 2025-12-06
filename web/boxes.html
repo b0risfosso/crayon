@@ -129,14 +129,21 @@ async function fetchBoxes() {
         boxes.forEach(b => {
             const li = document.createElement("li");
             li.className = "box-item";
+            const slug = b.slug;
+
             li.innerHTML = `
-                <strong>${b.slug}</strong>
+                <strong>${slug}</strong>
                 ${b.title ? ` — ${b.title}` : ""}
                 <br>
                 <small>Root: ${b.root_path}</small>
+                <br>
+                <a href="/create_dirt.html?box=${encodeURIComponent(slug)}">
+                Open box
+                </a>
             `;
             list.appendChild(li);
         });
+
     } catch (err) {
         console.error(err);
         document.getElementById("message").innerHTML =

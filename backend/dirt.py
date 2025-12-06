@@ -14,6 +14,9 @@ from flask import (
     abort,
     render_template_string,
 )
+from werkzeug.utils import secure_filename
+import os
+
 
 # === CONFIG ===
 DATA_ROOT = "/var/www/site/data"
@@ -211,6 +214,13 @@ def create_box(slug: str, title: Optional[str] = None):
                 pass
         raise
 
+def get_box_by_slug(slug: str):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    row = cur.fetchone()
+    return row
+
 
 # === ROUTES ===
 
@@ -300,7 +310,169 @@ def create_box_route():
 
 
 
-# For running via `python app.py`
-if __name__ == "__main__":
-    # For production behind something like gunicorn or uWSGI, you won’t use this.
-    app.run(host="0.0.0.0", port=5000, debug=True)
+@app.route("/boxes/<slug>", methods=["GET"])
+def get_box(slug):
+    row = get_box_by_slug(slug)
+    if row is None:
+        abort(404, description="Box not found")
+
+    return jsonify(
+        {
+            "id": row["id"],
+            "slug": row["slug"],
+            "title": row["title"],
+            "root_path": row["root_path"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+    )
+
+@app.route("/boxes/<slug>/nodes", methods=["GET"])
+def list_nodes(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM nodes WHERE box_id = ? ORDER BY depth, rel_path;",
+        (box["id"],),
+    )
+    rows = cur.fetchall()
+
+    return jsonify(
+        [
+            {
+                "id": r["id"],
+                "box_id": r["box_id"],
+                "parent_id": r["parent_id"],
+                "name": r["name"],
+                "kind": r["kind"],
+                "rel_path": r["rel_path"],
+                "mime_type": r["mime_type"],
+                "extension": r["extension"],
+                "size_bytes": r["size_bytes"],
+                "checksum": r["checksum"],
+                "depth": r["depth"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+            }
+            for r in rows
+        ]
+    )
+
+
+@app.route("/boxes/<slug>/nodes", methods=["POST"])
+def create_node(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    box_root_fs = os.path.join(DATA_ROOT, box["root_path"])  # e.g. /var/www/site/data/boxes/box_001
+    os.makedirs(box_root_fs, exist_ok=True)
+
+    # Common fields
+    kind = (request.form.get("kind") or request.json.get("kind") if request.is_json else "").strip()
+    parent_rel_path = (request.form.get("parent_rel_path") or
+                       (request.json.get("parent_rel_path") if request.is_json else "") or "").strip()
+
+    # Find parent node
+    if parent_rel_path == "":
+        # parent is box root node
+        cur.execute(
+            "SELECT id FROM nodes WHERE box_id = ? AND kind = 'box_root' AND rel_path = ''",
+            (box["id"],),
+        )
+    else:
+        cur.execute(
+            "SELECT id FROM nodes WHERE box_id = ? AND rel_path = ?",
+            (box["id"], parent_rel_path),
+        )
+    parent_row = cur.fetchone()
+    parent_id = parent_row["id"] if parent_row else None
+
+    # CHUNK: JSON body with name + no file
+    if kind == "chunk":
+        if request.is_json:
+            data = request.get_json() or {}
+            name = (data.get("name") or "").strip()
+        else:
+            name = (request.form.get("name") or "").strip()
+
+        if not name:
+            return jsonify({"error": "name is required for chunk"}), 400
+
+        if parent_rel_path:
+            rel_path = f"{parent_rel_path}/{name}"
+        else:
+            rel_path = name
+
+        target_dir = os.path.join(box_root_fs, rel_path)
+        try:
+            os.makedirs(target_dir, exist_ok=False)
+        except FileExistsError:
+            return jsonify({"error": "chunk already exists"}), 400
+
+        depth = rel_path.count("/") + 1
+        cur.execute(
+            """
+            INSERT INTO nodes (
+                box_id, parent_id, name, kind, rel_path,
+                mime_type, extension, size_bytes, checksum,
+                depth, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'chunk', ?, NULL, NULL, NULL, NULL,
+                    ?, datetime('now'), datetime('now'));
+            """,
+            (box["id"], parent_id, name, rel_path, depth),
+        )
+        conn.commit()
+        node_id = cur.lastrowid
+        return jsonify({"id": node_id, "kind": "chunk", "rel_path": rel_path}), 201
+
+    # PARTICLE: multipart/form-data with file
+    if kind == "particle":
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"error": "file is required for particle"}), 400
+
+        filename = secure_filename(file.filename)
+        if not filename:
+            return jsonify({"error": "invalid filename"}), 400
+
+        if parent_rel_path:
+            rel_path = f"{parent_rel_path}/{filename}"
+        else:
+            rel_path = filename
+
+        target_dir = os.path.join(box_root_fs, parent_rel_path) if parent_rel_path else box_root_fs
+        os.makedirs(target_dir, exist_ok=True)
+        target_path = os.path.join(target_dir, filename)
+
+        file.save(target_path)
+        size_bytes = os.path.getsize(target_path)
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else None
+        mime_type = file.mimetype
+
+        depth = rel_path.count("/") + 1
+        cur.execute(
+            """
+            INSERT INTO nodes (
+                box_id, parent_id, name, kind, rel_path,
+                mime_type, extension, size_bytes, checksum,
+                depth, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'particle', ?, ?, ?, ?, NULL,
+                    ?, datetime('now'), datetime('now'));
+            """,
+            (box["id"], parent_id, filename, rel_path, mime_type, ext, size_bytes, depth),
+        )
+        conn.commit()
+        node_id = cur.lastrowid
+        return jsonify({"id": node_id, "kind": "particle", "rel_path": rel_path}), 201
+
+    return jsonify({"error": "invalid kind; expected 'chunk' or 'particle'"}), 400
