@@ -398,9 +398,13 @@ def create_node(slug):
     os.makedirs(box_root_fs, exist_ok=True)
 
     # Common fields
-    kind = (request.form.get("kind") or request.json.get("kind") if request.is_json else "").strip()
-    parent_rel_path = (request.form.get("parent_rel_path") or
-                       (request.json.get("parent_rel_path") if request.is_json else "") or "").strip()
+    if request.is_json:
+        data = request.get_json() or {}
+        kind = (data.get("kind") or "").strip()
+        parent_rel_path = (data.get("parent_rel_path") or "").strip()
+    else:
+        kind = (request.form.get("kind") or "").strip()
+        parent_rel_path = (request.form.get("parent_rel_path") or "").strip()
 
     # Find parent node
     if parent_rel_path == "":
