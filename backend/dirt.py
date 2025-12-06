@@ -226,48 +226,20 @@ def list_boxes():
     cur.execute("SELECT * FROM boxes ORDER BY created_at DESC;")
     rows = cur.fetchall()
 
-    if "application/json" in request.headers.get("Accept", ""):
-        return jsonify(
-            [
-                {
-                    "id": row["id"],
-                    "slug": row["slug"],
-                    "title": row["title"],
-                    "root_path": row["root_path"],
-                    "created_at": row["created_at"],
-                    "updated_at": row["updated_at"],
-                }
-                for row in rows
-            ]
-        )
+    return jsonify(
+        [
+            {
+                "id": row["id"],
+                "slug": row["slug"],
+                "title": row["title"],
+                "root_path": row["root_path"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            for row in rows
+        ]
+    )
 
-    # simple HTML list
-    template = """
-    <!doctype html>
-    <html>
-    <head>
-      <title>Boxes of Dirt</title>
-    </head>
-    <body>
-      <h1>Boxes of Dirt</h1>
-      <p><a href="{{ url_for('new_box') }}">Create a new box</a></p>
-      {% if boxes %}
-        <ul>
-        {% for b in boxes %}
-          <li>
-            <strong>{{ b['slug'] }}</strong>
-            {% if b['title'] %} - {{ b['title'] }}{% endif %}
-            (root: {{ b['root_path'] }})
-          </li>
-        {% endfor %}
-        </ul>
-      {% else %}
-        <p>No boxes yet.</p>
-      {% endif %}
-    </body>
-    </html>
-    """
-    return render_template_string(template, boxes=rows)
 
 
 @app.route("/boxes/new", methods=["GET"])
