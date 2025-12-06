@@ -21,7 +21,6 @@ DB_PATH = os.path.join(DATA_ROOT, "dirt.db")
 
 app = Flask(__name__)
 
-
 # === DB CONNECTION HANDLING ===
 
 def get_db():
@@ -32,14 +31,6 @@ def get_db():
         conn.row_factory = sqlite3.Row
         g.db = conn
     return g.db
-
-
-@app.teardown_appcontext
-def close_db(exc):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
-
 
 def init_db():
     """Create tables and indexes if they don't exist."""
@@ -94,9 +85,19 @@ def init_db():
     conn.commit()
 
 
-@app.before_first_request
-def setup():
+# Initialize DB once at startup
+with app.app_context():
     init_db()
+
+
+
+
+@app.teardown_appcontext
+def close_db(exc):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
 
 
 # === CORE LOGIC ===
