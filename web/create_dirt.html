@@ -34,7 +34,7 @@
       margin-top: 10px;
       font-weight: bold;
   }
-  input[type="text"], input[type="file"] {
+  input[type="text"], input[type="file"], select {
       width: 100%;
       padding: 8px 10px;
       font-size: 14px;
@@ -127,8 +127,11 @@
     <!-- Upload particle (file) -->
     <div class="card">
       <h3>Upload Particle (File)</h3>
-      <label for="fileParent">Parent path (optional)</label>
-      <input id="fileParent" type="text" placeholder="e.g. chunk_a or blank for root">
+      <label for="fileParentSelect">Parent chunk</label>
+      <select id="fileParentSelect">
+        <!-- options populated from chunks; root is "" -->
+        <option value="">(root)</option>
+      </select>
 
       <label for="fileInput">File</label>
       <input id="fileInput" type="file">
@@ -143,6 +146,7 @@
 
 <script>
 let currentSlug = null;
+let currentNodes = [];
 
 function getQueryParam(name) {
   const params = new URLSearchParams(window.location.search);
@@ -180,6 +184,38 @@ function renderBoxMeta(box) {
   `;
 }
 
+function populateParentDropdown() {
+  const select = document.getElementById("fileParentSelect");
+  // Remember current selection so we don't annoy user when refreshing
+  const previous = select.value;
+
+  // Clear and add root option
+  select.innerHTML = "";
+  const rootOpt = document.createElement("option");
+  rootOpt.value = "";
+  rootOpt.textContent = "(root)";
+  select.appendChild(rootOpt);
+
+  // Add each chunk as an option, using its rel_path
+  const chunks = currentNodes.filter(n => n.kind === "chunk");
+
+  chunks.forEach(chunk => {
+      const opt = document.createElement("option");
+      opt.value = chunk.rel_path;  // used as parent_rel_path
+      // label: human name if present, fallback to rel_path
+      opt.textContent = chunk.name || chunk.rel_path || "(unnamed chunk)";
+      select.appendChild(opt);
+  });
+
+  // Restore previous selection if still present
+  const maybe = Array.from(select.options).find(o => o.value === previous);
+  if (maybe) {
+      select.value = previous;
+  } else {
+      select.value = "";
+  }
+}
+
 function renderNodes(nodes) {
   const tree = document.getElementById("tree");
   if (!nodes.length) {
@@ -195,7 +231,6 @@ function renderNodes(nodes) {
       div.style.paddingLeft = indent + "px";
 
       const label = n.name || n.rel_path || "(root)";
-
       let deleteButtonHtml = "";
       if (n.kind !== "box_root") {
           deleteButtonHtml = `
@@ -214,7 +249,6 @@ function renderNodes(nodes) {
   });
 }
 
-
 async function refreshAll() {
   setMessage("", "");
   const slug = currentSlug;
@@ -222,43 +256,14 @@ async function refreshAll() {
       const box = await loadBoxInfo(slug);
       renderBoxMeta(box);
       const nodes = await loadNodes(slug);
+      currentNodes = nodes;
       renderNodes(nodes);
+      populateParentDropdown();
   } catch (err) {
       console.error(err);
       setMessage(err.message, "error");
   }
 }
-
-async function deleteNode(id, kind) {
-  const confirmMsg =
-    kind === "chunk"
-      ? "Delete this folder and ALL of its contents?"
-      : "Delete this file?";
-
-  if (!confirm(confirmMsg)) return;
-
-  setMessage("", "");
-
-  try {
-      const res = await fetch(
-          `/dirt/boxes/${encodeURIComponent(currentSlug)}/nodes/${id}`,
-          { method: "DELETE" }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-          throw new Error(data.error || "Failed to delete");
-      }
-
-      setMessage(`${kind} deleted.`, "success");
-      await refreshAll();
-  } catch (err) {
-      console.error(err);
-      setMessage(err.message, "error");
-  }
-}
-
 
 async function createChunk() {
   const parentRel = document.getElementById("chunkParent").value.trim();
@@ -295,7 +300,7 @@ async function createChunk() {
 }
 
 async function uploadParticle() {
-  const parentRel = document.getElementById("fileParent").value.trim();
+  const parentRel = document.getElementById("fileParentSelect").value;
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files[0];
 
@@ -322,6 +327,36 @@ async function uploadParticle() {
       }
       setMessage("Particle uploaded.", "success");
       fileInput.value = "";
+      await refreshAll();
+  } catch (err) {
+      console.error(err);
+      setMessage(err.message, "error");
+  }
+}
+
+async function deleteNode(id, kind) {
+  const confirmMsg =
+    kind === "chunk"
+      ? "Delete this folder and ALL of its contents?"
+      : "Delete this file?";
+
+  if (!confirm(confirmMsg)) return;
+
+  setMessage("", "");
+
+  try {
+      const res = await fetch(
+          `/dirt/boxes/${encodeURIComponent(currentSlug)}/nodes/${id}`,
+          { method: "DELETE" }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+          throw new Error(data.error || "Failed to delete");
+      }
+
+      setMessage(`${kind} deleted.`, "success");
       await refreshAll();
   } catch (err) {
       console.error(err);
