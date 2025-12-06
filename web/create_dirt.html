@@ -186,7 +186,6 @@ function renderBoxMeta(box) {
 
 function populateParentDropdown() {
   const select = document.getElementById("fileParentSelect");
-  // Remember current selection so we don't annoy user when refreshing
   const previous = select.value;
 
   // Clear and add root option
@@ -196,13 +195,12 @@ function populateParentDropdown() {
   rootOpt.textContent = "(root)";
   select.appendChild(rootOpt);
 
-  // Add each chunk as an option, using its rel_path
+  // Get only chunk nodes (this excludes box_root automatically)
   const chunks = currentNodes.filter(n => n.kind === "chunk");
 
   chunks.forEach(chunk => {
       const opt = document.createElement("option");
       opt.value = chunk.rel_path;  // used as parent_rel_path
-      // label: human name if present, fallback to rel_path
       opt.textContent = chunk.name || chunk.rel_path || "(unnamed chunk)";
       select.appendChild(opt);
   });
@@ -215,6 +213,7 @@ function populateParentDropdown() {
       select.value = "";
   }
 }
+
 
 // Track expanded/collapsed state
 let expanded = {};
