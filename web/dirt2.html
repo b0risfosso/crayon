@@ -111,7 +111,7 @@
 <script>
 async function fetchBoxes() {
     try {
-        const res = await fetch("/dirt/boxes", {
+        const res = await fetch("/boxes", {
             headers: { "Accept": "application/json" }
         });
 
@@ -151,7 +151,7 @@ async function createBox() {
     message.innerHTML = "";
 
     try {
-        const res = await fetch("/dirt/boxes", {
+        const res = await fetch("/boxes", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ title })  // slug omitted → backend generates it
