@@ -193,13 +193,27 @@ function renderNodes(nodes) {
       div.className = `node ${n.kind}`;
       const indent = (n.depth || 0) * 18;
       div.style.paddingLeft = indent + "px";
+
+      const label = n.name || n.rel_path || "(root)";
+
+      let deleteButtonHtml = "";
+      if (n.kind !== "box_root") {
+          deleteButtonHtml = `
+            <button onclick="deleteNode(${n.id}, '${n.kind}')">
+              Delete
+            </button>
+          `;
+      }
+
       div.innerHTML = `
         <span class="kind">[${n.kind}]</span>
-        ${n.rel_path || "(root)"}
+        ${label}
+        ${deleteButtonHtml}
       `;
       tree.appendChild(div);
   });
 }
+
 
 async function refreshAll() {
   setMessage("", "");
@@ -214,6 +228,37 @@ async function refreshAll() {
       setMessage(err.message, "error");
   }
 }
+
+async function deleteNode(id, kind) {
+  const confirmMsg =
+    kind === "chunk"
+      ? "Delete this folder and ALL of its contents?"
+      : "Delete this file?";
+
+  if (!confirm(confirmMsg)) return;
+
+  setMessage("", "");
+
+  try {
+      const res = await fetch(
+          `/dirt/boxes/${encodeURIComponent(currentSlug)}/nodes/${id}`,
+          { method: "DELETE" }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+          throw new Error(data.error || "Failed to delete");
+      }
+
+      setMessage(`${kind} deleted.`, "success");
+      await refreshAll();
+  } catch (err) {
+      console.error(err);
+      setMessage(err.message, "error");
+  }
+}
+
 
 async function createChunk() {
   const parentRel = document.getElementById("chunkParent").value.trim();

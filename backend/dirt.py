@@ -16,6 +16,8 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 import os
+import shutil
+
 
 
 # === CONFIG ===
@@ -104,6 +106,25 @@ def close_db(exc):
 
 
 # === CORE LOGIC ===
+
+
+import re
+
+def sanitize_segment(display_name: str) -> str:
+    """
+    Turn a human label like 'seller (sales/marketing/business)'
+    into a filesystem-safe single directory name like
+    'seller-sales-marketing-business'.
+    """
+    # Replace slashes with hyphens
+    s = display_name.replace("/", "-")
+    # Optionally remove other nasty chars
+    s = re.sub(r"[^A-Za-z0-9._ -]+", "", s)
+    # Collapse whitespace to single dashes
+    s = re.sub(r"\s+", "-", s).strip("-")
+    # Fallback
+    return s or "chunk"
+
 
 def has_box_record(slug: str) -> bool:
     conn = get_db()
@@ -363,6 +384,7 @@ def list_nodes(slug):
     )
 
 
+
 @app.route("/boxes/<slug>/nodes", methods=["POST"])
 def create_node(slug):
     box = get_box_by_slug(slug)
@@ -399,25 +421,32 @@ def create_node(slug):
     if kind == "chunk":
         if request.is_json:
             data = request.get_json() or {}
-            name = (data.get("name") or "").strip()
+            display_name = (data.get("name") or "").strip()
         else:
-            name = (request.form.get("name") or "").strip()
+            display_name = (request.form.get("name") or "").strip()
 
-        if not name:
+        if not display_name:
             return jsonify({"error": "name is required for chunk"}), 400
 
+        # Filesystem-safe segment (no '/')
+        fs_segment = sanitize_segment(display_name)
+
+        # Build filesystem rel_path using safe segment
         if parent_rel_path:
-            rel_path = f"{parent_rel_path}/{name}"
+            rel_path = f"{parent_rel_path}/{fs_segment}"
         else:
-            rel_path = name
+            rel_path = fs_segment
 
         target_dir = os.path.join(box_root_fs, rel_path)
+
         try:
             os.makedirs(target_dir, exist_ok=False)
         except FileExistsError:
-            return jsonify({"error": "chunk already exists"}), 400
+            return jsonify({"error": "chunk already exists at that path"}), 400
 
         depth = rel_path.count("/") + 1
+
+        # Store human label in `name`, filesystem path in `rel_path`
         cur.execute(
             """
             INSERT INTO nodes (
@@ -428,11 +457,12 @@ def create_node(slug):
             VALUES (?, ?, ?, 'chunk', ?, NULL, NULL, NULL, NULL,
                     ?, datetime('now'), datetime('now'));
             """,
-            (box["id"], parent_id, name, rel_path, depth),
+            (box["id"], parent_id, display_name, rel_path, depth),
         )
         conn.commit()
         node_id = cur.lastrowid
         return jsonify({"id": node_id, "kind": "chunk", "rel_path": rel_path}), 201
+
 
     # PARTICLE: multipart/form-data with file
     if kind == "particle":
@@ -476,3 +506,67 @@ def create_node(slug):
         return jsonify({"id": node_id, "kind": "particle", "rel_path": rel_path}), 201
 
     return jsonify({"error": "invalid kind; expected 'chunk' or 'particle'"}), 400
+
+@app.route("/boxes/<slug>/nodes/<int:node_id>", methods=["DELETE"])
+def delete_node(slug, node_id):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Fetch node
+    cur.execute(
+        "SELECT * FROM nodes WHERE id = ? AND box_id = ?",
+        (node_id, box["id"]),
+    )
+    node = cur.fetchone()
+    if node is None:
+        return jsonify({"error": "Node not found"}), 404
+
+    if node["kind"] == "box_root":
+        return jsonify({"error": "Cannot delete box root"}), 400
+
+    box_root_fs = os.path.join(DATA_ROOT, box["root_path"])
+    rel_path = node["rel_path"]
+    target_path = os.path.join(box_root_fs, rel_path)
+
+    try:
+        if node["kind"] == "chunk":
+            # Delete directory tree from disk
+            if os.path.exists(target_path):
+                shutil.rmtree(target_path)
+
+            # Delete this chunk AND all descendants in DB
+            cur.execute(
+                """
+                DELETE FROM nodes
+                WHERE box_id = ?
+                  AND (rel_path = ? OR rel_path LIKE ?)
+                """,
+                (box["id"], rel_path, rel_path + "/%"),
+            )
+
+        elif node["kind"] == "particle":
+            # Delete single file
+            if os.path.exists(target_path):
+                try:
+                    os.remove(target_path)
+                except IsADirectoryError:
+                    shutil.rmtree(target_path)
+
+            cur.execute(
+                "DELETE FROM nodes WHERE id = ? AND box_id = ?",
+                (node_id, box["id"]),
+            )
+
+        else:
+            return jsonify({"error": "Unsupported node kind"}), 400
+
+        conn.commit()
+        return jsonify({"status": "deleted", "id": node_id}), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": "Failed to delete node", "details": str(e)}), 500
