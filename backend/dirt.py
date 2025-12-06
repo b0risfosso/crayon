@@ -108,6 +108,29 @@ def has_box_record(slug: str) -> bool:
     return cur.fetchone() is not None
 
 
+
+def generate_next_slug():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT slug FROM boxes
+        WHERE slug LIKE 'box_%'
+        ORDER BY slug DESC
+        LIMIT 1;
+    """)
+    row = cur.fetchone()
+
+    if not row:
+        return "box_001"
+
+    last_slug = row["slug"]  # e.g. "box_014"
+    last_num = int(last_slug.split("_")[1])
+    next_num = last_num + 1
+    return f"box_{next_num:03d}"
+
+
+
 def create_box(slug: str, title: Optional[str] = None):
     """
     Create a box of dirt:
@@ -274,7 +297,6 @@ def new_box():
 
 @app.route("/boxes", methods=["POST"])
 def create_box_route():
-    # support both form-encoded and JSON
     if request.is_json:
         data = request.get_json(silent=True) or {}
         slug = (data.get("slug") or "").strip()
@@ -283,10 +305,9 @@ def create_box_route():
         slug = (request.form.get("slug") or "").strip()
         title = (request.form.get("title") or "").strip() or None
 
+    # If slug empty → auto-generate
     if not slug:
-        if request.is_json:
-            return jsonify({"error": "slug is required"}), 400
-        abort(400, description="slug is required")
+        slug = generate_next_slug()
 
     try:
         result = create_box(slug, title)
@@ -302,8 +323,8 @@ def create_box_route():
     if request.is_json:
         return jsonify(result), 201
 
-    # redirect to list with a simple success hint (you can improve this later)
     return redirect(url_for("list_boxes"))
+
 
 
 # For running via `python app.py`
