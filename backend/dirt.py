@@ -3,6 +3,7 @@
 import os
 import shutil
 import sqlite3
+import subprocess
 import threading
 import time
 from typing import Optional
@@ -46,6 +47,19 @@ try:
 except Exception as e:  # pragma: no cover - optional dependency
     _client = None
     _client_err = e
+
+try:  # prefer PyPDF2 but fall back to the renamed pypdf package
+    from PyPDF2 import PdfReader as _PdfReader  # type: ignore
+except Exception:  # pragma: no cover
+    try:
+        from pypdf import PdfReader as _PdfReader  # type: ignore
+    except Exception:
+        _PdfReader = None
+
+try:
+    from pdfminer.high_level import extract_text as _pdfminer_extract_text  # type: ignore
+except Exception:
+    _pdfminer_extract_text = None
 
 app = Flask(__name__)
 
@@ -346,14 +360,28 @@ def read_particle_excerpt(node_row, max_chars: int = 10000) -> str:
 
 
 def _extract_pdf_text(path: str, max_chars: int) -> Optional[str]:
-    """Use PyPDF2 if available to pull text from a PDF file."""
-    try:
-        from PyPDF2 import PdfReader
-    except Exception:
-        return None
+    """Try several strategies to pull readable PDF text."""
 
+    text = _extract_pdf_with_reader(path, max_chars)
+    if text:
+        return text
+
+    text = _extract_pdf_with_pdfminer(path, max_chars)
+    if text:
+        return text
+
+    text = _extract_pdf_with_cli(path, max_chars)
+    if text:
+        return text
+
+    return None
+
+
+def _extract_pdf_with_reader(path: str, max_chars: int) -> Optional[str]:
+    if _PdfReader is None:
+        return None
     try:
-        reader = PdfReader(path)
+        reader = _PdfReader(path)
     except Exception:
         return None
 
@@ -371,9 +399,44 @@ def _extract_pdf_text(path: str, max_chars: int) -> Optional[str]:
         total += len(chunks[-1])
         if total >= max_chars:
             break
-
     combined = "".join(chunks).strip()
     return combined[:max_chars] if combined else None
+
+
+def _extract_pdf_with_pdfminer(path: str, max_chars: int) -> Optional[str]:
+    if _pdfminer_extract_text is None:
+        return None
+    try:
+        text = _pdfminer_extract_text(path, maxpages=None)
+    except Exception:
+        return None
+    if not text:
+        return None
+    return text[:max_chars]
+
+
+def _extract_pdf_with_cli(path: str, max_chars: int) -> Optional[str]:
+    exe = shutil.which("pdftotext")
+    if not exe:
+        return None
+    try:
+        proc = subprocess.run(
+            [exe, "-layout", path, "-"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=10,
+        )
+    except Exception:
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        text = proc.stdout.decode("utf-8", errors="ignore")
+    except Exception:
+        return None
+    text = text.strip()
+    return text[:max_chars] if text else None
 
 
 @app.route("/particles/<int:node_id>/excerpt", methods=["GET"])
@@ -890,4 +953,3 @@ def create_bridge():
             "usage": usage_payload,
         }
     ), 201
-
