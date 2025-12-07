@@ -817,6 +817,82 @@ def delete_node(slug, node_id):
         return jsonify({"error": "Failed to delete node", "details": str(e)}), 500
 
 
+@app.route("/bridge", methods=["GET"])
+def list_bridges():
+    """
+    Return recent bridge rows with node metadata. Supports optional filtering by node IDs.
+    """
+    limit = request.args.get("limit", default=50, type=int)
+    if not isinstance(limit, int):
+        return jsonify({"error": "limit must be integer"}), 400
+    limit = max(1, min(limit, 200))
+
+    node_a_id = request.args.get("node_a_id", type=int)
+    node_b_id = request.args.get("node_b_id", type=int)
+
+    clauses = []
+    params = []
+    if node_a_id is not None:
+        clauses.append("bridge.node_a_id = ?")
+        params.append(node_a_id)
+    if node_b_id is not None:
+        clauses.append("bridge.node_b_id = ?")
+        params.append(node_b_id)
+
+    query = """
+        SELECT
+            bridge.*,
+            a.name  AS node_a_name,
+            a.rel_path AS node_a_rel_path,
+            a.mime_type AS node_a_mime,
+            box_a.slug AS box_a_slug,
+            b.name  AS node_b_name,
+            b.rel_path AS node_b_rel_path,
+            b.mime_type AS node_b_mime,
+            box_b.slug AS box_b_slug
+        FROM bridge
+        JOIN nodes a ON a.id = bridge.node_a_id
+        JOIN boxes box_a ON box_a.id = a.box_id
+        JOIN nodes b ON b.id = bridge.node_b_id
+        JOIN boxes box_b ON box_b.id = b.box_id
+    """
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY bridge.id DESC LIMIT ?"
+    params.append(limit)
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(query, params)
+    rows = cur.fetchall()
+
+    payload = []
+    for row in rows:
+        payload.append(
+            {
+                "id": row["id"],
+                "prompt": row["prompt"],
+                "output": row["output"],
+                "created_at": row["created_at"],
+                "node_a": {
+                    "id": row["node_a_id"],
+                    "name": row["node_a_name"],
+                    "rel_path": row["node_a_rel_path"],
+                    "mime_type": row["node_a_mime"],
+                    "box_slug": row["box_a_slug"],
+                },
+                "node_b": {
+                    "id": row["node_b_id"],
+                    "name": row["node_b_name"],
+                    "rel_path": row["node_b_rel_path"],
+                    "mime_type": row["node_b_mime"],
+                    "box_slug": row["box_b_slug"],
+                },
+            }
+        )
+    return jsonify(payload)
+
+
 @app.route("/bridge", methods=["POST"])
 def create_bridge():
     """
