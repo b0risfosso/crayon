@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
 import os
+import queue
+import random
 import shutil
 import sqlite3
 import subprocess
 import threading
 import time
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from flask import (
@@ -38,6 +41,10 @@ BRIDGE_LLM_SYSTEM_PROMPT = os.environ.get(
     " detailed value exchanges grounded in the provided text.",
 )
 LLM_LOCK = threading.Lock()
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 try:
     from openai import OpenAI
@@ -91,6 +98,187 @@ def run_bridge_llm(prompt_text: str, *, model: Optional[str] = None):
     duration_ms = int((time.time() - start) * 1000)
 
     return text, usage_dict, tokens_in, tokens_out, total_tokens, duration_ms, resolved_model
+
+
+BRIDGE_QUEUE_CONCURRENCY = 2
+BRIDGE_TASK_HISTORY_LIMIT = 200
+BRIDGE_TASK_QUEUE: "queue.Queue[Dict[str, Any]]" = queue.Queue()
+BRIDGE_TASKS: Dict[str, Dict[str, Any]] = {}
+BRIDGE_TASK_ORDER: List[str] = []
+BRIDGE_TASKS_LOCK = threading.Lock()
+
+
+def _add_task(task: Dict[str, Any]) -> Dict[str, Any]:
+    with BRIDGE_TASKS_LOCK:
+        BRIDGE_TASKS[task["task_id"]] = task
+        BRIDGE_TASK_ORDER.append(task["task_id"])
+        while len(BRIDGE_TASK_ORDER) > BRIDGE_TASK_HISTORY_LIMIT:
+            oldest = BRIDGE_TASK_ORDER.pop(0)
+            BRIDGE_TASKS.pop(oldest, None)
+        return dict(task)
+
+
+def _update_task(task_id: str, **fields) -> None:
+    with BRIDGE_TASKS_LOCK:
+        task = BRIDGE_TASKS.get(task_id)
+        if not task:
+            return
+        task.update(fields)
+
+
+def enqueue_bridge_task(node_a_id: int, node_b_id: int, origin: str) -> Dict[str, Any]:
+    task = {
+        "task_id": uuid4().hex,
+        "node_a_id": node_a_id,
+        "node_b_id": node_b_id,
+        "origin": origin,
+        "status": "queued",
+        "created_at": utc_now_iso(),
+    }
+    payload = _add_task(task)
+    BRIDGE_TASK_QUEUE.put(task)
+    return payload
+
+
+def _execute_bridge_job(node_a_id: int, node_b_id: int, *, request_id: Optional[str] = None):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT n.*, b.root_path, b.slug AS box_slug
+            FROM nodes n
+            JOIN boxes b ON n.box_id = b.id
+            WHERE n.id IN (?, ?);
+            """,
+            (node_a_id, node_b_id),
+        )
+        rows = cur.fetchall()
+        if len(rows) != 2:
+            raise ValueError("One or both nodes not found")
+        node_map = {row["id"]: row for row in rows}
+        node_a = node_map.get(node_a_id)
+        node_b = node_map.get(node_b_id)
+        if node_a is None or node_b is None:
+            raise ValueError("One or both nodes not found")
+        if node_a["kind"] != "particle" or node_b["kind"] != "particle":
+            raise ValueError("Both nodes must be particles")
+
+        try:
+            doc_a_excerpt = read_particle_excerpt(node_a, max_chars=10000)
+            doc_b_excerpt = read_particle_excerpt(node_b, max_chars=10000)
+        except FileNotFoundError as exc:
+            raise RuntimeError(str(exc)) from exc
+        except Exception as exc:
+            raise RuntimeError(f"Failed to read particle files: {exc}") from exc
+
+        prompt_text = build_bridge_prompt(doc_a_excerpt, doc_b_excerpt)
+
+        (
+            model_output,
+            usage_dict,
+            tokens_in,
+            tokens_out,
+            total_tokens,
+            duration_ms,
+            resolved_model,
+        ) = run_bridge_llm(prompt_text)
+
+        try:
+            log_usage(
+                app="dirt.bridge",
+                model=resolved_model,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                endpoint="/bridge",
+                request_id=request_id,
+                duration_ms=duration_ms,
+                meta={
+                    "node_a_id": node_a_id,
+                    "node_b_id": node_b_id,
+                },
+            )
+        except Exception:
+            pass
+
+        usage_payload = {
+            "model": resolved_model,
+            "prompt_tokens": tokens_in,
+            "completion_tokens": tokens_out,
+            "total_tokens": total_tokens,
+            "duration_ms": duration_ms,
+        }
+        if usage_dict is not None:
+            usage_payload["raw"] = usage_dict
+
+        cur.execute(
+            """
+            INSERT INTO bridge (node_a_id, node_b_id, prompt, output, created_at)
+            VALUES (?, ?, ?, ?, datetime('now'));
+            """,
+            (node_a_id, node_b_id, prompt_text, model_output),
+        )
+        conn.commit()
+        bridge_id = cur.lastrowid
+        cur.execute("SELECT created_at FROM bridge WHERE id = ?", (bridge_id,))
+        created_row = cur.fetchone()
+        created_at = created_row["created_at"] if created_row else utc_now_iso()
+
+        return {
+            "id": bridge_id,
+            "node_a_id": node_a_id,
+            "node_b_id": node_b_id,
+            "prompt": prompt_text,
+            "output": model_output,
+            "usage": usage_payload,
+            "created_at": created_at,
+        }
+    finally:
+        conn.close()
+
+
+def bridge_worker_loop(worker_id: int):
+    while True:
+        task = BRIDGE_TASK_QUEUE.get()
+        task_id = task["task_id"]
+        _update_task(
+            task_id,
+            status="running",
+            started_at=utc_now_iso(),
+            worker_id=worker_id,
+        )
+        try:
+            result = _execute_bridge_job(
+                task["node_a_id"],
+                task["node_b_id"],
+                request_id=task_id,
+            )
+            _update_task(
+                task_id,
+                status="done",
+                finished_at=utc_now_iso(),
+                bridge_id=result["id"],
+                result=result,
+            )
+        except Exception as exc:
+            _update_task(
+                task_id,
+                status="error",
+                finished_at=utc_now_iso(),
+                error=str(exc),
+            )
+        finally:
+            BRIDGE_TASK_QUEUE.task_done()
+
+
+for worker_index in range(BRIDGE_QUEUE_CONCURRENCY):
+    thread = threading.Thread(
+        target=bridge_worker_loop, args=(worker_index,), daemon=True
+    )
+    thread.start()
+
+
 
 # === DB CONNECTION HANDLING ===
 
@@ -437,6 +625,26 @@ def _extract_pdf_with_cli(path: str, max_chars: int) -> Optional[str]:
         return None
     text = text.strip()
     return text[:max_chars] if text else None
+
+
+def _validate_particle_nodes(node_ids: List[int]) -> Optional[str]:
+    if not node_ids:
+        return "No node IDs provided"
+    conn = get_db()
+    cur = conn.cursor()
+    placeholders = ",".join("?" for _ in node_ids)
+    cur.execute(
+        f"SELECT id, kind FROM nodes WHERE id IN ({placeholders})",
+        tuple(node_ids),
+    )
+    rows = cur.fetchall()
+    seen = {row["id"] for row in rows}
+    if len(seen) != len(set(node_ids)):
+        return "One or more nodes not found"
+    for row in rows:
+        if row["kind"] != "particle":
+            return f"Node {row['id']} is not a particle"
+    return None
 
 
 @app.route("/particles/<int:node_id>/excerpt", methods=["GET"])
@@ -817,6 +1025,32 @@ def delete_node(slug, node_id):
         return jsonify({"error": "Failed to delete node", "details": str(e)}), 500
 
 
+@app.route("/bridge/tasks", methods=["GET"])
+def list_bridge_tasks():
+    limit = request.args.get("limit", default=50, type=int)
+    if not isinstance(limit, int):
+        return jsonify({"error": "limit must be integer"}), 400
+    limit = max(1, min(limit, BRIDGE_TASK_HISTORY_LIMIT))
+
+    with BRIDGE_TASKS_LOCK:
+        ordered = sorted(
+            BRIDGE_TASKS.values(), key=lambda t: t.get("created_at", ""), reverse=True
+        )
+        tasks = [dict(t) for t in ordered[:limit]]
+        counts = {"queued": 0, "running": 0, "done": 0, "error": 0}
+        for t in BRIDGE_TASKS.values():
+            status = t.get("status", "queued")
+            counts[status] = counts.get(status, 0) + 1
+
+    return jsonify(
+        {
+            "queue_size": BRIDGE_TASK_QUEUE.qsize(),
+            "tasks": tasks,
+            "counts": counts,
+        }
+    )
+
+
 @app.route("/bridge", methods=["GET"])
 def list_bridges():
     """
@@ -893,10 +1127,40 @@ def list_bridges():
     return jsonify(payload)
 
 
+@app.route("/bridge/random_batch", methods=["POST"])
+def enqueue_random_bridges():
+    """
+    Randomly enqueue N bridge creation tasks by sampling particle pairs.
+    """
+    if not request.is_json:
+        return jsonify({"error": "JSON body required"}), 400
+    data = request.get_json() or {}
+    try:
+        count = int(data.get("count", 1))
+    except (TypeError, ValueError):
+        return jsonify({"error": "count must be an integer"}), 400
+    count = max(1, min(count, 50))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM nodes WHERE kind = 'particle'")
+    ids = [row["id"] for row in cur.fetchall()]
+    if len(ids) < 2:
+        return jsonify({"error": "Need at least two particles to build bridges"}), 400
+
+    tasks = []
+    for _ in range(count):
+        node_a_id, node_b_id = random.sample(ids, 2)
+        task = enqueue_bridge_task(node_a_id, node_b_id, origin="random_batch")
+        tasks.append(task)
+
+    return jsonify({"enqueued": len(tasks), "tasks": tasks}), 202
+
+
 @app.route("/bridge", methods=["POST"])
 def create_bridge():
     """
-    Create a 'bridge' between two particle nodes.
+    Enqueue creation of a 'bridge' between two particle nodes.
 
     Request JSON:
     {
@@ -905,13 +1169,9 @@ def create_bridge():
     }
 
     Behavior:
-    - Verify both nodes exist and are kind='particle'
-    - Read their underlying files from /var/www/site/data/...
-    - Take up to 10,000 characters from each document
-    - Build the bridge prompt using prompts.build_bridge_prompt
-    - Run the configured LLM to generate bridge output
-    - Insert a row into the bridge table with prompt and output
-    - Return the bridge row metadata + prompt
+    - Validate node IDs
+    - Push a background task onto the bridge queue (processed by 2 workers)
+    - Return the queued task metadata
     """
     if not request.is_json:
         return jsonify({"error": "JSON body required"}), 400
@@ -926,106 +1186,10 @@ def create_bridge():
     if node_a_id == node_b_id:
         return jsonify({"error": "node_a_id and node_b_id must be different"}), 400
 
-    conn = get_db()
-    cur = conn.cursor()
+    error = _validate_particle_nodes([node_a_id, node_b_id])
+    if error:
+        return jsonify({"error": error}), 400
 
-    # Fetch both nodes and their box root_path
-    cur.execute(
-        """
-        SELECT n.*, b.root_path
-        FROM nodes n
-        JOIN boxes b ON n.box_id = b.id
-        WHERE n.id IN (?, ?);
-        """,
-        (node_a_id, node_b_id),
-    )
-    rows = cur.fetchall()
-    if len(rows) != 2:
-        return jsonify({"error": "One or both nodes not found"}), 404
-
-    node_map = {row["id"]: row for row in rows}
-    node_a = node_map.get(node_a_id)
-    node_b = node_map.get(node_b_id)
-
-    if node_a is None or node_b is None:
-        return jsonify({"error": "One or both nodes not found"}), 404
-
-    if node_a["kind"] != "particle" or node_b["kind"] != "particle":
-        return jsonify({"error": "Both nodes must be particles"}), 400
-
-    # Read up to 10,000 characters from each document
-    try:
-        doc_a_excerpt = read_particle_excerpt(node_a, max_chars=10000)
-        doc_b_excerpt = read_particle_excerpt(node_b, max_chars=10000)
-    except FileNotFoundError as e:
-        return jsonify({"error": str(e)}), 500
-    except Exception as e:
-        return jsonify({"error": "Failed to read particle files", "details": str(e)}), 500
-
-    # Build the prompt text
-    prompt_text = build_bridge_prompt(doc_a_excerpt, doc_b_excerpt)
-
-    try:
-        (
-            model_output,
-            usage_dict,
-            tokens_in,
-            tokens_out,
-            total_tokens,
-            duration_ms,
-            resolved_model,
-        ) = run_bridge_llm(prompt_text)
-    except RuntimeError as e:
-        return jsonify({"error": "LLM unavailable", "details": str(e)}), 503
-    except Exception as e:
-        return jsonify({"error": "LLM call failed", "details": str(e)}), 502
-
-    try:
-        log_usage(
-            app="dirt.bridge",
-            model=resolved_model,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            endpoint="/bridge",
-            request_id=f"bridge:{node_a_id}:{node_b_id}:{uuid4().hex}",
-            duration_ms=duration_ms,
-            meta={"node_a_id": node_a_id, "node_b_id": node_b_id},
-        )
-    except Exception:
-        # Usage logging is best-effort; failures shouldn't block the request.
-        pass
-
-    usage_payload = {
-        "model": resolved_model,
-        "prompt_tokens": tokens_in,
-        "completion_tokens": tokens_out,
-        "total_tokens": total_tokens,
-        "duration_ms": duration_ms,
-    }
-    if usage_dict is not None:
-        usage_payload["raw"] = usage_dict
-
-    try:
-        cur.execute(
-            """
-            INSERT INTO bridge (node_a_id, node_b_id, prompt, output, created_at)
-            VALUES (?, ?, ?, ?, datetime('now'));
-            """,
-            (node_a_id, node_b_id, prompt_text, model_output),
-        )
-        conn.commit()
-        bridge_id = cur.lastrowid
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"error": "Failed to insert bridge row", "details": str(e)}), 500
-
-    return jsonify(
-        {
-            "id": bridge_id,
-            "node_a_id": node_a_id,
-            "node_b_id": node_b_id,
-            "prompt": prompt_text,
-            "output": model_output,
-            "usage": usage_payload,
-        }
-    ), 201
+    task = enqueue_bridge_task(node_a_id, node_b_id, origin="manual")
+    task["queue_size"] = BRIDGE_TASK_QUEUE.qsize()
+    return jsonify(task), 202
