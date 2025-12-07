@@ -327,12 +327,53 @@ def read_particle_excerpt(node_row, max_chars: int = 10000) -> str:
     if not os.path.exists(abs_path) or not os.path.isfile(abs_path):
         raise FileNotFoundError(f"Particle file not found at {abs_path}")
 
-    # Read a chunk of bytes and decode as text; ignore binary noise.
+    # Prefer structured extraction for PDFs to avoid binary gibberish in UI.
+    if rel_path.lower().endswith(".pdf"):
+        pdf_text = _extract_pdf_text(abs_path, max_chars)
+        if pdf_text:
+            return pdf_text
+
     with open(abs_path, "rb") as f:
-        raw = f.read(50000)  # cap bytes to avoid huge reads
+        raw = f.read(50000)
 
     text = raw.decode("utf-8", errors="ignore")
+    if text.startswith("%PDF"):
+        fallback = _extract_pdf_text(abs_path, max_chars)
+        if fallback:
+            return fallback
+        return "[pdf detected but text extraction unavailable]"
     return text[:max_chars]
+
+
+def _extract_pdf_text(path: str, max_chars: int) -> Optional[str]:
+    """Use PyPDF2 if available to pull text from a PDF file."""
+    try:
+        from PyPDF2 import PdfReader
+    except Exception:
+        return None
+
+    try:
+        reader = PdfReader(path)
+    except Exception:
+        return None
+
+    chunks = []
+    total = 0
+    for page in reader.pages:
+        try:
+            page_text = page.extract_text() or ""
+        except Exception:
+            page_text = ""
+        if not page_text:
+            continue
+        needed = max_chars - total
+        chunks.append(page_text[:needed])
+        total += len(chunks[-1])
+        if total >= max_chars:
+            break
+
+    combined = "".join(chunks).strip()
+    return combined[:max_chars] if combined else None
 
 
 @app.route("/particles/<int:node_id>/excerpt", methods=["GET"])
@@ -849,5 +890,4 @@ def create_bridge():
             "usage": usage_payload,
         }
     ), 201
-
 
