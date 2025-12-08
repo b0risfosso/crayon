@@ -302,12 +302,19 @@ def init_db():
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             slug       TEXT UNIQUE NOT NULL,
             title      TEXT,
+            description TEXT,
             root_path  TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         """
     )
+
+    # Backfill description column if existing DB lacks it
+    cur.execute("PRAGMA table_info(boxes);")
+    box_columns = [row[1] for row in cur.fetchall()]
+    if "description" not in box_columns:
+        cur.execute("ALTER TABLE boxes ADD COLUMN description TEXT;")
 
     cur.execute(
         """
@@ -430,7 +437,7 @@ def generate_next_slug():
 
 
 
-def create_box(slug: str, title: Optional[str] = None):
+def create_box(slug: str, title: Optional[str] = None, description: Optional[str] = None):
     """
     Create a box of dirt:
     - Create /var/www/site/data/boxes/<slug> directory
@@ -465,10 +472,10 @@ def create_box(slug: str, title: Optional[str] = None):
         # insert box
         cur.execute(
             """
-            INSERT INTO boxes (slug, title, root_path, created_at, updated_at)
-            VALUES (?, ?, ?, datetime('now'), datetime('now'));
+            INSERT INTO boxes (slug, title, description, root_path, created_at, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'));
             """,
-            (slug, title, root_path_rel),
+            (slug, title, description, root_path_rel),
         )
         box_id = cur.lastrowid
 
@@ -495,6 +502,7 @@ def create_box(slug: str, title: Optional[str] = None):
             "box_id": box_id,
             "slug": slug,
             "title": title,
+            "description": description,
             "dir": box_dir,
             "root_path": root_path_rel,
         }
@@ -712,6 +720,7 @@ def list_boxes():
                 "id": row["id"],
                 "slug": row["slug"],
                 "title": row["title"],
+                "description": row["description"],
                 "root_path": row["root_path"],
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
@@ -754,16 +763,18 @@ def create_box_route():
         data = request.get_json(silent=True) or {}
         slug = (data.get("slug") or "").strip()
         title = (data.get("title") or "").strip() or None
+        description = (data.get("description") or "").strip() or None
     else:
         slug = (request.form.get("slug") or "").strip()
         title = (request.form.get("title") or "").strip() or None
+        description = (request.form.get("description") or "").strip() or None
 
     # If slug empty → auto-generate
     if not slug:
         slug = generate_next_slug()
 
     try:
-        result = create_box(slug, title)
+        result = create_box(slug, title, description)
     except ValueError as ve:
         if request.is_json:
             return jsonify({"error": str(ve)}), 400
@@ -791,11 +802,42 @@ def get_box(slug):
             "id": row["id"],
             "slug": row["slug"],
             "title": row["title"],
+            "description": row["description"],
             "root_path": row["root_path"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
     )
+
+
+@app.route("/boxes/<slug>/description", methods=["GET", "POST"])
+def box_description(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    if request.method == "GET":
+        return jsonify({"slug": box["slug"], "description": box["description"]})
+
+    data = request.get_json(silent=True) or {}
+    if "description" not in data:
+        return jsonify({"error": "description is required"}), 400
+
+    description = (data.get("description") or "").strip() or None
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE boxes SET description = ?, updated_at = datetime('now') WHERE id = ?;",
+        (description, box["id"]),
+    )
+    conn.commit()
+
+    return jsonify({
+        "slug": box["slug"],
+        "description": description,
+        "updated_at": utc_now_iso(),
+    })
 
 @app.route("/boxes/<slug>/nodes", methods=["GET"])
 def list_nodes(slug):

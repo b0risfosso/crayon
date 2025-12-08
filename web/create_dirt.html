@@ -42,6 +42,16 @@
       border-radius: 6px;
       margin-top: 4px;
   }
+  textarea {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-top: 4px;
+      min-height: 90px;
+      resize: vertical;
+  }
   button {
       background: #0066cc;
       color: white;
@@ -111,6 +121,12 @@
   <div id="boxMeta" class="meta"></div>
   <div id="message"></div>
 
+  <div class="card" style="margin-bottom: 16px;">
+    <h3>Box Description</h3>
+    <textarea id="boxDescription" placeholder="Describe this box..."></textarea>
+    <button onclick="saveDescription()">Save Description</button>
+  </div>
+
   <div class="forms">
     <!-- Create chunk (folder) -->
     <div class="card">
@@ -147,6 +163,16 @@
 <script>
 let currentSlug = null;
 let currentNodes = [];
+let currentBox = null;
+
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function getQueryParam(name) {
   const params = new URLSearchParams(window.location.search);
@@ -176,11 +202,16 @@ async function loadNodes(slug) {
 
 function renderBoxMeta(box) {
   const meta = document.getElementById("boxMeta");
+  const slug = escapeHtml(box.slug || "");
+  const title = box.title ? escapeHtml(box.title) : "";
+  const rootPath = escapeHtml(box.root_path || "");
+  const desc = box.description ? `<br><strong>Description:</strong> ${escapeHtml(box.description)}` : "";
   meta.innerHTML = `
-    <strong>Slug:</strong> ${box.slug}
-    ${box.title ? ` — <strong>${box.title}</strong>` : ""}
+    <strong>Slug:</strong> ${slug}
+    ${title ? ` — <strong>${title}</strong>` : ""}
     <br>
-    <strong>Root path:</strong> ${box.root_path}
+    <strong>Root path:</strong> ${rootPath}
+    ${desc}
   `;
 }
 
@@ -316,7 +347,9 @@ async function refreshAll() {
   const slug = currentSlug;
   try {
       const box = await loadBoxInfo(slug);
+      currentBox = box;
       renderBoxMeta(box);
+      document.getElementById("boxDescription").value = box.description || "";
       const nodes = await loadNodes(slug);
       currentNodes = nodes;
       renderNodes(nodes);
@@ -420,6 +453,31 @@ async function deleteNode(id, kind) {
 
       setMessage(`${kind} deleted.`, "success");
       await refreshAll();
+  } catch (err) {
+      console.error(err);
+      setMessage(err.message, "error");
+  }
+}
+
+async function saveDescription() {
+  if (!currentSlug) return;
+  const description = document.getElementById("boxDescription").value;
+  setMessage("", "");
+  try {
+      const res = await fetch(`/dirt/boxes/${encodeURIComponent(currentSlug)}/description`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+          throw new Error(data.error || "Failed to save description");
+      }
+      setMessage("Description saved.", "success");
+      if (currentBox) {
+          currentBox.description = description;
+          renderBoxMeta(currentBox);
+      }
   } catch (err) {
       console.error(err);
       setMessage(err.message, "error");
