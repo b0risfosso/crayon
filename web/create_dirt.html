@@ -13,10 +13,10 @@
       color: #333;
   }
   .container {
-      max-width: 900px;
+      max-width: 720px;
       margin: 0 auto;
       background: white;
-      padding: 20px 30px;
+      padding: 20px 24px;
       border-radius: 8px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   }
@@ -25,22 +25,15 @@
       color: #222;
   }
   .meta {
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       font-size: 14px;
       color: #555;
+      line-height: 1.5;
   }
   label {
       display: block;
       margin-top: 10px;
       font-weight: bold;
-  }
-  input[type="text"], input[type="file"], select {
-      width: 100%;
-      padding: 8px 10px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      margin-top: 4px;
   }
   textarea {
       width: 100%;
@@ -49,7 +42,7 @@
       border: 1px solid #ccc;
       border-radius: 6px;
       margin-top: 4px;
-      min-height: 90px;
+      min-height: 120px;
       resize: vertical;
   }
   button {
@@ -65,37 +58,30 @@
   button:hover {
       background: #004c99;
   }
-  .forms {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      margin-bottom: 20px;
-  }
   .card {
-      flex: 1 1 260px;
-      padding: 12px 16px;
+      padding: 14px 16px;
       border-radius: 8px;
       background: #fafafa;
       border: 1px solid #ddd;
+      margin-bottom: 12px;
   }
-  .tree {
-      margin-top: 20px;
+  .analysis-item {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      background: #fff;
   }
-  .node {
-      padding: 4px 0;
-      font-family: monospace;
+  .analysis-item pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      margin: 6px 0 0 0;
   }
-  .node.chunk {
-      font-weight: bold;
-  }
-  .node.particle {
-      color: #444;
-  }
-  .node .kind {
-      font-size: 11px;
-      text-transform: uppercase;
-      color: #888;
-      margin-right: 6px;
+  .note {
+      color: #555;
+      font-size: 14px;
+      margin-top: 10px;
   }
   .error {
       color: #b30000;
@@ -121,58 +107,30 @@
   <div id="boxMeta" class="meta"></div>
   <div id="message"></div>
 
-  <div class="card" style="margin-bottom: 16px;">
+  <div class="card">
     <h3>Box Description</h3>
     <textarea id="boxDescription" placeholder="Describe this box..."></textarea>
     <button onclick="saveDescription()">Save Description</button>
   </div>
 
-  <div class="forms">
-    <!-- Create chunk (folder) -->
-    <div class="card">
-      <h3>Create Chunk (Folder)</h3>
-      <label for="chunkParent">Parent path (optional)</label>
-      <input id="chunkParent" type="text" placeholder="e.g. chunk_a/chunk_a1 or blank for root">
-
-      <label for="chunkName">Folder name</label>
-      <input id="chunkName" type="text" placeholder="e.g. chunk_b">
-
-      <button onclick="createChunk()">Create Chunk</button>
-    </div>
-
-    <!-- Upload particle (file) -->
-    <div class="card">
-      <h3>Upload Particle (File)</h3>
-      <label for="fileParentSelect">Parent chunk</label>
-      <select id="fileParentSelect">
-        <!-- options populated from chunks; root is "" -->
-        <option value="">(root)</option>
-      </select>
-
-      <label for="fileInput">File</label>
-      <input id="fileInput" type="file">
-
-      <button onclick="uploadParticle()">Upload Particle</button>
-    </div>
+  <div class="card">
+    <h3>Decompose Box</h3>
+    <p class="note">Runs the analysis prompt against this box's title and description.</p>
+    <button id="decomposeBtn" onclick="enqueueDecomposition()">Run Decomposition</button>
   </div>
 
-  <h2>Contents</h2>
-  <div id="tree" class="tree"></div>
+  <div class="card">
+    <h3>Analyses</h3>
+    <div id="analysesList" class="note">No analyses yet.</div>
+  </div>
+
+  <p class="note">Chunk and particle management is disabled for this box.</p>
 </div>
 
 <script>
 let currentSlug = null;
-let currentNodes = [];
 let currentBox = null;
-
-function escapeHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+let analyses = [];
 
 function getQueryParam(name) {
   const params = new URLSearchParams(window.location.search);
@@ -184,6 +142,15 @@ function setMessage(html, cls) {
   el.innerHTML = html ? `<div class="${cls}">${html}</div>` : "";
 }
 
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function loadBoxInfo(slug) {
   const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}`);
   if (!res.ok) {
@@ -192,10 +159,10 @@ async function loadBoxInfo(slug) {
   return res.json();
 }
 
-async function loadNodes(slug) {
-  const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/nodes`);
+async function loadAnalyses(slug) {
+  const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses`);
   if (!res.ok) {
-      throw new Error("Failed to load nodes");
+      throw new Error("Failed to load analyses");
   }
   return res.json();
 }
@@ -215,132 +182,27 @@ function renderBoxMeta(box) {
   `;
 }
 
-function populateParentDropdown() {
-  const select = document.getElementById("fileParentSelect");
-  const previous = select.value;
-
-  // Clear and add root option
-  select.innerHTML = "";
-  const rootOpt = document.createElement("option");
-  rootOpt.value = "";
-  rootOpt.textContent = "(root)";
-  select.appendChild(rootOpt);
-
-  // Get only chunk nodes (this excludes box_root automatically)
-  const chunks = currentNodes.filter(n => n.kind === "chunk");
-
-  chunks.forEach(chunk => {
-      const opt = document.createElement("option");
-      opt.value = chunk.rel_path;  // used as parent_rel_path
-      opt.textContent = chunk.name || chunk.rel_path || "(unnamed chunk)";
-      select.appendChild(opt);
-  });
-
-  // Restore previous selection if still present
-  const maybe = Array.from(select.options).find(o => o.value === previous);
-  if (maybe) {
-      select.value = previous;
-  } else {
-      select.value = "";
+function renderAnalyses(list) {
+  const container = document.getElementById("analysesList");
+  if (!list || !list.length) {
+      container.innerHTML = "No analyses yet.";
+      return;
   }
+
+  container.innerHTML = "";
+  list.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "analysis-item";
+      const title = escapeHtml(item.name || "analysis");
+      const created = escapeHtml(item.created_at || "");
+      const content = escapeHtml(item.content || "");
+      div.innerHTML = `
+        <strong>${title}</strong> <small>${created}</small>
+        <pre>${content}</pre>
+      `;
+      container.appendChild(div);
+  });
 }
-
-
-// Track expanded/collapsed state
-let expanded = {};
-
-function buildTree(nodes) {
-    const map = {};
-    nodes.forEach(n => {
-        map[n.id] = { ...n, children: [] };
-    });
-
-    const roots = [];
-
-    nodes.forEach(n => {
-        const wrapped = map[n.id];
-
-        if (n.parent_id != null && map[n.parent_id]) {
-            map[n.parent_id].children.push(wrapped);
-        } else {
-            // no parent -> considered root
-            roots.push(wrapped);
-        }
-    });
-
-    return roots;
-}
-
-function renderTreeNode(node, container, depth = 0) {
-    const div = document.createElement("div");
-    div.className = `node ${node.kind}`;
-    div.style.paddingLeft = (depth * 16) + "px";
-
-    const hasChildren = node.children && node.children.length > 0;
-    const label = node.name || node.rel_path || "(root)";
-
-    // default expand root & first-level chunks
-    if (expanded[node.id] === undefined) {
-        expanded[node.id] = node.kind === "box_root" || node.parent_id === null;
-    }
-
-    let toggle = "";
-    if (hasChildren && (node.kind === "chunk" || node.kind === "box_root")) {
-        toggle = expanded[node.id] ? "[-]" : "[+]";
-    }
-
-    div.innerHTML = `
-        <span class="kind">[${node.kind}]</span>
-        <span class="toggle" style="cursor:pointer; margin-right:6px;">${toggle}</span>
-        ${label}
-        ${node.kind !== "box_root" ? `
-        <button onclick="deleteNode(${node.id}, '${node.kind}')">Delete</button>
-        ` : ""}
-    `;
-
-    const toggleEl = div.querySelector(".toggle");
-    if (toggleEl && toggleEl.textContent.trim() !== "") {
-        toggleEl.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            expanded[node.id] = !expanded[node.id];
-            renderNodes(currentNodes);
-        });
-    }
-
-    container.appendChild(div);
-
-    if (hasChildren && expanded[node.id]) {
-        node.children.forEach(child => {
-            renderTreeNode(child, container, depth + 1);
-        });
-    }
-}
-
-function renderNodes(nodes) {
-    const tree = document.getElementById("tree");
-    tree.innerHTML = "";
-
-    if (!nodes.length) {
-        tree.innerHTML = "<p>No chunks or particles yet.</p>";
-        return;
-    }
-
-    // Uncomment this if you want to debug what’s coming back:
-    // console.log("nodes from API:", nodes);
-
-    const roots = buildTree(nodes);
-
-    if (!roots.length) {
-        tree.innerHTML = "<p>No root nodes found.</p>";
-        return;
-    }
-
-    roots.forEach(root => {
-        renderTreeNode(root, tree, 0);
-    });
-}
-
-
 
 async function refreshAll() {
   setMessage("", "");
@@ -350,109 +212,8 @@ async function refreshAll() {
       currentBox = box;
       renderBoxMeta(box);
       document.getElementById("boxDescription").value = box.description || "";
-      const nodes = await loadNodes(slug);
-      currentNodes = nodes;
-      renderNodes(nodes);
-      populateParentDropdown();
-  } catch (err) {
-      console.error(err);
-      setMessage(err.message, "error");
-  }
-}
-
-async function createChunk() {
-  const parentRel = document.getElementById("chunkParent").value.trim();
-  const name = document.getElementById("chunkName").value.trim();
-
-  if (!name) {
-      setMessage("Folder name is required.", "error");
-      return;
-  }
-
-  setMessage("", "");
-
-  try {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(currentSlug)}/nodes`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-              kind: "chunk",
-              parent_rel_path: parentRel,
-              name: name
-          })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-          throw new Error(data.error || "Failed to create chunk");
-      }
-      setMessage("Chunk created.", "success");
-      document.getElementById("chunkName").value = "";
-      await refreshAll();
-  } catch (err) {
-      console.error(err);
-      setMessage(err.message, "error");
-  }
-}
-
-async function uploadParticle() {
-  const parentRel = document.getElementById("fileParentSelect").value;
-  const fileInput = document.getElementById("fileInput");
-  const file = fileInput.files[0];
-
-  if (!file) {
-      setMessage("Please choose a file.", "error");
-      return;
-  }
-
-  setMessage("", "");
-
-  const formData = new FormData();
-  formData.append("kind", "particle");
-  formData.append("parent_rel_path", parentRel);
-  formData.append("file", file);
-
-  try {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(currentSlug)}/nodes`, {
-          method: "POST",
-          body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) {
-          throw new Error(data.error || "Failed to upload particle");
-      }
-      setMessage("Particle uploaded.", "success");
-      fileInput.value = "";
-      await refreshAll();
-  } catch (err) {
-      console.error(err);
-      setMessage(err.message, "error");
-  }
-}
-
-async function deleteNode(id, kind) {
-  const confirmMsg =
-    kind === "chunk"
-      ? "Delete this folder and ALL of its contents?"
-      : "Delete this file?";
-
-  if (!confirm(confirmMsg)) return;
-
-  setMessage("", "");
-
-  try {
-      const res = await fetch(
-          `/dirt/boxes/${encodeURIComponent(currentSlug)}/nodes/${id}`,
-          { method: "DELETE" }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-          throw new Error(data.error || "Failed to delete");
-      }
-
-      setMessage(`${kind} deleted.`, "success");
-      await refreshAll();
+      analyses = await loadAnalyses(slug);
+      renderAnalyses(analyses);
   } catch (err) {
       console.error(err);
       setMessage(err.message, "error");
@@ -481,6 +242,39 @@ async function saveDescription() {
   } catch (err) {
       console.error(err);
       setMessage(err.message, "error");
+  }
+}
+
+async function enqueueDecomposition() {
+  if (!currentSlug) return;
+  const btn = document.getElementById("decomposeBtn");
+  btn.disabled = true;
+  btn.textContent = "Queuing...";
+  setMessage("", "");
+  try {
+      const res = await fetch(`/dirt/boxes/${encodeURIComponent(currentSlug)}/decompose`, {
+          method: "POST"
+      });
+      const data = await res.json();
+      if (!res.ok) {
+          throw new Error(data.error || "Failed to enqueue decomposition");
+      }
+      setMessage("Decomposition enqueued. Refreshing shortly...", "success");
+      // Poll once after a short delay
+      setTimeout(async () => {
+          try {
+              analyses = await loadAnalyses(currentSlug);
+              renderAnalyses(analyses);
+          } catch (err) {
+              console.error(err);
+          }
+      }, 3000);
+  } catch (err) {
+      console.error(err);
+      setMessage(err.message, "error");
+  } finally {
+      btn.disabled = false;
+      btn.textContent = "Run Decomposition";
   }
 }
 
