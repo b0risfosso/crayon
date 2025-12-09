@@ -218,8 +218,8 @@
   </style>
 </head>
 <body>
-  <h1>Colors Queue Monitor</h1>
-  <p class="muted">Live view of in-memory queue state from <code>/colors/queue/tasks</code> and <code>/colors/queue/workers</code>.</p>
+  <h1>Dirt LLM Queue Monitor</h1>
+  <p class="muted">Live view of in-memory LLM queue from <code>/dirt/llm/tasks</code> and <code>/dirt/llm/workers</code>.</p>
 
   <div class="page">
     <aside class="sidebar">
@@ -237,19 +237,19 @@
                 Status
                 <select name="status" id="filter-status">
                   <option value="">(any)</option>
-                  <option value="queued">queued</option>
-                  <option value="running">running</option>
-                  <option value="done">done</option>
-                  <option value="error">error</option>
-                </select>
-              </label>
-            </div>
-            <div class="controls-row">
-              <label>
-                Task type
-                <input type="text" name="task_type" id="filter-task-type" placeholder="e.g. build_thought" />
-              </label>
-            </div>
+              <option value="queued">queued</option>
+              <option value="running">running</option>
+              <option value="done">done</option>
+              <option value="error">error</option>
+            </select>
+          </label>
+        </div>
+        <div class="controls-row">
+          <label>
+            Task type
+            <input type="text" name="task_type" id="filter-task-type" placeholder="e.g. box_decomposition" />
+          </label>
+        </div>
             <div class="controls-row">
               <label>
                 Limit
@@ -332,8 +332,8 @@
   </div>
 
   <script>
-    const TASKS_ENDPOINT = "/colors/queue/tasks";
-    const WORKERS_ENDPOINT = "/colors/queue/workers";
+    const TASKS_ENDPOINT = "/dirt/llm/tasks";
+    const WORKERS_ENDPOINT = "/dirt/llm/workers";
 
     let autoRefreshTimer = null;
 
@@ -410,7 +410,7 @@
         tasks.forEach((t) => {
           const status = t.status || "unknown";
           const taskId = t.task_id || "";
-          const taskType = t.task_type || "";
+          const taskType = t.job_type || t.task_type || "";
           const label = `${taskType || "task"} — ${taskId.slice(0, 8)}…`;
           const timestamps = [];
           if (t.created_at) timestamps.push(`created ${formatTimestamp(t.created_at)}`);
@@ -445,12 +445,13 @@
 
       const rows = tasks.map((t) => {
         const status = t.status || "unknown";
-        const type = t.task_type || "";
+        const type = t.job_type || t.task_type || "";
         const taskId = t.task_id || "";
         const ids = [];
-        if (t.art_id != null) ids.push(`<span class="tag">art: ${t.art_id}</span>`);
-        if (t.color_id != null) ids.push(`<span class="tag">color: ${t.color_id}</span>`);
-        if (t.bridge_id != null) ids.push(`<span class="tag">bridge: ${t.bridge_id}</span>`);
+        const payload = t.payload || {};
+        if (payload.box_slug) ids.push(`<span class="tag">box: ${payload.box_slug}</span>`);
+        if (payload.node_a_id != null) ids.push(`<span class="tag">node_a: ${payload.node_a_id}</span>`);
+        if (payload.node_b_id != null) ids.push(`<span class="tag">node_b: ${payload.node_b_id}</span>`);
 
         const created = formatTimestamp(t.created_at);
         const started = formatTimestamp(t.started_at);
@@ -471,17 +472,10 @@
           metaBits.push(`source: ${t.source}`);
         }
 
-        let link = "";
-        if (taskId) {
-          const href = `/colors/tasks/${encodeURIComponent(taskId)}`;
-          link = `<div class="small"><a href="${href}" target="_blank" rel="noopener noreferrer">open task</a></div>`;
-        }
-
         return `
           <tr>
             <td class="small">
               <div>${taskId || "<span class='muted'>n/a</span>"}</div>
-              ${link}
             </td>
             <td>
               <span class="pill status-${status}">${status}</span>
