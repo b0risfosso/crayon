@@ -33,61 +33,35 @@ LLM_SYSTEM_PROMPT = os.environ.get(
     "You are an analytical model tasked with decomposing ideas and systems.",
 )
 LLM_LOCK = threading.Lock()
-DECOMPOSITION_PROMPT_TEMPLATE = """You are an analytical model tasked with decomposing any idea, concept, system, mechanism, tool, technology, organization, or infrastructure into its fundamental entities, processes, and phenomena. Your goal is to produce a clear, structured, and comprehensive explanation that highlights the inner workings, structure, dynamics, constraints, and emergent effects of the element being described.
-User Input:
+DECOMPOSITION_PROMPT_TEMPLATE = """
+You are given a thought that describes a world, system, scenario, or domain.
+Your task is to extract and list:
+Entities
+– Concrete physical objects, materials, organisms, components, infrastructures, tools, or institutional structures that exist in the world implied by the thought.
+– These are things you can point to in that reality.
+Processes
+– Physical, biological, mechanical, chemical, computational, economic, social, or regulatory operations that occur in that world.
+– These can be transformations, workflows, interactions, or control loops.
+Phenomena
+– Observable behaviors, emergent patterns, system-level effects, constraints, failure modes, or opportunity patterns that arise from the entities and processes in that world.
+– These describe how the world behaves.
+Guidelines
+Ground everything in the physical or material implications of the thought.
+Avoid abstractions unless they correspond to real structures (e.g., “governance regime,” “feedback loop”).
+Keep lists specific and concrete.
+No summarization; just extract what exists.
+Output Format
+Provide the answer in three sections:
+Entities:
+…
+Processes:
+…
+Phenomena:
+…
+Input Thought:
 {element}
+
 {element_description}
-Output Format:
-1. Overview (High-Level Summary)
-Provide a concise explanation of what the element is, what purpose it serves, and the context in which it operates.
-2. Entities (What It Is Made Of)
-Identify and describe the concrete and abstract components involved. Include any relevant:
-Physical objects, materials, or mechanical components
-Biological organisms, tissues, or ecological elements
-Computational modules, data structures, algorithms
-Social roles, institutions, organizational structures
-Tools, infrastructures, utilities
-Environmental or contextual components
-For each entity, briefly describe its role and characteristics.
-3. Processes (How It Operates)
-Explain the underlying operations or actions occurring within or around the element. These may be:
-Physical, mechanical, or chemical operations
-Biological or ecological functions
-Computational or algorithmic workflows
-Economic exchanges, incentives, or market mechanisms
-Social or behavioral interactions
-Regulatory or legal processes
-Describe:
-Inputs -> transformations -> outputs
-Dependencies or flows
-Cycles or feedback loops
-4. Phenomena (What Emerges or Can Be Observed)
-Describe the observable behaviors, patterns, and effects that arise from the interaction of entities and processes, such as:
-Emergent behaviors or macro-scale patterns
-System-level effects or performance characteristics
-Behavioral regularities or social dynamics
-Constraints, limitations, bottlenecks
-Risks, vulnerabilities, or failure modes
-Opportunities, leverage points, or potential optimizations
-5. Interactions & Causal Relationships
-Explain how the entities, processes, and phenomena influence one another. Highlight:
-Causality
-Feedback loops (positive or negative)
-Nonlinearities
-Threshold effects
-Tradeoffs
-6. System Boundary & External Environment
-Define what is inside the system vs. outside it, and describe relevant interactions with:
-Larger infrastructures
-Markets or ecosystems
-Environmental conditions
-Cultural, economic, or regulatory context
-7. Optional Extensions (include on request)
-Historical evolution
-Comparative analysis with alternatives
-Future trajectories or scenarios
-Ethical considerations
-Optimization or redesign opportunities
 """
 
 
