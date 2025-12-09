@@ -71,12 +71,15 @@
       padding: 10px 12px;
       margin-top: 8px;
       background: #fff;
+      cursor: pointer;
   }
+  .analysis-item .meta-line { font-size: 12px; color: #555; margin-top: 2px; }
   .analysis-item pre {
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 13px;
       margin: 6px 0 0 0;
+      display: none;
   }
   .note {
       color: #555;
@@ -114,9 +117,10 @@
   </div>
 
   <div class="card">
-    <h3>Decompose Box</h3>
-    <p class="note">Runs the analysis prompt against this box's title and description.</p>
-    <button id="decomposeBtn" onclick="enqueueDecomposition()">Run Decomposition</button>
+    <h3>Run Analyses</h3>
+    <p class="note">Run analysis prompts against this box's title and description.</p>
+    <div id="analysisButtons"></div>
+    <button id="runAllBtn" style="margin-top:8px;">Run All</button>
   </div>
 
   <div class="card">
@@ -131,6 +135,28 @@
 let currentSlug = null;
 let currentBox = null;
 let analyses = [];
+const analysisEndpoints = [
+  { key: "decompose", label: "Decomposition", path: "decompose" },
+  { key: "abstractions", label: "Abstractions & Metaphors", path: "abstractions" },
+  { key: "processes", label: "Processes/Forces/Interactions", path: "processes" },
+  { key: "datasets", label: "Datasets", path: "datasets" },
+  { key: "codebases", label: "Codebases", path: "codebases" },
+  { key: "hardware", label: "Hardware Builds", path: "hardware_builds" },
+  { key: "experiments", label: "Experiments", path: "experiments" },
+  { key: "intelligence", label: "Intelligence", path: "intelligence" },
+  { key: "control_levers", label: "Control Levers", path: "control_levers" },
+  { key: "companies", label: "Companies", path: "companies" },
+  { key: "theories", label: "Theories/Theses", path: "theories" },
+  { key: "historical", label: "Historical Context", path: "historical_context" },
+  { key: "value_exchange", label: "Value Exchange", path: "value_exchange" },
+  { key: "value_addition", label: "Value Addition", path: "value_addition" },
+  { key: "science", label: "Scientific Substructure", path: "science" },
+  { key: "spirit", label: "Spirit/Soul/Emotion", path: "spirit" },
+  { key: "environment", label: "Environment", path: "environment" },
+  { key: "imagination", label: "Imagination Windows", path: "imagination" },
+  { key: "musical", label: "Musical Composition", path: "musical" },
+  { key: "infinity", label: "Infinity", path: "infinity" },
+];
 
 function getQueryParam(name) {
   const params = new URLSearchParams(window.location.search);
@@ -196,10 +222,16 @@ function renderAnalyses(list) {
       const title = escapeHtml(item.name || "analysis");
       const created = escapeHtml(item.created_at || "");
       const content = escapeHtml(item.content || "");
+      const preId = `analysis-content-${item.id}`;
       div.innerHTML = `
-        <strong>${title}</strong> <small>${created}</small>
-        <pre>${content}</pre>
+        <strong>${title}</strong>
+        <div class="meta-line">${created}</div>
+        <pre id="${preId}">${content}</pre>
       `;
+      const pre = div.querySelector("pre");
+      div.addEventListener("click", () => {
+          pre.style.display = pre.style.display === "block" ? "none" : "block";
+      });
       container.appendChild(div);
   });
 }
@@ -247,20 +279,48 @@ async function saveDescription() {
 
 async function enqueueDecomposition() {
   if (!currentSlug) return;
-  const btn = document.getElementById("decomposeBtn");
-  btn.disabled = true;
-  btn.textContent = "Queuing...";
+  await enqueueAnalysis(`/dirt/boxes/${encodeURIComponent(currentSlug)}/decompose`, "Decomposition");
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const slug = getQueryParam("box");
+  if (!slug) {
+      setMessage("Missing ?box=<slug> in URL.", "error");
+      return;
+  }
+  currentSlug = slug;
+  renderAnalysisButtons();
+  await refreshAll();
+});
+
+function renderAnalysisButtons() {
+  const container = document.getElementById("analysisButtons");
+  container.innerHTML = "";
+  analysisEndpoints.forEach(ep => {
+      const btn = document.createElement("button");
+      btn.textContent = ep.label;
+      btn.style.marginRight = "6px";
+      btn.onclick = () => enqueueAnalysis(`/dirt/boxes/${encodeURIComponent(currentSlug)}/${ep.path}`, ep.label, btn);
+      container.appendChild(btn);
+  });
+  const runAllBtn = document.getElementById("runAllBtn");
+  runAllBtn.onclick = runAllAnalyses;
+}
+
+async function enqueueAnalysis(url, label, btnEl) {
+  if (!currentSlug) return;
   setMessage("", "");
+  if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.textContent = `Queuing ${label}...`;
+  }
   try {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(currentSlug)}/decompose`, {
-          method: "POST"
-      });
+      const res = await fetch(url, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-          throw new Error(data.error || "Failed to enqueue decomposition");
+          throw new Error(data.error || `Failed to enqueue ${label}`);
       }
-      setMessage("Decomposition enqueued. Refreshing shortly...", "success");
-      // Poll once after a short delay
+      setMessage(`${label} enqueued. Refreshing shortly...`, "success");
       setTimeout(async () => {
           try {
               analyses = await loadAnalyses(currentSlug);
@@ -273,20 +333,24 @@ async function enqueueDecomposition() {
       console.error(err);
       setMessage(err.message, "error");
   } finally {
-      btn.disabled = false;
-      btn.textContent = "Run Decomposition";
+      if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.textContent = label;
+      }
   }
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const slug = getQueryParam("box");
-  if (!slug) {
-      setMessage("Missing ?box=<slug> in URL.", "error");
-      return;
+async function runAllAnalyses() {
+  if (!currentSlug) return;
+  setMessage("Queuing all analyses...", "success");
+  for (const ep of analysisEndpoints) {
+      try {
+          await enqueueAnalysis(`/dirt/boxes/${encodeURIComponent(currentSlug)}/${ep.path}`, ep.label);
+      } catch (err) {
+          console.error(err);
+      }
   }
-  currentSlug = slug;
-  await refreshAll();
-});
+}
 </script>
 
 </body>

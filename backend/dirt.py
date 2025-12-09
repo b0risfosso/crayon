@@ -19,6 +19,28 @@ from flask import (
     abort,
     render_template_string,
 )
+from prompts2 import (
+    build_abstractions_metaphors_prompt,
+    build_decomposition_prompt,
+    build_datasets_prompt,
+    build_codebases_prompt,
+    build_hardware_builds_prompt,
+    build_experiments_prompt,
+    build_intelligence_prompt,
+    build_control_levers_prompt,
+    build_companies_prompt,
+    build_theories_prompt,
+    build_historical_context_prompt,
+    build_value_exchange_prompt,
+    build_value_addition_prompt,
+    build_scientific_substructure_prompt,
+    build_spirit_soul_emotion_prompt,
+    build_environment_prompt,
+    build_imaginative_windows_prompt,
+    build_musical_composition_prompt,
+    build_infinity_prompt,
+    build_processes_forces_interactions_prompt,
+)
 
 # === CONFIG ===
 DATA_ROOT = "/var/www/site/data"
@@ -33,36 +55,6 @@ LLM_SYSTEM_PROMPT = os.environ.get(
     "You are an analytical model tasked with decomposing ideas and systems.",
 )
 LLM_LOCK = threading.Lock()
-DECOMPOSITION_PROMPT_TEMPLATE = """
-You are given a thought that describes a world, system, scenario, or domain.
-Your task is to extract and list:
-Entities
-– Concrete physical objects, materials, organisms, components, infrastructures, tools, or institutional structures that exist in the world implied by the thought.
-– These are things you can point to in that reality.
-Processes
-– Physical, biological, mechanical, chemical, computational, economic, social, or regulatory operations that occur in that world.
-– These can be transformations, workflows, interactions, or control loops.
-Phenomena
-– Observable behaviors, emergent patterns, system-level effects, constraints, failure modes, or opportunity patterns that arise from the entities and processes in that world.
-– These describe how the world behaves.
-Guidelines
-Ground everything in the physical or material implications of the thought.
-Avoid abstractions unless they correspond to real structures (e.g., “governance regime,” “feedback loop”).
-Keep lists specific and concrete.
-No summarization; just extract what exists.
-Output Format
-Provide the answer in three sections:
-Entities:
-…
-Processes:
-…
-Phenomena:
-…
-Input Thought:
-{element}
-
-{element_description}
-"""
 
 
 def utc_now_iso() -> str:
@@ -110,13 +102,6 @@ def run_llm(prompt_text: str, *, model: Optional[str] = None):
     return text, usage_dict, tokens_in, tokens_out, total_tokens, duration_ms, resolved_model
 
 
-def build_decomposition_prompt(element: str, element_description: str) -> str:
-    return DECOMPOSITION_PROMPT_TEMPLATE.format(
-        element=element.strip() or "Unnamed element",
-        element_description=element_description.strip() or "(no description provided)",
-    )
-
-
 # === LLM TASK QUEUE ===
 
 LLM_QUEUE_CONCURRENCY = 2
@@ -162,6 +147,44 @@ def _process_llm_task(task: Dict[str, Any]):
     job_type = task.get("job_type")
     if job_type == "box_decomposition":
         return _handle_box_decomposition(task["payload"], request_id=task["task_id"])
+    if job_type == "box_abstractions_metaphors":
+        return _handle_box_abstractions_metaphors(task["payload"], request_id=task["task_id"])
+    if job_type == "box_processes_forces_interactions":
+        return _handle_box_processes_forces_interactions(task["payload"], request_id=task["task_id"])
+    if job_type == "box_datasets":
+        return _handle_box_datasets(task["payload"], request_id=task["task_id"])
+    if job_type == "box_codebases":
+        return _handle_box_codebases(task["payload"], request_id=task["task_id"])
+    if job_type == "box_hardware_builds":
+        return _handle_box_hardware_builds(task["payload"], request_id=task["task_id"])
+    if job_type == "box_experiments":
+        return _handle_box_experiments(task["payload"], request_id=task["task_id"])
+    if job_type == "box_intelligence":
+        return _handle_box_intelligence(task["payload"], request_id=task["task_id"])
+    if job_type == "box_control_levers":
+        return _handle_box_control_levers(task["payload"], request_id=task["task_id"])
+    if job_type == "box_companies":
+        return _handle_box_companies(task["payload"], request_id=task["task_id"])
+    if job_type == "box_theories":
+        return _handle_box_theories(task["payload"], request_id=task["task_id"])
+    if job_type == "box_historical_context":
+        return _handle_box_historical_context(task["payload"], request_id=task["task_id"])
+    if job_type == "box_value_exchange":
+        return _handle_box_value_exchange(task["payload"], request_id=task["task_id"])
+    if job_type == "box_value_addition":
+        return _handle_box_value_addition(task["payload"], request_id=task["task_id"])
+    if job_type == "box_scientific_substructure":
+        return _handle_box_scientific_substructure(task["payload"], request_id=task["task_id"])
+    if job_type == "box_spirit_soul_emotion":
+        return _handle_box_spirit_soul_emotion(task["payload"], request_id=task["task_id"])
+    if job_type == "box_environment":
+        return _handle_box_environment(task["payload"], request_id=task["task_id"])
+    if job_type == "box_imaginative_windows":
+        return _handle_box_imaginative_windows(task["payload"], request_id=task["task_id"])
+    if job_type == "box_musical_composition":
+        return _handle_box_musical_composition(task["payload"], request_id=task["task_id"])
+    if job_type == "box_infinity":
+        return _handle_box_infinity(task["payload"], request_id=task["task_id"])
     raise ValueError(f"Unknown job_type: {job_type}")
 
 
@@ -235,6 +258,514 @@ def _handle_box_decomposition(payload: Dict[str, Any], *, request_id: str):
         }
     finally:
         conn.close()
+
+
+def _handle_box_abstractions_metaphors(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+        box = cur.fetchone()
+        if box is None:
+            raise ValueError("Box not found")
+
+        element = box["title"] or box["slug"]
+        description = box["description"] or ""
+
+        prompt_text = build_abstractions_metaphors_prompt(element, description)
+
+        (
+            output_text,
+            usage_dict,
+            tokens_in,
+            tokens_out,
+            total_tokens,
+            duration_ms,
+            resolved_model,
+        ) = run_llm(prompt_text)
+
+        cur.execute(
+            "SELECT id FROM nodes WHERE box_id = ? AND kind = 'box_root' LIMIT 1;",
+            (box["id"],),
+        )
+        root_row = cur.fetchone()
+        parent_id = root_row["id"] if root_row else None
+
+        rel_path = f"analysis/abstractions_metaphors_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}"
+        depth = rel_path.count("/") + 1
+
+        cur.execute(
+            """
+            INSERT INTO nodes (
+                box_id, parent_id, name, kind, rel_path,
+                mime_type, extension, size_bytes, checksum,
+                depth, content, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'analysis', ?, NULL, NULL, NULL, NULL,
+                    ?, ?, datetime('now'), datetime('now'));
+            """,
+            (box["id"], parent_id, "abstractions_metaphors", rel_path, depth, output_text),
+        )
+        conn.commit()
+        node_id = cur.lastrowid
+
+        return {
+            "box_slug": slug,
+            "node_id": node_id,
+            "model": resolved_model,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "total_tokens": total_tokens,
+            "duration_ms": duration_ms,
+            "usage_raw": usage_dict,
+        }
+    finally:
+        conn.close()
+
+
+def _handle_box_processes_forces_interactions(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+        box = cur.fetchone()
+        if box is None:
+            raise ValueError("Box not found")
+
+        element = box["title"] or box["slug"]
+        description = box["description"] or ""
+
+        prompt_text = build_processes_forces_interactions_prompt(element, description)
+
+        return _run_and_store(
+            box,
+            prompt_text,
+            name="processes_forces_interactions",
+            rel_suffix="processes_forces_interactions",
+        )
+    finally:
+        conn.close()
+
+
+def _run_and_store(box, prompt_text: str, *, name: str, rel_suffix: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    try:
+        (
+            output_text,
+            usage_dict,
+            tokens_in,
+            tokens_out,
+            total_tokens,
+            duration_ms,
+            resolved_model,
+        ) = run_llm(prompt_text)
+
+        cur.execute(
+            "SELECT id FROM nodes WHERE box_id = ? AND kind = 'box_root' LIMIT 1;",
+            (box["id"],),
+        )
+        root_row = cur.fetchone()
+        parent_id = root_row["id"] if root_row else None
+
+        rel_path = f"analysis/{rel_suffix}_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}"
+        depth = rel_path.count("/") + 1
+
+        cur.execute(
+            """
+            INSERT INTO nodes (
+                box_id, parent_id, name, kind, rel_path,
+                mime_type, extension, size_bytes, checksum,
+                depth, content, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'analysis', ?, NULL, NULL, NULL, NULL,
+                    ?, ?, datetime('now'), datetime('now'));
+            """,
+            (box["id"], parent_id, name, rel_path, depth, output_text),
+        )
+        conn.commit()
+        node_id = cur.lastrowid
+
+        return {
+            "box_slug": box["slug"],
+            "node_id": node_id,
+            "model": resolved_model,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "total_tokens": total_tokens,
+            "duration_ms": duration_ms,
+            "usage_raw": usage_dict,
+        }
+    finally:
+        conn.close()
+
+
+def _handle_box_datasets(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_datasets_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="datasets", rel_suffix="datasets")
+
+
+def _handle_box_codebases(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_codebases_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="codebases", rel_suffix="codebases")
+
+
+def _handle_box_hardware_builds(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_hardware_builds_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="hardware_builds", rel_suffix="hardware_builds")
+
+
+def _handle_box_experiments(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_experiments_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="experiments", rel_suffix="experiments")
+
+
+def _handle_box_intelligence(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_intelligence_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="intelligence", rel_suffix="intelligence")
+
+
+def _handle_box_control_levers(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_control_levers_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="control_levers", rel_suffix="control_levers")
+
+
+def _handle_box_companies(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_companies_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="companies", rel_suffix="companies")
+
+
+def _handle_box_theories(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_theories_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="theories", rel_suffix="theories")
+
+
+def _handle_box_historical_context(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_historical_context_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="historical_context", rel_suffix="historical_context")
+
+
+def _handle_box_value_exchange(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_value_exchange_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="value_exchange", rel_suffix="value_exchange")
+
+
+def _handle_box_value_addition(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_value_addition_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="value_addition", rel_suffix="value_addition")
+
+
+def _handle_box_scientific_substructure(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_scientific_substructure_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="scientific_substructure", rel_suffix="scientific_substructure")
+
+
+def _handle_box_spirit_soul_emotion(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_spirit_soul_emotion_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="spirit_soul_emotion", rel_suffix="spirit_soul_emotion")
+
+
+def _handle_box_environment(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_environment_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="environment", rel_suffix="environment")
+
+
+def _handle_box_imaginative_windows(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_imaginative_windows_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="imaginative_windows", rel_suffix="imaginative_windows")
+
+
+def _handle_box_musical_composition(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_musical_composition_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="musical_composition", rel_suffix="musical_composition")
+
+
+def _handle_box_infinity(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_infinity_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="infinity", rel_suffix="infinity")
 
 
 def llm_worker_loop(worker_id: int):
@@ -675,14 +1206,73 @@ def list_decompositions(slug):
 
 @app.route("/llm/tasks", methods=["GET"])
 def list_llm_tasks():
+    limit = request.args.get("limit", default=200, type=int)
+    if not isinstance(limit, int):
+        return jsonify({"error": "limit must be integer"}), 400
+    limit = max(1, min(limit, LLM_TASK_HISTORY_LIMIT))
+
+    status_filter = request.args.get("status")
+    include_error = request.args.get("include_error") in ("1", "true", "yes")
+
+    with LLM_TASKS_LOCK:
+        counts = {"queued": 0, "running": 0, "done": 0, "error": 0}
+        for t in LLM_TASKS.values():
+            status = t.get("status", "queued")
+            counts[status] = counts.get(status, 0) + 1
+
+        ordered_ids = list(reversed(LLM_TASK_ORDER))
+        filtered_ids = []
+        for tid in ordered_ids:
+            task = LLM_TASKS.get(tid)
+            if not task:
+                continue
+            if status_filter and task.get("status") != status_filter:
+                continue
+            filtered_ids.append(tid)
+            if len(filtered_ids) >= limit:
+                break
+
+        tasks: List[Dict[str, Any]] = []
+        for tid in filtered_ids:
+            t = dict(LLM_TASKS.get(tid, {}))
+            if not include_error and "error" in t:
+                t["has_error"] = True
+                t.pop("error", None)
+            tasks.append(t)
+
+    return jsonify(
+        {
+            "queue": {
+                "queue_size": LLM_TASK_QUEUE.qsize(),
+                "concurrency": LLM_QUEUE_CONCURRENCY,
+                "tasks": counts,
+            },
+            "count": len(tasks),
+            "tasks": tasks,
+        }
+    )
+
+
+@app.route("/llm/workers", methods=["GET"])
+def list_llm_workers():
     limit = request.args.get("limit", default=50, type=int)
     if not isinstance(limit, int):
         return jsonify({"error": "limit must be integer"}), 400
     limit = max(1, min(limit, LLM_TASK_HISTORY_LIMIT))
 
+    workers: Dict[int, List[Dict[str, Any]]] = {}
     with LLM_TASKS_LOCK:
-        ordered_ids = list(reversed(LLM_TASK_ORDER))[:limit]
-        tasks = [LLM_TASKS[tid] for tid in ordered_ids if tid in LLM_TASKS]
+        for task in LLM_TASKS.values():
+            if task.get("status") != "running":
+                continue
+            worker_id = task.get("worker_id")
+            if worker_id is None:
+                continue
+            workers.setdefault(int(worker_id), []).append(dict(task))
+        # trim per worker
+        for wid, tasks in workers.items():
+            workers[wid] = tasks[:limit]
+
         counts = {"queued": 0, "running": 0, "done": 0, "error": 0}
         for t in LLM_TASKS.values():
             status = t.get("status", "queued")
@@ -690,8 +1280,277 @@ def list_llm_tasks():
 
     return jsonify(
         {
-            "queue_size": LLM_TASK_QUEUE.qsize(),
-            "tasks": tasks,
-            "counts": counts,
+            "queue": {
+                "queue_size": LLM_TASK_QUEUE.qsize(),
+                "concurrency": LLM_QUEUE_CONCURRENCY,
+                "tasks": counts,
+            },
+            "workers": workers,
         }
     )
+
+
+@app.route("/boxes/<slug>/abstractions", methods=["POST"])
+def enqueue_abstractions(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_abstractions_metaphors",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/processes", methods=["POST"])
+def enqueue_processes_forces_interactions(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_processes_forces_interactions",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/datasets", methods=["POST"])
+def enqueue_datasets(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_datasets",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/codebases", methods=["POST"])
+def enqueue_codebases(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_codebases",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/hardware_builds", methods=["POST"])
+def enqueue_hardware_builds(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_hardware_builds",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/experiments", methods=["POST"])
+def enqueue_experiments(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_experiments",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/intelligence", methods=["POST"])
+def enqueue_intelligence(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_intelligence",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/control_levers", methods=["POST"])
+def enqueue_control_levers(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_control_levers",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/companies", methods=["POST"])
+def enqueue_companies(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_companies",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/theories", methods=["POST"])
+def enqueue_theories(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_theories",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/historical_context", methods=["POST"])
+def enqueue_historical_context(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_historical_context",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/value_exchange", methods=["POST"])
+def enqueue_value_exchange(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_value_exchange",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/value_addition", methods=["POST"])
+def enqueue_value_addition(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_value_addition",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/science", methods=["POST"])
+def enqueue_scientific_substructure(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_scientific_substructure",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/spirit", methods=["POST"])
+def enqueue_spirit_soul_emotion(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_spirit_soul_emotion",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/environment", methods=["POST"])
+def enqueue_environment(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_environment",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/imagination", methods=["POST"])
+def enqueue_imaginative_windows(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_imaginative_windows",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/musical", methods=["POST"])
+def enqueue_musical_composition(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_musical_composition",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/infinity", methods=["POST"])
+def enqueue_infinity(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_infinity",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
