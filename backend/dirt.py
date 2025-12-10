@@ -1773,7 +1773,7 @@ def list_decompositions(slug):
     if box is None:
         abort(404, description="Box not found")
 
-    limit = request.args.get("limit", default=20, type=int)
+    limit = request.args.get("limit", default=200, type=int)
     limit = max(1, min(limit, 200))
 
     conn = get_db()

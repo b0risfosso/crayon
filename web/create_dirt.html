@@ -278,7 +278,7 @@ async function loadBoxInfo(slug) {
 }
 
 async function loadAnalyses(slug) {
-  const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses`);
+  const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses?limit=200`);
   if (!res.ok) {
       throw new Error("Failed to load analyses");
   }
