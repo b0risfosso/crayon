@@ -86,6 +86,31 @@
       font-size: 14px;
       margin-top: 10px;
   }
+  details {
+      margin-top: 8px;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      background: #f8f8f8;
+  }
+  summary {
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  .details-body {
+      padding: 8px 10px 12px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+  }
+  .run-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+  }
   .error {
       color: #b30000;
       margin-top: 8px;
@@ -119,8 +144,13 @@
   <div class="card">
     <h3>Run Analyses</h3>
     <p class="note">Run analysis prompts against this box's title and description.</p>
-    <div id="analysisButtons"></div>
-    <button id="runAllBtn" style="margin-top:8px;">Run All</button>
+    <div class="run-buttons">
+      <button id="runAllBtn">Run All</button>
+      <button id="runComputationalBtn">Run Computational</button>
+      <button id="runPhysicalBtn">Run Physical</button>
+      <button id="runIntellectualBtn">Run Intellectual</button>
+    </div>
+    <div id="analysisSections"></div>
   </div>
 
   <div class="card">
@@ -156,7 +186,69 @@ const analysisEndpoints = [
   { key: "imagination", label: "Imagination Windows", path: "imagination" },
   { key: "musical", label: "Musical Composition", path: "musical" },
   { key: "infinity", label: "Infinity", path: "infinity" },
+  { key: "computation_layer", label: "Computation Layer", path: "computation_layer" },
+  { key: "computation_rules", label: "Computation Rules", path: "computation_rules" },
+  { key: "computation_programs", label: "Computation Programs", path: "computation_programs" },
+  { key: "computation_universe", label: "Computation Universe", path: "computation_universe" },
+  { key: "computation_causal", label: "Computation Causal", path: "computation_causal" },
+  { key: "state_transition", label: "State Transition", path: "state_transition" },
+  { key: "computation_primitives", label: "Computation Primitives", path: "computation_primitives" },
+  { key: "computation_primitives_alt", label: "Computation Primitives (Alt)", path: "computation_primitives_alt" },
+  { key: "computation_sublayers", label: "Computation Sublayers", path: "computation_sublayers" },
+  { key: "computation_emergence", label: "Computation Emergence", path: "computation_emergence" },
+  { key: "substrate", label: "Substrate", path: "substrate" },
+  { key: "scaffolding", label: "Scaffolding", path: "scaffolding" },
+  { key: "constraints", label: "Constraints", path: "constraints" },
+  { key: "physical_substrate", label: "Physical Substrate", path: "physical_substrate" },
+  { key: "physical_states", label: "Physical States", path: "physical_states" },
+  { key: "foundational_physics", label: "Foundational Physics", path: "foundational_physics" },
+  { key: "tangibility_conservation", label: "Tangibility & Conservation", path: "tangibility_conservation" },
+  { key: "physical_subdomains", label: "Physical Subdomains", path: "physical_subdomains" },
+  { key: "emergence_from_physics", label: "Emergence from Physics", path: "emergence_from_physics" },
+  { key: "observer_independent", label: "Observer-Independent Reality", path: "observer_independent" },
+  { key: "sensory_profile", label: "Sensory Profile", path: "sensory_profile" },
+  { key: "real_world_behavior", label: "Real-World Behavior", path: "real_world_behavior" },
+  { key: "scenario_landscape", label: "Scenario Landscape", path: "scenario_landscape" },
+  { key: "construction_reconstruction", label: "Construction / Reconstruction", path: "construction_reconstruction" },
+  { key: "thought_to_reality", label: "Thought to Reality", path: "thought_to_reality" },
 ];
+
+const computationalKeys = [
+  "computation_layer",
+  "computation_rules",
+  "computation_programs",
+  "computation_universe",
+  "computation_causal",
+  "state_transition",
+  "computation_primitives",
+  "computation_primitives_alt",
+  "computation_sublayers",
+  "computation_emergence",
+];
+
+const physicalKeys = [
+  "substrate",
+  "scaffolding",
+  "constraints",
+  "physical_substrate",
+  "physical_states",
+  "foundational_physics",
+  "tangibility_conservation",
+  "physical_subdomains",
+  "emergence_from_physics",
+  "observer_independent",
+  "sensory_profile",
+  "real_world_behavior",
+  "scenario_landscape",
+  "construction_reconstruction",
+  "thought_to_reality",
+];
+
+const intellectualKeys = analysisEndpoints
+  .map((e) => e.key)
+  .filter(
+    (k) => !computationalKeys.includes(k) && !physicalKeys.includes(k)
+  );
 
 function getQueryParam(name) {
   const params = new URLSearchParams(window.location.search);
@@ -290,21 +382,45 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   currentSlug = slug;
   renderAnalysisButtons();
+  document.getElementById("runAllBtn").onclick = () => runGroup(analysisEndpoints.map(e => e.key), "All analyses");
+  document.getElementById("runComputationalBtn").onclick = () => runGroup(computationalKeys, "Computational analyses");
+  document.getElementById("runPhysicalBtn").onclick = () => runGroup(physicalKeys, "Physical analyses");
+  document.getElementById("runIntellectualBtn").onclick = () => runGroup(intellectualKeys, "Intellectual analyses");
   await refreshAll();
 });
 
 function renderAnalysisButtons() {
-  const container = document.getElementById("analysisButtons");
+  const container = document.getElementById("analysisSections");
   container.innerHTML = "";
-  analysisEndpoints.forEach(ep => {
+
+  const groups = [
+    { id: "computational", label: "Computational", keys: computationalKeys },
+    { id: "physical", label: "Physical", keys: physicalKeys },
+    { id: "intellectual", label: "Intellectual", keys: intellectualKeys },
+  ];
+
+  groups.forEach(group => {
+    const details = document.createElement("details");
+    details.id = `section-${group.id}`;
+    const summary = document.createElement("summary");
+    summary.textContent = `${group.label} analyses (${group.keys.length})`;
+    details.appendChild(summary);
+
+    const body = document.createElement("div");
+    body.className = "details-body";
+
+    group.keys.forEach(key => {
+      const ep = analysisEndpoints.find(e => e.key === key);
+      if (!ep) return;
       const btn = document.createElement("button");
       btn.textContent = ep.label;
-      btn.style.marginRight = "6px";
       btn.onclick = () => enqueueAnalysis(`/dirt/boxes/${encodeURIComponent(currentSlug)}/${ep.path}`, ep.label, btn);
-      container.appendChild(btn);
+      body.appendChild(btn);
+    });
+
+    details.appendChild(body);
+    container.appendChild(details);
   });
-  const runAllBtn = document.getElementById("runAllBtn");
-  runAllBtn.onclick = runAllAnalyses;
 }
 
 async function enqueueAnalysis(url, label, btnEl) {
@@ -340,10 +456,12 @@ async function enqueueAnalysis(url, label, btnEl) {
   }
 }
 
-async function runAllAnalyses() {
+async function runGroup(keys, label) {
   if (!currentSlug) return;
-  setMessage("Queuing all analyses...", "success");
-  for (const ep of analysisEndpoints) {
+  setMessage(`Queuing ${label}...`, "success");
+  for (const key of keys) {
+      const ep = analysisEndpoints.find(e => e.key === key);
+      if (!ep) continue;
       try {
           await enqueueAnalysis(`/dirt/boxes/${encodeURIComponent(currentSlug)}/${ep.path}`, ep.label);
       } catch (err) {

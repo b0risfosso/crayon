@@ -39,6 +39,31 @@ from prompts2 import (
     build_imaginative_windows_prompt,
     build_musical_composition_prompt,
     build_infinity_prompt,
+    build_computation_layer_prompt,
+    build_computation_rules_prompt,
+    build_computation_programs_prompt,
+    build_computation_universe_prompt,
+    build_computation_causal_prompt,
+    build_state_transition_prompt,
+    build_computation_primitives_prompt,
+    build_computation_primitives_alt_prompt,
+    build_computation_sublayers_prompt,
+    build_computation_emergence_prompt,
+    build_substrate_prompt,
+    build_scaffolding_prompt,
+    build_constraints_prompt,
+    build_physical_substrate_prompt,
+    build_physical_states_prompt,
+    build_foundational_physics_prompt,
+    build_tangibility_conservation_prompt,
+    build_physical_subdomains_prompt,
+    build_emergence_from_physics_prompt,
+    build_observer_independent_prompt,
+    build_sensory_profile_prompt,
+    build_real_world_behavior_prompt,
+    build_scenario_landscape_prompt,
+    build_construction_reconstruction_prompt,
+    build_thought_to_reality_prompt,
     build_processes_forces_interactions_prompt,
 )
 
@@ -185,6 +210,56 @@ def _process_llm_task(task: Dict[str, Any]):
         return _handle_box_musical_composition(task["payload"], request_id=task["task_id"])
     if job_type == "box_infinity":
         return _handle_box_infinity(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_layer":
+        return _handle_box_computation_layer(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_rules":
+        return _handle_box_computation_rules(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_programs":
+        return _handle_box_computation_programs(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_universe":
+        return _handle_box_computation_universe(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_causal":
+        return _handle_box_computation_causal(task["payload"], request_id=task["task_id"])
+    if job_type == "box_state_transition":
+        return _handle_box_state_transition(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_primitives":
+        return _handle_box_computation_primitives(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_primitives_alt":
+        return _handle_box_computation_primitives_alt(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_sublayers":
+        return _handle_box_computation_sublayers(task["payload"], request_id=task["task_id"])
+    if job_type == "box_computation_emergence":
+        return _handle_box_computation_emergence(task["payload"], request_id=task["task_id"])
+    if job_type == "box_substrate":
+        return _handle_box_substrate(task["payload"], request_id=task["task_id"])
+    if job_type == "box_scaffolding":
+        return _handle_box_scaffolding(task["payload"], request_id=task["task_id"])
+    if job_type == "box_constraints":
+        return _handle_box_constraints(task["payload"], request_id=task["task_id"])
+    if job_type == "box_physical_substrate":
+        return _handle_box_physical_substrate(task["payload"], request_id=task["task_id"])
+    if job_type == "box_physical_states":
+        return _handle_box_physical_states(task["payload"], request_id=task["task_id"])
+    if job_type == "box_foundational_physics":
+        return _handle_box_foundational_physics(task["payload"], request_id=task["task_id"])
+    if job_type == "box_tangibility_conservation":
+        return _handle_box_tangibility_conservation(task["payload"], request_id=task["task_id"])
+    if job_type == "box_physical_subdomains":
+        return _handle_box_physical_subdomains(task["payload"], request_id=task["task_id"])
+    if job_type == "box_emergence_from_physics":
+        return _handle_box_emergence_from_physics(task["payload"], request_id=task["task_id"])
+    if job_type == "box_observer_independent":
+        return _handle_box_observer_independent(task["payload"], request_id=task["task_id"])
+    if job_type == "box_sensory_profile":
+        return _handle_box_sensory_profile(task["payload"], request_id=task["task_id"])
+    if job_type == "box_real_world_behavior":
+        return _handle_box_real_world_behavior(task["payload"], request_id=task["task_id"])
+    if job_type == "box_scenario_landscape":
+        return _handle_box_scenario_landscape(task["payload"], request_id=task["task_id"])
+    if job_type == "box_construction_reconstruction":
+        return _handle_box_construction_reconstruction(task["payload"], request_id=task["task_id"])
+    if job_type == "box_thought_to_reality":
+        return _handle_box_thought_to_reality(task["payload"], request_id=task["task_id"])
     raise ValueError(f"Unknown job_type: {job_type}")
 
 
@@ -766,6 +841,531 @@ def _handle_box_infinity(payload: Dict[str, Any], *, request_id: str):
     description = box["description"] or ""
     prompt_text = build_infinity_prompt(element, description)
     return _run_and_store(box, prompt_text, name="infinity", rel_suffix="infinity")
+
+
+def _handle_box_computation_layer(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_layer_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_layer", rel_suffix="computation_layer")
+
+
+def _handle_box_computation_rules(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_rules_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_rules", rel_suffix="computation_rules")
+
+
+def _handle_box_computation_programs(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_programs_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_programs", rel_suffix="computation_programs")
+
+
+def _handle_box_computation_universe(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_universe_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_universe", rel_suffix="computation_universe")
+
+
+def _handle_box_computation_causal(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_causal_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_causal", rel_suffix="computation_causal")
+
+
+def _handle_box_state_transition(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_state_transition_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="state_transition", rel_suffix="state_transition")
+
+
+def _handle_box_computation_primitives(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_primitives_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_primitives", rel_suffix="computation_primitives")
+
+
+def _handle_box_computation_primitives_alt(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_primitives_alt_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_primitives_alt", rel_suffix="computation_primitives_alt")
+
+
+def _handle_box_computation_sublayers(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_sublayers_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_sublayers", rel_suffix="computation_sublayers")
+
+
+def _handle_box_computation_emergence(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_computation_emergence_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="computation_emergence", rel_suffix="computation_emergence")
+
+
+def _handle_box_substrate(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_substrate_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="substrate", rel_suffix="substrate")
+
+
+def _handle_box_scaffolding(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_scaffolding_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="scaffolding", rel_suffix="scaffolding")
+
+
+def _handle_box_constraints(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_constraints_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="constraints", rel_suffix="constraints")
+
+
+def _handle_box_physical_substrate(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_physical_substrate_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="physical_substrate", rel_suffix="physical_substrate")
+
+
+def _handle_box_physical_states(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_physical_states_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="physical_states", rel_suffix="physical_states")
+
+
+def _handle_box_foundational_physics(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_foundational_physics_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="foundational_physics", rel_suffix="foundational_physics")
+
+
+def _handle_box_tangibility_conservation(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_tangibility_conservation_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="tangibility_conservation", rel_suffix="tangibility_conservation")
+
+
+def _handle_box_physical_subdomains(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_physical_subdomains_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="physical_subdomains", rel_suffix="physical_subdomains")
+
+
+def _handle_box_emergence_from_physics(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_emergence_from_physics_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="emergence_from_physics", rel_suffix="emergence_from_physics")
+
+
+def _handle_box_observer_independent(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_observer_independent_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="observer_independent", rel_suffix="observer_independent")
+
+
+def _handle_box_sensory_profile(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_sensory_profile_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="sensory_profile", rel_suffix="sensory_profile")
+
+
+def _handle_box_real_world_behavior(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_real_world_behavior_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="real_world_behavior", rel_suffix="real_world_behavior")
+
+
+def _handle_box_scenario_landscape(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_scenario_landscape_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="scenario_landscape", rel_suffix="scenario_landscape")
+
+
+def _handle_box_construction_reconstruction(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_construction_reconstruction_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="construction_reconstruction", rel_suffix="construction_reconstruction")
+
+
+def _handle_box_thought_to_reality(payload: Dict[str, Any], *, request_id: str):
+    slug = payload.get("box_slug")
+    if not slug:
+        raise ValueError("box_slug is required")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
+    box = cur.fetchone()
+    if box is None:
+        conn.close()
+        raise ValueError("Box not found")
+    conn.close()
+
+    element = box["title"] or box["slug"]
+    description = box["description"] or ""
+    prompt_text = build_thought_to_reality_prompt(element, description)
+    return _run_and_store(box, prompt_text, name="thought_to_reality", rel_suffix="thought_to_reality")
 
 
 def llm_worker_loop(worker_id: int):
@@ -1550,6 +2150,356 @@ def enqueue_infinity(slug):
 
     task = enqueue_llm_task(
         "box_infinity",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_layer", methods=["POST"])
+def enqueue_computation_layer(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_layer",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_rules", methods=["POST"])
+def enqueue_computation_rules(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_rules",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_programs", methods=["POST"])
+def enqueue_computation_programs(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_programs",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_universe", methods=["POST"])
+def enqueue_computation_universe(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_universe",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_causal", methods=["POST"])
+def enqueue_computation_causal(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_causal",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/state_transition", methods=["POST"])
+def enqueue_state_transition(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_state_transition",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_primitives", methods=["POST"])
+def enqueue_computation_primitives(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_primitives",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_primitives_alt", methods=["POST"])
+def enqueue_computation_primitives_alt(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_primitives_alt",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_sublayers", methods=["POST"])
+def enqueue_computation_sublayers(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_sublayers",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/computation_emergence", methods=["POST"])
+def enqueue_computation_emergence(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_computation_emergence",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/substrate", methods=["POST"])
+def enqueue_substrate(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_substrate",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/scaffolding", methods=["POST"])
+def enqueue_scaffolding(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_scaffolding",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/constraints", methods=["POST"])
+def enqueue_constraints(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_constraints",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/physical_substrate", methods=["POST"])
+def enqueue_physical_substrate(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_physical_substrate",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/physical_states", methods=["POST"])
+def enqueue_physical_states(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_physical_states",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/foundational_physics", methods=["POST"])
+def enqueue_foundational_physics(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_foundational_physics",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/tangibility_conservation", methods=["POST"])
+def enqueue_tangibility_conservation(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_tangibility_conservation",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/physical_subdomains", methods=["POST"])
+def enqueue_physical_subdomains(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_physical_subdomains",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/emergence_from_physics", methods=["POST"])
+def enqueue_emergence_from_physics(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_emergence_from_physics",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/observer_independent", methods=["POST"])
+def enqueue_observer_independent(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_observer_independent",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/sensory_profile", methods=["POST"])
+def enqueue_sensory_profile(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_sensory_profile",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/real_world_behavior", methods=["POST"])
+def enqueue_real_world_behavior(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_real_world_behavior",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/scenario_landscape", methods=["POST"])
+def enqueue_scenario_landscape(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_scenario_landscape",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/construction_reconstruction", methods=["POST"])
+def enqueue_construction_reconstruction(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_construction_reconstruction",
+        {"box_slug": box["slug"]},
+    )
+    task["queue_size"] = LLM_TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.route("/boxes/<slug>/thought_to_reality", methods=["POST"])
+def enqueue_thought_to_reality(slug):
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found")
+
+    task = enqueue_llm_task(
+        "box_thought_to_reality",
         {"box_slug": box["slug"]},
     )
     task["queue_size"] = LLM_TASK_QUEUE.qsize()
