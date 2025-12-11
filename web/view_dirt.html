@@ -55,7 +55,7 @@
     }
 
     async function loadNodes(slug) {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/nodes`);
+      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses?limit=200`);
       if (!res.ok) throw new Error("Failed to load nodes");
       return res.json();
     }
