@@ -253,7 +253,7 @@
             <div class="controls-row">
               <label>
                 Limit
-                <input type="number" name="limit" id="filter-limit" value="200" min="1" />
+                <input type="number" name="limit" id="filter-limit" value="1000" min="1" />
               </label>
             </div>
             <div class="controls-row">
@@ -604,7 +604,7 @@
       document.getElementById("btn-reset").addEventListener("click", () => {
         document.getElementById("filter-status").value = "";
         document.getElementById("filter-task-type").value = "";
-        document.getElementById("filter-limit").value = "200";
+        document.getElementById("filter-limit").value = "1000";
         document.getElementById("filter-include-error").checked = false;
         refreshQueue();
       });
