@@ -16,6 +16,22 @@
   .node.particle { color: #444; }
   .node .kind { font-size: 11px; text-transform: uppercase; color: #888; margin-right: 6px; }
   .note { color:#777; font-size:13px; }
+  .analysis-item {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      background: #fff;
+      cursor: pointer;
+  }
+  .analysis-item .meta-line { font-size: 12px; color: #555; margin-top: 2px; }
+  .analysis-item pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      margin: 6px 0 0 0;
+      display: none;
+  }
 </style>
 </head>
 <body>
@@ -27,11 +43,16 @@
       <h3>Contents</h3>
       <div id="tree" class="tree note">Loading...</div>
     </div>
+    <div class="card">
+      <h3>Analyses</h3>
+      <div id="analysesList" class="note">Loading...</div>
+    </div>
   </div>
 
   <script>
     let currentSlug = null;
     let currentNodes = [];
+    let analyses = [];
     let expanded = {};
 
     function getQueryParam(name) {
@@ -55,8 +76,14 @@
     }
 
     async function loadNodes(slug) {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses?limit=200`);
+      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/nodes`);
       if (!res.ok) throw new Error("Failed to load nodes");
+      return res.json();
+    }
+
+    async function loadAnalyses(slug) {
+      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses?limit=200`);
+      if (!res.ok) throw new Error("Failed to load analyses");
       return res.json();
     }
 
@@ -144,6 +171,33 @@
       });
     }
 
+    function renderAnalyses(list) {
+      const container = document.getElementById("analysesList");
+      if (!list || !list.length) {
+          container.innerHTML = "No analyses yet.";
+          return;
+      }
+
+      container.innerHTML = "";
+      list.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "analysis-item";
+          const title = escapeHtml(item.name || "analysis");
+          const created = escapeHtml(item.created_at || "");
+          const content = escapeHtml(item.content || "");
+          div.innerHTML = `
+            <strong>${title}</strong>
+            <div class="meta-line">${created}</div>
+            <pre>${content}</pre>
+          `;
+          const pre = div.querySelector("pre");
+          div.addEventListener("click", () => {
+              pre.style.display = pre.style.display === "block" ? "none" : "block";
+          });
+          container.appendChild(div);
+      });
+    }
+
     async function refreshAll() {
       const slug = currentSlug;
       try {
@@ -152,6 +206,8 @@
         const nodes = await loadNodes(slug);
         currentNodes = nodes;
         renderNodes(nodes);
+        analyses = await loadAnalyses(slug);
+        renderAnalyses(analyses);
       } catch (err) {
         console.error(err);
         document.getElementById("tree").innerHTML = `<p class="note">${escapeHtml(err.message)}</p>`;
