@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Boxes of Dirt (Read Only)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      color: #333;
+  }
+  .container {
+      max-width: 720px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  h1 {
+      margin: 0 0 12px 0;
+      font-weight: 600;
+      color: #222;
+  }
+  .meta {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 12px;
+  }
+  ul.box-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+  }
+  li.box-item {
+      background: #fafafa;
+      padding: 12px 15px;
+      margin-bottom: 10px;
+      border-left: 4px solid #0066cc;
+      border-radius: 6px;
+  }
+  a {
+      color: #0066cc;
+      text-decoration: none;
+  }
+  a:hover {
+      text-decoration: underline;
+  }
+  .muted { color: #777; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Boxes of Dirt</h1>
+    <p class="meta">Read-only list. Use <a href="/create_dirt.html">create_dirt.html</a> to edit a box.</p>
+    <ul id="boxes" class="box-list"></ul>
+    <div id="message" class="muted"></div>
+  </div>
+
+  <script>
+    async function fetchBoxes() {
+        const list = document.getElementById("boxes");
+        const msg = document.getElementById("message");
+        msg.textContent = "Loading boxes...";
+        try {
+            const res = await fetch("/dirt/boxes", { headers: { "Accept": "application/json" } });
+            if (!res.ok) throw new Error("Failed to fetch boxes");
+            const boxes = await res.json();
+            list.innerHTML = "";
+            if (!boxes.length) {
+                list.innerHTML = "<li class='muted'>No boxes yet.</li>";
+                msg.textContent = "";
+                return;
+            }
+            boxes.forEach(b => {
+                const li = document.createElement("li");
+                li.className = "box-item";
+                const slug = b.slug;
+                li.innerHTML = `
+                    <strong>${slug}</strong> ${b.title ? " — " + b.title : ""}
+                    <br>
+                    <small>Root: ${b.root_path}</small>
+                    <br>
+                    <a href="/create_dirt.html?box=${encodeURIComponent(slug)}">Open box</a>
+                `;
+                list.appendChild(li);
+            });
+            msg.textContent = "";
+        } catch (err) {
+            console.error(err);
+            msg.textContent = "Error loading boxes.";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", fetchBoxes);
+  </script>
+</body>
+</html>

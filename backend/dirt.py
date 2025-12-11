@@ -130,7 +130,7 @@ def run_llm(prompt_text: str, *, model: Optional[str] = None):
 # === LLM TASK QUEUE ===
 
 LLM_QUEUE_CONCURRENCY = 2
-LLM_TASK_HISTORY_LIMIT = 200
+LLM_TASK_HISTORY_LIMIT = 1000
 LLM_TASK_QUEUE: "queue.Queue[Dict[str, Any]]" = queue.Queue()
 LLM_TASKS: Dict[str, Dict[str, Any]] = {}
 LLM_TASK_ORDER: List[str] = []
