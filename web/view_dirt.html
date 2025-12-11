@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>View Box of Dirt</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: Arial, sans-serif; background:#f4f4f4; color:#333; padding:20px; }
+  .container { max-width: 780px; margin:0 auto; background:#fff; padding:20px 24px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.12); }
+  h1 { margin-top:0; }
+  .meta { font-size: 14px; color:#555; line-height:1.6; }
+  .card { margin-top:16px; padding:14px 16px; background:#fafafa; border:1px solid #e5e5e5; border-radius:8px; }
+  .tree { margin-top:10px; }
+  .node { padding:4px 0; font-family: monospace; }
+  .node.chunk { font-weight: bold; }
+  .node.particle { color: #444; }
+  .node .kind { font-size: 11px; text-transform: uppercase; color: #888; margin-right: 6px; }
+  .note { color:#777; font-size:13px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>View Box of Dirt</h1>
+    <p><a href="/dirt2.html">&larr; Back to boxes</a></p>
+    <div id="boxMeta" class="meta"></div>
+    <div class="card">
+      <h3>Contents</h3>
+      <div id="tree" class="tree note">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    let currentSlug = null;
+    let currentNodes = [];
+    let expanded = {};
+
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    async function loadBoxInfo(slug) {
+      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}`);
+      if (!res.ok) throw new Error("Box not found");
+      return res.json();
+    }
+
+    async function loadNodes(slug) {
+      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/nodes`);
+      if (!res.ok) throw new Error("Failed to load nodes");
+      return res.json();
+    }
+
+    function renderBoxMeta(box) {
+      const meta = document.getElementById("boxMeta");
+      meta.innerHTML = `
+        <strong>Slug:</strong> ${escapeHtml(box.slug || "")}
+        ${box.title ? ` — <strong>${escapeHtml(box.title)}</strong>` : ""}
+        <br>
+        <strong>Root path:</strong> ${escapeHtml(box.root_path || "")}
+        ${box.description ? `<br><strong>Description:</strong> ${escapeHtml(box.description)}` : ""}
+      `;
+    }
+
+    function buildTree(nodes) {
+      const map = {};
+      nodes.forEach(n => { map[n.id] = { ...n, children: [] }; });
+      const roots = [];
+      nodes.forEach(n => {
+        const wrapped = map[n.id];
+        if (n.parent_id != null && map[n.parent_id]) {
+          map[n.parent_id].children.push(wrapped);
+        } else {
+          roots.push(wrapped);
+        }
+      });
+      return roots;
+    }
+
+    function renderTreeNode(node, container, depth = 0) {
+      const div = document.createElement("div");
+      div.className = `node ${node.kind}`;
+      div.style.paddingLeft = (depth * 16) + "px";
+
+      const hasChildren = node.children && node.children.length > 0;
+      const label = escapeHtml(node.name || node.rel_path || "(root)");
+
+      if (expanded[node.id] === undefined) {
+        expanded[node.id] = node.kind === "box_root" || node.parent_id === null;
+      }
+
+      let toggle = "";
+      if (hasChildren && (node.kind === "chunk" || node.kind === "box_root")) {
+        toggle = expanded[node.id] ? "[-]" : "[+]";
+      }
+
+      div.innerHTML = `
+          <span class="kind">[${node.kind}]</span>
+          <span class="toggle" style="cursor:pointer; margin-right:6px;">${toggle}</span>
+          ${label}
+      `;
+
+      const toggleEl = div.querySelector(".toggle");
+      if (toggleEl && toggleEl.textContent.trim() !== "") {
+        toggleEl.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          expanded[node.id] = !expanded[node.id];
+          renderNodes(currentNodes);
+        });
+      }
+
+      container.appendChild(div);
+
+      if (hasChildren && expanded[node.id]) {
+        node.children.forEach(child => {
+          renderTreeNode(child, container, depth + 1);
+        });
+      }
+    }
+
+    function renderNodes(nodes) {
+      const tree = document.getElementById("tree");
+      tree.innerHTML = "";
+      if (!nodes.length) {
+        tree.innerHTML = "<p class='note'>No chunks or particles yet.</p>";
+        return;
+      }
+      const roots = buildTree(nodes);
+      if (!roots.length) {
+        tree.innerHTML = "<p class='note'>No root nodes found.</p>";
+        return;
+      }
+      roots.forEach(root => {
+        renderTreeNode(root, tree, 0);
+      });
+    }
+
+    async function refreshAll() {
+      const slug = currentSlug;
+      try {
+        const box = await loadBoxInfo(slug);
+        renderBoxMeta(box);
+        const nodes = await loadNodes(slug);
+        currentNodes = nodes;
+        renderNodes(nodes);
+      } catch (err) {
+        console.error(err);
+        document.getElementById("tree").innerHTML = `<p class="note">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const slug = getQueryParam("box");
+      if (!slug) {
+        document.getElementById("tree").innerHTML = "<p class='note'>Missing ?box=&lt;slug&gt; in URL.</p>";
+        return;
+      }
+      currentSlug = slug;
+      await refreshAll();
+    });
+  </script>
+</body>
+</html>
