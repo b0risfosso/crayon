@@ -4,18 +4,67 @@
 <meta charset="UTF-8">
 <title>View Box of Dirt</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-  body { font-family: Arial, sans-serif; background:#f4f4f4; color:#333; padding:20px; }
-  .container { max-width: 780px; margin:0 auto; background:#fff; padding:20px 24px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.12); }
-  h1 { margin-top:0; }
-  .meta { font-size: 14px; color:#555; line-height:1.6; }
-  .card { margin-top:16px; padding:14px 16px; background:#fafafa; border:1px solid #e5e5e5; border-radius:8px; }
-  .tree { margin-top:10px; }
-  .node { padding:4px 0; font-family: monospace; }
-  .node.chunk { font-weight: bold; }
-  .node.particle { color: #444; }
-  .node .kind { font-size: 11px; text-transform: uppercase; color: #888; margin-right: 6px; }
-  .note { color:#777; font-size:13px; }
+  body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      color: #333;
+  }
+  .container {
+      max-width: 720px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px 24px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  h1, h2, h3 {
+      font-weight: 600;
+      color: #222;
+  }
+  .meta {
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: #555;
+      line-height: 1.5;
+  }
+  label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+  }
+  textarea {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-top: 4px;
+      min-height: 120px;
+      resize: vertical;
+  }
+  button {
+      background: #0066cc;
+      color: white;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+  }
+  button:hover {
+      background: #004c99;
+  }
+  .card {
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #fafafa;
+      border: 1px solid #ddd;
+      margin-bottom: 12px;
+  }
   .analysis-item {
       border: 1px solid #e0e0e0;
       border-radius: 6px;
@@ -32,197 +81,312 @@
       margin: 6px 0 0 0;
       display: none;
   }
+  .note {
+      color: #555;
+      font-size: 14px;
+      margin-top: 10px;
+  }
+  details {
+      margin-top: 8px;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      background: #f8f8f8;
+  }
+  summary {
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  .details-body {
+      padding: 8px 10px 12px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+  }
+  .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      background: #ececec;
+      border-radius: 14px;
+      font-size: 13px;
+      color: #444;
+  }
+  .error {
+      color: #b30000;
+      margin-top: 8px;
+      font-weight: bold;
+  }
+  .success {
+      color: #007700;
+      margin-top: 8px;
+      font-weight: bold;
+  }
+  a {
+      color: #0066cc;
+  }
 </style>
 </head>
 <body>
-  <div class="container">
-    <h1>View Box of Dirt</h1>
-    <p><a href="/dirt2.html">&larr; Back to boxes</a></p>
-    <div id="boxMeta" class="meta"></div>
-    <div class="card">
-      <h3>Contents</h3>
-      <div id="tree" class="tree note">Loading...</div>
-    </div>
-    <div class="card">
-      <h3>Analyses</h3>
-      <div id="analysesList" class="note">Loading...</div>
-    </div>
+
+<div class="container">
+  <h1>View Box of Dirt</h1>
+  <p><a href="/boxes.html">&larr; Back to boxes</a></p>
+
+  <div id="boxMeta" class="meta"></div>
+  <div id="message"></div>
+
+  <div class="card">
+    <h3>Box Description</h3>
+    <textarea id="boxDescription" placeholder="Describe this box..." readonly aria-label="Box description (read only)"></textarea>
+    <p class="note">Read-only view. Edit the description from the create page.</p>
   </div>
 
-  <script>
-    let currentSlug = null;
-    let currentNodes = [];
-    let analyses = [];
-    let expanded = {};
+  <div class="card">
+    <h3>Run Analyses</h3>
+    <p class="note">Viewing only. Queuing analyses is disabled here; use create_dirt.html to run them.</p>
+    <div id="analysisSections"></div>
+  </div>
 
-    function getQueryParam(name) {
-      const params = new URLSearchParams(window.location.search);
-      return params.get(name);
-    }
+  <div class="card">
+    <h3>Analyses</h3>
+    <div id="analysesList" class="note">No analyses yet.</div>
+  </div>
 
-    function escapeHtml(str) {
-      return String(str || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\\"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
+  <p class="note">Chunk and particle management is disabled for this box.</p>
+</div>
 
-    async function loadBoxInfo(slug) {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}`);
-      if (!res.ok) throw new Error("Box not found");
-      return res.json();
-    }
+<script>
+let currentSlug = null;
+let currentBox = null;
+let analyses = [];
+const analysisEndpoints = [
+  { key: "decompose", label: "Decomposition", path: "decompose" },
+  { key: "abstractions", label: "Abstractions & Metaphors", path: "abstractions" },
+  { key: "processes", label: "Processes/Forces/Interactions", path: "processes" },
+  { key: "datasets", label: "Datasets", path: "datasets" },
+  { key: "codebases", label: "Codebases", path: "codebases" },
+  { key: "hardware", label: "Hardware Builds", path: "hardware_builds" },
+  { key: "experiments", label: "Experiments", path: "experiments" },
+  { key: "intelligence", label: "Intelligence", path: "intelligence" },
+  { key: "control_levers", label: "Control Levers", path: "control_levers" },
+  { key: "companies", label: "Companies", path: "companies" },
+  { key: "theories", label: "Theories/Theses", path: "theories" },
+  { key: "historical", label: "Historical Context", path: "historical_context" },
+  { key: "value_exchange", label: "Value Exchange", path: "value_exchange" },
+  { key: "value_addition", label: "Value Addition", path: "value_addition" },
+  { key: "science", label: "Scientific Substructure", path: "science" },
+  { key: "spirit", label: "Spirit/Soul/Emotion", path: "spirit" },
+  { key: "environment", label: "Environment", path: "environment" },
+  { key: "imagination", label: "Imagination Windows", path: "imagination" },
+  { key: "musical", label: "Musical Composition", path: "musical" },
+  { key: "infinity", label: "Infinity", path: "infinity" },
+  { key: "computation_layer", label: "Computation Layer", path: "computation_layer" },
+  { key: "computation_rules", label: "Computation Rules", path: "computation_rules" },
+  { key: "computation_programs", label: "Computation Programs", path: "computation_programs" },
+  { key: "computation_universe", label: "Computation Universe", path: "computation_universe" },
+  { key: "computation_causal", label: "Computation Causal", path: "computation_causal" },
+  { key: "state_transition", label: "State Transition", path: "state_transition" },
+  { key: "computation_primitives", label: "Computation Primitives", path: "computation_primitives" },
+  { key: "computation_primitives_alt", label: "Computation Primitives (Alt)", path: "computation_primitives_alt" },
+  { key: "computation_sublayers", label: "Computation Sublayers", path: "computation_sublayers" },
+  { key: "computation_emergence", label: "Computation Emergence", path: "computation_emergence" },
+  { key: "substrate", label: "Substrate", path: "substrate" },
+  { key: "scaffolding", label: "Scaffolding", path: "scaffolding" },
+  { key: "constraints", label: "Constraints", path: "constraints" },
+  { key: "physical_substrate", label: "Physical Substrate", path: "physical_substrate" },
+  { key: "physical_states", label: "Physical States", path: "physical_states" },
+  { key: "foundational_physics", label: "Foundational Physics", path: "foundational_physics" },
+  { key: "tangibility_conservation", label: "Tangibility & Conservation", path: "tangibility_conservation" },
+  { key: "physical_subdomains", label: "Physical Subdomains", path: "physical_subdomains" },
+  { key: "emergence_from_physics", label: "Emergence from Physics", path: "emergence_from_physics" },
+  { key: "observer_independent", label: "Observer-Independent Reality", path: "observer_independent" },
+  { key: "sensory_profile", label: "Sensory Profile", path: "sensory_profile" },
+  { key: "real_world_behavior", label: "Real-World Behavior", path: "real_world_behavior" },
+  { key: "scenario_landscape", label: "Scenario Landscape", path: "scenario_landscape" },
+  { key: "construction_reconstruction", label: "Construction / Reconstruction", path: "construction_reconstruction" },
+  { key: "thought_to_reality", label: "Thought to Reality", path: "thought_to_reality" },
+];
 
-    async function loadNodes(slug) {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/nodes`);
-      if (!res.ok) throw new Error("Failed to load nodes");
-      return res.json();
-    }
+const computationalKeys = [
+  "computation_layer",
+  "computation_rules",
+  "computation_programs",
+  "computation_universe",
+  "computation_causal",
+  "state_transition",
+  "computation_primitives",
+  "computation_primitives_alt",
+  "computation_sublayers",
+  "computation_emergence",
+];
 
-    async function loadAnalyses(slug) {
-      const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses?limit=200`);
-      if (!res.ok) throw new Error("Failed to load analyses");
-      return res.json();
-    }
+const physicalKeys = [
+  "substrate",
+  "scaffolding",
+  "constraints",
+  "physical_substrate",
+  "physical_states",
+  "foundational_physics",
+  "tangibility_conservation",
+  "physical_subdomains",
+  "emergence_from_physics",
+  "observer_independent",
+  "sensory_profile",
+  "real_world_behavior",
+  "scenario_landscape",
+  "construction_reconstruction",
+  "thought_to_reality",
+];
 
-    function renderBoxMeta(box) {
-      const meta = document.getElementById("boxMeta");
-      meta.innerHTML = `
-        <strong>Slug:</strong> ${escapeHtml(box.slug || "")}
-        ${box.title ? ` — <strong>${escapeHtml(box.title)}</strong>` : ""}
-        <br>
-        <strong>Root path:</strong> ${escapeHtml(box.root_path || "")}
-        ${box.description ? `<br><strong>Description:</strong> ${escapeHtml(box.description)}` : ""}
-      `;
-    }
+const intellectualKeys = analysisEndpoints
+  .map((e) => e.key)
+  .filter(
+    (k) => !computationalKeys.includes(k) && !physicalKeys.includes(k)
+  );
 
-    function buildTree(nodes) {
-      const map = {};
-      nodes.forEach(n => { map[n.id] = { ...n, children: [] }; });
-      const roots = [];
-      nodes.forEach(n => {
-        const wrapped = map[n.id];
-        if (n.parent_id != null && map[n.parent_id]) {
-          map[n.parent_id].children.push(wrapped);
-        } else {
-          roots.push(wrapped);
-        }
-      });
-      return roots;
-    }
+function getQueryParam(name) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(name);
+}
 
-    function renderTreeNode(node, container, depth = 0) {
+function setMessage(html, cls) {
+  const el = document.getElementById("message");
+  el.innerHTML = html ? `<div class="${cls}">${html}</div>` : "";
+}
+
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function loadBoxInfo(slug) {
+  const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}`);
+  if (!res.ok) {
+      throw new Error("Box not found");
+  }
+  return res.json();
+}
+
+async function loadAnalyses(slug) {
+  const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses?limit=200`);
+  if (!res.ok) {
+      throw new Error("Failed to load analyses");
+  }
+  return res.json();
+}
+
+function renderBoxMeta(box) {
+  const meta = document.getElementById("boxMeta");
+  const slug = escapeHtml(box.slug || "");
+  const title = box.title ? escapeHtml(box.title) : "";
+  const rootPath = escapeHtml(box.root_path || "");
+  const desc = box.description ? `<br><strong>Description:</strong> ${escapeHtml(box.description)}` : "";
+  meta.innerHTML = `
+    <strong>Slug:</strong> ${slug}
+    ${title ? ` — <strong>${title}</strong>` : ""}
+    <br>
+    <strong>Root path:</strong> ${rootPath}
+    ${desc}
+  `;
+}
+
+function renderAnalyses(list) {
+  const container = document.getElementById("analysesList");
+  if (!list || !list.length) {
+      container.innerHTML = "No analyses yet.";
+      return;
+  }
+
+  container.innerHTML = "";
+  list.forEach(item => {
       const div = document.createElement("div");
-      div.className = `node ${node.kind}`;
-      div.style.paddingLeft = (depth * 16) + "px";
-
-      const hasChildren = node.children && node.children.length > 0;
-      const label = escapeHtml(node.name || node.rel_path || "(root)");
-
-      if (expanded[node.id] === undefined) {
-        expanded[node.id] = node.kind === "box_root" || node.parent_id === null;
-      }
-
-      let toggle = "";
-      if (hasChildren && (node.kind === "chunk" || node.kind === "box_root")) {
-        toggle = expanded[node.id] ? "[-]" : "[+]";
-      }
-
+      div.className = "analysis-item";
+      const title = escapeHtml(item.name || "analysis");
+      const created = escapeHtml(item.created_at || "");
+      const content = escapeHtml(item.content || "");
+      const preId = `analysis-content-${item.id}`;
       div.innerHTML = `
-          <span class="kind">[${node.kind}]</span>
-          <span class="toggle" style="cursor:pointer; margin-right:6px;">${toggle}</span>
-          ${label}
+        <strong>${title}</strong>
+        <div class="meta-line">${created}</div>
+        <pre id="${preId}">${content}</pre>
       `;
-
-      const toggleEl = div.querySelector(".toggle");
-      if (toggleEl && toggleEl.textContent.trim() !== "") {
-        toggleEl.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          expanded[node.id] = !expanded[node.id];
-          renderNodes(currentNodes);
-        });
-      }
-
+      const pre = div.querySelector("pre");
+      div.addEventListener("click", () => {
+          pre.style.display = pre.style.display === "block" ? "none" : "block";
+      });
       container.appendChild(div);
+  });
+}
 
-      if (hasChildren && expanded[node.id]) {
-        node.children.forEach(child => {
-          renderTreeNode(child, container, depth + 1);
-        });
-      }
-    }
+function renderAnalysisList() {
+  const container = document.getElementById("analysisSections");
+  container.innerHTML = "";
 
-    function renderNodes(nodes) {
-      const tree = document.getElementById("tree");
-      tree.innerHTML = "";
-      if (!nodes.length) {
-        tree.innerHTML = "<p class='note'>No chunks or particles yet.</p>";
-        return;
-      }
-      const roots = buildTree(nodes);
-      if (!roots.length) {
-        tree.innerHTML = "<p class='note'>No root nodes found.</p>";
-        return;
-      }
-      roots.forEach(root => {
-        renderTreeNode(root, tree, 0);
-      });
-    }
+  const groups = [
+    { id: "computational", label: "Computational", keys: computationalKeys },
+    { id: "physical", label: "Physical", keys: physicalKeys },
+    { id: "intellectual", label: "Intellectual", keys: intellectualKeys },
+  ];
 
-    function renderAnalyses(list) {
-      const container = document.getElementById("analysesList");
-      if (!list || !list.length) {
-          container.innerHTML = "No analyses yet.";
-          return;
-      }
+  groups.forEach(group => {
+    const details = document.createElement("details");
+    details.id = `section-${group.id}`;
+    details.open = true;
+    const summary = document.createElement("summary");
+    summary.textContent = `${group.label} analyses (${group.keys.length})`;
+    details.appendChild(summary);
 
-      container.innerHTML = "";
-      list.forEach(item => {
-          const div = document.createElement("div");
-          div.className = "analysis-item";
-          const title = escapeHtml(item.name || "analysis");
-          const created = escapeHtml(item.created_at || "");
-          const content = escapeHtml(item.content || "");
-          div.innerHTML = `
-            <strong>${title}</strong>
-            <div class="meta-line">${created}</div>
-            <pre>${content}</pre>
-          `;
-          const pre = div.querySelector("pre");
-          div.addEventListener("click", () => {
-              pre.style.display = pre.style.display === "block" ? "none" : "block";
-          });
-          container.appendChild(div);
-      });
-    }
+    const body = document.createElement("div");
+    body.className = "details-body";
 
-    async function refreshAll() {
-      const slug = currentSlug;
-      try {
-        const box = await loadBoxInfo(slug);
-        renderBoxMeta(box);
-        const nodes = await loadNodes(slug);
-        currentNodes = nodes;
-        renderNodes(nodes);
-        analyses = await loadAnalyses(slug);
-        renderAnalyses(analyses);
-      } catch (err) {
-        console.error(err);
-        document.getElementById("tree").innerHTML = `<p class="note">${escapeHtml(err.message)}</p>`;
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", async () => {
-      const slug = getQueryParam("box");
-      if (!slug) {
-        document.getElementById("tree").innerHTML = "<p class='note'>Missing ?box=&lt;slug&gt; in URL.</p>";
-        return;
-      }
-      currentSlug = slug;
-      await refreshAll();
+    group.keys.forEach(key => {
+      const ep = analysisEndpoints.find(e => e.key === key);
+      if (!ep) return;
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = ep.label;
+      body.appendChild(pill);
     });
-  </script>
+
+    details.appendChild(body);
+    container.appendChild(details);
+  });
+}
+
+async function refreshAll() {
+  setMessage("", "");
+  const slug = currentSlug;
+  try {
+      const box = await loadBoxInfo(slug);
+      currentBox = box;
+      renderBoxMeta(box);
+      document.getElementById("boxDescription").value = box.description || "";
+      document.getElementById("boxDescription").setAttribute("readonly", "readonly");
+      analyses = await loadAnalyses(slug);
+      renderAnalyses(analyses);
+  } catch (err) {
+      console.error(err);
+      setMessage(err.message, "error");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const slug = getQueryParam("box");
+  if (!slug) {
+      setMessage("Missing ?box=<slug> in URL.", "error");
+      return;
+  }
+  currentSlug = slug;
+  renderAnalysisList();
+  await refreshAll();
+});
+</script>
+
 </body>
 </html>
