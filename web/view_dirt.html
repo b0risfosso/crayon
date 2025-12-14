@@ -140,18 +140,18 @@
   <div class="card">
     <h3>Box Description</h3>
     <textarea id="boxDescription" placeholder="Describe this box..." readonly aria-label="Box description (read only)"></textarea>
-    <p class="note">Read-only view. Edit the description from the create page.</p>
+    <p class="note">Read-only view.</p>
   </div>
 
   <div class="card">
-    <h3>Run Analyses</h3>
-    <p class="note">Viewing only. Queuing analyses is disabled here; use create_dirt.html to run them.</p>
+    <h3>Create Dirt</h3>
+    <p class="note">Viewing only.</p>
     <div id="analysisSections"></div>
   </div>
 
   <div class="card">
-    <h3>Analyses</h3>
-    <div id="analysesList" class="note">No analyses yet.</div>
+    <h3>Dirt</h3>
+    <div id="analysesList" class="note">No dirt yet.</div>
   </div>
 
   <p class="note">Chunk and particle management is disabled for this box.</p>
@@ -276,7 +276,7 @@ async function loadBoxInfo(slug) {
 async function loadAnalyses(slug) {
   const res = await fetch(`/dirt/boxes/${encodeURIComponent(slug)}/analyses?limit=200`);
   if (!res.ok) {
-      throw new Error("Failed to load analyses");
+      throw new Error("Failed to load dirt");
   }
   return res.json();
 }
@@ -299,7 +299,7 @@ function renderBoxMeta(box) {
 function renderAnalyses(list) {
   const container = document.getElementById("analysesList");
   if (!list || !list.length) {
-      container.innerHTML = "No analyses yet.";
+      container.innerHTML = "No dirt yet.";
       return;
   }
 
@@ -339,7 +339,7 @@ function renderAnalysisList() {
     details.id = `section-${group.id}`;
     details.open = true;
     const summary = document.createElement("summary");
-    summary.textContent = `${group.label} analyses (${group.keys.length})`;
+    summary.textContent = `${group.label} dirt (${group.keys.length})`;
     details.appendChild(summary);
 
     const body = document.createElement("div");
