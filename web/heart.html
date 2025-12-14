@@ -29,26 +29,30 @@
       margin-bottom: 16px;
   }
   .files {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
   }
-  .card {
+  details.file {
       border: 1px solid #e0e0e0;
       border-radius: 8px;
       background: #fafafa;
-      padding: 12px 14px;
+      padding: 10px 12px;
+  }
+  summary {
+      cursor: pointer;
+      font-weight: 600;
       display: flex;
-      flex-direction: column;
-      min-height: 200px;
+      justify-content: space-between;
+      align-items: center;
+      list-style: none;
   }
-  .card h3 {
-      margin: 0 0 8px 0;
-      font-size: 16px;
-  }
+  summary::-webkit-details-marker { display: none; }
   .status {
       font-size: 13px;
       color: #666;
+      margin-left: 8px;
+      font-weight: normal;
   }
   pre {
       white-space: pre-wrap;
@@ -57,7 +61,6 @@
       font-size: 13px;
       margin: 10px 0 0 0;
       color: #111;
-      flex: 1;
       overflow-y: auto;
   }
   .error { color: #b30000; }
@@ -83,21 +86,24 @@
       "WE SAW THE SUN!.txt",
     ];
 
-    function createCard(name) {
-      const card = document.createElement("div");
-      card.className = "card";
-      const title = document.createElement("h3");
-      title.textContent = name;
-      const status = document.createElement("div");
+    function createItem(name) {
+      const details = document.createElement("details");
+      details.className = "file";
+      details.open = false;
+
+      const summary = document.createElement("summary");
+      summary.textContent = name;
+      const status = document.createElement("span");
       status.className = "status loading";
       status.textContent = "Loading...";
+      summary.appendChild(status);
+
       const pre = document.createElement("pre");
       pre.textContent = "";
-      pre.style.display = "none";
-      card.appendChild(title);
-      card.appendChild(status);
-      card.appendChild(pre);
-      return { card, status, pre };
+
+      details.appendChild(summary);
+      details.appendChild(pre);
+      return { details, status, pre };
     }
 
     async function loadFile(name, elements) {
@@ -110,9 +116,8 @@
         }
         const text = await res.text();
         elements.status.className = "status";
-        elements.status.textContent = "Loaded";
+        elements.status.textContent = "Loaded (click to view)";
         elements.pre.textContent = text;
-        elements.pre.style.display = "block";
       } catch (err) {
         elements.status.className = "status error";
         elements.status.textContent = `Failed to load: ${err.message}`;
@@ -122,8 +127,8 @@
     function init() {
       const container = document.getElementById("files");
       fileNames.forEach(name => {
-        const elements = createCard(name);
-        container.appendChild(elements.card);
+        const elements = createItem(name);
+        container.appendChild(elements.details);
         loadFile(name, elements);
       });
     }
