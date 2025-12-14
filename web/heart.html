@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Heart</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      color: #222;
+      margin: 0;
+      padding: 20px;
+  }
+  .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px 24px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  h1 {
+      margin: 0 0 6px 0;
+      font-weight: 700;
+  }
+  .meta {
+      color: #666;
+      margin-bottom: 16px;
+  }
+  .files {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+  }
+  .card {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fafafa;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+  }
+  .card h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+  }
+  .status {
+      font-size: 13px;
+      color: #666;
+  }
+  pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 13px;
+      margin: 10px 0 0 0;
+      color: #111;
+      flex: 1;
+      overflow-y: auto;
+  }
+  .error { color: #b30000; }
+  .loading { color: #0077cc; }
+  a { color: #0066cc; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Heart</h1>
+    <div class="meta">Reading text files from <code>heart/</code>.</div>
+    <p><a href="/index.html">&larr; Back</a></p>
+
+    <div id="files" class="files"></div>
+  </div>
+
+  <script>
+    // Update this list if new text files are added to heart/
+    const fileNames = [
+      "BAD FRUIT*.txt",
+      "Lisa.txt",
+      "Sing About Me, I'm Dying of Thirst.txt",
+      "WE SAW THE SUN!.txt",
+    ];
+
+    function createCard(name) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const title = document.createElement("h3");
+      title.textContent = name;
+      const status = document.createElement("div");
+      status.className = "status loading";
+      status.textContent = "Loading...";
+      const pre = document.createElement("pre");
+      pre.textContent = "";
+      pre.style.display = "none";
+      card.appendChild(title);
+      card.appendChild(status);
+      card.appendChild(pre);
+      return { card, status, pre };
+    }
+
+    async function loadFile(name, elements) {
+      try {
+        const res = await fetch(`/heart/${encodeURIComponent(name)}`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const text = await res.text();
+        elements.status.className = "status";
+        elements.status.textContent = "Loaded";
+        elements.pre.textContent = text;
+        elements.pre.style.display = "block";
+      } catch (err) {
+        elements.status.className = "status error";
+        elements.status.textContent = `Failed to load: ${err.message}`;
+      }
+    }
+
+    function init() {
+      const container = document.getElementById("files");
+      fileNames.forEach(name => {
+        const elements = createCard(name);
+        container.appendChild(elements.card);
+        loadFile(name, elements);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
