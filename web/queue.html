@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Colors Queue Monitor</title>
+  <title>LLM Queue Monitor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     :root {
@@ -218,11 +218,26 @@
   </style>
 </head>
 <body>
-  <h1>Dirt LLM Queue Monitor</h1>
-  <p class="muted">Live view of in-memory LLM queue from <code>/dirt/llm/tasks</code> and <code>/dirt/llm/workers</code>.</p>
+  <h1>LLM Queue Monitor</h1>
+  <p class="muted">Switch queues to view different in-memory workers.</p>
 
   <div class="page">
     <aside class="sidebar">
+      <div class="card">
+        <h2>Queue Target</h2>
+        <div class="controls">
+          <label>
+            Select queue
+            <select id="queue-target">
+              <option value="dirt">dirt /llm</option>
+              <option value="instruments">instruments /llm</option>
+              <option value="colors">colors</option>
+            </select>
+          </label>
+          <div class="muted small" id="queue-endpoints-hint"></div>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Queue Summary</h2>
         <div id="summary-content" class="muted small">Loading…</div>
@@ -332,8 +347,27 @@
   </div>
 
   <script>
-    const TASKS_ENDPOINT = "/dirt/llm/tasks";
-    const WORKERS_ENDPOINT = "/dirt/llm/workers";
+    const QUEUE_OPTIONS = {
+      dirt: { tasks: "/dirt/llm/tasks", workers: "/dirt/llm/workers", label: "dirt /llm" },
+      instruments: {
+        tasks: "/instruments/llm/tasks",
+        workers: "/instruments/llm/workers",
+        label: "instruments /llm",
+      },
+      colors: { tasks: "/colors/queue/tasks", workers: "/colors/queue/workers", label: "colors" },
+    };
+
+    let TASKS_ENDPOINT = QUEUE_OPTIONS.dirt.tasks;
+    let WORKERS_ENDPOINT = QUEUE_OPTIONS.dirt.workers;
+
+    function setQueueTarget(key) {
+      const opt = QUEUE_OPTIONS[key] || QUEUE_OPTIONS.dirt;
+      TASKS_ENDPOINT = opt.tasks;
+      WORKERS_ENDPOINT = opt.workers;
+      const hint = document.getElementById("queue-endpoints-hint");
+      hint.textContent = `tasks: ${TASKS_ENDPOINT} | workers: ${WORKERS_ENDPOINT}`;
+      refreshQueue();
+    }
 
     let autoRefreshTimer = null;
 
@@ -597,6 +631,12 @@
         refreshQueue();
       });
 
+      const queueSelect = document.getElementById("queue-target");
+      queueSelect.addEventListener("change", (e) => {
+        setQueueTarget(e.target.value);
+      });
+      setQueueTarget(queueSelect.value);
+
       document.getElementById("btn-refresh").addEventListener("click", () => {
         refreshQueue();
       });
@@ -616,8 +656,7 @@
         startAutoRefresh();
       });
 
-      // initial load
-      refreshQueue();
+      // initial load handled by setQueueTarget
     });
   </script>
 </body>

@@ -9,12 +9,31 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import uuid
+import threading
+import queue
+import time
+import json
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from flask import Flask, request, jsonify, g, abort
 
+try:
+    from openai import OpenAI
+    _client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    _client_err: Optional[Exception] = None
+except Exception as e:
+    _client = None
+    _client_err = e
+
+from instrument_prompts import OPERATOR_INSTRUCTION_COMPILER  # type: ignore
+
 DB_PATH = "/var/www/site/data/instruments.db"
+MODEL_DEFAULT = os.environ.get("INSTRUMENT_MODEL", "gpt-5-mini-2025-08-07")
+
+CONCURRENCY = 2
+LLM_LOCK = threading.Lock()
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
@@ -39,6 +58,30 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
             """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS instrument_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                instrument_id INTEGER REFERENCES instruments(id) ON DELETE SET NULL,
+                task_id TEXT,
+                scenario TEXT NOT NULL,
+                operator_name TEXT NOT NULL,
+                operator_description TEXT,
+                output_text TEXT,
+                model TEXT,
+                tokens_in INTEGER,
+                tokens_out INTEGER,
+                total_tokens INTEGER,
+                status TEXT NOT NULL,
+                error TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_instrument_runs_instrument ON instrument_runs(instrument_id, created_at DESC)"
         )
         conn.commit()
     finally:
@@ -69,6 +112,214 @@ def row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
+
+
+def require_json() -> Dict[str, Any]:
+    if not request.is_json:
+        abort(400, description="Request must be application/json")
+    payload = request.get_json(silent=True)
+    if payload is None:
+        abort(400, description="Invalid JSON body")
+    return payload
+
+
+def fetch_instrument_row(instrument_id: int) -> Optional[Dict[str, Any]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    try:
+        row = conn.execute("SELECT * FROM instruments WHERE id = ?", (instrument_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+# --- LLM helpers / queue --------------------------------------------------
+
+TASK_QUEUE: "queue.Queue[dict]" = queue.Queue()
+TASKS: Dict[str, Dict[str, Any]] = {}
+TASKS_LOCK = threading.Lock()
+
+
+def iso_time_ms() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def queue_stats() -> Dict[str, Any]:
+    with TASKS_LOCK:
+        counts = {"queued": 0, "running": 0, "done": 0, "error": 0}
+        for t in TASKS.values():
+            status = t.get("status")
+            if status in counts:
+                counts[status] += 1
+    return {"queue_size": TASK_QUEUE.qsize(), "tasks": counts, "concurrency": CONCURRENCY}
+
+
+def render_prompt(scenario: str, operator_name: str, operator_description: str) -> str:
+    return (
+        OPERATOR_INSTRUCTION_COMPILER
+        .replace("{{SCENARIO_TEXT}}", scenario)
+        .replace("{{OPERATOR_NAME}}", operator_name)
+        .replace("{{OPERATOR_DESCRIPTION}}", operator_description)
+    )
+
+
+def insert_run(
+    *,
+    instrument_id: Optional[int],
+    task_id: str,
+    scenario: str,
+    operator_name: str,
+    operator_description: str,
+    output_text: Optional[str],
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    total_tokens: int,
+    status: str,
+    error: Optional[str],
+) -> Dict[str, Any]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    try:
+        now = iso_time_ms()
+        row = conn.execute(
+            """
+            INSERT INTO instrument_runs
+              (instrument_id, task_id, scenario, operator_name, operator_description,
+               output_text, model, tokens_in, tokens_out, total_tokens, status, error,
+               created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING *
+            """,
+            (
+                instrument_id,
+                task_id,
+                scenario,
+                operator_name,
+                operator_description,
+                output_text,
+                model,
+                tokens_in,
+                tokens_out,
+                total_tokens,
+                status,
+                error,
+                now,
+                now,
+            ),
+        ).fetchone()
+        conn.commit()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+def worker_loop(worker_id: int):
+    while True:
+        task = TASK_QUEUE.get()
+        task_id = task["task_id"]
+        with TASKS_LOCK:
+            meta = TASKS.get(task_id)
+            if meta:
+                meta.update({"status": "running", "started_at": iso_time_ms(), "worker_id": worker_id})
+        try:
+            scenario = task["scenario"]
+            operator_name = task["operator_name"]
+            operator_description = task["operator_description"]
+            instrument_id = task.get("instrument_id")
+            model = task["model"]
+
+            if _client is None:
+                raise RuntimeError(f"OpenAI client not initialized: {_client_err}")
+
+            prompt = render_prompt(scenario, operator_name, operator_description)
+
+            with LLM_LOCK:
+                t0 = time.time()
+                resp = _client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "system", "content": prompt}],
+                )
+            output_text = (resp.choices[0].message.content or "").strip()
+
+            usage = getattr(resp, "usage", None)
+            usage_dict = usage.model_dump() if usage else {}
+            tokens_in = int(usage_dict.get("prompt_tokens", 0))
+            tokens_out = int(usage_dict.get("completion_tokens", 0))
+            total_tokens = int(usage_dict.get("total_tokens", tokens_in + tokens_out))
+            duration_ms = int((time.time() - t0) * 1000)
+
+            run_row = insert_run(
+                instrument_id=instrument_id,
+                task_id=task_id,
+                scenario=scenario,
+                operator_name=operator_name,
+                operator_description=operator_description,
+                output_text=output_text,
+                model=model,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                total_tokens=total_tokens,
+                status="done",
+                error=None,
+            )
+
+            result = {
+                "output": output_text,
+                "usage": usage_dict,
+                "duration_ms": duration_ms,
+                "run": run_row,
+            }
+
+            with TASKS_LOCK:
+                meta = TASKS.get(task_id)
+                if meta:
+                    meta.update(
+                        {
+                            "status": "done",
+                            "finished_at": iso_time_ms(),
+                            "result": result,
+                        }
+                    )
+
+        except Exception as e:
+            with TASKS_LOCK:
+                meta = TASKS.get(task_id)
+                if meta:
+                    meta.update(
+                        {
+                            "status": "error",
+                            "finished_at": iso_time_ms(),
+                            "error": str(e),
+                        }
+                    )
+            try:
+                insert_run(
+                    instrument_id=task.get("instrument_id"),
+                    task_id=task_id,
+                    scenario=task.get("scenario", ""),
+                    operator_name=task.get("operator_name", ""),
+                    operator_description=task.get("operator_description", ""),
+                    output_text=None,
+                    model=task.get("model", MODEL_DEFAULT),
+                    tokens_in=0,
+                    tokens_out=0,
+                    total_tokens=0,
+                    status="error",
+                    error=str(e),
+                )
+            except Exception:
+                pass
+        finally:
+            TASK_QUEUE.task_done()
+
+
+# start worker threads
+for wid in range(CONCURRENCY):
+    t = threading.Thread(target=worker_loop, args=(wid,), daemon=True)
+    t.start()
 
 
 @app.get("/instruments/health")
@@ -164,6 +415,157 @@ def delete_instrument(instrument_id: int) -> Any:
     db.execute("DELETE FROM instruments WHERE id = ?", (instrument_id,))
     db.commit()
     return jsonify({"ok": True, "deleted_id": instrument_id})
+
+
+@app.get("/instruments/<int:instrument_id>/runs")
+def list_runs_for_instrument(instrument_id: int) -> Any:
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT *
+        FROM instrument_runs
+        WHERE instrument_id = ?
+        ORDER BY created_at DESC
+        LIMIT 200
+        """,
+        (instrument_id,),
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.post("/instruments/compile")
+def enqueue_compile() -> Any:
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    scenario = payload.get("scenario")
+    if not isinstance(scenario, str) or not scenario.strip():
+        abort(400, description="'scenario' is required and must be a non-empty string")
+
+    instrument_id = payload.get("instrument_id")
+    if instrument_id is not None and not isinstance(instrument_id, int):
+        abort(400, description="'instrument_id' must be an integer when provided")
+
+    operator_name = payload.get("instrument_name")
+    operator_description = payload.get("instrument_description")
+
+    if instrument_id is not None:
+        row = fetch_instrument_row(instrument_id)
+        if not row:
+            abort(404, description=f"Instrument id {instrument_id} not found")
+        operator_name = operator_name or row.get("name")
+        operator_description = operator_description or row.get("description")
+
+    if not isinstance(operator_name, str) or not operator_name.strip():
+        abort(400, description="'instrument_name' is required (or present in instrument_id)")
+    if operator_description is None:
+        operator_description = ""
+    if not isinstance(operator_description, str):
+        abort(400, description="'instrument_description' must be a string")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "compile_plan",
+            "status": "queued",
+            "created_at": iso_time_ms(),
+            "instrument_id": instrument_id,
+            "model": model,
+            "scenario": scenario.strip(),
+            "operator_name": operator_name.strip(),
+            "operator_description": operator_description.strip(),
+        }
+
+    TASK_QUEUE.put(
+        {
+            "task_id": task_id,
+            "task_type": "compile_plan",
+            "instrument_id": instrument_id,
+            "model": model,
+            "scenario": scenario.strip(),
+            "operator_name": operator_name.strip(),
+            "operator_description": operator_description.strip(),
+        }
+    )
+
+    return (
+        jsonify(
+            {
+                "task_id": task_id,
+                "status": "queued",
+                "queue": queue_stats(),
+            }
+        ),
+        202,
+    )
+
+
+@app.get("/instruments/llm/tasks/<task_id>")
+def get_task(task_id: str) -> Any:
+    with TASKS_LOCK:
+        t = TASKS.get(task_id)
+    if t is None:
+        abort(404, description="task not found")
+    return jsonify(t)
+
+
+@app.get("/instruments/llm/tasks")
+def list_tasks() -> Any:
+    status = request.args.get("status")
+    include_error = request.args.get("include_error") == "1"
+    try:
+        limit = int(request.args.get("limit", "200"))
+    except ValueError:
+        abort(400, description="'limit' must be an integer")
+
+    with TASKS_LOCK:
+        items = list(TASKS.values())
+
+    if status:
+        items = [t for t in items if t.get("status") == status]
+
+    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    if limit > 0:
+        items = items[:limit]
+
+    tasks_out = []
+    for t in items:
+        entry = dict(t)
+        if not include_error and "error" in entry:
+            entry["has_error"] = True
+            entry.pop("error", None)
+        tasks_out.append(entry)
+
+    return jsonify({"queue": queue_stats(), "count": len(tasks_out), "tasks": tasks_out})
+
+
+@app.get("/instruments/llm/workers")
+def list_workers() -> Any:
+    with TASKS_LOCK:
+        running = [t for t in TASKS.values() if t.get("status") == "running"]
+
+    workers: Dict[str, list[Dict[str, Any]]] = {}
+    for t in running:
+        wid = t.get("worker_id")
+        if wid is None:
+            continue
+        wid_str = str(wid)
+        workers.setdefault(wid_str, []).append(
+            {
+                "task_id": t.get("task_id"),
+                "task_type": t.get("task_type"),
+                "status": t.get("status"),
+                "instrument_id": t.get("instrument_id"),
+                "created_at": t.get("created_at"),
+                "started_at": t.get("started_at"),
+            }
+        )
+
+    return jsonify({"queue": queue_stats(), "workers": workers})
 
 
 # Ensure the DB exists when the module is imported.

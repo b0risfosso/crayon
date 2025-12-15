@@ -21,6 +21,20 @@
     summary.desc-summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; list-style: none; margin: 0; }
     summary.desc-summary::-webkit-details-marker { display: none; }
     .chevron { font-size: 12px; color: #666; }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+    textarea, input, button { font-family: inherit; }
+    textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid #dcdcdc; font-size: 14px; min-height: 120px; }
+    button { padding: 9px 12px; border-radius: 8px; border: 1px solid #c9c9c9; background: linear-gradient(180deg, #fff, #f0f0f0); cursor: pointer; font-weight: 600; font-size: 14px; }
+    button:hover { background: #f7f7f7; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .runs { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .run { border: 1px solid #e5e5e5; border-radius: 10px; padding: 10px 12px; background: #fafafa; }
+    .run h3 { margin: 0 0 6px; font-size: 15px; }
+    .run .meta { font-size: 12px; color: #555; display: flex; gap: 8px; flex-wrap: wrap; }
+    .run .output { white-space: pre-wrap; line-height: 1.5; margin-top: 6px; font-size: 13px; }
+    .status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid #ddd; background: #eef3ff; color: #325ac0; }
+    .status-error { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+    .muted-line { color: #666; font-size: 13px; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -36,10 +50,44 @@
     <section id="instrumentCard" class="card">
       <div id="loadingState" class="muted">Loading instrument…</div>
     </section>
+
+    <section class="card" id="scenarioCard" style="display:none;">
+      <div class="flex-between" style="align-items:center; gap:10px;">
+        <h2 style="margin:0; font-size:18px;">Run scenario</h2>
+        <div id="submitStatus" class="muted"></div>
+      </div>
+      <form id="scenarioForm">
+        <div class="form-grid">
+          <label style="font-weight:600; font-size:13px;">
+            Scenario
+            <textarea id="scenarioInput" placeholder="Describe the goal, context, constraints…" required></textarea>
+          </label>
+        </div>
+        <button type="submit" id="runButton">Compile plan</button>
+        <div id="formError" class="error" role="alert" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="card" id="runsCard" style="display:none;">
+      <div class="flex-between" style="align-items:center;">
+        <h2 style="margin:0; font-size:18px;">Previous scenarios</h2>
+        <button type="button" id="refreshRuns" style="font-size:12px;">Refresh</button>
+      </div>
+      <div id="runsList" class="runs"></div>
+    </section>
   </main>
 
   <script>
-    const API_BASE = "/instruments";
+    function apiBase() {
+      const custom = (window.INSTRUMENTS_API_BASE || "").trim();
+      if (custom) return custom.replace(/\/+$/, "");
+      const origin = window.location.origin;
+      if (origin && origin !== "null" && origin !== "file://") {
+        return origin.replace(/\/+$/, "") + "/instruments";
+      }
+      return "instruments";
+    }
+    const API_BASE = apiBase();
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
 
@@ -47,7 +95,17 @@
       document.getElementById("instrumentCard").innerHTML = '<div class="error">No instrument id provided.</div>';
     } else {
       fetchInstrument(id);
+      document.getElementById("scenarioCard").style.display = "block";
+      document.getElementById("runsCard").style.display = "block";
+      loadRuns();
     }
+
+    document.getElementById("scenarioForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await submitScenario();
+    });
+
+    document.getElementById("refreshRuns").addEventListener("click", loadRuns);
 
     async function fetchInstrument(instrumentId) {
       const card = document.getElementById("instrumentCard");
@@ -105,6 +163,126 @@
       card.appendChild(title);
       card.appendChild(meta);
       card.appendChild(details);
+    }
+
+    async function submitScenario() {
+      const scenario = document.getElementById("scenarioInput").value.trim();
+      const errEl = document.getElementById("formError");
+      const btn = document.getElementById("runButton");
+      const status = document.getElementById("submitStatus");
+      errEl.textContent = "";
+      if (!scenario) {
+        errEl.textContent = "Scenario is required.";
+        return;
+      }
+      btn.disabled = true;
+      status.textContent = "Queued…";
+
+      try {
+        const res = await fetch(`${API_BASE}/compile`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instrument_id: Number(id),
+            scenario,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.description || data?.error || JSON.stringify(data));
+        }
+        const taskId = data.task_id;
+        await pollTask(taskId);
+        await loadRuns();
+        document.getElementById("scenarioInput").value = "";
+        status.textContent = "Done";
+      } catch (err) {
+        errEl.textContent = err.message || "Unable to run scenario.";
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => (status.textContent = ""), 1200);
+      }
+    }
+
+    async function pollTask(taskId) {
+      const maxAttempts = 30;
+      const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+      for (let i = 0; i < maxAttempts; i++) {
+        const res = await fetch(`/instruments/llm/tasks/${encodeURIComponent(taskId)}`);
+        if (!res.ok) break;
+        const data = await res.json();
+        if (data.status === "done") return data;
+        if (data.status === "error") throw new Error(data.error || "LLM task failed");
+        await delay(1000);
+      }
+      throw new Error("Timed out waiting for task");
+    }
+
+    async function loadRuns() {
+      const runsEl = document.getElementById("runsList");
+      runsEl.innerHTML = '<div class="muted">Loading…</div>';
+      try {
+        const res = await fetch(`${API_BASE}/${encodeURIComponent(id)}/runs`);
+        if (!res.ok) throw new Error("Failed to load runs");
+        const items = await res.json();
+        renderRuns(Array.isArray(items) ? items : []);
+      } catch (err) {
+        runsEl.innerHTML = `<div class="error">${err.message || "Unable to load scenarios."}</div>`;
+      }
+    }
+
+    function renderRuns(items) {
+      const runsEl = document.getElementById("runsList");
+      if (!items.length) {
+        runsEl.innerHTML = '<div class="muted">No scenarios yet for this instrument.</div>';
+        return;
+      }
+      runsEl.innerHTML = "";
+      items.forEach((run) => {
+        const wrap = document.createElement("div");
+        wrap.className = "run";
+        const status = document.createElement("span");
+        status.className = "status-pill" + (run.status === "error" ? " status-error" : "");
+        status.textContent = run.status || "unknown";
+
+        const heading = document.createElement("div");
+        heading.style.display = "flex";
+        heading.style.justifyContent = "space-between";
+        heading.style.alignItems = "center";
+        const h = document.createElement("h3");
+        h.textContent = "Scenario";
+        heading.appendChild(h);
+        heading.appendChild(status);
+
+        const scenario = document.createElement("div");
+        scenario.className = "muted-line";
+        scenario.textContent = run.scenario || "";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        if (run.model) meta.innerHTML += `<span>model: ${run.model}</span>`;
+        if (run.tokens_in != null) meta.innerHTML += `<span>tokens in: ${run.tokens_in}</span>`;
+        if (run.tokens_out != null) meta.innerHTML += `<span>tokens out: ${run.tokens_out}</span>`;
+        if (run.created_at) meta.innerHTML += `<span>${run.created_at}</span>`;
+
+        wrap.appendChild(heading);
+        wrap.appendChild(scenario);
+        wrap.appendChild(meta);
+
+        if (run.error) {
+          const err = document.createElement("div");
+          err.className = "error";
+          err.textContent = run.error;
+          wrap.appendChild(err);
+        } else if (run.output_text) {
+          const out = document.createElement("div");
+          out.className = "output";
+          out.textContent = run.output_text;
+          wrap.appendChild(out);
+        }
+
+        runsEl.appendChild(wrap);
+      });
     }
   </script>
 </body>
