@@ -289,7 +289,8 @@ def worker_loop(worker_id: int):
                 t0 = time.time()
                 resp = _client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "system", "content": prompt}],
+                    messages=[{"role": "system", "content": prompt},
+                              {"role": "user", "content": ""},],
                 )
             output_text = (resp.choices[0].message.content or "").strip()
 
