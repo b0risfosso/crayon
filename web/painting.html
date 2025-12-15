@@ -235,10 +235,6 @@
           const url = `/brush_strokes.html?art_id=${artId}&color_id=${c.id}`;
           window.open(url, '_blank');
         };
-        if (c.origin !== originFilter) {
-          brushBtn.disabled = true;
-          brushBtn.title = 'Brush strokes require build_thought colors';
-        }
         actionRow.appendChild(brushBtn);
 
         const pre = document.createElement('pre');
