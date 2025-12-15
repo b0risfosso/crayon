@@ -64,7 +64,17 @@
   </main>
 
   <script>
-    const API_BASE = "/instruments";
+    // Compute API base more defensively so it works in local file previews or custom hosts.
+    function apiBase() {
+      const custom = (window.INSTRUMENTS_API_BASE || "").trim();
+      if (custom) return custom.replace(/\/+$/, "");
+      const origin = window.location.origin;
+      if (origin && origin !== "null" && origin !== "file://") {
+        return origin.replace(/\/+$/, "") + "/instruments";
+      }
+      return "instruments";
+    }
+    const API_BASE = apiBase();
     const listEl = document.getElementById("instrumentList");
     const form = document.getElementById("instrumentForm");
     const submitBtn = document.getElementById("submitButton");
@@ -121,7 +131,7 @@
         const items = await res.json();
         renderList(Array.isArray(items) ? items : []);
       } catch (err) {
-        listEl.innerHTML = `<div class="error">${err.message || "Error loading instruments."}</div>`;
+        listEl.innerHTML = `<div class="error">${err.message || "Error loading instruments."}<br><span class="muted">Endpoint: ${API_BASE}</span></div>`;
       }
     }
 
