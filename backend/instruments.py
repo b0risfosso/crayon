@@ -215,7 +215,7 @@ def insert_run(
                operator_name, operator_description,
                output_text, model, tokens_in, tokens_out, total_tokens, status, error,
                created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING *
             """,
             (
@@ -289,8 +289,7 @@ def worker_loop(worker_id: int):
                 t0 = time.time()
                 resp = _client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "system", "content": prompt},
-                              {"role": "user", "content": ""},],
+                    messages=[{"role": "system", "content": prompt},],
                 )
             output_text = (resp.choices[0].message.content or "").strip()
 
