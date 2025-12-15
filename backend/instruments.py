@@ -15,7 +15,7 @@ import queue
 import time
 import json
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from flask import Flask, request, jsonify, g, abort
 
@@ -27,7 +27,7 @@ except Exception as e:
     _client = None
     _client_err = e
 
-from instrument_prompts import OPERATOR_INSTRUCTION_COMPILER  # type: ignore
+from instrument_prompts import OPERATOR_INSTRUCTION_COMPILER, SCENARIO_SYNTHESIZER  # type: ignore
 
 DB_PATH = "/var/www/site/data/instruments.db"
 MODEL_DEFAULT = os.environ.get("INSTRUMENT_MODEL", "gpt-5-mini-2025-08-07")
@@ -65,7 +65,10 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 instrument_id INTEGER REFERENCES instruments(id) ON DELETE SET NULL,
                 task_id TEXT,
-                scenario TEXT NOT NULL,
+                prompt_type TEXT DEFAULT 'instruction_compiler',
+                scenario TEXT,
+                system_description TEXT,
+                system_feature TEXT,
                 operator_name TEXT NOT NULL,
                 operator_description TEXT,
                 output_text TEXT,
@@ -155,7 +158,7 @@ def queue_stats() -> Dict[str, Any]:
     return {"queue_size": TASK_QUEUE.qsize(), "tasks": counts, "concurrency": CONCURRENCY}
 
 
-def render_prompt(scenario: str, operator_name: str, operator_description: str) -> str:
+def render_instruction_prompt(scenario: str, operator_name: str, operator_description: str) -> str:
     return (
         OPERATOR_INSTRUCTION_COMPILER
         .replace("{{SCENARIO_TEXT}}", scenario)
@@ -164,11 +167,29 @@ def render_prompt(scenario: str, operator_name: str, operator_description: str) 
     )
 
 
+def render_synth_prompt(
+    system_description: str,
+    system_feature: str,
+    operator_name: str,
+    operator_capabilities: str,
+) -> str:
+    return (
+        SCENARIO_SYNTHESIZER
+        .replace("{{SYSTEM_DESCRIPTION}}", system_description)
+        .replace("{{SYSTEM_FEATURE_DESCRIPTION}}", system_feature)
+        .replace("{{OPERATOR_NAME}}", operator_name)
+        .replace("{{OPERATOR_CAPABILITIES}}", operator_capabilities)
+    )
+
+
 def insert_run(
     *,
     instrument_id: Optional[int],
     task_id: str,
-    scenario: str,
+    prompt_type: str,
+    scenario: Optional[str],
+    system_description: Optional[str],
+    system_feature: Optional[str],
     operator_name: str,
     operator_description: str,
     output_text: Optional[str],
@@ -187,16 +208,20 @@ def insert_run(
         row = conn.execute(
             """
             INSERT INTO instrument_runs
-              (instrument_id, task_id, scenario, operator_name, operator_description,
+              (instrument_id, task_id, prompt_type, scenario, system_description, system_feature,
+               operator_name, operator_description,
                output_text, model, tokens_in, tokens_out, total_tokens, status, error,
                created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING *
             """,
             (
                 instrument_id,
                 task_id,
+                prompt_type,
                 scenario,
+                system_description,
+                system_feature,
                 operator_name,
                 operator_description,
                 output_text,
@@ -225,16 +250,36 @@ def worker_loop(worker_id: int):
             if meta:
                 meta.update({"status": "running", "started_at": iso_time_ms(), "worker_id": worker_id})
         try:
-            scenario = task["scenario"]
-            operator_name = task["operator_name"]
-            operator_description = task["operator_description"]
             instrument_id = task.get("instrument_id")
             model = task["model"]
+            task_type = task.get("task_type", "compile_plan")
 
             if _client is None:
                 raise RuntimeError(f"OpenAI client not initialized: {_client_err}")
 
-            prompt = render_prompt(scenario, operator_name, operator_description)
+            if task_type == "compile_plan":
+                scenario = task["scenario"]
+                operator_name = task["operator_name"]
+                operator_description = task["operator_description"]
+                prompt = render_instruction_prompt(scenario, operator_name, operator_description)
+                prompt_type = "instruction_compiler"
+                system_description = None
+                system_feature = None
+            elif task_type == "synthesize_scenarios":
+                system_description = task["system_description"]
+                system_feature = task["system_feature"]
+                operator_name = task["operator_name"]
+                operator_description = task["operator_description"]
+                prompt = render_synth_prompt(
+                    system_description,
+                    system_feature,
+                    operator_name,
+                    operator_description,
+                )
+                prompt_type = "scenario_synthesizer"
+                scenario = None
+            else:
+                raise ValueError(f"Unknown task_type '{task_type}'")
 
             with LLM_LOCK:
                 t0 = time.time()
@@ -254,7 +299,10 @@ def worker_loop(worker_id: int):
             run_row = insert_run(
                 instrument_id=instrument_id,
                 task_id=task_id,
+                prompt_type=prompt_type,
                 scenario=scenario,
+                system_description=system_description,
+                system_feature=system_feature,
                 operator_name=operator_name,
                 operator_description=operator_description,
                 output_text=output_text,
@@ -299,7 +347,10 @@ def worker_loop(worker_id: int):
                 insert_run(
                     instrument_id=task.get("instrument_id"),
                     task_id=task_id,
-                    scenario=task.get("scenario", ""),
+                    prompt_type=task.get("task_type", "unknown"),
+                    scenario=task.get("scenario"),
+                    system_description=task.get("system_description"),
+                    system_feature=task.get("system_feature"),
                     operator_name=task.get("operator_name", ""),
                     operator_description=task.get("operator_description", ""),
                     output_text=None,
@@ -498,6 +549,82 @@ def enqueue_compile() -> Any:
             "instrument_id": instrument_id,
             "model": model,
             "scenario": scenario.strip(),
+            "operator_name": operator_name.strip(),
+            "operator_description": operator_description.strip(),
+        }
+    )
+
+    return (
+        jsonify(
+            {
+                "task_id": task_id,
+                "status": "queued",
+                "queue": queue_stats(),
+            }
+        ),
+        202,
+    )
+
+
+@app.post("/instruments/synthesize")
+def enqueue_synthesize() -> Any:
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    system_description = payload.get("system_description")
+    system_feature = payload.get("system_feature")
+    if not isinstance(system_description, str) or not system_description.strip():
+        abort(400, description="'system_description' is required and must be a non-empty string")
+    if not isinstance(system_feature, str) or not system_feature.strip():
+        abort(400, description="'system_feature' is required and must be a non-empty string")
+
+    instrument_id = payload.get("instrument_id")
+    if instrument_id is not None and not isinstance(instrument_id, int):
+        abort(400, description="'instrument_id' must be an integer when provided")
+
+    operator_name = payload.get("instrument_name")
+    operator_description = payload.get("instrument_description")
+
+    if instrument_id is not None:
+        row = fetch_instrument_row(instrument_id)
+        if not row:
+            abort(404, description=f"Instrument id {instrument_id} not found")
+        operator_name = operator_name or row.get("name")
+        operator_description = operator_description or row.get("description")
+
+    if not isinstance(operator_name, str) or not operator_name.strip():
+        abort(400, description="'instrument_name' is required (or present in instrument_id)")
+    if operator_description is None:
+        operator_description = ""
+    if not isinstance(operator_description, str):
+        abort(400, description="'instrument_description' must be a string")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "synthesize_scenarios",
+            "status": "queued",
+            "created_at": iso_time_ms(),
+            "instrument_id": instrument_id,
+            "model": model,
+            "system_description": system_description.strip(),
+            "system_feature": system_feature.strip(),
+            "operator_name": operator_name.strip(),
+            "operator_description": operator_description.strip(),
+        }
+
+    TASK_QUEUE.put(
+        {
+            "task_id": task_id,
+            "task_type": "synthesize_scenarios",
+            "instrument_id": instrument_id,
+            "model": model,
+            "system_description": system_description.strip(),
+            "system_feature": system_feature.strip(),
             "operator_name": operator_name.strip(),
             "operator_description": operator_description.strip(),
         }

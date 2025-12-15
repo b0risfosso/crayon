@@ -409,8 +409,7 @@
           <div class="art-text">${escapeHtml(item.art || '')}</div>
 
           <div class="controls">
-            <button onclick="enqueueColors(${item.id})">Create Colors</button>
-            <button id="open-btn-${item.id}" onclick="openDirt(${item.id})">Open Dirt</button>
+            <button id="painting-btn-${item.id}" onclick="openPainting(${item.id})">Open Painting</button>
 
             <button
               ${!activeCollectionId || inActive ? "disabled" : ""}
@@ -424,7 +423,7 @@
               </button>
             ` : ``}
 
-            <button onclick="">
+            <button onclick="deleteArt(${item.id})">
               Delete
             </button>
           </div>
@@ -432,7 +431,6 @@
           <div class="meta">
             Created: ${item.created_at || ''} | Updated: ${item.updated_at || ''}
           </div>
-          <div id="colors-status-${item.id}" class="status"></div>
         `;
         list.appendChild(div);
       });
@@ -442,7 +440,7 @@
         const existsRes = await fetch(`/art/api/art/color_exists?art_ids=${ids.join(',')}`);
         const existsMap = await existsRes.json();
         ids.forEach(id => {
-          const btn = document.getElementById(`open-btn-${id}`);
+          const btn = document.getElementById(`painting-btn-${id}`);
           if (!btn) return;
           if (existsMap[String(id)]) btn.classList.add('has-colors');
           else btn.classList.remove('has-colors');
@@ -479,8 +477,7 @@
           <div class="art-text">${escapeHtml(item.art || '')}</div>
 
           <div class="controls">
-            <button onclick="enqueueColors(${item.id})">Expand → Colors</button>
-            <button id="open-btn-${item.id}" onclick="openDirt(${item.id})">Open Dirt</button>
+            <button id="painting-btn-${item.id}" onclick="openPainting(${item.id})">Open Painting</button>
 
             <button
               ${!activeCollectionId || inActive ? "disabled" : ""}
@@ -498,7 +495,6 @@
           <div class="meta">
             Created: ${item.created_at || ''} | Updated: ${item.updated_at || ''}
           </div>
-          <div id="colors-status-${item.id}" class="status"></div>
         `;
         list.appendChild(div);
       });
@@ -524,88 +520,42 @@
       fetchArt();
     }
 
-    function openDirt(id) {
-      window.open(`/dirt.html?art_id=${id}`, '_blank');
+    function openPainting(id) {
+      window.open(`/painting.html?art_id=${id}`, '_blank');
     }
 
-    async function enqueueColors(id) {
-      const outDiv = document.getElementById(`colors-status-${id}`);
-      outDiv.textContent = 'Queued…';
-
-      const res = await fetch('/colors/build_thought', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ art_id: id })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        outDiv.textContent = data.message || 'Error queueing.';
+    async function deleteArt(id) {
+      if (!confirm(`Delete art #${id}? This cannot be undone.`)) {
         return;
       }
 
-      const taskId = data.task_id;
-      outDiv.textContent = `Queued (task ${taskId}). Waiting for worker…`;
-
       try {
-        const result = await pollTask(taskId, outDiv);
-        outDiv.textContent = `Done. Saved color #${result.saved_color?.id || ''}.`;
+        const res = await fetch(`/art/api/art/${id}`, {
+          method: 'DELETE'
+        });
+
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (e) {
+          // ignore JSON parse errors on empty body
+        }
+
+        if (!res.ok) {
+          alert((data && data.message) || 'Failed to delete art');
+          return;
+        }
+
+        if (activeCollectionId && activeCollectionItemSet.has(String(id))) {
+          await loadActiveCollectionItems();
+          fetchCollections();
+        }
+
+        fetchArt();
       } catch (e) {
-        outDiv.textContent = `Error: ${e.message || e}`;
-      }
-
-      const openBtn = document.getElementById(`open-btn-${id}`);
-      if (openBtn) openBtn.classList.add('has-colors');
-    }
-
-    async function pollTask(taskId, outDiv) {
-      while (true) {
-        const r = await fetch(`/colors/tasks/${taskId}`);
-        const t = await r.json();
-
-        if (!r.ok) throw new Error(t.message || 'Polling failed');
-        if (t.status === 'done') return t.result;
-        if (t.status === 'error') throw new Error(t.error || 'Task error');
-
-        outDiv.textContent = `Status: ${t.status}…`;
-        await new Promise(ok => setTimeout(ok, 1200));
+        alert(`Error deleting art: ${e.message || e}`);
       }
     }
-
-      async function deleteArt(id) {
-    if (!confirm(`Delete art #${id}? This cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/art/api/art/${id}`, {
-        method: 'DELETE'
-      });
-
-      let data = null;
-      try {
-        data = await res.json();
-      } catch (e) {
-        // ignore JSON parse errors on empty body
-      }
-
-      if (!res.ok) {
-        alert((data && data.message) || 'Failed to delete art');
-        return;
-      }
-
-      // If this art was in the active collection, refresh that state
-      if (activeCollectionId && activeCollectionItemSet.has(String(id))) {
-        await loadActiveCollectionItems();
-        fetchCollections();
-      }
-
-      // Refresh list
-      fetchArt();
-    } catch (e) {
-      alert(`Error deleting art: ${e.message || e}`);
-    }
-  }
 
 
     function escapeHtml(str) {

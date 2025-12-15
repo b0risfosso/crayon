@@ -250,6 +250,12 @@
       }
     }
 
+    function runTitle(run) {
+      if (run.scenario) return run.scenario.slice(0, 80);
+      if (run.system_description) return run.system_description.slice(0, 80);
+      return "Scenario";
+    }
+
     function renderRuns(items) {
       const runsEl = document.getElementById("runsList");
       if (!items.length) {
@@ -274,7 +280,7 @@
         left.appendChild(chev);
 
         const title = document.createElement("span");
-        title.textContent = (run.scenario || "").slice(0, 80) || "Scenario";
+        title.textContent = runTitle(run);
         left.appendChild(title);
 
         summary.appendChild(left);
@@ -308,10 +314,24 @@
         const body = document.createElement("div");
         body.style.marginTop = "8px";
 
-        const scenario = document.createElement("div");
-        scenario.className = "muted-line";
-        scenario.textContent = run.scenario || "";
-        body.appendChild(scenario);
+        if (run.scenario) {
+          const scenario = document.createElement("div");
+          scenario.className = "muted-line";
+          scenario.textContent = run.scenario || "";
+          body.appendChild(scenario);
+        }
+        if (run.system_description || run.system_feature) {
+          const sys = document.createElement("div");
+          sys.className = "muted-line";
+          sys.textContent = `System: ${run.system_description || ""}`;
+          body.appendChild(sys);
+          if (run.system_feature) {
+            const feat = document.createElement("div");
+            feat.className = "muted-line";
+            feat.textContent = `Feature: ${run.system_feature}`;
+            body.appendChild(feat);
+          }
+        }
 
         const meta = document.createElement("div");
         meta.className = "meta";

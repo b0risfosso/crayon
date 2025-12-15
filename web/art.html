@@ -224,7 +224,7 @@
             <div class="art-text">${escapeHtml(item.art || '')}</div>
 
             <div class="controls">
-              <button onclick="openDirt(${item.id})">Open Dirt</button>
+              <button onclick="openPainting(${item.id})">Open Painting</button>
             </div>
 
             <div class="meta">
@@ -238,9 +238,8 @@
       }
     }
 
-    function openDirt(id) {
-      // View-only: just open read view for this art's dirt
-      window.open(`/dirt.html?art_id=${id}`, '_blank');
+    function openPainting(id) {
+      window.open(`/painting.html?art_id=${id}`, '_blank');
     }
 
     function escapeHtml(str) {

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painting</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --border: #dfe3eb;
+      --muted: #6b7280;
+      --accent: #1f7ae0;
+    }
+
+    body { margin: 0; font-family: "Inter", "Segoe UI", sans-serif; background: var(--bg); color: #111; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    h1 { margin: 0 0 10px 0; }
+    .muted { color: var(--muted); font-size: 13px; }
+
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+    button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.04);
+      margin-bottom: 14px;
+    }
+
+    .art-text {
+      white-space: pre-wrap;
+      background: #f9fafb;
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    .status { font-size: 12px; color: #333; margin-top: 8px; white-space: pre-wrap; }
+    textarea, input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+    }
+
+    .section-header { display:flex; justify-content: space-between; align-items:center; gap:10px; }
+
+    .color-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+    .color-head {
+      padding: 10px 12px;
+      background: #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      gap: 10px;
+    }
+    .color-title { font-weight: 700; }
+    .caret { font-size: 12px; color: var(--muted); }
+    .color-body { padding: 12px; border-top: 1px solid var(--border); }
+    .color-body.collapsed { display: none; }
+    .meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    pre { white-space: pre-wrap; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <a href="make-art.html" style="text-decoration:none;">
+        <button>← Back to Art</button>
+      </a>
+      <div class="muted" id="art-id-label"></div>
+    </div>
+
+    <div id="art-card" class="card">
+      <div class="muted">Art</div>
+      <div id="art-meta" class="meta"></div>
+      <div id="art-text" class="art-text">Loading art…</div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <h2 style="margin:0;">Create Colors</h2>
+        <button onclick="refreshColors()">Refresh</button>
+      </div>
+      <div class="toolbar">
+        <button class="primary" onclick="enqueueColors()" id="build-btn">Create via build_thought</button>
+      </div>
+      <div id="build-status" class="status"></div>
+
+      <div style="margin-top:12px;">
+        <div class="muted" style="margin-bottom:6px;">Manual color</div>
+        <textarea id="manualText" rows="4" placeholder="Paste or write a color expansion here…"></textarea>
+        <div class="toolbar" style="margin-top:8px;">
+          <button onclick="saveManualColor()">Save Manual Color</button>
+        </div>
+        <div id="manual-status" class="status"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <h2 style="margin:0;">Colors</h2>
+        <div class="muted">Loaded from /colors/by_art/&lt;id&gt; with origin filters (build_thought + manual)</div>
+      </div>
+      <div id="colors-list" style="margin-top:10px;">Loading colors…</div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const artId = parseInt(params.get('art_id') || '', 10);
+    const originFilter = 'colors.build_thought';
+    const manualOrigin = 'colors.manual_add';
+
+    if (!artId) {
+      document.getElementById('art-text').textContent = 'Missing art_id query param.';
+      document.getElementById('build-btn').disabled = true;
+    } else {
+      document.getElementById('art-id-label').textContent = `Art #${artId}`;
+      loadArt();
+      refreshColors();
+    }
+
+    async function loadArt() {
+      try {
+        const res = await fetch(`/art/api/art/${artId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load art');
+
+        document.getElementById('art-meta').textContent =
+          `Email: ${data.email || ''} · Created: ${data.created_at || ''}`;
+        document.getElementById('art-text').textContent = data.art || '';
+      } catch (e) {
+        document.getElementById('art-text').textContent =
+          `Error loading art: ${e.message || e}`;
+      }
+    }
+
+    async function refreshColors() {
+      if (!artId) return;
+      const list = document.getElementById('colors-list');
+      list.textContent = 'Loading colors…';
+      try {
+        const url = `/colors/by_art/${artId}?origin=${encodeURIComponent(originFilter)}`;
+        const manualUrl = `/colors/by_art/${artId}?origin=${encodeURIComponent(manualOrigin)}`;
+
+        const [autoRes, manualRes] = await Promise.all([
+          fetch(url),
+          fetch(manualUrl).catch(() => null),
+        ]);
+
+        const autoRows = await autoRes.json();
+        if (!autoRes.ok) throw new Error(autoRows.message || 'Failed to load colors');
+
+        let manualRows = [];
+        if (manualRes) {
+          try {
+            const j = await manualRes.json();
+            if (manualRes.ok && Array.isArray(j)) manualRows = j;
+          } catch (_e) { /* ignore manual errors */ }
+        }
+
+        const merged = [...(Array.isArray(autoRows) ? autoRows : []), ...manualRows];
+        merged.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+        renderColors(merged);
+      } catch (e) {
+        list.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    function renderColors(colors) {
+      const list = document.getElementById('colors-list');
+      list.innerHTML = '';
+      if (!colors.length) {
+        list.innerHTML = '<div class="muted">No colors yet for this art.</div>';
+        return;
+      }
+
+      colors.forEach((c, idx) => {
+        const card = document.createElement('div');
+        card.className = 'color-card';
+
+        const head = document.createElement('div');
+        head.className = 'color-head';
+        const caret = document.createElement('span');
+        caret.className = 'caret';
+        caret.textContent = '▸';
+        const title = document.createElement('div');
+        title.className = 'color-title';
+        title.textContent = `Color #${c.id} · ${c.origin || ''}`;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `${c.model || ''} · ${c.created_at || ''}`;
+
+        head.appendChild(title);
+        head.appendChild(meta);
+        head.appendChild(caret);
+
+        const body = document.createElement('div');
+        body.className = 'color-body collapsed';
+
+        const bodyMeta = document.createElement('div');
+        bodyMeta.className = 'meta';
+        bodyMeta.textContent = `updated: ${c.updated_at || ''}`;
+
+        const actionRow = document.createElement('div');
+        actionRow.className = 'toolbar';
+        const brushBtn = document.createElement('button');
+        brushBtn.textContent = 'Open Brush Strokes';
+        brushBtn.onclick = (e) => {
+          e.stopPropagation();
+          const url = `/brush_strokes.html?art_id=${artId}&color_id=${c.id}`;
+          window.open(url, '_blank');
+        };
+        if (c.origin !== originFilter) {
+          brushBtn.disabled = true;
+          brushBtn.title = 'Brush strokes require build_thought colors';
+        }
+        actionRow.appendChild(brushBtn);
+
+        const pre = document.createElement('pre');
+        pre.textContent = c.output_text || '';
+
+        body.appendChild(bodyMeta);
+        body.appendChild(actionRow);
+        body.appendChild(pre);
+
+        head.addEventListener('click', () => {
+          const collapsed = body.classList.toggle('collapsed');
+          caret.textContent = collapsed ? '▸' : '▾';
+        });
+
+        if (idx === 0) {
+          body.classList.remove('collapsed');
+          caret.textContent = '▾';
+        }
+
+        card.appendChild(head);
+        card.appendChild(body);
+        list.appendChild(card);
+      });
+    }
+
+    async function enqueueColors() {
+      if (!artId) return;
+      const status = document.getElementById('build-status');
+      status.textContent = 'Queued…';
+      try {
+        const res = await fetch('/colors/build_thought', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ art_id: artId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to queue');
+        status.textContent = `Queued task ${data.task_id}. Waiting for worker…`;
+
+        const result = await pollTask(data.task_id, status);
+        status.textContent = `Done. Saved color #${result.saved_color?.id || ''}.`;
+        refreshColors();
+      } catch (e) {
+        status.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    async function pollTask(taskId, statusDiv) {
+      while (true) {
+        const res = await fetch(`/colors/tasks/${taskId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Task poll failed');
+        if (data.status === 'done') return data.result;
+        if (data.status === 'error') throw new Error(data.error || 'Task error');
+        statusDiv.textContent = `Status: ${data.status}…`;
+        await new Promise(ok => setTimeout(ok, 1200));
+      }
+    }
+
+    async function saveManualColor() {
+      if (!artId) return;
+      const status = document.getElementById('manual-status');
+      const text = document.getElementById('manualText').value.trim();
+      if (!text) {
+        alert('Enter color text first.');
+        return;
+      }
+
+      status.textContent = 'Saving…';
+      try {
+        const res = await fetch('/colors/manual_add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            art_id: artId,
+            text,
+            metadata: { source: 'painting.manual' },
+            model: 'manual'
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to save');
+
+        status.textContent = `Saved color #${data.id}.`;
+        document.getElementById('manualText').value = '';
+        refreshColors();
+      } catch (e) {
+        status.textContent = `Error: ${e.message || e}`;
+      }
+    }
+  </script>
+</body>
+</html>

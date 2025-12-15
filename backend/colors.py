@@ -1147,6 +1147,47 @@ def colors_dirt_by_color_alias(color_id: int):
     return dirt_by_color(color_id)
 
 
+@app.post("/colors/manual_add")
+def colors_manual_add():
+    """
+    Insert a color row directly, bypassing the LLM queue.
+
+    Body:
+      {
+        "art_id": 123,
+        "text": "manual color text",  # required
+        "model": "manual",            # optional label
+        "metadata": {...}             # optional user metadata
+      }
+    """
+    payload = require_json()
+    art_id = payload.get("art_id")
+    if not isinstance(art_id, int):
+        abort(400, description="'art_id' is required and must be an integer")
+
+    text = payload.get("text")
+    if not isinstance(text, str) or not text.strip():
+        abort(400, description="'text' is required and must be a non-empty string")
+
+    model = str(payload.get("model", "manual"))
+    user_metadata = payload.get("metadata") or {}
+
+    art_row = fetch_art_text(art_id)
+    input_art = art_row.get("art") or ""
+
+    color_row = insert_color_row(
+        art_id=art_id,
+        input_art=input_art,
+        output_text=text.strip(),
+        model=model,
+        usage=None,
+        user_metadata=user_metadata,
+        origin="colors.manual_add",
+    )
+
+    return jsonify(color_row), 201
+
+
 # --- Error handlers -------------------------------------------------------
 
 

@@ -70,6 +70,7 @@ from prompts2 import (
 # === CONFIG ===
 DATA_ROOT = "/var/www/site/data"
 DB_PATH = os.path.join(DATA_ROOT, "dirt.db")
+ART_DB_PATH = os.environ.get("ART_DB_PATH", os.path.join(DATA_ROOT, "art.db"))  # source for art + colors
 LLM_MODEL = (
     os.environ.get("DECOMP_LLM_MODEL")
     or os.environ.get("LLM_MODEL")
@@ -1504,6 +1505,122 @@ def has_box_record(slug: str) -> bool:
     return cur.fetchone() is not None
 
 
+def fetch_color_and_art(color_id: int) -> Dict[str, Any]:
+    """
+    Load color + art text from the art.db database so we can build a box description.
+    """
+    conn = sqlite3.connect(ART_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT
+              c.id AS color_id,
+              c.art_id AS art_id,
+              c.output_text AS color_text,
+              a.art AS art_text
+            FROM colors c
+            JOIN art a ON a.id = c.art_id
+            WHERE c.id = ?
+            """,
+            (color_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        raise ValueError(f"Color id {color_id} not found in art.db")
+
+    return dict(row)
+
+
+def ensure_box_for_color(color_id: int) -> Dict[str, Any]:
+    """
+    Make or fetch a box in dirt.db representing a colors.build_thought output.
+    The slug is deterministic: color_<id>.
+    """
+    slug = f"color_{color_id:06d}"
+    if has_box_record(slug):
+        row = get_box_by_slug(slug)
+        return {"slug": slug, "created": False, "box": row}
+
+    payload = fetch_color_and_art(color_id)
+    art_text = (payload.get("art_text") or "").strip()
+    color_text = (payload.get("color_text") or "").strip()
+    art_id = payload.get("art_id")
+
+    title = f"Color {color_id} (art {art_id})"
+    description = (
+        f"Art ID: {art_id}\nColor ID: {color_id}\n\n"
+        f"Art:\n{art_text}\n\n"
+        f"Color:\n{color_text}"
+    )
+
+    created = create_box(slug=slug, title=title, description=description)
+    return {"slug": slug, "created": True, "box": created}
+
+
+def box_row_to_dict(row: Any) -> Dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    try:
+        return dict(row)
+    except Exception:
+        return {"slug": getattr(row, "slug", None)}
+
+
+# Map brush_strokes analysis keys to job types used by the queue
+COLOR_ANALYSIS_JOB_MAP: Dict[str, str] = {
+    "decompose": "box_decomposition",
+    "abstractions": "box_abstractions_metaphors",
+    "processes": "box_processes_forces_interactions",
+    "datasets": "box_datasets",
+    "codebases": "box_codebases",
+    "hardware_builds": "box_hardware_builds",
+    "experiments": "box_experiments",
+    "intelligence": "box_intelligence",
+    "control_levers": "box_control_levers",
+    "companies": "box_companies",
+    "theories": "box_theories",
+    "historical_context": "box_historical_context",
+    "value_exchange": "box_value_exchange",
+    "value_addition": "box_value_addition",
+    "science": "box_scientific_substructure",
+    "spirit": "box_spirit_soul_emotion",
+    "environment": "box_environment",
+    "imagination": "box_imaginative_windows",
+    "musical": "box_musical_composition",
+    "infinity": "box_infinity",
+    "computation_layer": "box_computation_layer",
+    "computation_rules": "box_computation_rules",
+    "computation_programs": "box_computation_programs",
+    "computation_universe": "box_computation_universe",
+    "computation_causal": "box_computation_causal",
+    "state_transition": "box_state_transition",
+    "computation_primitives": "box_computation_primitives",
+    "computation_primitives_alt": "box_computation_primitives_alt",
+    "computation_sublayers": "box_computation_sublayers",
+    "computation_emergence": "box_computation_emergence",
+    "substrate": "box_substrate",
+    "scaffolding": "box_scaffolding",
+    "constraints": "box_constraints",
+    "physical_substrate": "box_physical_substrate",
+    "physical_states": "box_physical_states",
+    "foundational_physics": "box_foundational_physics",
+    "tangibility_conservation": "box_tangibility_conservation",
+    "physical_subdomains": "box_physical_subdomains",
+    "emergence_from_physics": "box_emergence_from_physics",
+    "observer_independent": "box_observer_independent",
+    "sensory_profile": "box_sensory_profile",
+    "real_world_behavior": "box_real_world_behavior",
+    "scenario_landscape": "box_scenario_landscape",
+    "construction_reconstruction": "box_construction_reconstruction",
+    "thought_to_reality": "box_thought_to_reality",
+}
+
+
 
 def generate_next_slug():
     conn = get_db()
@@ -1613,6 +1730,90 @@ def get_box_by_slug(slug: str):
     cur.execute("SELECT * FROM boxes WHERE slug = ?", (slug,))
     row = cur.fetchone()
     return row
+
+# --- Color → Box bridge (used by brush_strokes) ---------------------------
+
+@app.route("/bridge/color/<int:color_id>/box", methods=["GET", "POST"])
+def bridge_color_box(color_id: int):
+    """
+    Ensure there is a box in dirt.db representing this color_id from art.db.
+    Returns the slug for subsequent analysis calls.
+    """
+    try:
+        info = ensure_box_for_color(color_id)
+    except ValueError as e:
+        abort(404, description=str(e))
+    box_dict = box_row_to_dict(info.get("box"))
+    return jsonify(
+        {
+            "slug": info["slug"],
+            "created": bool(info.get("created")),
+            "box": box_dict,
+        }
+    )
+
+
+@app.route("/bridge/color/<int:color_id>/analyses", methods=["GET", "POST"])
+def bridge_color_analyses(color_id: int):
+    """
+    POST: enqueue one or more analysis jobs for the color-backed box.
+      Body: { "keys": ["decompose", "abstractions", ...] }
+            (defaults to all known keys)
+
+    GET: list analyses for the color-backed box (same as /boxes/<slug>/analyses).
+    """
+    try:
+        info = ensure_box_for_color(color_id)
+    except ValueError as e:
+        abort(404, description=str(e))
+
+    slug = info["slug"]
+    box = get_box_by_slug(slug)
+    if box is None:
+        abort(404, description="Box not found after creation")
+
+    if request.method == "GET":
+        limit = request.args.get("limit", default=200, type=int)
+        limit = max(1, min(limit, 200))
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, name, rel_path, content, created_at, updated_at
+            FROM nodes
+            WHERE box_id = ? AND kind = 'analysis'
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (box["id"], limit),
+        )
+        rows = cur.fetchall()
+        return jsonify([dict(r) for r in rows])
+
+    payload = request.get_json(silent=True) or {}
+    keys = payload.get("keys")
+    if keys is None:
+        keys = list(COLOR_ANALYSIS_JOB_MAP.keys())
+    if not isinstance(keys, list) or not keys:
+        abort(400, description="'keys' must be a non-empty list if provided")
+
+    tasks = []
+    for key in keys:
+        if key not in COLOR_ANALYSIS_JOB_MAP:
+            abort(400, description=f"Unknown analysis key '{key}'")
+        job_type = COLOR_ANALYSIS_JOB_MAP[key]
+        task = enqueue_llm_task(job_type, {"box_slug": slug})
+        task["queue_size"] = LLM_TASK_QUEUE.qsize()
+        task["key"] = key
+        tasks.append(task)
+
+    return jsonify(
+        {
+            "slug": slug,
+            "tasks": tasks,
+            "queue_size": LLM_TASK_QUEUE.qsize(),
+        }
+    ), 202
 # === ROUTES ===
 
 @app.route("/")

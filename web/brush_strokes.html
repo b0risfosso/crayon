@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brush Strokes</title>
+  <style>
+    body { margin: 0; font-family: "Inter", "Segoe UI", sans-serif; background: #f6f7fb; color: #111; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    h1 { margin: 0 0 8px 0; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .card {
+      background: #fff;
+      border: 1px solid #dfe3eb;
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.04);
+      margin-bottom: 14px;
+    }
+    .section-title { display:flex; justify-content: space-between; align-items:center; gap:10px; }
+    textarea {
+      width: 100%; box-sizing: border-box; padding: 10px;
+      border-radius: 8px; border: 1px solid #dfe3eb; font-family: inherit;
+      background: #f9fafb;
+    }
+    .art-block { white-space: pre-wrap; border: 1px solid #e5e7eb; background: #f9fafb; border-radius: 8px; padding: 10px; margin-top: 8px; }
+    .controls { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; }
+    button { padding: 8px 12px; border-radius: 8px; border: 1px solid #dfe3eb; background: #fff; cursor: pointer; font-weight: 600; }
+    button.primary { background: #1f7ae0; color: #fff; border-color: #1f7ae0; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    input[type="number"] { width: 80px; padding: 6px 8px; border-radius: 6px; border: 1px solid #dfe3eb; }
+    .list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .pill { display:inline-block; padding:4px 8px; border-radius: 999px; background:#eef2ff; border:1px solid #dcdffa; font-size:12px; color:#3847a3; }
+    .status { font-size: 12px; color: #333; white-space: pre-wrap; margin-top: 6px; }
+    .dirt-item, .instrument-item { border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; background:#fff; }
+    .output { white-space: pre-wrap; margin-top: 6px; border-top:1px solid #eee; padding-top:6px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Brush Strokes</h1>
+    <div class="muted" id="crumbs"></div>
+
+    <div class="card">
+      <div class="section-title">
+        <h2 style="margin:0;">Art & Color</h2>
+        <div class="controls">
+          <button onclick="window.open('make-art.html', '_blank')">Back to Art</button>
+          <button onclick="refreshAll()">Refresh</button>
+        </div>
+      </div>
+      <div class="muted">Art</div>
+      <div id="art-meta" class="muted"></div>
+      <div id="art-text" class="art-block">Loading art…</div>
+      <div class="muted" style="margin-top:8px;">Color (build_thought)</div>
+      <div id="color-meta" class="muted"></div>
+      <div id="color-text" class="art-block">Loading color…</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <h2 style="margin:0;">Create Dirt</h2>
+        <div class="muted">Randomly run N analyses</div>
+      </div>
+      <div class="controls" style="margin-top:6px;">
+        <label class="muted">N <input id="numAnalyses" type="number" min="1" max="10" value="3" /></label>
+        <button class="primary" id="createDirtBtn" onclick="createRandomDirt()">Create dirt</button>
+      </div>
+      <div class="muted" style="margin-top:8px;">Available analyses</div>
+      <div id="analysisList" class="list"></div>
+      <div id="dirtStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <h2 style="margin:0;">Dirt</h2>
+        <div class="controls">
+          <label class="muted">M dirt <input id="numDirt" type="number" min="1" max="20" value="2" /></label>
+          <label class="muted">P instruments <input id="numInstruments" type="number" min="1" max="10" value="2" /></label>
+          <button class="primary" id="brushBtn" onclick="createBrushStrokes()">Create brush strokes</button>
+        </div>
+      </div>
+      <div id="dirtList" class="list">Loading dirt…</div>
+      <div class="muted" style="margin-top:6px;">Instruments loaded from /instruments</div>
+      <div id="instrumentList" class="list"></div>
+      <div id="brushStatus" class="status"></div>
+      <div id="brushOutputs" class="list"></div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const artId = parseInt(params.get('art_id') || '', 10);
+    const colorId = parseInt(params.get('color_id') || '', 10);
+    const ANALYSES = [
+      { key: "entities_processes_phenomena", label: "Entities / Processes / Phenomena" },
+      { key: "abstractions_metaphors", label: "Abstractions & Metaphors" },
+      { key: "processes_forces_interactions", label: "Processes / Forces / Interactions" },
+      { key: "theories", label: "Theories" },
+      { key: "companies", label: "Companies" },
+      { key: "historical_context", label: "Historical Context" },
+      { key: "levers", label: "Levers" },
+      { key: "intelligence", label: "Intelligence" },
+      { key: "experiments", label: "Experiments" },
+      { key: "physical_build", label: "Physical Build" },
+      { key: "codebases", label: "Codebases" },
+      { key: "datasets", label: "Datasets" },
+      { key: "value_exchange", label: "Value Exchange" },
+      { key: "value_added", label: "Value Added" },
+      { key: "science", label: "Science" },
+      { key: "heart", label: "Heart" },
+      { key: "environment", label: "Environment" },
+      { key: "imagination", label: "Imagination" },
+      { key: "music", label: "Music" },
+      { key: "infinity", label: "Infinity" },
+    ];
+
+    let artText = "";
+    let colorText = "";
+    let dirtRows = [];
+    let instruments = [];
+
+    if (!artId || !colorId) {
+      document.getElementById('art-text').textContent = 'Missing art_id or color_id.';
+      document.getElementById('createDirtBtn').disabled = true;
+      document.getElementById('brushBtn').disabled = true;
+    } else {
+      document.getElementById('crumbs').textContent = `Art #${artId} · Color #${colorId}`;
+      refreshAll();
+    }
+
+    async function refreshAll() {
+      await Promise.all([loadArt(), loadColor(), loadDirt(), loadInstruments()]);
+      renderAnalyses();
+    }
+
+    async function loadArt() {
+      try {
+        const res = await fetch(`/art/api/art/${artId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load art');
+        artText = data.art || '';
+        document.getElementById('art-meta').textContent = `Email: ${data.email || ''} · Created: ${data.created_at || ''}`;
+        document.getElementById('art-text').textContent = artText;
+      } catch (e) {
+        document.getElementById('art-text').textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    async function loadColor() {
+      try {
+        const res = await fetch(`/colors/by_art/${artId}?origin=colors.build_thought`);
+        const rows = await res.json();
+        if (!res.ok) throw new Error(rows.message || 'Failed to load colors');
+        const match = (Array.isArray(rows) ? rows : []).find(r => Number(r.id) === colorId);
+        if (!match) throw new Error('Color not found for this art');
+        colorText = match.output_text || '';
+        document.getElementById('color-meta').textContent = `${match.model || ''} · ${match.created_at || ''}`;
+        document.getElementById('color-text').textContent = colorText;
+      } catch (e) {
+        document.getElementById('color-text').textContent = `Error: ${e.message || e}`;
+        document.getElementById('createDirtBtn').disabled = true;
+        document.getElementById('brushBtn').disabled = true;
+      }
+    }
+
+    async function loadDirt() {
+      const list = document.getElementById('dirtList');
+      list.textContent = 'Loading dirt…';
+      try {
+        const res = await fetch(`/dirt/by_color/${colorId}`);
+        const rows = await res.json();
+        if (!res.ok) throw new Error(rows.message || 'Failed to load dirt');
+        dirtRows = Array.isArray(rows) ? rows : [];
+        renderDirt();
+      } catch (e) {
+        list.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    async function loadInstruments() {
+      const list = document.getElementById('instrumentList');
+      list.textContent = 'Loading instruments…';
+      try {
+        const res = await fetch('/instruments');
+        const rows = await res.json();
+        if (!res.ok) throw new Error(rows.message || 'Failed to load instruments');
+        instruments = Array.isArray(rows) ? rows : [];
+        renderInstruments();
+      } catch (e) {
+        list.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    function renderAnalyses() {
+      const container = document.getElementById('analysisList');
+      container.innerHTML = '';
+      ANALYSES.forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'dirt-item';
+        div.innerHTML = `<strong>${a.label}</strong><div class="muted">${a.key}</div>`;
+        container.appendChild(div);
+      });
+    }
+
+    function renderDirt() {
+      const list = document.getElementById('dirtList');
+      list.innerHTML = '';
+      if (!dirtRows.length) {
+        list.textContent = 'No dirt yet for this color.';
+        return;
+      }
+      dirtRows.forEach(d => {
+        const div = document.createElement('div');
+        div.className = 'dirt-item';
+        div.innerHTML = `
+          <div><strong>Dirt #${d.id}</strong> <span class="muted">${d.created_at || ''}</span></div>
+          <div class="muted">${d.model || ''}</div>
+          <div class="output">${escapeHtml(d.output_text || '')}</div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function renderInstruments() {
+      const list = document.getElementById('instrumentList');
+      list.innerHTML = '';
+      if (!instruments.length) {
+        list.textContent = 'No instruments found.';
+        return;
+      }
+      instruments.forEach(inst => {
+        const div = document.createElement('div');
+        div.className = 'instrument-item';
+        div.innerHTML = `
+          <div><strong>${escapeHtml(inst.name || '')}</strong> <span class="muted">#${inst.id}</span></div>
+          <div class="muted">${escapeHtml(inst.description || '')}</div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function randomSubset(arr, n) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy.slice(0, Math.max(0, Math.min(n, copy.length)));
+    }
+
+    async function createRandomDirt() {
+      const status = document.getElementById('dirtStatus');
+      status.textContent = '';
+      const n = parseInt(document.getElementById('numAnalyses').value || '0', 10);
+      if (!n || !artId || !colorId) return;
+      const selected = randomSubset(ANALYSES, n);
+      status.textContent = `Running ${selected.length} analyses…`;
+      for (const a of selected) {
+        try {
+          const task = await enqueueCreateDirt(a.key);
+          await pollColorsTask(task.task_id, status);
+        } catch (e) {
+          status.textContent = `Error: ${e.message || e}`;
+          return;
+        }
+      }
+      status.textContent = 'Done.';
+      await loadDirt();
+    }
+
+    async function enqueueCreateDirt(promptKey) {
+      const res = await fetch('/colors/create_dirt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color_id: colorId, prompt_key: promptKey })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to queue create_dirt');
+      return data;
+    }
+
+    async function pollColorsTask(taskId, statusDiv) {
+      while (true) {
+        const r = await fetch(`/colors/tasks/${taskId}`);
+        const t = await r.json();
+        if (!r.ok) throw new Error(t.message || 'Polling failed');
+        if (t.status === 'done') return t.result;
+        if (t.status === 'error') throw new Error(t.error || 'Task error');
+        statusDiv.textContent = `Task ${taskId}: ${t.status}…`;
+        await new Promise(ok => setTimeout(ok, 1200));
+      }
+    }
+
+    async function createBrushStrokes() {
+      const status = document.getElementById('brushStatus');
+      const outputs = document.getElementById('brushOutputs');
+      status.textContent = '';
+      outputs.innerHTML = '';
+      if (!dirtRows.length || !instruments.length) {
+        status.textContent = 'Need dirt and instruments to create brush strokes.';
+        return;
+      }
+      const m = Math.max(1, parseInt(document.getElementById('numDirt').value || '1', 10));
+      const p = Math.max(1, parseInt(document.getElementById('numInstruments').value || '1', 10));
+      const selectedDirt = randomSubset(dirtRows, m);
+      const selectedInstruments = randomSubset(instruments, p);
+
+      status.textContent = `Running ${selectedDirt.length * selectedInstruments.length} instrument synths…`;
+
+      for (const d of selectedDirt) {
+        for (const inst of selectedInstruments) {
+          try {
+            const run = await enqueueBrush(inst, d);
+            const result = await pollInstrumentTask(run.task_id);
+            renderBrushOutput(outputs, inst, d, result);
+          } catch (e) {
+            renderBrushOutput(outputs, inst, d, null, e);
+          }
+        }
+      }
+      status.textContent = 'Brush strokes complete.';
+    }
+
+    async function enqueueBrush(inst, dirt) {
+      const payload = {
+        instrument_id: inst.id,
+        system_description: `${artText}\n\nColor:\n${colorText}`,
+        system_feature: dirt.output_text || '',
+        instrument_name: inst.name,
+        instrument_description: inst.description || ''
+      };
+      const res = await fetch('/instruments/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to enqueue synth');
+      return data;
+    }
+
+    async function pollInstrumentTask(taskId) {
+      while (true) {
+        const r = await fetch(`/instruments/llm/tasks/${encodeURIComponent(taskId)}`);
+        const t = await r.json();
+        if (!r.ok) throw new Error(t.message || 'Task poll failed');
+        if (t.status === 'done') return t.result;
+        if (t.status === 'error') throw new Error(t.error || 'Task error');
+        await new Promise(ok => setTimeout(ok, 1200));
+      }
+    }
+
+    function renderBrushOutput(container, inst, dirt, result, error) {
+      const div = document.createElement('div');
+      div.className = 'dirt-item';
+      let html = `<div><strong>${escapeHtml(inst.name || '')}</strong> on dirt #${dirt.id}</div>`;
+      if (error) {
+        html += `<div class="status">Error: ${escapeHtml(error.message || error)}</div>`;
+      } else {
+        html += `<div class="muted">Tokens: ${result?.usage?.total_tokens ?? ''}</div>`;
+        html += `<div class="output">${escapeHtml(result?.output || '')}</div>`;
+      }
+      div.innerHTML = html;
+      container.appendChild(div);
+    }
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+  </script>
+</body>
+</html>
