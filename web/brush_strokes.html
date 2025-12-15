@@ -221,11 +221,43 @@
       dirtRows.forEach(d => {
         const div = document.createElement('div');
         div.className = 'dirt-item';
-        div.innerHTML = `
-          <div><strong>Dirt #${d.id}</strong> <span class="muted">${d.created_at || ''}</span></div>
-          <div class="muted">${d.name || ''}</div>
-          <div class="output">${escapeHtml(d.content || d.output_text || '')}</div>
-        `;
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.cursor = 'pointer';
+        const title = document.createElement('div');
+        title.innerHTML = `<strong>Dirt #${d.id}</strong> <span class="muted">${d.created_at || ''}</span>`;
+        const meta = document.createElement('div');
+        meta.className = 'muted';
+        meta.textContent = d.name || '';
+        const caret = document.createElement('span');
+        caret.className = 'caret';
+        caret.textContent = '▸';
+        header.appendChild(title);
+        header.appendChild(meta);
+        header.appendChild(caret);
+
+        const body = document.createElement('div');
+        body.className = 'output';
+        body.style.display = 'none';
+        body.innerHTML = escapeHtml(d.content || d.output_text || '');
+
+        header.addEventListener('click', () => {
+          const open = body.style.display === 'none';
+          body.style.display = open ? 'block' : 'none';
+          caret.textContent = open ? '▾' : '▸';
+        });
+
+        // expand first item by default
+        if (dirtRows[0] === d) {
+          body.style.display = 'block';
+          caret.textContent = '▾';
+        }
+
+        div.appendChild(header);
+        div.appendChild(body);
         list.appendChild(div);
       });
     }
