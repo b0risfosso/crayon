@@ -16,6 +16,11 @@
     .title { font-size: 22px; margin: 0 0 8px; }
     .desc { white-space: pre-wrap; line-height: 1.7; margin: 0; font-size: 15px; }
     .error { color: #b00020; margin-top: 12px; }
+    details.desc-block { margin-top: 12px; border: 1px solid #e6e6e6; border-radius: 10px; background: #fafafa; padding: 10px 12px; }
+    details.desc-block[open] { background: #fff; }
+    summary.desc-summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; list-style: none; margin: 0; }
+    summary.desc-summary::-webkit-details-marker { display: none; }
+    .chevron { font-size: 12px; color: #666; }
   </style>
 </head>
 <body>
@@ -72,13 +77,34 @@
       meta.className = "muted";
       meta.textContent = `#${instrument.id}`;
 
+      const details = document.createElement("details");
+      details.className = "desc-block";
+
+      const summary = document.createElement("summary");
+      summary.className = "desc-summary";
+      const chevron = document.createElement("span");
+      chevron.className = "chevron";
+      chevron.textContent = "▸";
+      summary.appendChild(chevron);
+      summary.appendChild(document.createTextNode(" Description"));
+
+      summary.addEventListener("click", () => {
+        setTimeout(() => {
+          chevron.textContent = details.open ? "▾" : "▸";
+        }, 0);
+      });
+
       const desc = document.createElement("p");
       desc.className = "desc";
       desc.textContent = instrument.description || "No description provided.";
 
+      details.appendChild(summary);
+      details.appendChild(desc);
+      chevron.textContent = details.open ? "▾" : "▸";
+
       card.appendChild(title);
       card.appendChild(meta);
-      card.appendChild(desc);
+      card.appendChild(details);
     }
   </script>
 </body>
