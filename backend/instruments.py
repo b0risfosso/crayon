@@ -433,6 +433,17 @@ def list_runs_for_instrument(instrument_id: int) -> Any:
     return jsonify([dict(r) for r in rows])
 
 
+@app.delete("/instruments/runs/<int:run_id>")
+def delete_run(run_id: int) -> Any:
+    db = get_db()
+    row = db.execute("SELECT id FROM instrument_runs WHERE id = ?", (run_id,)).fetchone()
+    if not row:
+        abort(404, description="run not found")
+    db.execute("DELETE FROM instrument_runs WHERE id = ?", (run_id,))
+    db.commit()
+    return jsonify({"ok": True, "deleted_id": run_id})
+
+
 @app.post("/instruments/compile")
 def enqueue_compile() -> Any:
     if _client is None:

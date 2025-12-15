@@ -63,7 +63,6 @@ Execution Details
 Any ordering, parameters, tolerances, or decision rules required.
 Completion Signal
 A clear condition that indicates the step is complete or successful.
-Steps must be ordered such that a failure in one step clearly blocks or alters subsequent steps.
 5. Validation & Quality Checks
 Define:
 How the operator verifies correctness at intermediate and final stages.

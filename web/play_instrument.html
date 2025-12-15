@@ -35,6 +35,12 @@
     .status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid #ddd; background: #eef3ff; color: #325ac0; }
     .status-error { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
     .muted-line { color: #666; font-size: 13px; margin-top: 8px; }
+    details.run-details { border: 1px solid #e5e5e5; border-radius: 10px; padding: 10px 12px; background: #fafafa; }
+    summary.run-summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    summary.run-summary::-webkit-details-marker { display: none; }
+    .chev { font-size: 12px; color: #666; margin-right: 6px; }
+    .actions { display: flex; gap: 8px; }
+    .linkish { border: none; background: transparent; padding: 0; color: #0b68d0; cursor: pointer; text-decoration: underline; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -233,6 +239,17 @@
       }
     }
 
+    async function deleteRun(runId) {
+      if (!confirm("Delete this scenario run?")) return;
+      try {
+        const res = await fetch(`/instruments/runs/${runId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Delete failed");
+        await loadRuns();
+      } catch (err) {
+        alert(err.message || "Unable to delete run.");
+      }
+    }
+
     function renderRuns(items) {
       const runsEl = document.getElementById("runsList");
       if (!items.length) {
@@ -241,24 +258,60 @@
       }
       runsEl.innerHTML = "";
       items.forEach((run) => {
-        const wrap = document.createElement("div");
-        wrap.className = "run";
+        const details = document.createElement("details");
+        details.className = "run-details";
+
+        const summary = document.createElement("summary");
+        summary.className = "run-summary";
+        const left = document.createElement("div");
+        left.style.display = "flex";
+        left.style.alignItems = "center";
+        left.style.gap = "6px";
+
+        const chev = document.createElement("span");
+        chev.className = "chev";
+        chev.textContent = "▸";
+        left.appendChild(chev);
+
+        const title = document.createElement("span");
+        title.textContent = (run.scenario || "").slice(0, 80) || "Scenario";
+        left.appendChild(title);
+
+        summary.appendChild(left);
+
+        const right = document.createElement("div");
+        right.className = "actions";
         const status = document.createElement("span");
         status.className = "status-pill" + (run.status === "error" ? " status-error" : "");
         status.textContent = run.status || "unknown";
+        right.appendChild(status);
 
-        const heading = document.createElement("div");
-        heading.style.display = "flex";
-        heading.style.justifyContent = "space-between";
-        heading.style.alignItems = "center";
-        const h = document.createElement("h3");
-        h.textContent = "Scenario";
-        heading.appendChild(h);
-        heading.appendChild(status);
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "linkish";
+        del.textContent = "Delete";
+        del.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          deleteRun(run.id);
+        };
+        right.appendChild(del);
+
+        summary.appendChild(right);
+
+        summary.addEventListener("click", () => {
+          setTimeout(() => {
+            chev.textContent = details.open ? "▾" : "▸";
+          }, 0);
+        });
+
+        const body = document.createElement("div");
+        body.style.marginTop = "8px";
 
         const scenario = document.createElement("div");
         scenario.className = "muted-line";
         scenario.textContent = run.scenario || "";
+        body.appendChild(scenario);
 
         const meta = document.createElement("div");
         meta.className = "meta";
@@ -266,24 +319,23 @@
         if (run.tokens_in != null) meta.innerHTML += `<span>tokens in: ${run.tokens_in}</span>`;
         if (run.tokens_out != null) meta.innerHTML += `<span>tokens out: ${run.tokens_out}</span>`;
         if (run.created_at) meta.innerHTML += `<span>${run.created_at}</span>`;
-
-        wrap.appendChild(heading);
-        wrap.appendChild(scenario);
-        wrap.appendChild(meta);
+        body.appendChild(meta);
 
         if (run.error) {
           const err = document.createElement("div");
           err.className = "error";
           err.textContent = run.error;
-          wrap.appendChild(err);
+          body.appendChild(err);
         } else if (run.output_text) {
           const out = document.createElement("div");
           out.className = "output";
           out.textContent = run.output_text;
-          wrap.appendChild(out);
+          body.appendChild(out);
         }
 
-        runsEl.appendChild(wrap);
+        details.appendChild(summary);
+        details.appendChild(body);
+        runsEl.appendChild(details);
       });
     }
   </script>
