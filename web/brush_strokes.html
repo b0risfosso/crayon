@@ -149,7 +149,8 @@
 
     async function loadColor() {
       try {
-        const res = await fetch(`/colors/by_art/${artId}?origin=colors.build_thought`);
+        // Fetch all colors (manual + build_thought) for this art, then match by id.
+        const res = await fetch(`/colors/by_art/${artId}`);
         const rows = await res.json();
         if (!res.ok) throw new Error(rows.message || 'Failed to load colors');
         const match = (Array.isArray(rows) ? rows : []).find(r => Number(r.id) === colorId);
