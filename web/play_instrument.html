@@ -176,7 +176,7 @@
         return;
       }
       btn.disabled = true;
-      status.textContent = "Queued…";
+      status.textContent = "Queued (processing in background)…";
 
       try {
         const res = await fetch(`${API_BASE}/compile`, {
@@ -192,9 +192,11 @@
           throw new Error(data?.description || data?.error || JSON.stringify(data));
         }
         const taskId = data.task_id;
+        // Clear immediately and note enqueue; polling continues to populate history.
+        document.getElementById("scenarioInput").value = "";
+        status.textContent = "Queued; waiting for result…";
         await pollTask(taskId);
         await loadRuns();
-        document.getElementById("scenarioInput").value = "";
         status.textContent = "Done";
       } catch (err) {
         errEl.textContent = err.message || "Unable to run scenario.";
