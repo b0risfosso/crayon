@@ -200,6 +200,9 @@ def insert_run(
     status: str,
     error: Optional[str],
 ) -> Dict[str, Any]:
+    # Allow scenario to be empty/None by normalizing to empty string before insert
+    if scenario is None:
+        scenario = ""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -270,6 +273,7 @@ def worker_loop(worker_id: int):
                 system_feature = task["system_feature"]
                 operator_name = task["operator_name"]
                 operator_description = task["operator_description"]
+                scenario = ""  # synth tasks do not supply a scenario; keep schema happy
                 prompt = render_synth_prompt(
                     system_description,
                     system_feature,

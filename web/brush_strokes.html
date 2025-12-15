@@ -327,17 +327,25 @@
 
       status.textContent = `Running ${selectedDirt.length * selectedInstruments.length} instrument synths…`;
 
+      const tasks = [];
       for (const d of selectedDirt) {
         for (const inst of selectedInstruments) {
-          try {
-            const run = await enqueueBrush(inst, d);
-            const result = await pollInstrumentTask(run.task_id);
-            renderBrushOutput(outputs, inst, d, result);
-          } catch (e) {
-            renderBrushOutput(outputs, inst, d, null, e);
-          }
+          tasks.push(
+            (async () => {
+              try {
+                const run = await enqueueBrush(inst, d);
+                const result = await pollInstrumentTask(run.task_id);
+                renderBrushOutput(outputs, inst, d, result);
+              } catch (e) {
+                renderBrushOutput(outputs, inst, d, null, e);
+              }
+            })()
+          );
         }
       }
+
+      // Run all in parallel and wait for completion
+      await Promise.allSettled(tasks);
       status.textContent = 'Brush strokes complete.';
     }
 
