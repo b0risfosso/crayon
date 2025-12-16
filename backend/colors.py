@@ -1147,6 +1147,25 @@ def colors_dirt_by_color_alias(color_id: int):
     return dirt_by_color(color_id)
 
 
+@app.delete("/colors/<int:color_id>")
+def delete_color(color_id: int):
+    """
+    Delete a color row and any associated brush_strokes entries.
+    """
+    db = get_art_db()
+    try:
+        db.execute("DELETE FROM brush_strokes WHERE color_id = ?", (color_id,))
+        cur = db.execute("DELETE FROM colors WHERE id = ?", (color_id,))
+        db.commit()
+    finally:
+        db.close()
+
+    if cur.rowcount == 0:
+        abort(404, description="color not found")
+
+    return jsonify({"ok": True, "deleted_id": color_id})
+
+
 @app.get("/colors/brush_strokes")
 def list_brush_strokes():
     """
