@@ -596,6 +596,12 @@ def enqueue_compile() -> Any:
     art_id = payload.get("art_id")
     color_id = payload.get("color_id")
     dirt_id = payload.get("dirt_id")
+    for fname, fval in (("art_id", art_id), ("color_id", color_id), ("dirt_id", dirt_id)):
+        if fval is not None and not isinstance(fval, int):
+            abort(400, description=f"'{fname}' must be an integer when provided")
+    art_id = payload.get("art_id")
+    color_id = payload.get("color_id")
+    dirt_id = payload.get("dirt_id")
 
     for field_name, field_val in [("art_id", art_id), ("color_id", color_id), ("dirt_id", dirt_id)]:
         if field_val is not None and not isinstance(field_val, int):
@@ -704,6 +710,9 @@ def enqueue_synthesize() -> Any:
             "system_feature": system_feature.strip(),
             "operator_name": operator_name.strip(),
             "operator_description": operator_description.strip(),
+            "art_id": payload.get("art_id"),
+            "color_id": payload.get("color_id"),
+            "dirt_id": payload.get("dirt_id"),
         }
 
     TASK_QUEUE.put(
