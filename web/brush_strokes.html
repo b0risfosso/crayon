@@ -136,6 +136,7 @@
     let colorBoxSlug = "";
     let dirtRows = [];
     let instruments = [];
+    let savedBrushStrokes = [];
 
     if (!artId || !colorId) {
       document.getElementById('art-text').textContent = 'Missing art_id or color_id.';
@@ -147,7 +148,7 @@
     }
 
     async function refreshAll() {
-      await Promise.all([loadArt(), loadColor(), loadDirt(), loadInstruments()]);
+      await Promise.all([loadArt(), loadColor(), loadDirt(), loadInstruments(), loadSavedBrushStrokes()]);
       renderAnalyses();
     }
 
@@ -213,6 +214,20 @@
         renderInstruments();
       } catch (e) {
         list.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    async function loadSavedBrushStrokes() {
+      const list = document.getElementById('brushOutputs');
+      list.innerHTML = '';
+      try {
+        const res = await fetch(`/brush_strokes?art_id=${artId}&color_id=${colorId}`);
+        const rows = await res.json();
+        if (!res.ok) throw new Error(rows.message || rows.error || 'Failed to load brush strokes');
+        savedBrushStrokes = Array.isArray(rows) ? rows : [];
+        renderSavedBrushStrokes();
+      } catch (e) {
+        list.innerHTML = `<div class="status">Error loading brush strokes: ${escapeHtml(e.message || e)}</div>`;
       }
     }
 
@@ -441,6 +456,53 @@
       wrapper.appendChild(header);
       wrapper.appendChild(body);
       container.appendChild(wrapper);
+      // persist to DB if we have a result
+      if (!error && result) {
+        saveBrushStroke(inst, dirt, result).catch(() => {});
+      }
+    }
+
+    function renderSavedBrushStrokes() {
+      const container = document.getElementById('brushOutputs');
+      // Keep existing runtime outputs; append saved ones first
+      savedBrushStrokes.forEach(row => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'dirt-item';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.cursor = 'pointer';
+
+        const title = document.createElement('div');
+        title.innerHTML = `<strong>${escapeHtml((row.metadata || {}).instrument_name || '')}</strong> on dirt #${row.dirt_id}`;
+        const meta = document.createElement('div');
+        meta.className = 'muted';
+        meta.textContent = row.created_at || '';
+        const caret = document.createElement('span');
+        caret.className = 'chev';
+        caret.textContent = '▸';
+
+        header.appendChild(title);
+        header.appendChild(meta);
+        header.appendChild(caret);
+
+        const body = document.createElement('div');
+        body.className = 'output';
+        body.style.display = 'none';
+        body.innerHTML = escapeHtml(row.output_text || '');
+
+        header.addEventListener('click', () => {
+          const open = body.style.display === 'none';
+          body.style.display = open ? 'block' : 'none';
+          caret.textContent = open ? '▾' : '▸';
+        });
+
+        wrapper.appendChild(header);
+        wrapper.appendChild(body);
+        container.appendChild(wrapper);
+      });
     }
 
     function escapeHtml(str) {
@@ -450,6 +512,31 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+    }
+
+    async function saveBrushStroke(inst, dirt, result) {
+      try {
+        await fetch('/brush_strokes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            art_id: artId,
+            color_id: colorId,
+            dirt_id: dirt.id,
+            instrument_id: inst.id,
+            instrument_task_id: result?.task_id,
+            instrument_run_id: result?.run_id,
+            output_text: result?.output || '',
+            metadata: {
+              instrument_name: inst.name,
+              instrument_description: inst.description,
+              tokens: result?.usage,
+            },
+          }),
+        });
+      } catch (_e) {
+        // ignore save errors to avoid blocking UI
+      }
     }
 
     function wireChevron(detailsEl) {

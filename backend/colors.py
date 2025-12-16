@@ -1147,6 +1147,150 @@ def colors_dirt_by_color_alias(color_id: int):
     return dirt_by_color(color_id)
 
 
+@app.get("/brush_strokes")
+def list_brush_strokes():
+    """
+    List saved brush_stroke rows for a given art_id and color_id.
+
+    Query params (required):
+      - art_id (int)
+      - color_id (int)
+
+    Optional:
+      - limit (int, default 200)
+    """
+    try:
+        art_id = int(request.args.get("art_id", ""))
+        color_id = int(request.args.get("color_id", ""))
+    except ValueError:
+        abort(400, description="'art_id' and 'color_id' are required and must be integers")
+
+    limit = request.args.get("limit", default=200, type=int)
+    limit = max(1, min(limit, 500))
+
+    db = get_art_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT *
+            FROM brush_strokes
+            WHERE art_id = ? AND color_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (art_id, color_id, limit),
+        ).fetchall()
+    finally:
+        db.close()
+
+    out = []
+    for r in rows:
+        row = dict(r)
+        try:
+            row["metadata"] = json.loads(row.get("metadata") or "{}")
+        except Exception:
+            pass
+        out.append(row)
+    return jsonify(out)
+
+
+@app.post("/brush_strokes")
+def create_brush_stroke():
+    """
+    Insert a brush_stroke row.
+
+    Body:
+      {
+        "art_id": int,
+        "color_id": int,
+        "dirt_id": int,
+        "instrument_id": int (optional),
+        "instrument_task_id": str (optional),
+        "instrument_run_id": int (optional),
+        "output_text": str,
+        "metadata": { ... } (optional)
+      }
+    """
+    payload = require_json()
+    art_id = payload.get("art_id")
+    color_id = payload.get("color_id")
+    dirt_id = payload.get("dirt_id")
+
+    try:
+        art_id_int = int(art_id)
+        color_id_int = int(color_id)
+        dirt_id_int = int(dirt_id)
+    except Exception:
+        abort(400, description="'art_id', 'color_id', and 'dirt_id' are required integers")
+
+    output_text = payload.get("output_text") or ""
+    if not isinstance(output_text, str) or not output_text.strip():
+        abort(400, description="'output_text' is required and must be a non-empty string")
+
+    instrument_id = payload.get("instrument_id")
+    if instrument_id is not None:
+        try:
+            instrument_id = int(instrument_id)
+        except Exception:
+            abort(400, description="'instrument_id' must be integer if provided")
+
+    instrument_run_id = payload.get("instrument_run_id")
+    if instrument_run_id is not None:
+        try:
+            instrument_run_id = int(instrument_run_id)
+        except Exception:
+            abort(400, description="'instrument_run_id' must be integer if provided")
+
+    instrument_task_id = payload.get("instrument_task_id")
+    if instrument_task_id is not None and not isinstance(instrument_task_id, str):
+        abort(400, description="'instrument_task_id' must be a string if provided")
+
+    md_str = None
+    metadata_obj = payload.get("metadata")
+    if metadata_obj is not None:
+        if isinstance(metadata_obj, (dict, list)):
+            md_str = json.dumps(metadata_obj, ensure_ascii=False)
+        elif isinstance(metadata_obj, str):
+            md_str = metadata_obj
+        else:
+            abort(400, description="'metadata' must be object/array/string if provided")
+
+    now = utc_now_iso()
+    db = get_art_db()
+    try:
+        row = db.execute(
+            """
+            INSERT INTO brush_strokes
+              (art_id, color_id, dirt_id, instrument_id, instrument_task_id,
+               instrument_run_id, output_text, metadata, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING *
+            """,
+            (
+                art_id_int,
+                color_id_int,
+                dirt_id_int,
+                instrument_id,
+                instrument_task_id,
+                instrument_run_id,
+                output_text.strip(),
+                md_str,
+                now,
+                now,
+            ),
+        ).fetchone()
+        db.commit()
+    finally:
+        db.close()
+
+    out = dict(row)
+    try:
+        out["metadata"] = json.loads(out.get("metadata") or "{}")
+    except Exception:
+        pass
+    return jsonify(out), 201
+
+
 @app.post("/colors/manual_add")
 def colors_manual_add():
     """
