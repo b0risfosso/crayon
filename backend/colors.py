@@ -1147,7 +1147,7 @@ def colors_dirt_by_color_alias(color_id: int):
     return dirt_by_color(color_id)
 
 
-@app.get("/brush_strokes")
+@app.get("/colors/brush_strokes")
 def list_brush_strokes():
     """
     List saved brush_stroke rows for a given art_id and color_id.
@@ -1194,7 +1194,7 @@ def list_brush_strokes():
     return jsonify(out)
 
 
-@app.post("/brush_strokes")
+@app.post("/colors/brush_strokes")
 def create_brush_stroke():
     """
     Insert a brush_stroke row.

@@ -516,7 +516,7 @@
 
     async function saveBrushStroke(inst, dirt, result) {
       try {
-        await fetch('/brush_strokes', {
+        await fetch('/colors/brush_strokes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
