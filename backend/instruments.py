@@ -303,11 +303,11 @@ def insert_brush_stroke(
 def worker_loop(worker_id: int):
     while True:
         task = TASK_QUEUE.get()
-            task_id = task["task_id"]
-            with TASKS_LOCK:
-                meta = TASKS.get(task_id)
-                if meta:
-                    meta.update({"status": "running", "started_at": iso_time_ms(), "worker_id": worker_id})
+        task_id = task["task_id"]
+        with TASKS_LOCK:
+            meta = TASKS.get(task_id)
+            if meta:
+                meta.update({"status": "running", "started_at": iso_time_ms(), "worker_id": worker_id})
         try:
             instrument_id = task.get("instrument_id")
             model = task["model"]
@@ -337,7 +337,6 @@ def worker_loop(worker_id: int):
                     operator_description,
                 )
                 prompt_type = "scenario_synthesizer"
-                scenario = None
             else:
                 raise ValueError(f"Unknown task_type '{task_type}'")
 
