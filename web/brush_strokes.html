@@ -70,8 +70,8 @@
         <label class="muted">N <input id="numAnalyses" type="number" min="1" max="10" value="3" /></label>
         <button class="primary" id="createDirtBtn" onclick="createRandomDirt()">Create dirt</button>
       </div>
-      <div class="muted" style="margin-top:8px;">Available analyses</div>
-      <div id="analysisList" class="list"></div>
+      <!-- Hide analysis catalog from view but keep for selection -->
+      <div id="analysisList" class="list" style="display:none;"></div>
       <div id="dirtStatus" class="status"></div>
     </div>
 
@@ -397,17 +397,50 @@
     }
 
     function renderBrushOutput(container, inst, dirt, result, error) {
-      const div = document.createElement('div');
-      div.className = 'dirt-item';
-      let html = `<div><strong>${escapeHtml(inst.name || '')}</strong> on dirt #${dirt.id}</div>`;
-      if (error) {
-        html += `<div class="status">Error: ${escapeHtml(error.message || error)}</div>`;
-      } else {
-        html += `<div class="muted">Tokens: ${result?.usage?.total_tokens ?? ''}</div>`;
-        html += `<div class="output">${escapeHtml(result?.output || '')}</div>`;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'dirt-item';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'center';
+      header.style.cursor = 'pointer';
+
+      const title = document.createElement('div');
+      title.innerHTML = `<strong>${escapeHtml(inst.name || '')}</strong> on dirt #${dirt.id}`;
+      const meta = document.createElement('div');
+      meta.className = 'muted';
+      meta.textContent = error ? 'error' : `Tokens: ${result?.usage?.total_tokens ?? ''}`;
+      const caret = document.createElement('span');
+      caret.className = 'chev';
+      caret.textContent = '▸';
+
+      header.appendChild(title);
+      header.appendChild(meta);
+      header.appendChild(caret);
+
+      const body = document.createElement('div');
+      body.className = 'output';
+      body.style.display = 'none';
+      body.innerHTML = error
+        ? `<div class="status">Error: ${escapeHtml(error.message || error)}</div>`
+        : escapeHtml(result?.output || '');
+
+      header.addEventListener('click', () => {
+        const open = body.style.display === 'none';
+        body.style.display = open ? 'block' : 'none';
+        caret.textContent = open ? '▾' : '▸';
+      });
+
+      // open first output by default
+      if (!container.hasChildNodes()) {
+        body.style.display = 'block';
+        caret.textContent = '▾';
       }
-      div.innerHTML = html;
-      container.appendChild(div);
+
+      wrapper.appendChild(header);
+      wrapper.appendChild(body);
+      container.appendChild(wrapper);
     }
 
     function escapeHtml(str) {
