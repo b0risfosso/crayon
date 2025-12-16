@@ -377,7 +377,7 @@
       const status = document.getElementById('brushStatus');
       const outputs = document.getElementById('brushOutputs');
       status.textContent = '';
-      outputs.innerHTML = '';
+      // keep existing saved outputs; append new ones
       if (!dirtRows.length || !instruments.length) {
         status.textContent = 'Need dirt and instruments to create brush strokes.';
         return;
@@ -419,7 +419,10 @@
         system_description: `${artText}\n\nColor:\n${colorText}`,
         system_feature: dirt.content || dirt.output_text || '',
         instrument_name: inst.name,
-        instrument_description: inst.description || ''
+        instrument_description: inst.description || '',
+        art_id: artId,
+        color_id: colorId,
+        dirt_id: dirt.id,
       };
       const res = await fetch('/instruments/synthesize', {
         method: 'POST',
