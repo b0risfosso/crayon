@@ -221,7 +221,7 @@
       const list = document.getElementById('brushOutputs');
       list.innerHTML = '';
       try {
-        const res = await fetch(`/brush_strokes?art_id=${artId}&color_id=${colorId}`);
+        const res = await fetch(`/colors/brush_strokes?art_id=${artId}&color_id=${colorId}`);
         const rows = await res.json();
         if (!res.ok) throw new Error(rows.message || rows.error || 'Failed to load brush strokes');
         savedBrushStrokes = Array.isArray(rows) ? rows : [];
