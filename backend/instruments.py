@@ -378,6 +378,7 @@ def worker_loop(worker_id: int):
             color_id = task.get("color_id")
             dirt_id = task.get("dirt_id")
             if art_id and color_id and dirt_id:
+            print("running insert_brush_stroke")
                 try:
                     insert_brush_stroke(
                         art_id=int(art_id),
@@ -393,7 +394,9 @@ def worker_loop(worker_id: int):
                             "tokens": usage_dict,
                         },
                     )
+                    print("insert_brush_stroke done")
                 except Exception:
+                    print("insert_brush_stroke failed")
                     pass
 
             result = {
