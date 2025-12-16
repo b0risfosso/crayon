@@ -42,6 +42,14 @@
 </head>
 <body>
   <div class="page">
+    <div class="card">
+      <div class="section-title">
+        <h2 style="margin:0;">Brush Strokes / Scenarios</h2>
+        <div class="muted">Loaded from saved runs</div>
+      </div>
+      <div id="brushOutputs" class="list" style="margin-top:8px;">Loading brush strokes…</div>
+    </div>
+
     <h1>Brush Strokes</h1>
     <div class="muted" id="crumbs"></div>
 
@@ -97,10 +105,6 @@
 
       <div id="brushStatus" class="status"></div>
 
-      <details class="collapsible" id="outputsDetails" style="margin-top:10px;">
-        <summary class="chevron"><span class="chev">▸</span> Brush Strokes / Scenarios</summary>
-        <div id="brushOutputs" class="list" style="margin-top:8px;"></div>
-      </details>
     </div>
   </div>
 
@@ -524,17 +528,14 @@
     }
 
     function openOutputsPanel() {
-      const outputs = document.getElementById('outputsDetails');
-      if (outputs && !outputs.open) {
-        outputs.open = true;
-        const chev = outputs.querySelector('.chev');
-        if (chev) chev.textContent = '▾';
-      }
+      const outputs = document.getElementById('brushOutputs');
+      const card = document.getElementById('brushStrokesCard');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // wire chevrons on load
     document.addEventListener('DOMContentLoaded', () => {
-      ['dirtDetails','instrumentDetails','outputsDetails'].forEach(id => {
+      ['dirtDetails','instrumentDetails'].forEach(id => {
         const el = document.getElementById(id);
         if (el) wireChevron(el);
       });
