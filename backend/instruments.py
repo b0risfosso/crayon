@@ -260,12 +260,14 @@ def insert_brush_stroke(
     blocking synth completion.
     """
     try:
+        print("insert_brush_stroke: connecting to art db")
         conn = sqlite3.connect(ART_DB_PATH)
         conn.row_factory = sqlite3.Row
         now = iso_time_ms()
         md_str = None
         if metadata is not None:
             md_str = json.dumps(metadata, ensure_ascii=False)
+        print("insert_brush_stroke: inserting row")
         conn.execute(
             """
             INSERT INTO brush_strokes
@@ -287,7 +289,9 @@ def insert_brush_stroke(
             ),
         )
         conn.commit()
+        print("insert_brush_stroke: done")
     except Exception:
+        print("insert_brush_stroke: exception occurred")
         # ignore errors to keep synth responses flowing
         try:
             conn.rollback()
