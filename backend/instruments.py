@@ -680,6 +680,12 @@ def enqueue_synthesize() -> Any:
 
     operator_name = payload.get("instrument_name")
     operator_description = payload.get("instrument_description")
+    art_id = payload.get("art_id")
+    color_id = payload.get("color_id")
+    dirt_id = payload.get("dirt_id")
+    for fname, fval in (("art_id", art_id), ("color_id", color_id), ("dirt_id", dirt_id)):
+        if fval is not None and not isinstance(fval, int):
+            abort(400, description=f"'{fname}' must be an integer when provided")
 
     if instrument_id is not None:
         row = fetch_instrument_row(instrument_id)
@@ -710,9 +716,9 @@ def enqueue_synthesize() -> Any:
             "system_feature": system_feature.strip(),
             "operator_name": operator_name.strip(),
             "operator_description": operator_description.strip(),
-            "art_id": payload.get("art_id"),
-            "color_id": payload.get("color_id"),
-            "dirt_id": payload.get("dirt_id"),
+            "art_id": art_id,
+            "color_id": color_id,
+            "dirt_id": dirt_id,
         }
 
     TASK_QUEUE.put(
