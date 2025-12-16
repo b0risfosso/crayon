@@ -34,6 +34,10 @@
     .status { font-size: 12px; color: #333; white-space: pre-wrap; margin-top: 6px; }
     .dirt-item, .instrument-item { border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; background:#fff; }
     .output { white-space: pre-wrap; margin-top: 6px; border-top:1px solid #eee; padding-top:6px; }
+    details.collapsible { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 10px; background: #fff; }
+    summary.chevron { cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; font-weight: 700; }
+    summary.chevron::-webkit-details-marker { display: none; }
+    .chev { font-size: 12px; color: #666; }
   </style>
 </head>
 <body>
@@ -80,11 +84,23 @@
           <button class="primary" id="brushBtn" onclick="createBrushStrokes()">Create brush strokes</button>
         </div>
       </div>
-      <div id="dirtList" class="list">Loading dirt…</div>
-      <div class="muted" style="margin-top:6px;">Instruments loaded from /instruments</div>
-      <div id="instrumentList" class="list"></div>
+      <details class="collapsible" id="dirtDetails">
+        <summary class="chevron"><span class="chev">▸</span> Dirt / Analyses</summary>
+        <div id="dirtList" class="list" style="margin-top:8px;">Loading dirt…</div>
+      </details>
+
+      <details class="collapsible" id="instrumentDetails" style="margin-top:10px;">
+        <summary class="chevron"><span class="chev">▸</span> Instruments</summary>
+        <div class="muted" style="margin-top:6px;">Loaded from /instruments</div>
+        <div id="instrumentList" class="list" style="margin-top:6px;"></div>
+      </details>
+
       <div id="brushStatus" class="status"></div>
-      <div id="brushOutputs" class="list"></div>
+
+      <details class="collapsible" id="outputsDetails" style="margin-top:10px;">
+        <summary class="chevron"><span class="chev">▸</span> Brush Strokes / Scenarios</summary>
+        <div id="brushOutputs" class="list" style="margin-top:8px;"></div>
+      </details>
     </div>
   </div>
 
@@ -260,6 +276,7 @@
         div.appendChild(body);
         list.appendChild(div);
       });
+      // keep collapsed by default
     }
 
     function renderInstruments() {
@@ -347,6 +364,7 @@
       // Run all in parallel and wait for completion
       await Promise.allSettled(tasks);
       status.textContent = 'Brush strokes complete.';
+      openOutputsPanel();
     }
 
     async function enqueueBrush(inst, dirt) {
@@ -400,6 +418,34 @@
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
     }
+
+    function wireChevron(detailsEl) {
+      const summary = detailsEl.querySelector('summary.chevron');
+      if (!summary) return;
+      const chev = summary.querySelector('.chev');
+      summary.addEventListener('click', () => {
+        setTimeout(() => {
+          if (chev) chev.textContent = detailsEl.open ? '▾' : '▸';
+        }, 0);
+      });
+    }
+
+    function openOutputsPanel() {
+      const outputs = document.getElementById('outputsDetails');
+      if (outputs && !outputs.open) {
+        outputs.open = true;
+        const chev = outputs.querySelector('.chev');
+        if (chev) chev.textContent = '▾';
+      }
+    }
+
+    // wire chevrons on load
+    document.addEventListener('DOMContentLoaded', () => {
+      ['dirtDetails','instrumentDetails','outputsDetails'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) wireChevron(el);
+      });
+    });
   </script>
 </body>
 </html>
