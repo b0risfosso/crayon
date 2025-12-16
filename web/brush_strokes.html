@@ -380,6 +380,7 @@
       await Promise.allSettled(tasks);
       status.textContent = 'Brush strokes complete.';
       openOutputsPanel();
+      await loadSavedBrushStrokes();
     }
 
     async function enqueueBrush(inst, dirt) {
@@ -456,10 +457,6 @@
       wrapper.appendChild(header);
       wrapper.appendChild(body);
       container.appendChild(wrapper);
-      // persist to DB if we have a result
-      if (!error && result) {
-        saveBrushStroke(inst, dirt, result).catch(() => {});
-      }
     }
 
     function renderSavedBrushStrokes() {
@@ -514,30 +511,6 @@
         .replace(/'/g, "&#39;");
     }
 
-    async function saveBrushStroke(inst, dirt, result) {
-      try {
-        await fetch('/colors/brush_strokes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            art_id: artId,
-            color_id: colorId,
-            dirt_id: dirt.id,
-            instrument_id: inst.id,
-            instrument_task_id: result?.task_id,
-            instrument_run_id: result?.run_id,
-            output_text: result?.output || '',
-            metadata: {
-              instrument_name: inst.name,
-              instrument_description: inst.description,
-              tokens: result?.usage,
-            },
-          }),
-        });
-      } catch (_e) {
-        // ignore save errors to avoid blocking UI
-      }
-    }
 
     function wireChevron(detailsEl) {
       const summary = detailsEl.querySelector('summary.chevron');

@@ -237,6 +237,24 @@
         };
         actionRow.appendChild(brushBtn);
 
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete Color';
+        deleteBtn.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm(`Delete color #${c.id}? This cannot be undone.`)) return;
+          try {
+            const res = await fetch(`/colors/${c.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.message || data.error || 'Delete failed');
+            }
+            refreshColors();
+          } catch (err) {
+            alert(err.message || err);
+          }
+        };
+        actionRow.appendChild(deleteBtn);
+
         const pre = document.createElement('pre');
         pre.textContent = c.output_text || '';
 

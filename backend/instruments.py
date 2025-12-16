@@ -30,6 +30,7 @@ except Exception as e:
 from instrument_prompts import OPERATOR_INSTRUCTION_COMPILER, SCENARIO_SYNTHESIZER  # type: ignore
 
 DB_PATH = "/var/www/site/data/instruments.db"
+ART_DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
 MODEL_DEFAULT = os.environ.get("INSTRUMENT_MODEL", "gpt-5-mini-2025-08-07")
 
 CONCURRENCY = 2
@@ -243,15 +244,70 @@ def insert_run(
     finally:
         conn.close()
 
+def insert_brush_stroke(
+    *,
+    art_id: int,
+    color_id: int,
+    dirt_id: int,
+    instrument_id: Optional[int],
+    instrument_task_id: str,
+    instrument_run_id: Optional[int],
+    output_text: str,
+    metadata: Optional[dict] = None,
+) -> None:
+    """
+    Store a brush_stroke in art.db. Best-effort; failures are swallowed to avoid
+    blocking synth completion.
+    """
+    try:
+        conn = sqlite3.connect(ART_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        now = iso_time_ms()
+        md_str = None
+        if metadata is not None:
+            md_str = json.dumps(metadata, ensure_ascii=False)
+        conn.execute(
+            """
+            INSERT INTO brush_strokes
+              (art_id, color_id, dirt_id, instrument_id, instrument_task_id,
+               instrument_run_id, output_text, metadata, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                art_id,
+                color_id,
+                dirt_id,
+                instrument_id,
+                instrument_task_id,
+                instrument_run_id,
+                output_text,
+                md_str,
+                now,
+                now,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        # ignore errors to keep synth responses flowing
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 
 def worker_loop(worker_id: int):
     while True:
         task = TASK_QUEUE.get()
-        task_id = task["task_id"]
-        with TASKS_LOCK:
-            meta = TASKS.get(task_id)
-            if meta:
-                meta.update({"status": "running", "started_at": iso_time_ms(), "worker_id": worker_id})
+            task_id = task["task_id"]
+            with TASKS_LOCK:
+                meta = TASKS.get(task_id)
+                if meta:
+                    meta.update({"status": "running", "started_at": iso_time_ms(), "worker_id": worker_id})
         try:
             instrument_id = task.get("instrument_id")
             model = task["model"]
@@ -317,6 +373,29 @@ def worker_loop(worker_id: int):
                 status="done",
                 error=None,
             )
+
+            # Best-effort save into brush_strokes if art/color/dirt are provided
+            art_id = task.get("art_id")
+            color_id = task.get("color_id")
+            dirt_id = task.get("dirt_id")
+            if art_id and color_id and dirt_id:
+                try:
+                    insert_brush_stroke(
+                        art_id=int(art_id),
+                        color_id=int(color_id),
+                        dirt_id=int(dirt_id),
+                        instrument_id=instrument_id,
+                        instrument_task_id=task_id,
+                        instrument_run_id=run_row.get("id") if isinstance(run_row, dict) else None,
+                        output_text=output_text,
+                        metadata={
+                            "instrument_name": operator_name,
+                            "instrument_description": operator_description,
+                            "tokens": usage_dict,
+                        },
+                    )
+                except Exception:
+                    pass
 
             result = {
                 "output": output_text,
@@ -515,6 +594,13 @@ def enqueue_compile() -> Any:
 
     operator_name = payload.get("instrument_name")
     operator_description = payload.get("instrument_description")
+    art_id = payload.get("art_id")
+    color_id = payload.get("color_id")
+    dirt_id = payload.get("dirt_id")
+
+    for field_name, field_val in [("art_id", art_id), ("color_id", color_id), ("dirt_id", dirt_id)]:
+        if field_val is not None and not isinstance(field_val, int):
+            abort(400, description=f"'{field_name}' must be an integer when provided")
 
     if instrument_id is not None:
         row = fetch_instrument_row(instrument_id)
@@ -631,6 +717,9 @@ def enqueue_synthesize() -> Any:
             "system_feature": system_feature.strip(),
             "operator_name": operator_name.strip(),
             "operator_description": operator_description.strip(),
+            "art_id": art_id,
+            "color_id": color_id,
+            "dirt_id": dirt_id,
         }
     )
 
