@@ -27,7 +27,7 @@ except Exception as e:
     _client = None
     _client_err = e
 
-from instrument_prompts import OPERATOR_INSTRUCTION_COMPILER, SCENARIO_SYNTHESIZER  # type: ignore
+from instrument_prompts import OPERATOR_INSTRUCTION_COMPILER, SCENARIO_SYNTHESIZER, SYSTEMS_ANALYST  # type: ignore
 
 DB_PATH = "/var/www/site/data/instruments.db"
 ART_DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
@@ -180,6 +180,23 @@ def render_synth_prompt(
         .replace("{{SYSTEM_FEATURE_DESCRIPTION}}", system_feature)
         .replace("{{OPERATOR_NAME}}", operator_name)
         .replace("{{OPERATOR_CAPABILITIES}}", operator_capabilities)
+    )
+
+
+def render_systems_analyst_prompt(
+    system_name: str,
+    system_description: str,
+) -> str:
+    desc = system_description.strip() or "No description provided."
+    return (
+        f"{SYSTEMS_ANALYST}\n\n"
+        "System Definition\n"
+        "Object / System\n"
+        f"{system_name.strip()}\n"
+        "Components / attributes\n"
+        f"{desc}\n"
+        "Operational Capabilities\n"
+        f"{desc}"
     )
 
 
@@ -341,6 +358,14 @@ def worker_loop(worker_id: int):
                     operator_description,
                 )
                 prompt_type = "scenario_synthesizer"
+            elif task_type == "systems_analyst":
+                operator_name = task["operator_name"]
+                operator_description = task["operator_description"]
+                scenario = ""
+                system_description = None
+                system_feature = None
+                prompt = render_systems_analyst_prompt(operator_name, operator_description)
+                prompt_type = "systems_analyst"
             else:
                 raise ValueError(f"Unknown task_type '{task_type}'")
 
@@ -653,6 +678,71 @@ def enqueue_compile() -> Any:
             "scenario": scenario.strip(),
             "operator_name": operator_name.strip(),
             "operator_description": operator_description.strip(),
+        }
+    )
+
+    return (
+        jsonify(
+            {
+                "task_id": task_id,
+                "status": "queued",
+                "queue": queue_stats(),
+            }
+        ),
+        202,
+    )
+
+
+@app.post("/instruments/analyze")
+def enqueue_analysis() -> Any:
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    instrument_id = payload.get("instrument_id")
+    if instrument_id is not None and not isinstance(instrument_id, int):
+        abort(400, description="'instrument_id' must be an integer when provided")
+
+    instrument_name = payload.get("instrument_name")
+    instrument_description = payload.get("instrument_description")
+
+    if instrument_id is not None:
+        row = fetch_instrument_row(instrument_id)
+        if not row:
+            abort(404, description=f"Instrument id {instrument_id} not found")
+        instrument_name = instrument_name or row.get("name")
+        instrument_description = instrument_description or row.get("description")
+
+    if not isinstance(instrument_name, str) or not instrument_name.strip():
+        abort(400, description="'instrument_name' is required (or present in instrument_id)")
+    if instrument_description is None:
+        instrument_description = ""
+    if not isinstance(instrument_description, str):
+        abort(400, description="'instrument_description' must be a string")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "systems_analyst",
+            "status": "queued",
+            "created_at": iso_time_ms(),
+            "instrument_id": instrument_id,
+            "model": model,
+            "operator_name": instrument_name.strip(),
+            "operator_description": instrument_description.strip(),
+        }
+
+    TASK_QUEUE.put(
+        {
+            "task_id": task_id,
+            "task_type": "systems_analyst",
+            "instrument_id": instrument_id,
+            "model": model,
+            "operator_name": instrument_name.strip(),
+            "operator_description": instrument_description.strip(),
         }
     )
 
