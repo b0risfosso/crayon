@@ -84,6 +84,21 @@
       <div id="analystError" class="error" role="alert" aria-live="polite"></div>
     </section>
 
+    <section class="card" id="measurementCard" style="display:none;">
+      <div class="flex-between" style="align-items:center; gap:10px;">
+        <h2 style="margin:0; font-size:18px;">System measurement</h2>
+        <div id="measurementStatus" class="muted"></div>
+      </div>
+      <p class="muted" style="margin:8px 0 12px;">Instrument the latest systems analyst output.</p>
+      <label style="display:block; font-size:13px; font-weight:600; margin-bottom:8px;">
+        Choose system analysis
+        <select id="measurementSource" style="width:100%; margin-top:6px; padding:8px 10px; border-radius:8px; border:1px solid #dcdcdc; font-size:14px;"></select>
+      </label>
+      <div class="muted" id="measurementHint" style="font-size:12px; margin:4px 0 10px;"></div>
+      <button type="button" id="runMeasurementButton">Run measurement analyst</button>
+      <div id="measurementError" class="error" role="alert" aria-live="polite"></div>
+    </section>
+
     <section class="card" id="runsCard" style="display:none;">
       <div class="flex-between" style="align-items:center;">
         <h2 style="margin:0; font-size:18px;">Previous scenarios</h2>
@@ -98,6 +113,14 @@
         <button type="button" id="refreshAnalystRuns" style="font-size:12px;">Refresh</button>
       </div>
       <div id="analystRunsList" class="runs"></div>
+    </section>
+
+    <section class="card" id="measurementRunsCard" style="display:none;">
+      <div class="flex-between" style="align-items:center;">
+        <h2 style="margin:0; font-size:18px;">Measurement analyst results</h2>
+        <button type="button" id="refreshMeasurementRuns" style="font-size:12px;">Refresh</button>
+      </div>
+      <div id="measurementRunsList" class="runs"></div>
     </section>
   </main>
 
@@ -115,6 +138,7 @@
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
     let currentInstrument = null;
+    let latestAnalystRuns = [];
 
     if (!id) {
       document.getElementById("instrumentCard").innerHTML = '<div class="error">No instrument id provided.</div>';
@@ -122,8 +146,10 @@
       fetchInstrument(id);
       document.getElementById("scenarioCard").style.display = "block";
       document.getElementById("analystCard").style.display = "block";
+      document.getElementById("measurementCard").style.display = "block";
       document.getElementById("runsCard").style.display = "block";
       document.getElementById("analystRunsCard").style.display = "block";
+      document.getElementById("measurementRunsCard").style.display = "block";
       loadRuns();
     }
 
@@ -134,7 +160,9 @@
 
     document.getElementById("refreshRuns").addEventListener("click", loadRuns);
     document.getElementById("refreshAnalystRuns").addEventListener("click", loadRuns);
+    document.getElementById("refreshMeasurementRuns").addEventListener("click", loadRuns);
     document.getElementById("runAnalystButton").addEventListener("click", runAnalystPrompt);
+    document.getElementById("runMeasurementButton").addEventListener("click", runMeasurementPrompt);
 
     async function fetchInstrument(instrumentId) {
       const card = document.getElementById("instrumentCard");
@@ -271,6 +299,49 @@
       }
     }
 
+    async function runMeasurementPrompt() {
+      const errEl = document.getElementById("measurementError");
+      const btn = document.getElementById("runMeasurementButton");
+      const status = document.getElementById("measurementStatus");
+      const select = document.getElementById("measurementSource");
+      errEl.textContent = "";
+
+      if (!select.value) {
+        errEl.textContent = "Select a system analysis to instrument.";
+        return;
+      }
+
+      btn.disabled = true;
+      status.textContent = "Queued (processing in background)…";
+
+      try {
+        const res = await fetch(`${API_BASE}/measure`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instrument_id: Number(id),
+            instrument_name: currentInstrument?.name,
+            instrument_description: currentInstrument?.description,
+            analyst_run_id: Number(select.value),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.description || data?.error || JSON.stringify(data));
+        }
+        const taskId = data.task_id;
+        status.textContent = "Queued; waiting for result…";
+        await pollTask(taskId);
+        await loadRuns();
+        status.textContent = "Done";
+      } catch (err) {
+        errEl.textContent = err.message || "Unable to run measurement analyst.";
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => (status.textContent = ""), 1200);
+      }
+    }
+
     async function pollTask(taskId) {
       const maxAttempts = 30;
       const delay = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -288,20 +359,29 @@
     async function loadRuns() {
       const runsEl = document.getElementById("runsList");
       const analystRunsEl = document.getElementById("analystRunsList");
+      const measurementRunsEl = document.getElementById("measurementRunsList");
       runsEl.innerHTML = '<div class="muted">Loading…</div>';
       analystRunsEl.innerHTML = '<div class="muted">Loading…</div>';
+      measurementRunsEl.innerHTML = '<div class="muted">Loading…</div>';
       try {
         const res = await fetch(`${API_BASE}/${encodeURIComponent(id)}/runs`);
         if (!res.ok) throw new Error("Failed to load runs");
         const items = await res.json();
         const runs = Array.isArray(items) ? items : [];
-        const scenarioRuns = runs.filter((r) => r.prompt_type !== "systems_analyst");
+        const scenarioRuns = runs.filter(
+          (r) => r.prompt_type !== "systems_analyst" && r.prompt_type !== "measurement_analyst"
+        );
         const analystRuns = runs.filter((r) => r.prompt_type === "systems_analyst");
+        const measurementRuns = runs.filter((r) => r.prompt_type === "measurement_analyst");
+        latestAnalystRuns = analystRuns;
+        populateMeasurementSelect();
         renderRuns(runsEl, scenarioRuns, "No scenarios yet for this instrument.");
         renderRuns(analystRunsEl, analystRuns, "No system analyses yet.");
+        renderRuns(measurementRunsEl, measurementRuns, "No measurement analyses yet.");
       } catch (err) {
         runsEl.innerHTML = `<div class="error">${err.message || "Unable to load scenarios."}</div>`;
         analystRunsEl.innerHTML = `<div class="error">${err.message || "Unable to load systems analyst runs."}</div>`;
+        measurementRunsEl.innerHTML = `<div class="error">${err.message || "Unable to load measurement runs."}</div>`;
       }
     }
 
@@ -321,6 +401,9 @@
       if (run.system_description) return run.system_description.slice(0, 80);
       if (run.prompt_type === "systems_analyst" && run.operator_name) {
         return `Systems analyst: ${run.operator_name}`.slice(0, 80);
+      }
+      if (run.prompt_type === "measurement_analyst" && run.operator_name) {
+        return `Measurement analyst: ${run.operator_name}`.slice(0, 80);
       }
       if (run.operator_name) return run.operator_name.slice(0, 80);
       return run.prompt_type || "Run";
@@ -434,6 +517,35 @@
         details.appendChild(body);
         targetEl.appendChild(details);
       });
+    }
+
+    function populateMeasurementSelect() {
+      const select = document.getElementById("measurementSource");
+      const hint = document.getElementById("measurementHint");
+      select.innerHTML = "";
+
+      if (!latestAnalystRuns.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No systems analyst results yet.";
+        select.appendChild(opt);
+        select.disabled = true;
+        hint.textContent = "Run a systems analyst first, then instrument it.";
+        document.getElementById("runMeasurementButton").disabled = true;
+        return;
+      }
+
+      select.disabled = false;
+      document.getElementById("runMeasurementButton").disabled = false;
+      latestAnalystRuns.forEach((run, idx) => {
+        const opt = document.createElement("option");
+        opt.value = run.id;
+        const label = runTitle(run);
+        opt.textContent = `#${run.id}: ${label}`;
+        if (idx === 0) opt.selected = true;
+        select.appendChild(opt);
+      });
+      hint.textContent = "Uses the output of the selected systems analyst run.";
     }
   </script>
 </body>

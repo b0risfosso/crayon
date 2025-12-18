@@ -27,7 +27,12 @@ except Exception as e:
     _client = None
     _client_err = e
 
-from instrument_prompts import OPERATOR_INSTRUCTION_COMPILER, SCENARIO_SYNTHESIZER, SYSTEMS_ANALYST  # type: ignore
+from instrument_prompts import (
+    OPERATOR_INSTRUCTION_COMPILER,
+    SCENARIO_SYNTHESIZER,
+    SYSTEMS_ANALYST,
+    SYSTEMS_MEASUREMENT_ANALYST,
+)  # type: ignore
 
 DB_PATH = "/var/www/site/data/instruments.db"
 ART_DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
@@ -200,6 +205,27 @@ def render_systems_analyst_prompt(
     )
 
 
+def render_measurement_prompt(
+    system_name: str,
+    system_description: str,
+    analyst_examples: str,
+) -> str:
+    desc = system_description.strip() or "No description provided."
+    examples = analyst_examples.strip()
+    return (
+        f"{SYSTEMS_MEASUREMENT_ANALYST}\n\n"
+        "System Definition\n"
+        "Object / System\n"
+        f"{system_name.strip()}\n"
+        "Components / attributes\n"
+        f"{desc}\n"
+        "System Operational Capabilities\n"
+        f"{desc}\n"
+        "Example Operational Sequences\n"
+        f"{examples}\n"
+    )
+
+
 def insert_run(
     *,
     instrument_id: Optional[int],
@@ -366,6 +392,15 @@ def worker_loop(worker_id: int):
                 system_feature = None
                 prompt = render_systems_analyst_prompt(operator_name, operator_description)
                 prompt_type = "systems_analyst"
+            elif task_type == "measurement_analyst":
+                operator_name = task["operator_name"]
+                operator_description = task["operator_description"]
+                analyst_examples = task["analyst_examples"]
+                scenario = ""
+                system_description = None
+                system_feature = None
+                prompt = render_measurement_prompt(operator_name, operator_description, analyst_examples)
+                prompt_type = "measurement_analyst"
             else:
                 raise ValueError(f"Unknown task_type '{task_type}'")
 
@@ -743,6 +778,99 @@ def enqueue_analysis() -> Any:
             "model": model,
             "operator_name": instrument_name.strip(),
             "operator_description": instrument_description.strip(),
+        }
+    )
+
+    return (
+        jsonify(
+            {
+                "task_id": task_id,
+                "status": "queued",
+                "queue": queue_stats(),
+            }
+        ),
+        202,
+    )
+
+
+@app.post("/instruments/measure")
+def enqueue_measurement() -> Any:
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    instrument_id = payload.get("instrument_id")
+    if instrument_id is not None and not isinstance(instrument_id, int):
+        abort(400, description="'instrument_id' must be an integer when provided")
+
+    instrument_name = payload.get("instrument_name")
+    instrument_description = payload.get("instrument_description")
+    analyst_run_id = payload.get("analyst_run_id")
+    analyst_output = payload.get("analyst_output")
+
+    if analyst_run_id is not None and not isinstance(analyst_run_id, int):
+        abort(400, description="'analyst_run_id' must be an integer when provided")
+    if analyst_output is not None and not isinstance(analyst_output, str):
+        abort(400, description="'analyst_output' must be a string when provided")
+
+    if instrument_id is not None:
+        row = fetch_instrument_row(instrument_id)
+        if not row:
+            abort(404, description=f"Instrument id {instrument_id} not found")
+        instrument_name = instrument_name or row.get("name")
+        instrument_description = instrument_description or row.get("description")
+
+    if not isinstance(instrument_name, str) or not instrument_name.strip():
+        abort(400, description="'instrument_name' is required (or present in instrument_id)")
+    if instrument_description is None:
+        instrument_description = ""
+    if not isinstance(instrument_description, str):
+        abort(400, description="'instrument_description' must be a string")
+
+    examples_text = (analyst_output or "").strip()
+    if not examples_text:
+        if analyst_run_id is None:
+            abort(400, description="Provide 'analyst_output' or 'analyst_run_id'")
+        # fetch from DB
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        try:
+            row = conn.execute(
+                "SELECT output_text FROM instrument_runs WHERE id = ? AND prompt_type = 'systems_analyst'",
+                (analyst_run_id,),
+            ).fetchone()
+            if not row or not row["output_text"]:
+                abort(404, description="systems analyst run not found or has no output")
+            examples_text = row["output_text"]
+        finally:
+            conn.close()
+
+    model = payload.get("model", MODEL_DEFAULT)
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "measurement_analyst",
+            "status": "queued",
+            "created_at": iso_time_ms(),
+            "instrument_id": instrument_id,
+            "model": model,
+            "operator_name": instrument_name.strip(),
+            "operator_description": instrument_description.strip(),
+            "analyst_examples": examples_text,
+        }
+
+    TASK_QUEUE.put(
+        {
+            "task_id": task_id,
+            "task_type": "measurement_analyst",
+            "instrument_id": instrument_id,
+            "model": model,
+            "operator_name": instrument_name.strip(),
+            "operator_description": instrument_description.strip(),
+            "analyst_examples": examples_text,
         }
     )
 
