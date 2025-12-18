@@ -225,6 +225,9 @@
 
         const grid = document.createElement("div");
         grid.className = "runs";
+        grid.style.display = "flex";
+        grid.style.flexDirection = "column";
+        grid.style.gap = "10px";
         items.forEach(({ run, instrument }) => {
           const details = document.createElement("details");
           details.className = "run-card";
