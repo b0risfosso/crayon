@@ -226,35 +226,64 @@
         const grid = document.createElement("div");
         grid.className = "runs";
         items.forEach(({ run, instrument }) => {
-          const card = document.createElement("div");
-          card.className = "run-card";
+          const details = document.createElement("details");
+          details.className = "run-card";
+
+          const summary = document.createElement("summary");
+          summary.style.alignItems = "center";
+          summary.style.justifyContent = "space-between";
+          summary.style.gap = "8px";
+          const left = document.createElement("div");
+          left.style.display = "flex";
+          left.style.flexDirection = "column";
+          left.style.gap = "4px";
 
           const title = document.createElement("div");
           title.className = "run-title";
           title.textContent = instrument?.name
             ? `${instrument.name} (#${instrument.id})`
             : `Instrument #${instrument?.id ?? "?"}`;
-          card.appendChild(title);
+          left.appendChild(title);
+
+          const metaTop = document.createElement("div");
+          metaTop.className = "run-meta";
+          if (run.created_at) metaTop.innerHTML += `<span>${run.created_at}</span>`;
+          if (run.model) metaTop.innerHTML += `<span>model: ${run.model}</span>`;
+          left.appendChild(metaTop);
+
+          summary.appendChild(left);
+
+          const status = document.createElement("span");
+          status.className = "badge";
+          status.textContent = run.status || "unknown";
+          summary.appendChild(status);
+
+          details.appendChild(summary);
+
+          const body = document.createElement("div");
+          body.style.marginTop = "8px";
 
           const meta = document.createElement("div");
           meta.className = "run-meta";
-          if (run.status) meta.innerHTML += `<span>${run.status}</span>`;
-          if (run.model) meta.innerHTML += `<span>model: ${run.model}</span>`;
-          if (run.created_at) meta.innerHTML += `<span>${run.created_at}</span>`;
-          card.appendChild(meta);
+          meta.innerHTML += `<span>prompt: goal_planner</span>`;
+          if (run.tokens_in != null) meta.innerHTML += `<span>tokens in: ${run.tokens_in}</span>`;
+          if (run.tokens_out != null) meta.innerHTML += `<span>tokens out: ${run.tokens_out}</span>`;
+          body.appendChild(meta);
 
           if (run.error) {
             const err = document.createElement("div");
             err.className = "error";
             err.textContent = run.error;
-            card.appendChild(err);
+            body.appendChild(err);
           } else if (run.output_text) {
             const out = document.createElement("div");
             out.className = "run-output";
             out.textContent = run.output_text;
-            card.appendChild(out);
+            body.appendChild(out);
           }
-          grid.appendChild(card);
+
+          details.appendChild(body);
+          grid.appendChild(details);
         });
 
         wrapper.appendChild(grid);
