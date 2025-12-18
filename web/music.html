@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Goal Planner</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #f8f9ff; color: #111; }
+    main { max-width: 960px; margin: 0 auto; padding: 28px 16px 48px; }
+    h1 { margin: 0; font-size: 24px; }
+    .muted { color: #666; font-size: 13px; }
+    .card { background: #fff; border: 1px solid #e6e6e6; border-radius: 12px; padding: 16px 18px; box-shadow: 0 10px 32px rgba(0,0,0,0.05); margin-top: 14px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    textarea, select, input { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid #d9d9d9; font-size: 14px; font-family: inherit; background: #fbfbfb; }
+    textarea { min-height: 120px; resize: vertical; }
+    button { padding: 9px 12px; border-radius: 8px; border: 1px solid #c9c9c9; background: linear-gradient(180deg, #fff, #f0f0f0); cursor: pointer; font-weight: 600; font-size: 14px; }
+    button:hover { background: #f7f7f7; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error { color: #b00020; font-size: 13px; margin-top: 6px; }
+    .runs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 12px; }
+    .run-card { border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; background: #fff; }
+    .run-title { font-weight: 700; margin: 0 0 6px; font-size: 14px; }
+    .run-meta { font-size: 12px; color: #555; display: flex; gap: 8px; flex-wrap: wrap; }
+    .run-output { white-space: pre-wrap; line-height: 1.5; font-size: 13px; margin-top: 8px; }
+    details { border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; background: #fdfdfd; }
+    summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef3ff; color: #325ac0; font-size: 11px; border: 1px solid #d7e1ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <header style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div>
+        <h1>Goal Planner</h1>
+        <div class="muted">Send a goal to an instrument; view goal plans per instrument.</div>
+      </div>
+      <a href="/instruments.html" class="muted" style="text-decoration:none;">Back to instruments</a>
+    </header>
+
+    <section class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h2 style="margin:0; font-size:18px;">Plan a goal</h2>
+        <div id="submitStatus" class="muted"></div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr; gap: 10px; margin-top:8px;">
+        <div>
+          <label for="goalInput">Goal / Scenario</label>
+          <textarea id="goalInput" placeholder="Describe the goal or scenario…"></textarea>
+        </div>
+        <div>
+          <label for="instrumentSelect">Choose instrument</label>
+          <select id="instrumentSelect"></select>
+        </div>
+      </div>
+      <button id="submitButton" style="margin-top:10px;">Enqueue goal plan</button>
+      <div id="formError" class="error" role="alert" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h2 style="margin:0; font-size:18px;">Goal plans by instrument</h2>
+        <button type="button" id="refreshButton" style="font-size:12px;">Refresh</button>
+      </div>
+      <div id="runsContainer" style="margin-top:12px;"></div>
+    </section>
+  </main>
+
+  <script>
+    function apiBase() {
+      const custom = (window.INSTRUMENTS_API_BASE || "").trim();
+      if (custom) return custom.replace(/\/+$/, "");
+      const origin = window.location.origin;
+      if (origin && origin !== "null" && origin !== "file://") {
+        return origin.replace(/\/+$/, "") + "/instruments";
+      }
+      return "instruments";
+    }
+    const API_BASE = apiBase();
+
+    const selectEl = document.getElementById("instrumentSelect");
+    const goalInput = document.getElementById("goalInput");
+    const submitBtn = document.getElementById("submitButton");
+    const submitStatus = document.getElementById("submitStatus");
+    const formError = document.getElementById("formError");
+    const runsContainer = document.getElementById("runsContainer");
+
+    let instruments = [];
+    let runsByInstrument = {};
+
+    document.getElementById("refreshButton").addEventListener("click", () => {
+      loadInstruments();
+    });
+    submitBtn.addEventListener("click", submitGoal);
+
+    loadInstruments();
+
+    async function loadInstruments() {
+      runsContainer.innerHTML = '<div class="muted">Loading instruments…</div>';
+      try {
+        const res = await fetch(`${API_BASE}`);
+        if (!res.ok) throw new Error("Failed to load instruments");
+        instruments = await res.json();
+        renderSelect();
+        await loadRunsForAll();
+      } catch (err) {
+        runsContainer.innerHTML = `<div class="error">${err.message || "Unable to load instruments."}</div>`;
+      }
+    }
+
+    function renderSelect() {
+      selectEl.innerHTML = "";
+      if (!instruments.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No instruments available";
+        selectEl.appendChild(opt);
+        selectEl.disabled = true;
+        return;
+      }
+      selectEl.disabled = false;
+      instruments.forEach((inst, idx) => {
+        const opt = document.createElement("option");
+        opt.value = inst.id;
+        opt.textContent = `${inst.name || "(untitled)"} (#${inst.id})`;
+        if (idx === 0) opt.selected = true;
+        selectEl.appendChild(opt);
+      });
+    }
+
+    async function submitGoal() {
+      formError.textContent = "";
+      const goal = goalInput.value.trim();
+      const instrumentId = Number(selectEl.value);
+
+      if (!goal) {
+        formError.textContent = "Goal is required.";
+        return;
+      }
+      if (!instrumentId) {
+        formError.textContent = "Choose an instrument.";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitStatus.textContent = "Queued (processing in background)…";
+
+      try {
+        const res = await fetch(`${API_BASE}/plan_goal`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goal, instrument_id: instrumentId }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.description || data?.error || JSON.stringify(data));
+        }
+        const taskId = data.task_id;
+        goalInput.value = "";
+        submitStatus.textContent = "Queued; waiting for result…";
+        await pollTask(taskId);
+        await loadRunsForAll();
+        submitStatus.textContent = "Done";
+      } catch (err) {
+        formError.textContent = err.message || "Unable to plan goal.";
+      } finally {
+        submitBtn.disabled = false;
+        setTimeout(() => (submitStatus.textContent = ""), 1200);
+      }
+    }
+
+    async function pollTask(taskId) {
+      const maxAttempts = 30;
+      const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+      for (let i = 0; i < maxAttempts; i++) {
+        const res = await fetch(`/instruments/llm/tasks/${encodeURIComponent(taskId)}`);
+        if (!res.ok) break;
+        const data = await res.json();
+        if (data.status === "done") return data;
+        if (data.status === "error") throw new Error(data.error || "LLM task failed");
+        await delay(1000);
+      }
+      throw new Error("Timed out waiting for task");
+    }
+
+    async function loadRunsForAll() {
+      if (!instruments.length) {
+        runsContainer.innerHTML = '<div class="muted">No instruments yet.</div>';
+        return;
+      }
+      runsContainer.innerHTML = '<div class="muted">Loading goal plans…</div>';
+      try {
+        const results = await Promise.all(
+          instruments.map(async (inst) => {
+            const res = await fetch(`${API_BASE}/${encodeURIComponent(inst.id)}/runs`);
+            if (!res.ok) throw new Error("Failed to load runs");
+            const runs = await res.json();
+            return { inst, runs: Array.isArray(runs) ? runs : [] };
+          })
+        );
+        runsByInstrument = {};
+        results.forEach(({ inst, runs }) => {
+          runsByInstrument[inst.id] = runs.filter((r) => r.prompt_type === "goal_planner");
+        });
+        renderRuns();
+      } catch (err) {
+        runsContainer.innerHTML = `<div class="error">${err.message || "Unable to load goal plans."}</div>`;
+      }
+    }
+
+    function renderRuns() {
+      runsContainer.innerHTML = "";
+      instruments.forEach((inst) => {
+        const instRuns = runsByInstrument[inst.id] || [];
+        const wrapper = document.createElement("details");
+        wrapper.open = true;
+
+        const summary = document.createElement("summary");
+        summary.textContent = inst.name || "(untitled instrument)";
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = `#${inst.id}`;
+        summary.appendChild(badge);
+        wrapper.appendChild(summary);
+
+        if (!instRuns.length) {
+          const empty = document.createElement("div");
+          empty.className = "muted";
+          empty.style.marginTop = "6px";
+          empty.textContent = "No goal plans yet.";
+          wrapper.appendChild(empty);
+        } else {
+          const grid = document.createElement("div");
+          grid.className = "runs";
+          instRuns.forEach((run) => {
+            const card = document.createElement("div");
+            card.className = "run-card";
+
+            const title = document.createElement("div");
+            title.className = "run-title";
+            title.textContent = run.scenario ? run.scenario.slice(0, 120) : "Goal";
+            card.appendChild(title);
+
+            const meta = document.createElement("div");
+            meta.className = "run-meta";
+            if (run.status) meta.innerHTML += `<span>${run.status}</span>`;
+            if (run.model) meta.innerHTML += `<span>model: ${run.model}</span>`;
+            if (run.created_at) meta.innerHTML += `<span>${run.created_at}</span>`;
+            card.appendChild(meta);
+
+            if (run.error) {
+              const err = document.createElement("div");
+              err.className = "error";
+              err.textContent = run.error;
+              card.appendChild(err);
+            } else if (run.output_text) {
+              const out = document.createElement("div");
+              out.className = "run-output";
+              out.textContent = run.output_text;
+              card.appendChild(out);
+            }
+            grid.appendChild(card);
+          });
+          wrapper.appendChild(grid);
+        }
+
+        runsContainer.appendChild(wrapper);
+      });
+    }
+  </script>
+</body>
+</html>

@@ -32,6 +32,7 @@ from instrument_prompts import (
     SCENARIO_SYNTHESIZER,
     SYSTEMS_ANALYST,
     SYSTEMS_MEASUREMENT_ANALYST,
+    GOAL_ORIENTED_PLANNER,
 )  # type: ignore
 
 DB_PATH = "/var/www/site/data/instruments.db"
@@ -226,6 +227,22 @@ def render_measurement_prompt(
     )
 
 
+def render_goal_planner_prompt(
+    goal: str,
+    operator_name: str,
+    operator_capabilities: str,
+) -> str:
+    return (
+        f"{GOAL_ORIENTED_PLANNER}\n\n"
+        "Goal / Scenario\n"
+        f"{goal.strip()}\n\n"
+        "Operator / System\n"
+        f"{operator_name.strip()}\n\n"
+        "Operator Capabilities\n"
+        f"{operator_capabilities.strip()}\n"
+    )
+
+
 def insert_run(
     *,
     instrument_id: Optional[int],
@@ -401,6 +418,14 @@ def worker_loop(worker_id: int):
                 system_feature = None
                 prompt = render_measurement_prompt(operator_name, operator_description, analyst_examples)
                 prompt_type = "measurement_analyst"
+            elif task_type == "goal_planner":
+                scenario = task["goal"]
+                operator_name = task["operator_name"]
+                operator_description = task["operator_description"]
+                system_description = None
+                system_feature = None
+                prompt = render_goal_planner_prompt(scenario, operator_name, operator_description)
+                prompt_type = "goal_planner"
             else:
                 raise ValueError(f"Unknown task_type '{task_type}'")
 
@@ -871,6 +896,77 @@ def enqueue_measurement() -> Any:
             "operator_name": instrument_name.strip(),
             "operator_description": instrument_description.strip(),
             "analyst_examples": examples_text,
+        }
+    )
+
+    return (
+        jsonify(
+            {
+                "task_id": task_id,
+                "status": "queued",
+                "queue": queue_stats(),
+            }
+        ),
+        202,
+    )
+
+
+@app.post("/instruments/plan_goal")
+def enqueue_goal_plan() -> Any:
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+    goal = payload.get("goal")
+    if not isinstance(goal, str) or not goal.strip():
+        abort(400, description="'goal' is required and must be a non-empty string")
+
+    instrument_id = payload.get("instrument_id")
+    if instrument_id is not None and not isinstance(instrument_id, int):
+        abort(400, description="'instrument_id' must be an integer when provided")
+
+    instrument_name = payload.get("instrument_name")
+    instrument_description = payload.get("instrument_description")
+
+    if instrument_id is not None:
+        row = fetch_instrument_row(instrument_id)
+        if not row:
+            abort(404, description=f"Instrument id {instrument_id} not found")
+        instrument_name = instrument_name or row.get("name")
+        instrument_description = instrument_description or row.get("description")
+
+    if not isinstance(instrument_name, str) or not instrument_name.strip():
+        abort(400, description="'instrument_name' is required (or present in instrument_id)")
+    if instrument_description is None:
+        instrument_description = ""
+    if not isinstance(instrument_description, str):
+        abort(400, description="'instrument_description' must be a string")
+
+    model = payload.get("model", MODEL_DEFAULT)
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "goal_planner",
+            "status": "queued",
+            "created_at": iso_time_ms(),
+            "instrument_id": instrument_id,
+            "model": model,
+            "goal": goal.strip(),
+            "operator_name": instrument_name.strip(),
+            "operator_description": instrument_description.strip(),
+        }
+
+    TASK_QUEUE.put(
+        {
+            "task_id": task_id,
+            "task_type": "goal_planner",
+            "instrument_id": instrument_id,
+            "model": model,
+            "goal": goal.strip(),
+            "operator_name": instrument_name.strip(),
+            "operator_description": instrument_description.strip(),
         }
     )
 
