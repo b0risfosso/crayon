@@ -348,7 +348,7 @@
         return;
       }
 
-      instruments.forEach(inst => {
+      instruments.forEach((inst) => {
         const row = document.createElement("label");
         row.className = "instrument-item";
 
@@ -369,16 +369,12 @@
         name.className = "instrument-name";
         name.textContent = inst.name || "(untitled)";
 
-        const desc = document.createElement("span");
-        desc.className = "instrument-desc";
-        desc.textContent = inst.description || "No description.";
-
         row.appendChild(checkbox);
         row.appendChild(name);
-        row.appendChild(desc);
         container.appendChild(row);
       });
     }
+
 
     function selectRandomInstruments() {
       if (!instruments.length) return;
