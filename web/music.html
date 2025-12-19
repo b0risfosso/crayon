@@ -15,7 +15,7 @@
 
     body {
       margin: 0;
-      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
       background: var(--bg);
       color: #111;
     }
@@ -203,7 +203,7 @@
         <span class="muted">This color text will be used as the goal / brush stroke.</span>
       </div>
       <div id="color-meta" class="meta"></div>
-      <div id="color-text" class="color-text">(no color text)</div>
+      <div id="color-text" class="color-text">(loading…)</div>
     </section>
 
     <!-- Instruments + run controls -->
@@ -248,15 +248,15 @@
     const params = new URLSearchParams(window.location.search);
     const artId = parseInt(params.get("art_id") || "", 10);
     const colorId = parseInt(params.get("color_id") || "", 10);
-    const colorTextParam = params.get("color_text") || "";
 
     const API_INSTRUMENTS = "/instruments";
     const API_OPERATIONAL = "/instruments/operational_pathways";
+    const API_COLORS_BY_ART = (aid) => `/colors/by_art/${aid}`;
     const API_BRUSH_LIST = "/colors/brush_strokes";
 
     let instruments = [];
     let selectedInstrumentIds = new Set();
-    let colorText = colorTextParam;
+    let colorText = "";
 
     const backLink = document.getElementById("backLink");
     const headerLabel = document.getElementById("header-label");
@@ -272,23 +272,48 @@
       headerLabel.textContent = colorId ? `Color #${colorId}` : "Missing art_id";
     }
 
-    function initColorDisplay() {
-      if (!colorId) {
-        colorMetaEl.textContent = "Missing color_id query param.";
+    // Load color text using colors.py endpoints: GET /colors/by_art/<art_id>
+    async function loadColor() {
+      if (!artId || !colorId) {
+        colorMetaEl.textContent = "Missing art_id or color_id query param.";
         colorTextEl.textContent = "";
         document.getElementById("runButton").disabled = true;
         return;
       }
 
-      const metaBits = [];
-      metaBits.push(`art_id=${artId || "?"}`);
-      metaBits.push(`color_id=${colorId}`);
-      colorMetaEl.textContent = metaBits.join(" · ");
+      colorMetaEl.textContent = "Loading color…";
+      colorTextEl.textContent = "Loading…";
 
-      if (colorTextParam) {
-        colorTextEl.textContent = colorTextParam;
-      } else {
-        colorTextEl.textContent = "(no color text provided in URL; brush_stroke will be empty)";
+      try {
+        const res = await fetch(API_COLORS_BY_ART(artId));
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to load colors");
+        }
+
+        const rows = Array.isArray(data) ? data : [];
+        const row = rows.find(r => Number(r.id) === colorId);
+
+        if (!row) {
+          colorMetaEl.textContent = `Color #${colorId} not found for art #${artId}.`;
+          colorTextEl.textContent = "";
+          document.getElementById("runButton").disabled = true;
+          return;
+        }
+
+        const bits = [];
+        if (row.origin) bits.push(row.origin);
+        if (row.model) bits.push(row.model);
+        if (row.created_at) bits.push(`created: ${row.created_at}`);
+        if (row.updated_at) bits.push(`updated: ${row.updated_at}`);
+
+        colorMetaEl.textContent = bits.join(" · ") || `art_id=${row.art_id} · color_id=${row.id}`;
+        colorText = row.output_text || "";
+        colorTextEl.textContent = colorText || "(no color text)";
+      } catch (err) {
+        colorMetaEl.textContent = "Error loading color.";
+        colorTextEl.textContent = err.message || String(err);
+        document.getElementById("runButton").disabled = true;
       }
     }
 
@@ -396,7 +421,7 @@
       statusEl.textContent = "Submitting tasks…";
       resultsEl.innerHTML = "";
 
-      const brush_stroke = colorText || ""; // from URL param
+      const brush_stroke = colorText || "";
 
       const payloads = instrumentIds.map(instrument_id => ({
         art_id: artId,
@@ -531,9 +556,9 @@
         .replaceAll("'", "&#039;");
     }
 
-    // --- Init sequence ---
-    initColorDisplay();
+    // Init sequence
     (async () => {
+      await loadColor();
       await loadInstruments();
       await loadPreviousRuns();
     })();
