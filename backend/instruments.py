@@ -33,6 +33,7 @@ from instrument_prompts import (
     SYSTEMS_ANALYST,
     SYSTEMS_MEASUREMENT_ANALYST,
     GOAL_ORIENTED_PLANNER,
+    OPERATIONAL_PATHWAYS_PLANNER,
 )  # type: ignore
 
 DB_PATH = "/var/www/site/data/instruments.db"
@@ -242,6 +243,22 @@ def render_goal_planner_prompt(
         f"{operator_capabilities.strip()}\n"
     )
 
+def render_operational_pathways_prompt(
+    brush_stroke: str,
+    instrument_name: str,
+    instrument_description: str,
+) -> str:
+    """
+    Render the operational pathways planner prompt for a given brush stroke and instrument.
+    """
+    desc = instrument_description.strip() or "No description provided."
+    return OPERATIONAL_PATHWAYS_PLANNER.format(
+        brush_stroke=brush_stroke.strip(),
+        instrument=instrument_name.strip(),
+        instrument_description=desc,
+    )
+
+
 
 def insert_run(
     *,
@@ -426,6 +443,20 @@ def worker_loop(worker_id: int):
                 system_feature = None
                 prompt = render_goal_planner_prompt(scenario, operator_name, operator_description)
                 prompt_type = "goal_planner"
+            elif task_type == "operational_pathways":
+                brush_stroke = task["brush_stroke"]
+                operator_name = task["operator_name"]
+                operator_description = task["operator_description"]
+                scenario = brush_stroke
+                # For instrument_runs, we treat the instrument description as the system_description.
+                system_description = operator_description
+                system_feature = None
+                prompt = render_operational_pathways_prompt(
+                    brush_stroke,
+                    operator_name,
+                    operator_description,
+                )
+                prompt_type = "operational_pathways"
             else:
                 raise ValueError(f"Unknown task_type '{task_type}'")
 
@@ -1068,6 +1099,101 @@ def enqueue_synthesize() -> Any:
         ),
         202,
     )
+
+
+@app.post("/instruments/operational_pathways")
+def enqueue_operational_pathways() -> Any:
+    """
+    Enqueue an operational pathways planning task for a given brush stroke and instrument.
+
+    Expected JSON payload:
+      - art_id: int (required)
+      - color_id: int (required)
+      - instrument_id: int (required)
+      - brush_stroke: str (required)
+      - model: str (optional, overrides MODEL_DEFAULT)
+    """
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+
+    payload = require_json()
+
+    brush_stroke = payload.get("brush_stroke")
+    if not isinstance(brush_stroke, str) or not brush_stroke.strip():
+        abort(400, description="'brush_stroke' is required and must be a non-empty string")
+
+    # Required IDs for tying back into art / color / instrument
+    art_id = payload.get("art_id")
+    color_id = payload.get("color_id")
+    instrument_id = payload.get("instrument_id")
+
+    # Basic type validation
+    for fname, fval in (("art_id", art_id), ("color_id", color_id), ("instrument_id", instrument_id)):
+        if fval is None:
+            abort(400, description=f"'{fname}' is required and must be an integer")
+        if not isinstance(fval, int):
+            abort(400, description=f"'{fname}' must be an integer")
+
+    # Resolve instrument name/description from instruments table
+    row = fetch_instrument_row(instrument_id)
+    if not row:
+        abort(404, description=f"Instrument id {instrument_id} not found")
+
+    instrument_name = (row.get("name") or "").strip()
+    instrument_description = (row.get("description") or "").strip()
+
+    if not instrument_name:
+        abort(400, description="Instrument has no name; cannot render prompt")
+
+    # We currently don't have a dirt_id in the payload; use a sentinel so brush_strokes
+    # rows can still be inserted against a non-null dirt_id column.
+    dirt_id = -1
+
+    model = payload.get("model", MODEL_DEFAULT)
+    task_id = str(uuid.uuid4())
+
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            "task_id": task_id,
+            "task_type": "operational_pathways",
+            "status": "queued",
+            "created_at": iso_time_ms(),
+            "instrument_id": instrument_id,
+            "model": model,
+            "brush_stroke": brush_stroke.strip(),
+            "operator_name": instrument_name,
+            "operator_description": instrument_description,
+            "art_id": art_id,
+            "color_id": color_id,
+            "dirt_id": dirt_id,
+        }
+
+    TASK_QUEUE.put(
+        {
+            "task_id": task_id,
+            "task_type": "operational_pathways",
+            "instrument_id": instrument_id,
+            "model": model,
+            "brush_stroke": brush_stroke.strip(),
+            "operator_name": instrument_name,
+            "operator_description": instrument_description,
+            "art_id": art_id,
+            "color_id": color_id,
+            "dirt_id": dirt_id,
+        }
+    )
+
+    return (
+        jsonify(
+            {
+                "task_id": task_id,
+                "status": "queued",
+                "queue": queue_stats(),
+            }
+        ),
+        202,
+    )
+
 
 
 @app.get("/instruments/llm/tasks/<task_id>")

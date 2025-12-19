@@ -448,3 +448,56 @@ Whether the system can realistically achieve the goal,
 how it would do so,
 and where its limits lie.
 Not all systems are capable of all goals — identifying impossibility is as valuable as finding a solution."""
+
+
+OPERATIONAL_PATHWAYS_PLANNER = """📥 INPUT
+You are given:
+1️⃣ Goal / Target Scenario:
+{brush_stroke}
+2️⃣ System / Phenomenon Being Used:
+{instrument}
+3️⃣ Operational Capacities of That System:
+{instrument_description}
+🧠 TASK
+Using ONLY the given system + its operational capabilities, devise several distinct operational pathways that could realistically or theoretically achieve the goal.
+Each pathway should treat the system like a machine made of:
+operations,
+transformations,
+constraints,
+controllable variables,
+emergent effects.
+Do NOT invent capabilities not listed. Work strictly within the described operations and their implied physical/logical consequences.
+🏗️ REQUIRED OUTPUT STRUCTURE
+For each proposed pathway, output:
+Pathway N — [Short Descriptive Name]
+Goal Mechanism:
+Explain how this pathway ultimately achieves the goal (economic mechanism, behavioral mechanism, causal chain, emergent effect, etc.)
+Operational Sequence:
+Write as a logical chain of system operations using the provided capabilities, for example:
+Use <operation class> to do X
+This triggers Y process in the system
+Environmental/temporal/feedback effects amplify it
+Human or engineered control aligns outputs toward the goal
+Final outcome aligns with the target value
+Use the categories supplied (e.g., “Natural / Physical”, “Human-Controlled”, “Biological”, “Information”, etc.) where relevant.
+Dependencies / Required Scale:
+State what scale, repetition, infrastructure, or duration is implied.
+Risks / Limitations:
+Note constraints, failure modes, and real-world feasibility.
+🎯 REQUIREMENTS
+Provide at least 3–6 distinct pathways
+Some pathways may be:
+direct/engineering based
+indirect/emergent/systemic
+information-driven
+behavioral/biological (if system allows)
+Pathways may be realistic, theoretical, or speculative, but must remain internally consistent with the system.
+Avoid trivial answers; look for strategic leverage, compounding mechanisms, and feedback loops.
+✅ FINAL RESPONSE FORMAT
+Short introduction summarizing how the system can theoretically achieve the goal
+Then the structured list of pathways as described above
+Brief comparative summary of which pathways seem:
+highest leverage
+highest feasibility
+most speculative
+"""

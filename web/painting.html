@@ -237,6 +237,15 @@
         };
         actionRow.appendChild(brushBtn);
 
+        const musicBtn = document.createElement('button');
+        musicBtn.textContent = 'Open Music';
+        musicBtn.onclick = (e) => {
+          e.stopPropagation();
+          const url = `/music.html?art_id=${artId}&color_id=${c.id}`;
+          window.open(url, '_blank');
+        };
+        actionRow.appendChild(musicBtn);
+
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = 'Delete Color';
         deleteBtn.onclick = async (e) => {
