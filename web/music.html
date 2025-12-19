@@ -181,10 +181,26 @@
     }
 
     .prev-body {
-      white-space: pre-wrap;
-      font-size: 13px;
-      margin: 0;
-    }
+  white-space: pre-wrap;
+  font-size: 13px;
+  margin: 0;
+  display: none;            /* collapsed by default */
+}
+
+/* Show body when expanded */
+.prev-card.expanded .prev-body {
+  display: block;
+}
+
+.prev-toggle {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  background: #f9fafb;
+  cursor: pointer;
+}
+
   </style>
 </head>
 <body>
@@ -513,30 +529,52 @@
             ? inst.name
             : (row.instrument_id != null ? `Instrument #${row.instrument_id}` : "Unknown instrument");
 
-          const card = document.createElement("div");
-          card.className = "prev-card";
+            const card = document.createElement("div");
+            card.className = "prev-card";  // starts collapsed (no 'expanded' class)
 
-          const head = document.createElement("div");
-          head.className = "prev-head";
+            /* Header */
+            const head = document.createElement("div");
+            head.className = "prev-head";
 
-          const title = document.createElement("div");
-          title.innerHTML = `<strong>${escapeHtml(instName)}</strong>`;
+            const title = document.createElement("div");
+            title.innerHTML = `<strong>${escapeHtml(instName)}</strong>`;
 
-          const meta = document.createElement("div");
-          meta.className = "muted";
-          meta.textContent = `Brush stroke #${row.id} · ${row.created_at || ""}`;
+            const meta = document.createElement("div");
+            meta.className = "muted";
+            meta.textContent = `Brush stroke #${row.id} · ${row.created_at || ""}`;
 
-          head.appendChild(title);
-          head.appendChild(meta);
+            /* Expand/Collapse toggle */
+            const toggleBtn = document.createElement("button");
+            toggleBtn.type = "button";
+            toggleBtn.className = "prev-toggle";
+            toggleBtn.textContent = "Expand";
 
-          const body = document.createElement("pre");
-          body.className = "prev-body";
-          body.textContent = row.output_text || "";
+            toggleBtn.addEventListener("click", () => {
+              const expanded = card.classList.toggle("expanded");
+              toggleBtn.textContent = expanded ? "Collapse" : "Expand";
+            });
 
-          card.appendChild(head);
-          card.appendChild(body);
+            /* Assemble header: title + meta on left, toggle on right */
+            const headLeft = document.createElement("div");
+            headLeft.style.display = "flex";
+            headLeft.style.flexDirection = "column";
+            headLeft.appendChild(title);
+            headLeft.appendChild(meta);
 
-          container.appendChild(card);
+            head.innerHTML = "";
+            head.appendChild(headLeft);
+            head.appendChild(toggleBtn);
+
+            /* Body (hidden until expanded) */
+            const body = document.createElement("pre");
+            body.className = "prev-body";
+            body.textContent = row.output_text || "";
+
+            /* Assemble card */
+            card.appendChild(head);
+            card.appendChild(body);
+            container.appendChild(card);
+
         });
       } catch (err) {
         container.textContent = err.message || "Error loading previous runs.";
