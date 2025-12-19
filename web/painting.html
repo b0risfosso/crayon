@@ -228,23 +228,16 @@
 
         const actionRow = document.createElement('div');
         actionRow.className = 'toolbar';
-        const brushBtn = document.createElement('button');
-        brushBtn.textContent = 'Open Brush Strokes';
-        brushBtn.onclick = (e) => {
-          e.stopPropagation();
-          const url = `/brush_strokes.html?art_id=${artId}&color_id=${c.id}`;
-          window.open(url, '_blank');
-        };
-        actionRow.appendChild(brushBtn);
 
-        const musicBtn = document.createElement('button');
-        musicBtn.textContent = 'Open Music';
-        musicBtn.onclick = (e) => {
+        // NEW: single button to open dirt3.html
+        const dirt3Btn = document.createElement('button');
+        dirt3Btn.textContent = 'Open Dirt';
+        dirt3Btn.onclick = (e) => {
           e.stopPropagation();
-          const url = `/music.html?art_id=${artId}&color_id=${c.id}`;
+          const url = `/dirt3.html?art_id=${artId}&color_id=${c.id}`;
           window.open(url, '_blank');
         };
-        actionRow.appendChild(musicBtn);
+        actionRow.appendChild(dirt3Btn);
 
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = 'Delete Color';

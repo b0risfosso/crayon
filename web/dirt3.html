@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dirt & Operational Pathways</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --border: #dfe3eb;
+      --muted: #6b7280;
+      --accent: #1f7ae0;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: #111;
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    h1, h2 {
+      margin: 0;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 14px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.04);
+      margin-bottom: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 4px 0 8px;
+    }
+
+    .color-text {
+      white-space: pre-wrap;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 10px;
+      font-size: 14px;
+    }
+
+    .status {
+      font-size: 12px;
+      color: #333;
+      white-space: pre-wrap;
+      margin-top: 6px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    input[type="number"] {
+      width: 80px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #fff;
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .item-title {
+      font-weight: 600;
+    }
+
+    .item-body {
+      margin-top: 6px;
+      white-space: pre-wrap;
+      display: none;
+      font-size: 13px;
+      border-top: 1px solid #eee;
+      padding-top: 6px;
+    }
+
+    .caret {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .instrument-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 260px;
+      overflow-y: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 8px;
+      background: #f9fafb;
+    }
+
+    .instrument-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .instrument-name {
+      font-weight: 600;
+    }
+
+    .instrument-desc {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .op-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .op-entry {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    a.back-link {
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <a id="backLink" class="back-link">
+        <button>← Back to Painting</button>
+      </a>
+      <div id="header-label" class="muted"></div>
+    </div>
+
+    <!-- Color -->
+    <section class="card">
+      <div class="section-header">
+        <h1 style="font-size:18px;">Color</h1>
+        <span class="muted">This color text is used for dirt and operational pathways.</span>
+      </div>
+      <div id="color-meta" class="meta"></div>
+      <div id="color-text" class="color-text">(loading…)</div>
+    </section>
+
+    <!-- Create dirt -->
+    <section class="card">
+      <div class="section-header">
+        <h2 style="font-size:16px;">Create Dirt</h2>
+        <span class="muted">Randomly run N analyses for this (art, color).</span>
+      </div>
+      <div class="controls">
+        <label class="muted">
+          N analyses
+          <input id="numAnalyses" type="number" min="1" max="10" value="3" />
+        </label>
+        <button class="primary" id="createDirtBtn" type="button" onclick="createRandomDirt()">
+          Create dirt
+        </button>
+      </div>
+      <div id="dirtStatus" class="status"></div>
+    </section>
+
+    <!-- Dirt list -->
+    <section class="card">
+      <div class="section-header">
+        <h2 style="font-size:16px;">Dirt</h2>
+        <button type="button" onclick="loadDirt()">Refresh</button>
+      </div>
+      <div class="muted">Created via /dirt/bridge/color/&lt;color_id&gt;/analyses.</div>
+      <div id="dirtList" class="list">Loading dirt…</div>
+    </section>
+
+    <!-- Operational pathways -->
+    <section class="card">
+      <div class="section-header">
+        <h2 style="font-size:16px;">Operational Pathways</h2>
+        <span class="muted">Create brush_strokes via /instruments/operational_pathways.</span>
+      </div>
+
+      <div class="muted" style="margin-bottom:6px;">Instruments</div>
+      <div id="instrument-status" class="status"></div>
+      <div id="instrument-choices" class="instrument-list">Loading instruments…</div>
+
+      <div class="controls">
+        <label class="muted">
+          Random N
+          <input id="randomCount" type="number" min="1" value="1" />
+        </label>
+        <button type="button" onclick="selectRandomInstruments()">Select random</button>
+        <button type="button" class="primary" id="runButton" onclick="runOperationalPathways()">
+          Run operational pathways
+        </button>
+      </div>
+
+      <div id="run-status" class="status"></div>
+      <div id="run-results" class="op-list"></div>
+    </section>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const artId = parseInt(params.get("art_id") || "", 10);
+    const colorId = parseInt(params.get("color_id") || "", 10);
+
+    const API_COLORS_BY_ART = (aid) => `/colors/by_art/${aid}`;
+    const API_DIRT_ANALYSES = (cid) => `/dirt/bridge/color/${cid}/analyses`;
+    const API_INSTRUMENTS = "/instruments";
+    const API_OPERATIONAL = "/instruments/operational_pathways";
+
+    // Same analysis keys used in brush_strokes.html
+    const ANALYSES = [
+      { key: "decompose", label: "Decomposition" },
+      { key: "abstractions", label: "Abstractions & Metaphors" },
+      { key: "processes", label: "Processes / Forces / Interactions" },
+      { key: "datasets", label: "Datasets" },
+      { key: "codebases", label: "Codebases" },
+      { key: "hardware_builds", label: "Hardware Builds" },
+      { key: "experiments", label: "Experiments" },
+      { key: "intelligence", label: "Intelligence" },
+      { key: "control_levers", label: "Control Levers" },
+      { key: "companies", label: "Companies" },
+      { key: "theories", label: "Theories" },
+      { key: "historical_context", label: "Historical Context" },
+      { key: "value_exchange", label: "Value Exchange" },
+      { key: "value_addition", label: "Value Addition" },
+      { key: "science", label: "Science" },
+      { key: "spirit", label: "Spirit / Soul / Emotion" },
+      { key: "environment", label: "Environment" },
+      { key: "imagination", label: "Imagination" },
+      { key: "musical", label: "Musical Composition" },
+      { key: "infinity", label: "Infinity" },
+      { key: "computation_layer", label: "Computation Layer" },
+      { key: "computation_rules", label: "Computation Rules" },
+      { key: "computation_programs", label: "Computation Programs" },
+      { key: "computation_universe", label: "Computation Universe" },
+      { key: "computation_causal", label: "Computation Causal" },
+      { key: "state_transition", label: "State Transition" },
+      { key: "computation_primitives", label: "Computation Primitives" },
+      { key: "computation_primitives_alt", label: "Computation Primitives (Alt)" },
+      { key: "computation_sublayers", label: "Computation Sublayers" },
+      { key: "computation_emergence", label: "Computation Emergence" },
+      { key: "substrate", label: "Substrate" },
+      { key: "scaffolding", label: "Scaffolding" },
+      { key: "constraints", label: "Constraints" },
+      { key: "physical_substrate", label: "Physical Substrate" },
+      { key: "physical_states", label: "Physical States" },
+      { key: "foundational_physics", label: "Foundational Physics" },
+      { key: "tangibility_conservation", label: "Tangibility & Conservation" },
+      { key: "physical_subdomains", label: "Physical Subdomains" },
+      { key: "emergence_from_physics", label: "Emergence from Physics" },
+      { key: "observer_independent", label: "Observer-Independent" },
+      { key: "sensory_profile", label: "Sensory Profile" },
+      { key: "real_world_behavior", label: "Real-World Behavior" },
+      { key: "scenario_landscape", label: "Scenario Landscape" },
+      { key: "construction_reconstruction", label: "Construction / Reconstruction" },
+      { key: "thought_to_reality", label: "Thought to Reality" },
+    ];
+
+    let colorText = "";
+    let dirtRows = [];
+    let instruments = [];
+    let selectedInstrumentIds = new Set();
+
+    const backLink = document.getElementById("backLink");
+    const headerLabel = document.getElementById("header-label");
+
+    if (artId) {
+      backLink.href = `/painting.html?art_id=${artId}`;
+      headerLabel.textContent = `Art #${artId}${colorId ? " · Color #" + colorId : ""}`;
+    } else {
+      backLink.href = "/art.html";
+      headerLabel.textContent = colorId ? `Color #${colorId}` : "Missing art_id";
+    }
+
+    async function loadColor() {
+      const metaEl = document.getElementById("color-meta");
+      const textEl = document.getElementById("color-text");
+
+      if (!artId || !colorId) {
+        metaEl.textContent = "Missing art_id or color_id query param.";
+        textEl.textContent = "";
+        document.getElementById("createDirtBtn").disabled = true;
+        document.getElementById("runButton").disabled = true;
+        return;
+      }
+
+      metaEl.textContent = "Loading color…";
+      textEl.textContent = "Loading…";
+
+      try {
+        const res = await fetch(API_COLORS_BY_ART(artId));
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to load colors");
+        }
+
+        const rows = Array.isArray(data) ? data : [];
+        const row = rows.find((r) => Number(r.id) === colorId);
+
+        if (!row) {
+          metaEl.textContent = `Color #${colorId} not found for art #${artId}.`;
+          textEl.textContent = "";
+          document.getElementById("createDirtBtn").disabled = true;
+          document.getElementById("runButton").disabled = true;
+          return;
+        }
+
+        const bits = [];
+        if (row.origin) bits.push(row.origin);
+        if (row.model) bits.push(row.model);
+        if (row.created_at) bits.push(`created: ${row.created_at}`);
+        if (row.updated_at) bits.push(`updated: ${row.updated_at}`);
+
+        metaEl.textContent = bits.join(" · ") || `art_id=${row.art_id} · color_id=${row.id}`;
+        colorText = row.output_text || "";
+        textEl.textContent = colorText || "(no color text)";
+      } catch (err) {
+        metaEl.textContent = "Error loading color.";
+        textEl.textContent = err.message || String(err);
+        document.getElementById("createDirtBtn").disabled = true;
+        document.getElementById("runButton").disabled = true;
+      }
+    }
+
+    async function loadDirt() {
+      const list = document.getElementById("dirtList");
+      list.textContent = "Loading dirt…";
+
+      if (!colorId) {
+        list.textContent = "Missing color_id.";
+        return;
+      }
+
+      try {
+        const res = await fetch(API_DIRT_ANALYSES(colorId));
+        const rows = await res.json();
+        if (!res.ok) throw new Error(rows.message || rows.error || "Failed to load dirt");
+
+        dirtRows = Array.isArray(rows) ? rows : [];
+        renderDirt();
+      } catch (e) {
+        list.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    function renderDirt() {
+      const list = document.getElementById("dirtList");
+      list.innerHTML = "";
+
+      if (!dirtRows.length) {
+        list.textContent = "No dirt yet for this color.";
+        return;
+      }
+
+      // newest first if created_at exists
+      dirtRows.sort((a, b) =>
+        String(b.created_at || "").localeCompare(String(a.created_at || ""))
+      );
+
+      dirtRows.forEach((d, idx) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "item";
+
+        const header = document.createElement("div");
+        header.className = "item-header";
+
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "item-title";
+        title.textContent = `Dirt #${d.id}`;
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = `${d.name || ""}${d.created_at ? " · " + d.created_at : ""}`;
+        left.appendChild(title);
+        left.appendChild(meta);
+
+        const caret = document.createElement("span");
+        caret.className = "caret";
+        caret.textContent = "▸";
+
+        header.appendChild(left);
+        header.appendChild(caret);
+
+        const body = document.createElement("div");
+        body.className = "item-body";
+        body.textContent = (d.content || d.output_text || "").trim();
+
+        header.addEventListener("click", () => {
+          const open = body.style.display === "none" || body.style.display === "";
+          body.style.display = open ? "block" : "none";
+          caret.textContent = open ? "▾" : "▸";
+        });
+
+        if (idx === 0) {
+          body.style.display = "block";
+          caret.textContent = "▾";
+        }
+
+        wrapper.appendChild(header);
+        wrapper.appendChild(body);
+        list.appendChild(wrapper);
+      });
+    }
+
+    function randomSubset(arr, n) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy.slice(0, Math.max(0, Math.min(n, copy.length)));
+    }
+
+    async function createRandomDirt() {
+      const status = document.getElementById("dirtStatus");
+      status.textContent = "";
+
+      if (!colorId) {
+        status.textContent = "Missing color_id.";
+        return;
+      }
+
+      const n = parseInt(document.getElementById("numAnalyses").value || "0", 10);
+      if (!n || n <= 0) {
+        status.textContent = "Enter N ≥ 1.";
+        return;
+      }
+
+      const selected = randomSubset(ANALYSES, n);
+      status.textContent = `Running ${selected.length} analyses…`;
+
+      try {
+        const res = await fetch(API_DIRT_ANALYSES(colorId), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: selected.map((a) => a.key) }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || data.error || "Failed to queue analyses");
+        status.textContent = `Queued ${selected.length} analyses. Refresh soon to see created dirt.`;
+        setTimeout(loadDirt, 3000);
+      } catch (e) {
+        status.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
+    async function loadInstruments() {
+      const container = document.getElementById("instrument-choices");
+      const statusEl = document.getElementById("instrument-status");
+      container.textContent = "Loading instruments…";
+      statusEl.textContent = "";
+
+      try {
+        const res = await fetch(API_INSTRUMENTS);
+        if (!res.ok) throw new Error("Failed to load instruments");
+        const data = await res.json();
+        instruments = Array.isArray(data) ? data : [];
+        renderInstrumentChoices();
+        if (!instruments.length) {
+          statusEl.textContent = "No instruments yet. Add some on instruments.html.";
+        }
+      } catch (err) {
+        container.textContent = "";
+        statusEl.textContent = err.message || "Error loading instruments.";
+      }
+    }
+
+    function renderInstrumentChoices() {
+      const container = document.getElementById("instrument-choices");
+      container.innerHTML = "";
+
+      if (!instruments.length) {
+        container.innerHTML = '<div class="muted">No instruments available.</div>';
+        return;
+      }
+
+      instruments.forEach((inst) => {
+        const row = document.createElement("label");
+        row.className = "instrument-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = inst.id;
+
+        checkbox.addEventListener("change", () => {
+          const id = inst.id;
+          if (checkbox.checked) {
+            selectedInstrumentIds.add(id);
+          } else {
+            selectedInstrumentIds.delete(id);
+          }
+        });
+
+        const info = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "instrument-name";
+        name.textContent = inst.name || "(untitled)";
+        const desc = document.createElement("div");
+        desc.className = "instrument-desc";
+        desc.textContent = inst.description || "";
+        info.appendChild(name);
+        info.appendChild(desc);
+
+        row.appendChild(checkbox);
+        row.appendChild(info);
+        container.appendChild(row);
+      });
+    }
+
+    function selectRandomInstruments() {
+      if (!instruments.length) return;
+
+      const nInput = document.getElementById("randomCount");
+      let n = parseInt(nInput.value || "1", 10);
+      if (Number.isNaN(n) || n <= 0) n = 1;
+
+      const ids = instruments.map((i) => i.id);
+      const shuffled = ids.slice().sort(() => Math.random() - 0.5);
+      const chosen = new Set(shuffled.slice(0, Math.min(n, shuffled.length)));
+
+      selectedInstrumentIds = chosen;
+
+      const container = document.getElementById("instrument-choices");
+      container.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        const id = parseInt(cb.value, 10);
+        cb.checked = chosen.has(id);
+      });
+    }
+
+    async function runOperationalPathways() {
+      const runBtn = document.getElementById("runButton");
+      const statusEl = document.getElementById("run-status");
+      const resultsEl = document.getElementById("run-results");
+
+      if (!artId || !colorId) {
+        alert("Missing art_id or color_id.");
+        return;
+      }
+
+      const instrumentIds = Array.from(selectedInstrumentIds);
+      if (!instrumentIds.length) {
+        alert("Select at least one instrument.");
+        return;
+      }
+
+      runBtn.disabled = true;
+      statusEl.textContent = "Submitting tasks…";
+      resultsEl.innerHTML = "";
+
+      const brush_stroke = colorText || "";
+
+      const payloads = instrumentIds.map((instrument_id) => ({
+        art_id: artId,
+        color_id: colorId,
+        instrument_id,
+        brush_stroke,
+      }));
+
+      const calls = payloads.map(async (payload) => {
+        try {
+          const res = await fetch(API_OPERATIONAL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.message || data.error || "Request failed");
+          }
+          const inst = instruments.find((i) => i.id === payload.instrument_id);
+          return {
+            ok: true,
+            instrument_id: payload.instrument_id,
+            instrument_name: inst ? inst.name : `Instrument #${payload.instrument_id}`,
+            task_id: data.task_id,
+            status: data.status,
+          };
+        } catch (err) {
+          return {
+            ok: false,
+            instrument_id: payload.instrument_id,
+            error: err.message || String(err),
+          };
+        }
+      });
+
+      const results = await Promise.all(calls);
+
+      results.forEach((entry) => {
+        const div = document.createElement("div");
+        div.className = "op-entry";
+        if (entry.ok) {
+          div.textContent =
+            `${entry.instrument_name} (#${entry.instrument_id}): ` +
+            `queued as task ${entry.task_id} (status: ${entry.status}).`;
+        } else {
+          div.textContent =
+            `Instrument #${entry.instrument_id ?? "?"}: error submitting – ${entry.error}`;
+        }
+        resultsEl.appendChild(div);
+      });
+
+      statusEl.textContent = `Submitted ${instrumentIds.length} task(s).`;
+      runBtn.disabled = false;
+    }
+
+    (async () => {
+      await loadColor();
+      await loadDirt();
+      await loadInstruments();
+    })();
+  </script>
+</body>
+</html>
