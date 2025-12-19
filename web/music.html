@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Music Builder</title>
+  <title>Music – Instrument Pathways</title>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -26,21 +26,12 @@
       padding: 20px;
     }
 
-    h1 {
-      margin: 0 0 6px 0;
-    }
-
-    .muted {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
     .toolbar {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-bottom: 12px;
       align-items: center;
+      margin-bottom: 14px;
     }
 
     button {
@@ -50,12 +41,13 @@
       background: #fff;
       cursor: pointer;
       font-weight: 600;
+      font-size: 13px;
     }
 
     button.primary {
       background: var(--accent);
-      color: #fff;
       border-color: var(--accent);
+      color: #fff;
     }
 
     button:disabled {
@@ -63,10 +55,23 @@
       cursor: not-allowed;
     }
 
+    a.back-link {
+      text-decoration: none;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    h1, h2 {
+      margin: 0;
+    }
+
     .card {
       background: var(--card);
-      border: 1px solid var(--border);
       border-radius: 12px;
+      border: 1px solid var(--border);
       padding: 14px;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.04);
       margin-bottom: 14px;
@@ -77,32 +82,29 @@
       justify-content: space-between;
       align-items: center;
       gap: 10px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .meta {
       font-size: 12px;
       color: var(--muted);
-      margin-top: 4px;
-      margin-bottom: 6px;
+      margin: 4px 0 8px;
     }
 
-    .art-text,
     .color-text {
       white-space: pre-wrap;
       background: #f9fafb;
+      border-radius: 8px;
       border: 1px solid var(--border);
       padding: 10px;
-      border-radius: 8px;
-      margin-top: 6px;
       font-size: 14px;
     }
 
     .status {
       font-size: 12px;
       color: #333;
-      margin-top: 8px;
       white-space: pre-wrap;
+      margin-top: 6px;
     }
 
     .instrument-list {
@@ -111,8 +113,8 @@
       gap: 6px;
       max-height: 260px;
       overflow-y: auto;
-      border: 1px solid var(--border);
       border-radius: 10px;
+      border: 1px solid var(--border);
       padding: 8px;
       background: #f9fafb;
     }
@@ -164,8 +166,8 @@
     }
 
     .prev-card {
-      border: 1px solid var(--border);
       border-radius: 10px;
+      border: 1px solid var(--border);
       padding: 10px;
       background: #fff;
     }
@@ -179,13 +181,9 @@
     }
 
     .prev-body {
-      margin: 0;
       white-space: pre-wrap;
       font-size: 13px;
-    }
-
-    a.back-link {
-      text-decoration: none;
+      margin: 0;
     }
   </style>
 </head>
@@ -195,31 +193,28 @@
       <a id="backLink" class="back-link">
         <button>← Back to Painting</button>
       </a>
-      <div class="muted" id="header-label"></div>
+      <div id="header-label" class="muted"></div>
     </div>
 
-    <!-- COLOR DISPLAY -->
+    <!-- Color -->
     <section class="card">
       <div class="section-header">
-        <h1 style="font-size:18px; margin:0;">Color</h1>
-        <span class="muted">Source color for music / instrument runs</span>
+        <h1 style="font-size:18px;">Color</h1>
+        <span class="muted">This color text will be used as the goal / brush stroke.</span>
       </div>
-      <div id="color-meta" class="meta">Loading color…</div>
-      <div id="color-text" class="color-text">Loading…</div>
+      <div id="color-meta" class="meta"></div>
+      <div id="color-text" class="color-text">(no color text)</div>
     </section>
 
-    <!-- INSTRUMENT SELECTION -->
+    <!-- Instruments + run controls -->
     <section class="card">
       <div class="section-header">
-        <h2 style="margin:0; font-size:16px;">Instruments</h2>
-        <span class="muted">Select specific instruments or pick random ones</span>
+        <h2 style="font-size:16px;">Instruments</h2>
+        <span class="muted">Select one or more instruments, or choose N random.</span>
       </div>
 
       <div id="instrument-status" class="status"></div>
-
-      <div id="instrument-choices" class="instrument-list">
-        Loading instruments…
-      </div>
+      <div id="instrument-choices" class="instrument-list">Loading instruments…</div>
 
       <div class="run-controls">
         <label style="font-size:13px;">
@@ -227,7 +222,7 @@
           <input id="randomCount" type="number" min="1" value="1" />
         </label>
         <button type="button" onclick="selectRandomInstruments()">Select random</button>
-        <button type="button" class="primary" onclick="runOperationalPathways()" id="runButton">
+        <button type="button" class="primary" id="runButton" onclick="runOperationalPathways()">
           Run operational pathways
         </button>
       </div>
@@ -236,18 +231,16 @@
       <div id="run-results" class="runs-list"></div>
     </section>
 
-    <!-- PREVIOUS RESULTS -->
+    <!-- Previous results -->
     <section class="card">
       <div class="section-header">
-        <h2 style="margin:0; font-size:16px;">Previous results</h2>
+        <h2 style="font-size:16px;">Previous results</h2>
         <button type="button" onclick="loadPreviousRuns()">Refresh</button>
       </div>
       <div class="muted" style="margin-bottom:4px;">
-        Showing brush strokes / instrument runs previously generated for this color.
+        Previously generated brush strokes / instrument runs for this (art, color) pair.
       </div>
-      <div id="previous-runs" class="runs-list">
-        Loading…
-      </div>
+      <div id="previous-runs" class="runs-list">Loading…</div>
     </section>
   </div>
 
@@ -255,72 +248,55 @@
     const params = new URLSearchParams(window.location.search);
     const artId = parseInt(params.get("art_id") || "", 10);
     const colorId = parseInt(params.get("color_id") || "", 10);
+    const colorTextParam = params.get("color_text") || "";
 
     const API_INSTRUMENTS = "/instruments";
     const API_OPERATIONAL = "/instruments/operational_pathways";
-    // Adjust this if your existing brush_strokes API uses a different path:
-    const API_BRUSH_BY_COLOR = (cid) => `/brush_strokes/by_color/${cid}`;
+    const API_BRUSH_LIST = "/colors/brush_strokes";
 
     let instruments = [];
     let selectedInstrumentIds = new Set();
-    let colorText = "";
+    let colorText = colorTextParam;
 
     const backLink = document.getElementById("backLink");
     const headerLabel = document.getElementById("header-label");
+    const colorMetaEl = document.getElementById("color-meta");
+    const colorTextEl = document.getElementById("color-text");
 
+    // Header + back link wiring
     if (artId) {
       backLink.href = `/painting.html?art_id=${artId}`;
       headerLabel.textContent = `Art #${artId}${colorId ? " · Color #" + colorId : ""}`;
     } else {
-      backLink.href = "/make-art.html";
+      backLink.href = "/art.html";
       headerLabel.textContent = colorId ? `Color #${colorId}` : "Missing art_id";
     }
 
-    if (!colorId) {
-      document.getElementById("color-meta").textContent = "Missing color_id query param.";
-      document.getElementById("color-text").textContent = "";
-      document.getElementById("runButton").disabled = true;
-    }
-
-    // --- INIT ---
-    (async function init() {
-      try {
-        await Promise.all([loadColor(), loadInstruments()]);
-        await loadPreviousRuns();
-      } catch (e) {
-        console.warn("Init error", e);
+    function initColorDisplay() {
+      if (!colorId) {
+        colorMetaEl.textContent = "Missing color_id query param.";
+        colorTextEl.textContent = "";
+        document.getElementById("runButton").disabled = true;
+        return;
       }
-    })();
 
-    // --- LOAD COLOR TEXT ---
-    async function loadColor() {
-      if (!colorId) return;
-      const metaEl = document.getElementById("color-meta");
-      const textEl = document.getElementById("color-text");
-      metaEl.textContent = "Loading color…";
-      textEl.textContent = "Loading…";
+      const metaBits = [];
+      metaBits.push(`art_id=${artId || "?"}`);
+      metaBits.push(`color_id=${colorId}`);
+      colorMetaEl.textContent = metaBits.join(" · ");
 
-      try {
-        // If your API is different, adjust this URL.
-        const res = await fetch(`/colors/${colorId}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Failed to load color");
-
-        metaEl.textContent =
-          `Origin: ${data.origin || ""} · Model: ${data.model || ""} · Created: ${data.created_at || ""}`;
-        colorText = data.output_text || "";
-        textEl.textContent = colorText || "(no color text)";
-      } catch (err) {
-        metaEl.textContent = "Error loading color.";
-        textEl.textContent = err.message || String(err);
+      if (colorTextParam) {
+        colorTextEl.textContent = colorTextParam;
+      } else {
+        colorTextEl.textContent = "(no color text provided in URL; brush_stroke will be empty)";
       }
     }
 
-    // --- LOAD INSTRUMENTS ---
+    // Load instruments from the same API used by instruments.html
     async function loadInstruments() {
       const container = document.getElementById("instrument-choices");
       const statusEl = document.getElementById("instrument-status");
-      container.innerHTML = "Loading instruments…";
+      container.textContent = "Loading instruments…";
       statusEl.textContent = "";
 
       try {
@@ -333,7 +309,7 @@
           statusEl.textContent = "No instruments yet. Add some on instruments.html.";
         }
       } catch (err) {
-        container.innerHTML = "";
+        container.textContent = "";
         statusEl.textContent = err.message || "Error loading instruments.";
       }
     }
@@ -347,7 +323,7 @@
         return;
       }
 
-      instruments.forEach((inst) => {
+      instruments.forEach(inst => {
         const row = document.createElement("label");
         row.className = "instrument-item";
 
@@ -364,23 +340,21 @@
           }
         });
 
-        const title = document.createElement("span");
-        title.className = "instrument-name";
-        title.textContent = inst.name || "(untitled)";
+        const name = document.createElement("span");
+        name.className = "instrument-name";
+        name.textContent = inst.name || "(untitled)";
 
         const desc = document.createElement("span");
         desc.className = "instrument-desc";
         desc.textContent = inst.description || "No description.";
 
         row.appendChild(checkbox);
-        row.appendChild(title);
+        row.appendChild(name);
         row.appendChild(desc);
-
         container.appendChild(row);
       });
     }
 
-    // --- RANDOM SELECTION ---
     function selectRandomInstruments() {
       if (!instruments.length) return;
 
@@ -388,33 +362,23 @@
       let n = parseInt(nInput.value || "1", 10);
       if (Number.isNaN(n) || n <= 0) n = 1;
 
-      const ids = instruments.map((i) => i.id);
-      const chosen = new Set();
-
-      // Simple shuffle-based selection
+      const ids = instruments.map(i => i.id);
       const shuffled = ids.slice().sort(() => Math.random() - 0.5);
-      for (let i = 0; i < Math.min(n, shuffled.length); i++) {
-        chosen.add(shuffled[i]);
-      }
+      const chosen = new Set(shuffled.slice(0, Math.min(n, shuffled.length)));
 
       selectedInstrumentIds = chosen;
 
-      // Update checkboxes in UI
+      // sync checkboxes
       const container = document.getElementById("instrument-choices");
-      container.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+      container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
         const id = parseInt(cb.value, 10);
         cb.checked = chosen.has(id);
       });
     }
 
-    // --- RUN OPERATIONAL PATHWAYS (PARALLEL ENDPOINT CALLS) ---
     async function runOperationalPathways() {
-      if (!colorId || !artId) {
+      if (!artId || !colorId) {
         alert("Missing art_id or color_id.");
-        return;
-      }
-      if (!colorText) {
-        alert("Color text is not loaded yet.");
         return;
       }
 
@@ -432,45 +396,47 @@
       statusEl.textContent = "Submitting tasks…";
       resultsEl.innerHTML = "";
 
-      const payloads = instrumentIds.map((instrument_id) => ({
+      const brush_stroke = colorText || ""; // from URL param
+
+      const payloads = instrumentIds.map(instrument_id => ({
         art_id: artId,
         color_id: colorId,
         instrument_id,
-        brush_stroke: colorText,
+        brush_stroke
       }));
 
-      const calls = payloads.map(async (payload) => {
+      // Fire all endpoint calls simultaneously – backend handles queueing / concurrency
+      const calls = payloads.map(async payload => {
         try {
           const res = await fetch(API_OPERATIONAL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload)
           });
           const data = await res.json();
           if (!res.ok) {
             throw new Error(data.message || data.error || "Request failed");
           }
-          const inst = instruments.find((i) => i.id === payload.instrument_id);
+          const inst = instruments.find(i => i.id === payload.instrument_id);
           return {
             ok: true,
             instrument_id: payload.instrument_id,
             instrument_name: inst ? inst.name : `Instrument #${payload.instrument_id}`,
             task_id: data.task_id,
-            status: data.status,
+            status: data.status
           };
         } catch (err) {
           return {
             ok: false,
             instrument_id: payload.instrument_id,
-            error: err.message || String(err),
+            error: err.message || String(err)
           };
         }
       });
 
-      const settled = await Promise.allSettled(calls);
-      const flat = settled.map((r) => (r.status === "fulfilled" ? r.value : { ok: false, error: r.reason }));
+      const results = await Promise.all(calls);
 
-      flat.forEach((entry) => {
+      results.forEach(entry => {
         const div = document.createElement("div");
         div.className = "run-item";
         if (entry.ok) {
@@ -484,25 +450,29 @@
         resultsEl.appendChild(div);
       });
 
-      statusEl.textContent = `Submitted ${instrumentIds.length} task(s). Backend worker will process them via queue.`;
+      statusEl.textContent = `Submitted ${instrumentIds.length} task(s). Backend worker will process them via the queue.`;
       runBtn.disabled = false;
 
-      // After a short delay, refresh previous results so completed runs start to appear.
+      // Refresh previous runs shortly after submitting
       setTimeout(() => {
         loadPreviousRuns();
       }, 1500);
     }
 
-    // --- PREVIOUS RESULTS ---
     async function loadPreviousRuns() {
-      if (!colorId) return;
       const container = document.getElementById("previous-runs");
+      if (!artId || !colorId) {
+        container.textContent = "Missing art_id or color_id.";
+        return;
+      }
+
       container.textContent = "Loading…";
 
       try {
-        const res = await fetch(API_BRUSH_BY_COLOR(colorId));
+        const url = `${API_BRUSH_LIST}?art_id=${encodeURIComponent(artId)}&color_id=${encodeURIComponent(colorId)}`;
+        const res = await fetch(url);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Failed to load previous runs");
+        if (!res.ok) throw new Error(data.message || "Failed to load brush strokes");
 
         const rows = Array.isArray(data) ? data : [];
         if (!rows.length) {
@@ -510,15 +480,17 @@
           return;
         }
 
-        // Newest first
-        rows.sort(
-          (a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))
+        // Sort newest first by created_at (backend already does, but just in case)
+        rows.sort((a, b) =>
+          String(b.created_at || "").localeCompare(String(a.created_at || ""))
         );
 
         container.innerHTML = "";
-        rows.forEach((row) => {
-          const inst = instruments.find((i) => i.id === row.instrument_id);
-          const name = inst ? inst.name : (row.instrument_id != null ? `Instrument #${row.instrument_id}` : "Unknown instrument");
+        rows.forEach(row => {
+          const inst = instruments.find(i => i.id === row.instrument_id);
+          const instName = inst
+            ? inst.name
+            : (row.instrument_id != null ? `Instrument #${row.instrument_id}` : "Unknown instrument");
 
           const card = document.createElement("div");
           card.className = "prev-card";
@@ -527,7 +499,7 @@
           head.className = "prev-head";
 
           const title = document.createElement("div");
-          title.innerHTML = `<strong>${escapeHtml(name)}</strong>`;
+          title.innerHTML = `<strong>${escapeHtml(instName)}</strong>`;
 
           const meta = document.createElement("div");
           meta.className = "muted";
@@ -558,6 +530,13 @@
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
     }
+
+    // --- Init sequence ---
+    initColorDisplay();
+    (async () => {
+      await loadInstruments();
+      await loadPreviousRuns();
+    })();
   </script>
 </body>
 </html>
