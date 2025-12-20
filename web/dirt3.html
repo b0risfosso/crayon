@@ -184,11 +184,7 @@
       font-weight: 600;
     }
 
-    .instrument-desc {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
+    /* For op-pathway submission info */
     .op-list {
       display: flex;
       flex-direction: column;
@@ -201,6 +197,51 @@
     .op-entry {
       font-size: 12px;
       color: var(--muted);
+    }
+
+    /* Brush strokes list (copied style from music.html) */
+    .runs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+
+    .prev-card {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 10px;
+      background: #fff;
+    }
+
+    .prev-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+
+    .prev-body {
+      white-space: pre-wrap;
+      font-size: 13px;
+      margin: 0;
+      display: none; /* collapsed by default */
+    }
+
+    .prev-card.expanded .prev-body {
+      display: block;
+    }
+
+    .prev-toggle {
+      font-size: 12px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      cursor: pointer;
     }
 
     a.back-link {
@@ -231,17 +272,23 @@
     <section class="card">
       <div class="section-header">
         <h2 style="font-size:16px;">Create Dirt</h2>
-        <span class="muted">Randomly run N analyses for this (art, color).</span>
+        <span class="muted">Select analyses to run for this (art, color).</span>
       </div>
+
+      <div class="muted" style="margin-bottom:6px;">Analyses</div>
+      <div id="analysis-choices" class="instrument-list"></div>
+
       <div class="controls">
         <label class="muted">
-          N analyses
-          <input id="numAnalyses" type="number" min="1" max="10" value="3" />
+          Random N
+          <input id="analysisRandomCount" type="number" min="1" value="3" />
         </label>
-        <button class="primary" id="createDirtBtn" type="button" onclick="createRandomDirt()">
+        <button type="button" onclick="selectRandomAnalyses()">Select random analyses</button>
+        <button class="primary" id="createDirtBtn" type="button" onclick="createDirt()">
           Create dirt
         </button>
       </div>
+
       <div id="dirtStatus" class="status"></div>
     </section>
 
@@ -255,7 +302,7 @@
       <div id="dirtList" class="list">Loading dirt…</div>
     </section>
 
-    <!-- Operational pathways -->
+    <!-- Operational pathways (create brush_strokes) -->
     <section class="card">
       <div class="section-header">
         <h2 style="font-size:16px;">Operational Pathways</h2>
@@ -271,7 +318,7 @@
           Random N
           <input id="randomCount" type="number" min="1" value="1" />
         </label>
-        <button type="button" onclick="selectRandomInstruments()">Select random</button>
+        <button type="button" onclick="selectRandomInstruments()">Select random instruments</button>
         <button type="button" class="primary" id="runButton" onclick="runOperationalPathways()">
           Run operational pathways
         </button>
@@ -279,6 +326,18 @@
 
       <div id="run-status" class="status"></div>
       <div id="run-results" class="op-list"></div>
+    </section>
+
+    <!-- Brush strokes display (like music.html) -->
+    <section class="card">
+      <div class="section-header">
+        <h2 style="font-size:16px;">Brush Strokes</h2>
+        <button type="button" onclick="loadBrushStrokes()">Refresh</button>
+      </div>
+      <div class="muted" style="margin-bottom:4px;">
+        Previously generated brush strokes / instrument runs for this (art, color) pair.
+      </div>
+      <div id="brushList" class="runs-list">Loading…</div>
     </section>
   </div>
 
@@ -291,8 +350,9 @@
     const API_DIRT_ANALYSES = (cid) => `/dirt/bridge/color/${cid}/analyses`;
     const API_INSTRUMENTS = "/instruments";
     const API_OPERATIONAL = "/instruments/operational_pathways";
+    const API_BRUSH_LIST = "/colors/brush_strokes";
 
-    // Same analysis keys used in brush_strokes.html
+    // Analyses catalog (from brush_strokes.html)
     const ANALYSES = [
       { key: "decompose", label: "Decomposition" },
       { key: "abstractions", label: "Abstractions & Metaphors" },
@@ -345,6 +405,7 @@
     let dirtRows = [];
     let instruments = [];
     let selectedInstrumentIds = new Set();
+    let selectedAnalysisKeys = new Set();
 
     const backLink = document.getElementById("backLink");
     const headerLabel = document.getElementById("header-label");
@@ -437,7 +498,6 @@
         return;
       }
 
-      // newest first if created_at exists
       dirtRows.sort((a, b) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))
       );
@@ -471,7 +531,8 @@
         body.textContent = (d.content || d.output_text || "").trim();
 
         header.addEventListener("click", () => {
-          const open = body.style.display === "none" || body.style.display === "";
+          const open =
+            body.style.display === "none" || body.style.display === "";
           body.style.display = open ? "block" : "none";
           caret.textContent = open ? "▾" : "▸";
         });
@@ -496,7 +557,57 @@
       return copy.slice(0, Math.max(0, Math.min(n, copy.length)));
     }
 
-    async function createRandomDirt() {
+    // --- Analyses selection UI ---
+
+    function renderAnalysisChoices() {
+      const container = document.getElementById("analysis-choices");
+      container.innerHTML = "";
+
+      ANALYSES.forEach((a) => {
+        const row = document.createElement("label");
+        row.className = "instrument-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = a.key;
+
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) {
+            selectedAnalysisKeys.add(a.key);
+          } else {
+            selectedAnalysisKeys.delete(a.key);
+          }
+        });
+
+        const name = document.createElement("span");
+        name.className = "instrument-name";
+        name.textContent = a.label || a.key;
+
+        row.appendChild(checkbox);
+        row.appendChild(name);
+        container.appendChild(row);
+      });
+    }
+
+    function selectRandomAnalyses() {
+      const countInput = document.getElementById("analysisRandomCount");
+      let n = parseInt(countInput.value || "1", 10);
+      if (Number.isNaN(n) || n <= 0) n = 1;
+
+      const chosen = new Set(
+        randomSubset(ANALYSES, n).map((a) => a.key)
+      );
+      selectedAnalysisKeys = chosen;
+
+      const container = document.getElementById("analysis-choices");
+      container
+        .querySelectorAll('input[type="checkbox"]')
+        .forEach((cb) => {
+          cb.checked = chosen.has(cb.value);
+        });
+    }
+
+    async function createDirt() {
       const status = document.getElementById("dirtStatus");
       status.textContent = "";
 
@@ -505,29 +616,30 @@
         return;
       }
 
-      const n = parseInt(document.getElementById("numAnalyses").value || "0", 10);
-      if (!n || n <= 0) {
-        status.textContent = "Enter N ≥ 1.";
+      const keys = Array.from(selectedAnalysisKeys);
+      if (!keys.length) {
+        status.textContent = "Select at least one analysis (or use random selection).";
         return;
       }
 
-      const selected = randomSubset(ANALYSES, n);
-      status.textContent = `Running ${selected.length} analyses…`;
+      status.textContent = `Running ${keys.length} analyses…`;
 
       try {
         const res = await fetch(API_DIRT_ANALYSES(colorId), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keys: selected.map((a) => a.key) }),
+          body: JSON.stringify({ keys }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || data.error || "Failed to queue analyses");
-        status.textContent = `Queued ${selected.length} analyses. Refresh soon to see created dirt.`;
+        status.textContent = `Queued ${keys.length} analyses. Refreshing shortly…`;
         setTimeout(loadDirt, 3000);
       } catch (e) {
         status.textContent = `Error: ${e.message || e}`;
       }
     }
+
+    // --- Instruments & operational pathways (brush_strokes creation) ---
 
     async function loadInstruments() {
       const container = document.getElementById("instrument-choices");
@@ -576,18 +688,13 @@
           }
         });
 
-        const info = document.createElement("div");
-        const name = document.createElement("div");
+        const name = document.createElement("span");
         name.className = "instrument-name";
         name.textContent = inst.name || "(untitled)";
-        const desc = document.createElement("div");
-        desc.className = "instrument-desc";
-        desc.textContent = inst.description || "";
-        info.appendChild(name);
-        info.appendChild(desc);
 
+        // NOTE: No instrument descriptions shown here per your request
         row.appendChild(checkbox);
-        row.appendChild(info);
+        row.appendChild(name);
         container.appendChild(row);
       });
     }
@@ -687,12 +794,113 @@
 
       statusEl.textContent = `Submitted ${instrumentIds.length} task(s).`;
       runBtn.disabled = false;
+
+      // After submitting, refresh brush strokes later to show new results when ready
+      setTimeout(loadBrushStrokes, 2000);
     }
 
+    // --- Brush strokes display (like music.html) ---
+
+    async function loadBrushStrokes() {
+      const container = document.getElementById("brushList");
+      if (!artId || !colorId) {
+        container.textContent = "Missing art_id or color_id.";
+        return;
+      }
+
+      container.textContent = "Loading…";
+
+      try {
+        const url =
+          `${API_BRUSH_LIST}?art_id=${encodeURIComponent(artId)}&color_id=${encodeURIComponent(colorId)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load brush strokes");
+
+        const rows = Array.isArray(data) ? data : [];
+        if (!rows.length) {
+          container.textContent = "No brush strokes yet for this (art, color) pair.";
+          return;
+        }
+
+        rows.sort((a, b) =>
+          String(b.created_at || "").localeCompare(String(a.created_at || ""))
+        );
+
+        container.innerHTML = "";
+
+        rows.forEach((row) => {
+          const inst = instruments.find((i) => i.id === row.instrument_id);
+          const instName = inst
+            ? inst.name
+            : row.instrument_id != null
+            ? `Instrument #${row.instrument_id}`
+            : "Unknown instrument";
+
+          const card = document.createElement("div");
+          card.className = "prev-card";
+
+          const head = document.createElement("div");
+          head.className = "prev-head";
+
+          const headLeft = document.createElement("div");
+          headLeft.style.display = "flex";
+          headLeft.style.flexDirection = "column";
+
+          const title = document.createElement("div");
+          title.innerHTML = `<strong>${escapeHtml(instName)}</strong>`;
+
+          const meta = document.createElement("div");
+          meta.className = "muted";
+          meta.textContent =
+            `Brush stroke #${row.id}` +
+            (row.created_at ? ` · ${row.created_at}` : "");
+
+          headLeft.appendChild(title);
+          headLeft.appendChild(meta);
+
+          const toggleBtn = document.createElement("button");
+          toggleBtn.type = "button";
+          toggleBtn.className = "prev-toggle";
+          toggleBtn.textContent = "Expand";
+
+          toggleBtn.addEventListener("click", () => {
+            const expanded = card.classList.toggle("expanded");
+            toggleBtn.textContent = expanded ? "Collapse" : "Expand";
+          });
+
+          head.appendChild(headLeft);
+          head.appendChild(toggleBtn);
+
+          const body = document.createElement("pre");
+          body.className = "prev-body";
+          body.textContent = row.output_text || "";
+
+          card.appendChild(head);
+          card.appendChild(body);
+          container.appendChild(card);
+        });
+      } catch (err) {
+        container.textContent = err.message || "Error loading brush strokes.";
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    // Init
     (async () => {
+      renderAnalysisChoices();
       await loadColor();
       await loadDirt();
       await loadInstruments();
+      await loadBrushStrokes();
     })();
   </script>
 </body>
