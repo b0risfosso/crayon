@@ -94,6 +94,8 @@
       <div class="muted" id="art-id-label"></div>
     </div>
 
+    <div class="muted" id="breadcrumb" style="margin-bottom: 8px;"></div>
+
     <div id="art-card" class="card">
       <div class="muted">Art</div>
       <div id="art-meta" class="meta"></div>
@@ -128,16 +130,40 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const artId = parseInt(params.get('art_id') || '', 10);
+    const parentColorId = params.has('color_id')
+      ? parseInt(params.get('color_id') || '', 10)
+      : null;
+
+    // full breadcrumb trail of color ids, from root to current
+    const trailParam = params.get('trail') || '';
+    let colorTrail = [];
+    if (trailParam) {
+      colorTrail = trailParam
+        .split(',')
+        .map((s) => parseInt(s, 10))
+        .filter((n) => !Number.isNaN(n));
+    } else if (parentColorId) {
+      // first time entering a color context without explicit trail
+      colorTrail = [parentColorId];
+    }
+
+
     const originFilter = 'colors.build_thought';
     const manualOrigin = 'colors.manual_add';
 
     if (!artId) {
       document.getElementById('art-text').textContent = 'Missing art_id query param.';
     } else {
-      document.getElementById('art-id-label').textContent = `Art #${artId}`;
+      const label = parentColorId
+        ? `Art #${artId} · Colors under Color #${parentColorId}`
+        : `Art #${artId}`;
+      document.getElementById('art-id-label').textContent = label;
+
+      renderBreadcrumb();
       loadArt();
       refreshColors();
     }
+
 
     async function loadArt() {
       try {
@@ -195,6 +221,53 @@
       }
     }
 
+    function renderBreadcrumb() {
+      const el = document.getElementById('breadcrumb');
+      if (!el) return;
+
+      if (!artId) {
+        el.textContent = '';
+        return;
+      }
+
+      const parts = [];
+
+      // Root: art-level
+      const rootLink = document.createElement('a');
+      rootLink.href = `/painting.html?art_id=${artId}`;
+      rootLink.textContent = `Art #${artId}`;
+      rootLink.style.textDecoration = 'none';
+      rootLink.style.cursor = 'pointer';
+      parts.push(rootLink);
+
+      // Color trail: Color #x › Color #y…
+      colorTrail.forEach((id, idx) => {
+        const sep = document.createElement('span');
+        sep.textContent = ' › ';
+        parts.push(sep);
+
+        if (idx === colorTrail.length - 1) {
+          // current level (not clickable)
+          const span = document.createElement('span');
+          span.textContent = `Color #${id}`;
+          parts.push(span);
+        } else {
+          // ancestor color – clickable
+          const link = document.createElement('a');
+          const partialTrail = colorTrail.slice(0, idx + 1).join(',');
+          link.href = `/painting.html?art_id=${artId}&color_id=${id}&trail=${encodeURIComponent(partialTrail)}`;
+          link.textContent = `Color #${id}`;
+          link.style.textDecoration = 'none';
+          link.style.cursor = 'pointer';
+          parts.push(link);
+        }
+      });
+
+      el.innerHTML = '';
+      parts.forEach((node) => el.appendChild(node));
+    }
+
+
 
     function renderColors(colors) {
       const list = document.getElementById('colors-list');
@@ -238,8 +311,22 @@
         openColorsBtn.textContent = 'Open Colors';
         openColorsBtn.onclick = (e) => {
           e.stopPropagation();
-          const url = `/painting.html?art_id=${artId}&color_id=${c.id}`;
-          window.open(url, '_blank'); // or window.location.href = url; if you prefer same tab
+
+          // Build new trail: existing trail + this color
+          let newTrail;
+          if (colorTrail.length) {
+            newTrail = [...colorTrail, c.id];
+          } else if (parentColorId) {
+            // safety fallback, but usually colorTrail already has parentColorId
+            newTrail = [parentColorId, c.id];
+          } else {
+            // from top-level art view
+            newTrail = [c.id];
+          }
+
+          const trailStr = encodeURIComponent(newTrail.join(','));
+          const url = `/painting.html?art_id=${artId}&color_id=${c.id}&trail=${trailStr}`;
+          window.open(url, '_blank'); // or window.location.href = url;
         };
         actionRow.appendChild(openColorsBtn);
 
