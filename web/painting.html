@@ -88,7 +88,7 @@
 <body>
   <div class="page">
     <div class="toolbar">
-      <a href="make-art.html" style="text-decoration:none;">
+      <a href="art.html" style="text-decoration:none;">
         <button>← Back to Art</button>
       </a>
       <div class="muted" id="art-id-label"></div>
@@ -105,10 +105,6 @@
         <h2 style="margin:0;">Create Colors</h2>
         <button onclick="refreshColors()">Refresh</button>
       </div>
-      <div class="toolbar">
-        <button class="primary" onclick="enqueueColors()" id="build-btn">Create via build_thought</button>
-      </div>
-      <div id="build-status" class="status"></div>
 
       <div style="margin-top:12px;">
         <div class="muted" style="margin-bottom:6px;">Manual color</div>
@@ -137,7 +133,6 @@
 
     if (!artId) {
       document.getElementById('art-text').textContent = 'Missing art_id query param.';
-      document.getElementById('build-btn').disabled = true;
     } else {
       document.getElementById('art-id-label').textContent = `Art #${artId}`;
       loadArt();
@@ -163,9 +158,18 @@
       if (!artId) return;
       const list = document.getElementById('colors-list');
       list.textContent = 'Loading colors…';
+
       try {
-        const url = `/colors/by_art/${artId}?origin=${encodeURIComponent(originFilter)}`;
-        const manualUrl = `/colors/by_art/${artId}?origin=${encodeURIComponent(manualOrigin)}`;
+        const autoParams = new URLSearchParams();
+        autoParams.set('origin', originFilter);
+        if (parentColorId) autoParams.set('parent_color_id', String(parentColorId));
+
+        const manualParams = new URLSearchParams();
+        manualParams.set('origin', manualOrigin);
+        if (parentColorId) manualParams.set('parent_color_id', String(parentColorId));
+
+        const url = `/colors/by_art/${artId}?` + autoParams.toString();
+        const manualUrl = `/colors/by_art/${artId}?` + manualParams.toString();
 
         const [autoRes, manualRes] = await Promise.all([
           fetch(url),
@@ -190,6 +194,7 @@
         list.textContent = `Error: ${e.message || e}`;
       }
     }
+
 
     function renderColors(colors) {
       const list = document.getElementById('colors-list');
@@ -229,6 +234,16 @@
         const actionRow = document.createElement('div');
         actionRow.className = 'toolbar';
 
+        const openColorsBtn = document.createElement('button');
+        openColorsBtn.textContent = 'Open Colors';
+        openColorsBtn.onclick = (e) => {
+          e.stopPropagation();
+          const url = `/painting.html?art_id=${artId}&color_id=${c.id}`;
+          window.open(url, '_blank'); // or window.location.href = url; if you prefer same tab
+        };
+        actionRow.appendChild(openColorsBtn);
+
+
         // NEW: single button to open dirt3.html
         const dirt3Btn = document.createElement('button');
         dirt3Btn.textContent = 'Open Dirt';
@@ -238,6 +253,8 @@
           window.open(url, '_blank');
         };
         actionRow.appendChild(dirt3Btn);
+
+        
 
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = 'Delete Color';
@@ -332,8 +349,9 @@
             art_id: artId,
             text,
             metadata: { source: 'painting.manual' },
-            model: 'manual'
-          })
+            model: 'manual',
+            parent_color_id: parentColorId,  // <-- key line
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Failed to save');
@@ -345,6 +363,7 @@
         status.textContent = `Error: ${e.message || e}`;
       }
     }
+
   </script>
 </body>
 </html>

@@ -223,6 +223,7 @@ def insert_color_row(
     usage: Optional[Dict[str, Any]],
     user_metadata: Dict[str, Any],
     origin: str = "colors.build_thought",
+    parent_color_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     created_at = utc_now_iso()
     updated_at = created_at
@@ -230,6 +231,7 @@ def insert_color_row(
     md_obj = {
         "source": origin,
         "original_art_id": art_id,
+        "parent_color_id": parent_color_id,
         "usage": usage,
         "user_metadata": user_metadata or {},
     }
@@ -240,14 +242,15 @@ def insert_color_row(
         row = db.execute(
             """
             INSERT INTO colors
-              (art_id, input_art, output_text, model, provider,
+              (art_id, parent_color_id, input_art, output_text, model, provider,
                metadata, origin, created_at, updated_at)
-            VALUES (?,      ?,         ?,          ?,     ?, 
-                    ?,      ?,          ?,          ?)
+            VALUES (?,      ?,               ?,         ?,          ?,     ?,
+                    ?,       ?,       ?,          ?)
             RETURNING *
             """,
             (
                 art_id,
+                parent_color_id,
                 input_art,
                 output_text,
                 model,
@@ -268,6 +271,7 @@ def insert_color_row(
     except Exception:
         pass
     return out
+
 
 
 def insert_dirt_row(
@@ -614,6 +618,7 @@ def worker_loop(worker_id: int):
                     usage=usage_dict,
                     user_metadata=user_metadata,
                     origin="colors.build_thought",
+                    parent_color_id=None,  # explicitly top-level
                 )
 
                 result = {
@@ -1048,36 +1053,71 @@ def get_queue_workers():
 @app.get("/colors/by_art/<int:art_id>")
 def colors_by_art(art_id: int):
     """
-    Return all color expansions for a given art_id.
+    Return color expansions for a given art_id.
 
-    Optional query param:
-      ?origin=colors.build_thought
+    Query params:
+      - origin: optional origin filter, e.g. "colors.build_thought" or "colors.manual_add"
+      - parent_color_id:
+          * omitted or null  → colors directly attached to the art (parent_color_id IS NULL)
+          * integer          → colors whose parent_color_id == that integer
     """
     origin = request.args.get("origin", type=str)
+    parent_color_id = request.args.get("parent_color_id", type=int)
 
     db = get_art_db()
-    if origin:
-        rows = db.execute(
-            """
-            SELECT *
-            FROM colors
-            WHERE art_id = ?
-              AND origin = ?
-            ORDER BY created_at DESC
-            """,
-            (art_id, origin),
-        ).fetchall()
-    else:
-        rows = db.execute(
-            """
-            SELECT *
-            FROM colors
-            WHERE art_id = ?
-            ORDER BY created_at DESC
-            """,
-            (art_id,),
-        ).fetchall()
-    db.close()
+    try:
+        if parent_color_id is None:
+            # top-level colors for this art
+            if origin:
+                rows = db.execute(
+                    """
+                    SELECT *
+                    FROM colors
+                    WHERE art_id = ?
+                      AND parent_color_id IS NULL
+                      AND origin = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (art_id, origin),
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    """
+                    SELECT *
+                    FROM colors
+                    WHERE art_id = ?
+                      AND parent_color_id IS NULL
+                    ORDER BY created_at DESC
+                    """,
+                    (art_id,),
+                ).fetchall()
+        else:
+            # children of a specific color within this art
+            if origin:
+                rows = db.execute(
+                    """
+                    SELECT *
+                    FROM colors
+                    WHERE art_id = ?
+                      AND parent_color_id = ?
+                      AND origin = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (art_id, parent_color_id, origin),
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    """
+                    SELECT *
+                    FROM colors
+                    WHERE art_id = ?
+                      AND parent_color_id = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (art_id, parent_color_id),
+                ).fetchall()
+    finally:
+        db.close()
 
     out = []
     for r in rows:
@@ -1089,6 +1129,7 @@ def colors_by_art(art_id: int):
         out.append(row)
 
     return jsonify(out)
+
 
 
 @app.get("/dirt/by_color/<int:color_id>")
@@ -1320,7 +1361,8 @@ def colors_manual_add():
         "art_id": 123,
         "text": "manual color text",  # required
         "model": "manual",            # optional label
-        "metadata": {...}             # optional user metadata
+        "metadata": {...},            # optional user metadata
+        "parent_color_id": 456        # optional, link this color to another color
       }
     """
     payload = require_json()
@@ -1335,6 +1377,31 @@ def colors_manual_add():
     model = str(payload.get("model", "manual"))
     user_metadata = payload.get("metadata") or {}
 
+    parent_color_id = payload.get("parent_color_id")
+    if parent_color_id is not None and not isinstance(parent_color_id, int):
+        abort(400, description="'parent_color_id' must be an integer if provided")
+
+    # Optional safety check: ensure parent_color_id (if present) belongs to same art_id
+    if parent_color_id is not None:
+        db = get_art_db()
+        try:
+            parent = db.execute(
+                "SELECT art_id FROM colors WHERE id = ?",
+                (parent_color_id,),
+            ).fetchone()
+        finally:
+            db.close()
+        if parent is None:
+            abort(400, description=f"parent_color_id {parent_color_id} not found")
+        if parent["art_id"] != art_id:
+            abort(
+                400,
+                description=(
+                    f"parent_color_id {parent_color_id} belongs to art_id "
+                    f"{parent['art_id']}, not {art_id}"
+                ),
+            )
+
     art_row = fetch_art_text(art_id)
     input_art = art_row.get("art") or ""
 
@@ -1346,9 +1413,11 @@ def colors_manual_add():
         usage=None,
         user_metadata=user_metadata,
         origin="colors.manual_add",
+        parent_color_id=parent_color_id,
     )
 
     return jsonify(color_row), 201
+
 
 
 # --- Error handlers -------------------------------------------------------
