@@ -102,6 +102,14 @@
       <div id="art-text" class="art-text">Loading art…</div>
     </div>
 
+    <!-- NEW: Parent Color card -->
+    <div id="parent-color-card" class="card" style="display:none;">
+      <div class="muted">Parent Color</div>
+      <div id="parent-color-meta" class="meta"></div>
+      <div id="parent-color-text" class="art-text"></div>
+    </div>
+
+
     <div class="card">
       <div class="section-header">
         <h2 style="margin:0;">Create Colors</h2>
@@ -161,6 +169,7 @@
 
       renderBreadcrumb();
       loadArt();
+      if (parentColorId) loadParentColor(parentColorId);
       refreshColors();
     }
 
@@ -266,6 +275,27 @@
       el.innerHTML = '';
       parts.forEach((node) => el.appendChild(node));
     }
+
+    async function loadParentColor(id) {
+      const card = document.getElementById('parent-color-card');
+      const meta = document.getElementById('parent-color-meta');
+      const text = document.getElementById('parent-color-text');
+
+      card.style.display = 'block';
+      text.textContent = 'Loading parent color…';
+
+      try {
+        const res = await fetch(`/colors/${id}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load parent color');
+
+        meta.textContent = `${data.origin || ''} · ${data.model || ''} · ${data.created_at || ''}`;
+        text.textContent = data.output_text || '(empty)';
+      } catch (e) {
+        text.textContent = `Error: ${e.message || e}`;
+      }
+    }
+
 
 
 
