@@ -346,7 +346,7 @@
     const artId = parseInt(params.get("art_id") || "", 10);
     const colorId = parseInt(params.get("color_id") || "", 10);
 
-    const API_COLORS_BY_ART = (aid) => `/colors/by_art/${aid}`;
+    const API_COLOR = (cid) => `/colors/${cid}`;
     const API_DIRT_ANALYSES = (cid) => `/dirt/bridge/color/${cid}/analyses`;
     const API_INSTRUMENTS = "/instruments";
     const API_OPERATIONAL = "/instruments/operational_pathways";
@@ -411,19 +411,25 @@
     const headerLabel = document.getElementById("header-label");
 
     if (artId) {
-      backLink.href = `/painting.html?art_id=${artId}`;
+      if (colorId) {
+        // Go back to the color’s nested painting view
+        backLink.href = `/painting.html?art_id=${artId}&color_id=${colorId}`;
+      } else {
+        backLink.href = `/painting.html?art_id=${artId}`;
+      }
       headerLabel.textContent = `Art #${artId}${colorId ? " · Color #" + colorId : ""}`;
     } else {
       backLink.href = "/art.html";
       headerLabel.textContent = colorId ? `Color #${colorId}` : "Missing art_id";
     }
 
+
     async function loadColor() {
       const metaEl = document.getElementById("color-meta");
       const textEl = document.getElementById("color-text");
 
-      if (!artId || !colorId) {
-        metaEl.textContent = "Missing art_id or color_id query param.";
+      if (!colorId) {
+        metaEl.textContent = "Missing color_id query param.";
         textEl.textContent = "";
         document.getElementById("createDirtBtn").disabled = true;
         document.getElementById("runButton").disabled = true;
@@ -434,21 +440,16 @@
       textEl.textContent = "Loading…";
 
       try {
-        const res = await fetch(API_COLORS_BY_ART(artId));
-        const data = await res.json();
+        const res = await fetch(API_COLOR(colorId));
+        const row = await res.json();
         if (!res.ok) {
-          throw new Error(data.message || "Failed to load colors");
+          throw new Error(row.message || "Failed to load color");
         }
 
-        const rows = Array.isArray(data) ? data : [];
-        const row = rows.find((r) => Number(r.id) === colorId);
-
-        if (!row) {
-          metaEl.textContent = `Color #${colorId} not found for art #${artId}.`;
-          textEl.textContent = "";
-          document.getElementById("createDirtBtn").disabled = true;
-          document.getElementById("runButton").disabled = true;
-          return;
+        // if artId wasn't passed in, or is wrong, sync it from the color row
+        if (!artId && row.art_id) {
+          backLink.href = `/painting.html?art_id=${row.art_id}`;
+          headerLabel.textContent = `Art #${row.art_id} · Color #${row.id}`;
         }
 
         const bits = [];
@@ -460,6 +461,10 @@
         metaEl.textContent = bits.join(" · ") || `art_id=${row.art_id} · color_id=${row.id}`;
         colorText = row.output_text || "";
         textEl.textContent = colorText || "(no color text)";
+
+        // make sure the buttons are enabled now that we have a valid color
+        document.getElementById("createDirtBtn").disabled = false;
+        document.getElementById("runButton").disabled = false;
       } catch (err) {
         metaEl.textContent = "Error loading color.";
         textEl.textContent = err.message || String(err);
@@ -467,6 +472,7 @@
         document.getElementById("runButton").disabled = true;
       }
     }
+
 
     async function loadDirt() {
       const list = document.getElementById("dirtList");
