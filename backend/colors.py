@@ -1419,6 +1419,26 @@ def colors_manual_add():
     return jsonify(color_row), 201
 
 
+@app.get("/colors/<int:color_id>")
+def get_color(color_id):
+    db = get_art_db()
+    try:
+        row = db.execute("SELECT * FROM colors WHERE id = ?", (color_id,)).fetchone()
+    finally:
+        db.close()
+
+    if not row:
+        abort(404, "color not found")
+
+    r = dict(row)
+    try:
+        r["metadata"] = json.loads(r.get("metadata") or "{}")
+    except:
+        pass
+    return jsonify(r)
+
+
+
 
 # --- Error handlers -------------------------------------------------------
 
