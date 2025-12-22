@@ -17,6 +17,7 @@ DB_PATH = "/var/www/site/data/oasis.db"
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+app.url_map.strict_slashes = False
 
 
 def utc_now_iso() -> str:
