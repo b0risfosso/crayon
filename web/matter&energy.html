@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matter &amp; Energy</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #f7f7f7; color: #111; }
+    main { max-width: 900px; margin: 0 auto; padding: 24px 18px 48px; }
+    header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: 22px; }
+    .muted { color: #666; font-size: 13px; }
+    .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
+    form { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    label { font-size: 13px; font-weight: 600; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid #d9d9d9; font-size: 14px; font-family: inherit; background: #fbfbfb; }
+    textarea { min-height: 90px; resize: vertical; }
+    button { padding: 9px 12px; border-radius: 8px; border: 1px solid #c9c9c9; background: linear-gradient(180deg, #fff, #f0f0f0); cursor: pointer; font-weight: 600; font-size: 14px; }
+    button:hover { background: #f7f7f7; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .list { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+    details { border: 1px solid #e6e6e6; border-radius: 10px; background: #fff; padding: 10px 12px; }
+    summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef3ff; color: #325ac0; font-size: 11px; border: 1px solid #d7e1ff; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .linkish { border: none; background: transparent; padding: 0; color: #0b68d0; cursor: pointer; text-decoration: underline; font-size: 13px; }
+    .desc { margin-top: 6px; line-height: 1.6; white-space: pre-wrap; }
+    .empty { padding: 16px; text-align: center; color: #666; border: 1px dashed #d7d7d7; border-radius: 10px; background: #fff; }
+    .error { color: #b00020; font-size: 13px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Matter &amp; Energy</h1>
+        <div class="muted">Add entities, expand for descriptions, display or delete.</div>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="addEntityHeading">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <h2 id="addEntityHeading" style="margin:0; font-size:16px;">Add entity</h2>
+        <div id="submitStatus" class="muted"></div>
+      </div>
+      <form id="entityForm">
+        <div>
+          <label for="nameInput">Name</label>
+          <input id="nameInput" name="name" placeholder="e.g., Black hole" required />
+        </div>
+        <div>
+          <label for="descInput">Description</label>
+          <textarea id="descInput" name="description" placeholder="What is it? How does it behave?"></textarea>
+        </div>
+        <button type="submit" id="submitButton">Add entity</button>
+        <div id="formError" class="error" role="alert" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="list" id="entityList" aria-live="polite" aria-label="Entity list"></section>
+  </main>
+
+  <script>
+    const API_BASE = "/oasis";
+    const listEl = document.getElementById("entityList");
+    const form = document.getElementById("entityForm");
+    const submitBtn = document.getElementById("submitButton");
+    const submitStatus = document.getElementById("submitStatus");
+    const formError = document.getElementById("formError");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await createEntity();
+    });
+
+    async function createEntity() {
+      formError.textContent = "";
+      const name = document.getElementById("nameInput").value.trim();
+      const description = document.getElementById("descInput").value.trim();
+
+      if (!name) {
+        formError.textContent = "Name is required.";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitStatus.textContent = "Saving...";
+
+      try {
+        const res = await fetch(API_BASE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, description })
+        });
+
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || "Request failed");
+        }
+
+        document.getElementById("nameInput").value = "";
+        document.getElementById("descInput").value = "";
+        submitStatus.textContent = "Saved";
+        await loadEntities();
+      } catch (err) {
+        formError.textContent = err.message || "Unable to save entity.";
+      } finally {
+        submitBtn.disabled = false;
+        setTimeout(() => submitStatus.textContent = "", 1200);
+      }
+    }
+
+    async function loadEntities() {
+      listEl.innerHTML = '<div class="muted">Loading...</div>';
+      try {
+        const res = await fetch(API_BASE);
+        if (!res.ok) throw new Error("Failed to load entities");
+        const items = await res.json();
+        renderList(Array.isArray(items) ? items : []);
+      } catch (err) {
+        listEl.innerHTML = `<div class="error">${err.message || "Error loading entities."}</div>`;
+      }
+    }
+
+    function renderList(items) {
+      listEl.innerHTML = "";
+      if (!items.length) {
+        listEl.innerHTML = '<div class="empty">No entities yet. Add one above.</div>';
+        return;
+      }
+
+      items.forEach(item => {
+        const wrapper = document.createElement("details");
+        wrapper.dataset.id = item.id;
+
+        const summary = document.createElement("summary");
+        summary.textContent = item.name || "(untitled)";
+        const pill = document.createElement("span");
+        pill.className = "pill";
+        pill.textContent = `#${item.id}`;
+        summary.appendChild(pill);
+
+        const desc = document.createElement("div");
+        desc.className = "desc";
+        desc.textContent = item.description || "No description provided yet.";
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const displayBtn = document.createElement("button");
+        displayBtn.type = "button";
+        displayBtn.className = "linkish";
+        displayBtn.textContent = "Display";
+        displayBtn.onclick = () => {
+          wrapper.open = true;
+          wrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+        };
+
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "linkish";
+        delBtn.textContent = "Delete";
+        delBtn.onclick = () => deleteEntity(item.id);
+
+        actions.appendChild(displayBtn);
+        actions.appendChild(delBtn);
+
+        wrapper.appendChild(summary);
+        wrapper.appendChild(desc);
+        wrapper.appendChild(actions);
+        listEl.appendChild(wrapper);
+      });
+    }
+
+    async function deleteEntity(id) {
+      if (!confirm("Delete this entity?")) return;
+      try {
+        const res = await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Delete failed");
+        await loadEntities();
+      } catch (err) {
+        alert(err.message || "Could not delete entity.");
+      }
+    }
+
+    loadEntities();
+  </script>
+</body>
+</html>
