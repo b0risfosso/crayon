@@ -7,13 +7,32 @@ Simple Flask API for entities.
 
 from __future__ import annotations
 
+import os
+import queue
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 from flask import Flask, g, request, jsonify, abort
 
+from oasis_prompts import BRIDGE_PROMPT, PROVENANCE_PROMPT
+
+try:
+    from openai import OpenAI
+    _client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    _client_err: Optional[Exception] = None
+except Exception as e:  # pragma: no cover - optional dependency
+    _client = None
+    _client_err = e
+
 DB_PATH = "/var/www/site/data/oasis.db"
+ART_DB_PATH = os.environ.get("ART_DB_PATH", "/var/www/site/data/art.db")
+DIRT_DB_PATH = os.environ.get("DIRT_DB_PATH", "/var/www/site/data/dirt.db")
+MODEL_DEFAULT = os.environ.get("OASIS_MODEL", "gpt-5-mini-2025-08-07")
+CONCURRENCY = 2
+LLM_LOCK = threading.Lock()
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
@@ -59,12 +78,317 @@ def require_json() -> Dict[str, Any]:
     return payload
 
 
+def run_llm(prompt_text: str, *, model: Optional[str] = None) -> tuple[str, Dict[str, Any], int, int, int]:
+    if _client is None:
+        raise RuntimeError(f"OpenAI client not initialized: {_client_err}")
+
+    resolved_model = model or MODEL_DEFAULT
+    with LLM_LOCK:
+        response = _client.chat.completions.create(
+            model=resolved_model,
+            messages=[{"role": "user", "content": prompt_text}],
+        )
+
+    text = (response.choices[0].message.content or "").strip()
+    usage = getattr(response, "usage", None)
+    usage_dict = usage.model_dump() if usage else {}
+    tokens_in = int(usage_dict.get("prompt_tokens", 0))
+    tokens_out = int(usage_dict.get("completion_tokens", 0))
+    total_tokens = int(usage_dict.get("total_tokens", tokens_in + tokens_out))
+
+    return text, usage_dict, tokens_in, tokens_out, total_tokens
+
+
+def fetch_entity(entity_id: int) -> Dict[str, Any]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute("SELECT * FROM entites WHERE id = ?", (entity_id,)).fetchone()
+        if row is None:
+            raise ValueError("Entity not found")
+        return dict(row)
+    finally:
+        conn.close()
+
+
+def fetch_art_color_text(art_id: int, color_id: int) -> tuple[str, str]:
+    conn = sqlite3.connect(ART_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT art.art AS art_text, colors.output_text AS color_text
+            FROM art
+            JOIN colors ON colors.art_id = art.id
+            WHERE art.id = ? AND colors.id = ?
+            """,
+            (art_id, color_id),
+        ).fetchone()
+        if row is None:
+            raise ValueError("art_id/color_id not found")
+        return row["art_text"], row["color_text"]
+    finally:
+        conn.close()
+
+
+def fetch_dirt_analysis(dirt_id: int) -> str:
+    conn = sqlite3.connect(DIRT_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT content FROM nodes WHERE id = ?",
+            (dirt_id,),
+        ).fetchone()
+        if row is None or row["content"] is None:
+            raise ValueError("dirt_id not found or has no content")
+        return row["content"]
+    finally:
+        conn.close()
+
+
+def build_bridge_prompt(thought: str, analysis: str, entity_title: str, entity_description: str) -> str:
+    return (
+        f"{BRIDGE_PROMPT}\n"
+        "\nINPUT A - Thought World\n"
+        f"Thought:\n{thought}\n\n"
+        f"Analysis:\n{analysis}\n\n"
+        "INPUT B - Material / Energetic / Monetary System\n"
+        f"Entity Title: {entity_title}\n"
+        f"Entity Description: {entity_description}\n"
+    )
+
+
+def build_provenance_prompt(bridge_text: str) -> str:
+    return f"{PROVENANCE_PROMPT}\n{bridge_text}\n"
+
+
 def _require_entity(entity_id: int) -> sqlite3.Row:
     db = get_db()
     row = db.execute("SELECT * FROM entites WHERE id = ?", (entity_id,)).fetchone()
     if not row:
         abort(404, description="Entity not found")
     return row
+
+
+TASK_QUEUE: "queue.Queue[dict]" = queue.Queue()
+TASKS: Dict[str, Dict[str, Any]] = {}
+TASKS_LOCK = threading.Lock()
+
+
+def enqueue_bridge_task(payload: Dict[str, Any]) -> Dict[str, Any]:
+    task = {
+        "task_id": uuid4().hex,
+        "task_type": "bridge_build",
+        "payload": payload,
+        "status": "queued",
+        "created_at": utc_now_iso(),
+    }
+    with TASKS_LOCK:
+        TASKS[task["task_id"]] = task
+    TASK_QUEUE.put(task)
+    return dict(task)
+
+
+def _store_bridge_run(
+    *,
+    entity_id: Optional[int],
+    entity_title: str,
+    entity_description: str,
+    art_id: Optional[int],
+    color_id: Optional[int],
+    dirt_id: Optional[int],
+    thought_text: str,
+    analysis_text: str,
+    bridge_text: str,
+    sources_text: str,
+    model_bridge: str,
+    model_sources: str,
+    tokens_in_bridge: int,
+    tokens_out_bridge: int,
+    total_tokens_bridge: int,
+    tokens_in_sources: int,
+    tokens_out_sources: int,
+    total_tokens_sources: int,
+) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            INSERT INTO oasis_bridge_runs (
+                entity_id,
+                entity_title,
+                entity_description,
+                art_id,
+                color_id,
+                dirt_id,
+                thought_text,
+                analysis_text,
+                bridge_text,
+                sources_text,
+                model_bridge,
+                model_sources,
+                tokens_in_bridge,
+                tokens_out_bridge,
+                total_tokens_bridge,
+                tokens_in_sources,
+                tokens_out_sources,
+                total_tokens_sources,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+            """,
+            (
+                entity_id,
+                entity_title,
+                entity_description,
+                art_id,
+                color_id,
+                dirt_id,
+                thought_text,
+                analysis_text,
+                bridge_text,
+                sources_text,
+                model_bridge,
+                model_sources,
+                tokens_in_bridge,
+                tokens_out_bridge,
+                total_tokens_bridge,
+                tokens_in_sources,
+                tokens_out_sources,
+                total_tokens_sources,
+                utc_now_iso(),
+            ),
+        ).fetchone()
+        conn.commit()
+        return int(row["id"])
+    finally:
+        conn.close()
+
+
+def _process_bridge_task(task: Dict[str, Any]) -> Dict[str, Any]:
+    payload = task.get("payload", {})
+    entity_id = payload.get("entity_id")
+    entity_title = payload.get("entity_title")
+    entity_description = payload.get("entity_description") or ""
+
+    art_id = payload.get("art_id")
+    color_id = payload.get("color_id")
+    dirt_id = payload.get("dirt_id")
+
+    thought_text = payload.get("thought")
+    analysis_text = payload.get("analysis")
+
+    model = payload.get("model") or MODEL_DEFAULT
+
+    if entity_id is not None:
+        try:
+            entity_id = int(entity_id)
+        except Exception as e:
+            raise ValueError("entity_id must be an integer") from e
+        row = fetch_entity(entity_id)
+        entity_title = row.get("name") or entity_title
+        entity_description = row.get("description") or entity_description
+
+    any_db_inputs = any(x is not None for x in (art_id, color_id, dirt_id))
+    use_db_inputs = all(x is not None for x in (art_id, color_id, dirt_id))
+    if any_db_inputs and not use_db_inputs:
+        raise ValueError("art_id, color_id, and dirt_id must be provided together")
+    if use_db_inputs:
+        try:
+            art_id = int(art_id)
+            color_id = int(color_id)
+            dirt_id = int(dirt_id)
+        except Exception as e:
+            raise ValueError("art_id, color_id, and dirt_id must be integers") from e
+        art_text, color_text = fetch_art_color_text(art_id, color_id)
+        thought_text = f"{art_text}\n\n{color_text}"
+        analysis_text = fetch_dirt_analysis(dirt_id)
+
+    if not isinstance(thought_text, str) or not thought_text.strip():
+        raise ValueError("thought text is required")
+    if not isinstance(analysis_text, str) or not analysis_text.strip():
+        raise ValueError("analysis text is required")
+    if not isinstance(entity_title, str) or not entity_title.strip():
+        raise ValueError("entity_title is required")
+    if not isinstance(entity_description, str):
+        raise ValueError("entity_description must be a string")
+
+    bridge_prompt = build_bridge_prompt(
+        thought_text.strip(),
+        analysis_text.strip(),
+        entity_title.strip(),
+        entity_description.strip(),
+    )
+    bridge_text, _, tokens_in_bridge, tokens_out_bridge, total_tokens_bridge = run_llm(
+        bridge_prompt,
+        model=model,
+    )
+
+    provenance_prompt = build_provenance_prompt(bridge_text)
+    sources_text, _, tokens_in_sources, tokens_out_sources, total_tokens_sources = run_llm(
+        provenance_prompt,
+        model=model,
+    )
+
+    run_id = _store_bridge_run(
+        entity_id=entity_id,
+        entity_title=entity_title.strip(),
+        entity_description=entity_description.strip(),
+        art_id=art_id,
+        color_id=color_id,
+        dirt_id=dirt_id,
+        thought_text=thought_text.strip(),
+        analysis_text=analysis_text.strip(),
+        bridge_text=bridge_text,
+        sources_text=sources_text,
+        model_bridge=model,
+        model_sources=model,
+        tokens_in_bridge=tokens_in_bridge,
+        tokens_out_bridge=tokens_out_bridge,
+        total_tokens_bridge=total_tokens_bridge,
+        tokens_in_sources=tokens_in_sources,
+        tokens_out_sources=tokens_out_sources,
+        total_tokens_sources=total_tokens_sources,
+    )
+
+    return {
+        "run_id": run_id,
+        "bridge_text": bridge_text,
+        "sources_text": sources_text,
+    }
+
+
+def worker_loop(worker_id: int) -> None:
+    while True:
+        task = TASK_QUEUE.get()
+        task_id = task.get("task_id")
+        with TASKS_LOCK:
+            if task_id in TASKS:
+                TASKS[task_id]["status"] = "running"
+                TASKS[task_id]["started_at"] = utc_now_iso()
+                TASKS[task_id]["worker_id"] = worker_id
+        try:
+            result = _process_bridge_task(task)
+            with TASKS_LOCK:
+                if task_id in TASKS:
+                    TASKS[task_id]["status"] = "done"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["result"] = result
+        except Exception as exc:
+            with TASKS_LOCK:
+                if task_id in TASKS:
+                    TASKS[task_id]["status"] = "error"
+                    TASKS[task_id]["finished_at"] = utc_now_iso()
+                    TASKS[task_id]["error"] = str(exc)
+        finally:
+            TASK_QUEUE.task_done()
+
+
+for wid in range(CONCURRENCY):
+    t = threading.Thread(target=worker_loop, args=(wid,), daemon=True)
+    t.start()
 
 
 @app.get("/oasis/health")
@@ -118,6 +442,34 @@ def delete_entity(entity_id: int) -> Any:
     db.execute("DELETE FROM entites WHERE id = ?", (entity_id,))
     db.commit()
     return jsonify({"ok": True, "deleted_id": entity_id})
+
+
+@app.post("/oasis/bridge")
+def enqueue_bridge() -> Any:
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+    payload = require_json()
+    task = enqueue_bridge_task(payload)
+    task["queue_size"] = TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
+@app.get("/oasis/llm/tasks/<task_id>")
+def get_task(task_id: str) -> Any:
+    with TASKS_LOCK:
+        task = TASKS.get(task_id)
+        if not task:
+            abort(404, description="task not found")
+        return jsonify(task)
+
+
+@app.get("/oasis/llm/tasks")
+def list_tasks() -> Any:
+    limit = request.args.get("limit", default=200, type=int)
+    limit = max(1, min(limit, 500))
+    with TASKS_LOCK:
+        tasks = list(TASKS.values())[-limit:]
+    return jsonify(tasks)
 
 
 if __name__ == "__main__":
