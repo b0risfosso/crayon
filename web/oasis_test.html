@@ -21,6 +21,14 @@
     button:disabled { opacity: 0.6; cursor: not-allowed; }
     .grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
     .results { margin-top: 18px; display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 900px) {
+      .results { grid-template-columns: 1fr 1fr; }
+    }
+    .history { margin-top: 18px; display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .history details { border: 1px solid #e6e6e6; border-radius: 10px; background: #fff; padding: 10px 12px; }
+    .history summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; list-style: none; }
+    .history summary::-webkit-details-marker { display: none; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef3ff; color: #325ac0; font-size: 11px; border: 1px solid #d7e1ff; }
     pre { white-space: pre-wrap; line-height: 1.6; margin: 0; }
     .error { color: #b00020; font-size: 13px; }
   </style>
@@ -65,6 +73,13 @@
         <pre id="sourcesOutput" class="muted">No output yet.</pre>
       </div>
     </section>
+
+    <section class="history">
+      <div class="card">
+        <h2 style="margin:0 0 8px; font-size:16px;">Previous runs</h2>
+        <div id="historyList" class="muted">Select an entity to load history.</div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -75,6 +90,7 @@
     const analysisInput = document.getElementById("analysisInput");
     const bridgesOutput = document.getElementById("bridgesOutput");
     const sourcesOutput = document.getElementById("sourcesOutput");
+    const historyList = document.getElementById("historyList");
     const formError = document.getElementById("formError");
     const statusEl = document.getElementById("status");
     const submitButton = document.getElementById("submitButton");
@@ -104,6 +120,7 @@
         });
         entitySelect.disabled = false;
         updateEntityDescription();
+        await loadHistory();
       } catch (err) {
         formError.textContent = err.message || "Could not load entities.";
       }
@@ -115,7 +132,10 @@
       entityDesc.textContent = entity ? (entity.description || "No description.") : "";
     }
 
-    entitySelect.addEventListener("change", updateEntityDescription);
+    entitySelect.addEventListener("change", async () => {
+      updateEntityDescription();
+      await loadHistory();
+    });
 
     document.getElementById("bridgeForm").addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -179,6 +199,7 @@
         if (task.status === "done") {
           bridgesOutput.textContent = task.result?.bridge_text || "No bridge output.";
           sourcesOutput.textContent = task.result?.sources_text || "No sources output.";
+          await loadHistory();
           statusEl.textContent = "done";
           return;
         }
@@ -191,6 +212,52 @@
         }
         await new Promise((resolve) => setTimeout(resolve, pollInterval));
       }
+    }
+
+    async function loadHistory() {
+      const entityId = entitySelect.value;
+      historyList.textContent = "Loading...";
+      if (!entityId) {
+        historyList.textContent = "Select an entity to load history.";
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/bridge/runs?entity_id=${encodeURIComponent(entityId)}`);
+        if (!res.ok) throw new Error("Failed to load history");
+        const runs = await res.json();
+        renderHistory(Array.isArray(runs) ? runs : []);
+      } catch (err) {
+        historyList.textContent = err.message || "Could not load history.";
+      }
+    }
+
+    function renderHistory(runs) {
+      historyList.innerHTML = "";
+      if (!runs.length) {
+        historyList.textContent = "No runs yet for this entity.";
+        return;
+      }
+      runs.forEach((run) => {
+        const wrapper = document.createElement("details");
+        const summary = document.createElement("summary");
+        const when = run.created_at || "unknown time";
+        summary.textContent = when;
+        const pill = document.createElement("span");
+        pill.className = "pill";
+        pill.textContent = `#${run.id}`;
+        summary.appendChild(pill);
+
+        const bridgeBlock = document.createElement("pre");
+        bridgeBlock.textContent = run.bridge_text || "No bridge output.";
+
+        const sourcesBlock = document.createElement("pre");
+        sourcesBlock.textContent = run.sources_text || "No sources output.";
+
+        wrapper.appendChild(summary);
+        wrapper.appendChild(bridgeBlock);
+        wrapper.appendChild(sourcesBlock);
+        historyList.appendChild(wrapper);
+      });
     }
 
     loadEntities();

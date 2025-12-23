@@ -454,6 +454,38 @@ def enqueue_bridge() -> Any:
     return jsonify(task), 202
 
 
+@app.get("/oasis/bridge/runs")
+def list_bridge_runs() -> Any:
+    entity_id = request.args.get("entity_id")
+    if entity_id is None:
+        abort(400, description="'entity_id' is required")
+    try:
+        entity_id_int = int(entity_id)
+    except Exception:
+        abort(400, description="'entity_id' must be an integer")
+
+    limit = request.args.get("limit", default=50, type=int)
+    limit = max(1, min(limit, 200))
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, entity_id, entity_title, entity_description, art_id, color_id, dirt_id,
+                   bridge_text, sources_text, created_at
+            FROM oasis_bridge_runs
+            WHERE entity_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (entity_id_int, limit),
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        conn.close()
+
+
 @app.get("/oasis/llm/tasks/<task_id>")
 def get_task(task_id: str) -> Any:
     with TASKS_LOCK:
