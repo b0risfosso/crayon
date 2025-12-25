@@ -23,6 +23,10 @@ from oasis_prompts import (
     STORY_PROMPT,
     STORY_PROVENANCE_PROMPT,
     STORY_ORIGIN_PROMPT,
+    STORY_CONFLICT_PROMPT,
+    STORY_COORDINATION_PROMPT,
+    RELATIONSHIP_PROMPT,
+    RELATIONSHIP_SOURCES_PROMPT,
 )
 
 try:
@@ -179,8 +183,8 @@ def build_story_prompt(prompt_text: str, thought: str, entity_title: str, entity
     )
 
 
-def build_story_provenance_prompt(story_text: str) -> str:
-    return f"{STORY_PROVENANCE_PROMPT}\n{story_text}\n"
+def build_sources_prompt(prompt_text: str, source_text: str) -> str:
+    return f"{prompt_text}\n{source_text}\n"
 
 
 def _require_entity(entity_id: int) -> sqlite3.Row:
@@ -481,11 +485,14 @@ def _process_story_task(task: Dict[str, Any]) -> Dict[str, Any]:
     prompt_map = {
         "connection": STORY_PROMPT,
         "origin": STORY_ORIGIN_PROMPT,
+        "conflict": STORY_CONFLICT_PROMPT,
+        "coordination": STORY_COORDINATION_PROMPT,
+        "relationship": RELATIONSHIP_PROMPT,
     }
     prompt_type = str(prompt_type)
     prompt_text = prompt_map.get(prompt_type)
     if prompt_text is None:
-        raise ValueError("prompt_type must be 'connection' or 'origin'")
+        raise ValueError("prompt_type must be 'connection', 'origin', 'conflict', 'coordination', or 'relationship'")
 
     try:
         entity_id = int(entity_id)
@@ -512,7 +519,11 @@ def _process_story_task(task: Dict[str, Any]) -> Dict[str, Any]:
         model=model,
     )
 
-    provenance_prompt = build_story_provenance_prompt(story_text)
+    source_prompt_map = {
+        "relationship": RELATIONSHIP_SOURCES_PROMPT,
+    }
+    source_prompt_text = source_prompt_map.get(prompt_type, STORY_PROVENANCE_PROMPT)
+    provenance_prompt = build_sources_prompt(source_prompt_text, story_text)
     sources_text, _, tokens_in_sources, tokens_out_sources, total_tokens_sources = run_llm(
         provenance_prompt,
         model=model,
@@ -652,8 +663,8 @@ def enqueue_story() -> Any:
         if field not in payload:
             abort(400, description=f"'{field}' is required")
     prompt_type = payload.get("prompt_type")
-    if prompt_type is not None and prompt_type not in ("connection", "origin"):
-        abort(400, description="'prompt_type' must be 'connection' or 'origin' when provided")
+    if prompt_type is not None and prompt_type not in ("connection", "origin", "conflict", "coordination", "relationship"):
+        abort(400, description="'prompt_type' must be 'connection', 'origin', 'conflict', 'coordination', or 'relationship' when provided")
     task = enqueue_story_task(payload)
     task["queue_size"] = TASK_QUEUE.qsize()
     return jsonify(task), 202
