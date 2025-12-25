@@ -371,6 +371,15 @@
         };
         actionRow.appendChild(dirt3Btn);
 
+        const oasisBtn = document.createElement('button');
+        oasisBtn.textContent = 'Enter Oasis';
+        oasisBtn.onclick = (e) => {
+          e.stopPropagation();
+          const url = `/oasis.html?art_id=${artId}&color_id=${c.id}`;
+          window.open(url, '_blank');
+        };
+        actionRow.appendChild(oasisBtn);
+
         
 
         const deleteBtn = document.createElement('button');

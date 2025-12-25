@@ -17,7 +17,12 @@ from uuid import uuid4
 
 from flask import Flask, g, request, jsonify, abort
 
-from oasis_prompts import BRIDGE_PROMPT, PROVENANCE_PROMPT
+from oasis_prompts import (
+    BRIDGE_PROMPT,
+    PROVENANCE_PROMPT,
+    STORY_PROMPT,
+    STORY_PROVENANCE_PROMPT,
+)
 
 try:
     from openai import OpenAI
@@ -162,6 +167,21 @@ def build_provenance_prompt(bridge_text: str) -> str:
     return f"{PROVENANCE_PROMPT}\n{bridge_text}\n"
 
 
+def build_story_prompt(thought: str, entity_title: str, entity_description: str) -> str:
+    return (
+        f"{STORY_PROMPT}\n"
+        "\nThought / World:\n"
+        f"{thought}\n\n"
+        "Material + Energetic System:\n"
+        f"Entity Title: {entity_title}\n"
+        f"Entity Description: {entity_description}\n"
+    )
+
+
+def build_story_provenance_prompt(story_text: str) -> str:
+    return f"{STORY_PROVENANCE_PROMPT}\n{story_text}\n"
+
+
 def _require_entity(entity_id: int) -> sqlite3.Row:
     db = get_db()
     row = db.execute("SELECT * FROM entites WHERE id = ?", (entity_id,)).fetchone()
@@ -179,6 +199,20 @@ def enqueue_bridge_task(payload: Dict[str, Any]) -> Dict[str, Any]:
     task = {
         "task_id": uuid4().hex,
         "task_type": "bridge_build",
+        "payload": payload,
+        "status": "queued",
+        "created_at": utc_now_iso(),
+    }
+    with TASKS_LOCK:
+        TASKS[task["task_id"]] = task
+    TASK_QUEUE.put(task)
+    return dict(task)
+
+
+def enqueue_story_task(payload: Dict[str, Any]) -> Dict[str, Any]:
+    task = {
+        "task_id": uuid4().hex,
+        "task_type": "story_build",
         "payload": payload,
         "status": "queued",
         "created_at": utc_now_iso(),
@@ -255,6 +289,78 @@ def _store_bridge_run(
                 tokens_in_bridge,
                 tokens_out_bridge,
                 total_tokens_bridge,
+                tokens_in_sources,
+                tokens_out_sources,
+                total_tokens_sources,
+                utc_now_iso(),
+            ),
+        ).fetchone()
+        conn.commit()
+        return int(row["id"])
+    finally:
+        conn.close()
+
+
+def _store_story_run(
+    *,
+    entity_id: int,
+    entity_title: str,
+    entity_description: str,
+    art_id: int,
+    color_id: int,
+    thought_text: str,
+    story_text: str,
+    sources_text: str,
+    model_story: str,
+    model_sources: str,
+    tokens_in_story: int,
+    tokens_out_story: int,
+    total_tokens_story: int,
+    tokens_in_sources: int,
+    tokens_out_sources: int,
+    total_tokens_sources: int,
+) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            INSERT INTO oasis_story_runs (
+                entity_id,
+                entity_title,
+                entity_description,
+                art_id,
+                color_id,
+                thought_text,
+                story_text,
+                sources_text,
+                model_story,
+                model_sources,
+                tokens_in_story,
+                tokens_out_story,
+                total_tokens_story,
+                tokens_in_sources,
+                tokens_out_sources,
+                total_tokens_sources,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+            """,
+            (
+                entity_id,
+                entity_title,
+                entity_description,
+                art_id,
+                color_id,
+                thought_text,
+                story_text,
+                sources_text,
+                model_story,
+                model_sources,
+                tokens_in_story,
+                tokens_out_story,
+                total_tokens_story,
                 tokens_in_sources,
                 tokens_out_sources,
                 total_tokens_sources,
@@ -360,6 +466,70 @@ def _process_bridge_task(task: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _process_story_task(task: Dict[str, Any]) -> Dict[str, Any]:
+    payload = task.get("payload", {})
+    entity_id = payload.get("entity_id")
+    art_id = payload.get("art_id")
+    color_id = payload.get("color_id")
+    model = payload.get("model") or MODEL_DEFAULT
+
+    try:
+        entity_id = int(entity_id)
+        art_id = int(art_id)
+        color_id = int(color_id)
+    except Exception as e:
+        raise ValueError("entity_id, art_id, and color_id are required integers") from e
+
+    entity = fetch_entity(entity_id)
+    entity_title = entity.get("name") or ""
+    entity_description = entity.get("description") or ""
+
+    art_text, color_text = fetch_art_color_text(art_id, color_id)
+    thought_text = f"{art_text}\n\n{color_text}".strip()
+
+    if not thought_text:
+        raise ValueError("thought text is required")
+    if not entity_title:
+        raise ValueError("entity title is required")
+
+    story_prompt = build_story_prompt(thought_text, entity_title, entity_description)
+    story_text, _, tokens_in_story, tokens_out_story, total_tokens_story = run_llm(
+        story_prompt,
+        model=model,
+    )
+
+    provenance_prompt = build_story_provenance_prompt(story_text)
+    sources_text, _, tokens_in_sources, tokens_out_sources, total_tokens_sources = run_llm(
+        provenance_prompt,
+        model=model,
+    )
+
+    run_id = _store_story_run(
+        entity_id=entity_id,
+        entity_title=entity_title,
+        entity_description=entity_description,
+        art_id=art_id,
+        color_id=color_id,
+        thought_text=thought_text,
+        story_text=story_text,
+        sources_text=sources_text,
+        model_story=model,
+        model_sources=model,
+        tokens_in_story=tokens_in_story,
+        tokens_out_story=tokens_out_story,
+        total_tokens_story=total_tokens_story,
+        tokens_in_sources=tokens_in_sources,
+        tokens_out_sources=tokens_out_sources,
+        total_tokens_sources=total_tokens_sources,
+    )
+
+    return {
+        "run_id": run_id,
+        "story_text": story_text,
+        "sources_text": sources_text,
+    }
+
+
 def worker_loop(worker_id: int) -> None:
     while True:
         task = TASK_QUEUE.get()
@@ -370,7 +540,11 @@ def worker_loop(worker_id: int) -> None:
                 TASKS[task_id]["started_at"] = utc_now_iso()
                 TASKS[task_id]["worker_id"] = worker_id
         try:
-            result = _process_bridge_task(task)
+            task_type = task.get("task_type")
+            if task_type == "story_build":
+                result = _process_story_task(task)
+            else:
+                result = _process_bridge_task(task)
             with TASKS_LOCK:
                 if task_id in TASKS:
                     TASKS[task_id]["status"] = "done"
@@ -454,6 +628,19 @@ def enqueue_bridge() -> Any:
     return jsonify(task), 202
 
 
+@app.post("/oasis/story")
+def enqueue_story() -> Any:
+    if _client is None:
+        abort(500, description=f"OpenAI client not initialized: {_client_err}")
+    payload = require_json()
+    for field in ("entity_id", "art_id", "color_id"):
+        if field not in payload:
+            abort(400, description=f"'{field}' is required")
+    task = enqueue_story_task(payload)
+    task["queue_size"] = TASK_QUEUE.qsize()
+    return jsonify(task), 202
+
+
 @app.get("/oasis/bridge/runs")
 def list_bridge_runs() -> Any:
     entity_id = request.args.get("entity_id")
@@ -482,6 +669,60 @@ def list_bridge_runs() -> Any:
             (entity_id_int, limit),
         ).fetchall()
         return jsonify([dict(r) for r in rows])
+    finally:
+        conn.close()
+
+
+@app.get("/oasis/story/runs")
+def list_story_runs() -> Any:
+    entity_id = request.args.get("entity_id")
+    art_id = request.args.get("art_id")
+    color_id = request.args.get("color_id")
+    if entity_id is None or art_id is None or color_id is None:
+        abort(400, description="'entity_id', 'art_id', and 'color_id' are required")
+    try:
+        entity_id_int = int(entity_id)
+        art_id_int = int(art_id)
+        color_id_int = int(color_id)
+    except Exception:
+        abort(400, description="'entity_id', 'art_id', and 'color_id' must be integers")
+
+    limit = request.args.get("limit", default=50, type=int)
+    limit = max(1, min(limit, 200))
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, entity_id, entity_title, entity_description, art_id, color_id,
+                   story_text, sources_text, created_at
+            FROM oasis_story_runs
+            WHERE entity_id = ? AND art_id = ? AND color_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (entity_id_int, art_id_int, color_id_int, limit),
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        conn.close()
+
+
+@app.delete("/oasis/story/runs/<int:run_id>")
+def delete_story_run(run_id: int) -> Any:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT id FROM oasis_story_runs WHERE id = ?",
+            (run_id,),
+        ).fetchone()
+        if not row:
+            abort(404, description="story run not found")
+        conn.execute("DELETE FROM oasis_story_runs WHERE id = ?", (run_id,))
+        conn.commit()
+        return jsonify({"ok": True, "deleted_id": run_id})
     finally:
         conn.close()
 
