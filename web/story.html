@@ -18,6 +18,10 @@
     @media (min-width: 900px) {
       .grid-2 { grid-template-columns: 1fr 1fr; }
     }
+    .scroll-box {
+      max-height: 240px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -37,18 +41,18 @@
       </div>
       <div class="card">
         <div class="muted">Color</div>
-        <pre id="colorText">Loading color...</pre>
+        <pre id="colorText" class="scroll-box">Loading color...</pre>
       </div>
     </section>
 
     <section class="grid-2" style="margin-top:14px;">
       <div class="card">
         <div class="muted">Story</div>
-        <pre id="storyText">Loading story...</pre>
+        <pre id="storyText" class="scroll-box">Loading story...</pre>
       </div>
       <div class="card">
         <div class="muted">Sources</div>
-        <pre id="sourcesText">Loading sources...</pre>
+        <pre id="sourcesText" class="scroll-box">Loading sources...</pre>
       </div>
     </section>
 
@@ -61,7 +65,7 @@
         <button id="saveNoteBtn" type="button">Save note</button>
         <div id="noteStatus" class="muted"></div>
       </div>
-      <div id="notesList" class="stack" style="margin-top:8px;"></div>
+      <div id="notesList" class="stack scroll-box" style="margin-top:8px;"></div>
     </section>
   </main>
 
@@ -165,8 +169,63 @@
         meta.textContent = row.created_at || "";
         const body = document.createElement("pre");
         body.textContent = row.note_text || "";
+
+        const actions = document.createElement("div");
+        actions.className = "row";
+        actions.style.marginTop = "6px";
+
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.textContent = "Edit";
+        editBtn.onclick = async () => {
+          const next = prompt("Edit note:", row.note_text || "");
+          if (next === null) return;
+          const trimmed = next.trim();
+          if (!trimmed) {
+            alert("Note cannot be empty.");
+            return;
+          }
+          try {
+            const res = await fetch(`/oasis/story/notes/${encodeURIComponent(row.id)}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ note_text: trimmed })
+            });
+            if (!res.ok) {
+              const msg = await res.text();
+              throw new Error(msg || "Failed to update note");
+            }
+            await loadNotes();
+          } catch (err) {
+            alert(err.message || "Failed to update note.");
+          }
+        };
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = async () => {
+          if (!confirm("Delete this note?")) return;
+          try {
+            const res = await fetch(`/oasis/story/notes/${encodeURIComponent(row.id)}`, {
+              method: "DELETE"
+            });
+            if (!res.ok) {
+              const msg = await res.text();
+              throw new Error(msg || "Failed to delete note");
+            }
+            await loadNotes();
+          } catch (err) {
+            alert(err.message || "Failed to delete note.");
+          }
+        };
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
         card.appendChild(meta);
         card.appendChild(body);
+        card.appendChild(actions);
         notesList.appendChild(card);
       });
     }

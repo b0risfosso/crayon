@@ -846,6 +846,56 @@ def create_story_note(run_id: int) -> Any:
         conn.close()
 
 
+@app.put("/oasis/story/notes/<int:note_id>")
+@app.patch("/oasis/story/notes/<int:note_id>")
+def update_story_note(note_id: int) -> Any:
+    payload = require_json()
+    note_text = payload.get("note_text")
+    if not isinstance(note_text, str) or not note_text.strip():
+        abort(400, description="'note_text' is required and must be a non-empty string")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT id FROM oasis_story_notes WHERE id = ?",
+            (note_id,),
+        ).fetchone()
+        if not row:
+            abort(404, description="note not found")
+        row = conn.execute(
+            """
+            UPDATE oasis_story_notes
+            SET note_text = ?
+            WHERE id = ?
+            RETURNING id, story_run_id, note_text, created_at
+            """,
+            (note_text.strip(), note_id),
+        ).fetchone()
+        conn.commit()
+        return jsonify(dict(row))
+    finally:
+        conn.close()
+
+
+@app.delete("/oasis/story/notes/<int:note_id>")
+def delete_story_note(note_id: int) -> Any:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT id FROM oasis_story_notes WHERE id = ?",
+            (note_id,),
+        ).fetchone()
+        if not row:
+            abort(404, description="note not found")
+        conn.execute("DELETE FROM oasis_story_notes WHERE id = ?", (note_id,))
+        conn.commit()
+        return jsonify({"ok": True, "deleted_id": note_id})
+    finally:
+        conn.close()
+
+
 @app.get("/oasis/story/runs/all")
 def list_all_story_runs() -> Any:
     limit = request.args.get("limit", default=200, type=int)
