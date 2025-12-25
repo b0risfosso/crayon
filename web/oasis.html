@@ -62,6 +62,13 @@
           <select id="entitySelect" required></select>
           <div id="entityDesc" class="muted" style="margin-top:6px;"></div>
         </div>
+        <div>
+          <label for="promptSelect">Story prompt</label>
+          <select id="promptSelect">
+            <option value="connection">Connection</option>
+            <option value="origin">Origin / Production</option>
+          </select>
+        </div>
         <div class="row">
           <button type="submit" id="submitButton">Run story pipeline</button>
           <div id="formError" class="error" role="alert" aria-live="polite"></div>
@@ -83,7 +90,7 @@
     <section style="margin-top:14px;">
       <div class="card">
         <h2 style="margin:0 0 8px; font-size:16px;">Previous stories</h2>
-        <div id="historyList" class="muted">Select an entity to load history.</div>
+        <div id="historyList" class="muted">Loading history...</div>
       </div>
     </section>
   </main>
@@ -95,6 +102,7 @@
 
     const entitySelect = document.getElementById("entitySelect");
     const entityDesc = document.getElementById("entityDesc");
+    const promptSelect = document.getElementById("promptSelect");
     const storyOutput = document.getElementById("storyOutput");
     const sourcesOutput = document.getElementById("sourcesOutput");
     const historyList = document.getElementById("historyList");
@@ -174,9 +182,8 @@
       entityDesc.textContent = entity ? (entity.description || "No description.") : "";
     }
 
-    entitySelect.addEventListener("change", async () => {
+    entitySelect.addEventListener("change", () => {
       updateEntityDescription();
-      await loadHistory();
     });
 
     document.getElementById("storyForm").addEventListener("submit", async (event) => {
@@ -205,7 +212,8 @@
           body: JSON.stringify({
             entity_id: Number(entityId),
             art_id: artId,
-            color_id: colorId
+            color_id: colorId,
+            prompt_type: promptSelect.value
           })
         });
         if (!res.ok) {
@@ -252,14 +260,9 @@
     }
 
     async function loadHistory() {
-      const entityId = entitySelect.value;
       historyList.textContent = "Loading...";
-      if (!entityId) {
-        historyList.textContent = "Select an entity to load history.";
-        return;
-      }
       try {
-        const url = `/oasis/story/runs?entity_id=${encodeURIComponent(entityId)}&art_id=${encodeURIComponent(artId)}&color_id=${encodeURIComponent(colorId)}`;
+        const url = `/oasis/story/runs?art_id=${encodeURIComponent(artId)}&color_id=${encodeURIComponent(colorId)}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load history");
         const runs = await res.json();
@@ -272,13 +275,14 @@
     function renderHistory(runs) {
       historyList.innerHTML = "";
       if (!runs.length) {
-        historyList.textContent = "No stories yet for this entity.";
+        historyList.textContent = "No stories yet for this art/color.";
         return;
       }
       runs.forEach((run) => {
         const wrapper = document.createElement("details");
         const summary = document.createElement("summary");
-        summary.textContent = run.created_at || "unknown time";
+        const promptLabel = run.prompt_type ? ` · ${run.prompt_type}` : "";
+        summary.textContent = `${run.entity_title || "Entity"}${promptLabel} · ${run.created_at || "unknown time"}`;
         const pill = document.createElement("span");
         pill.className = "pill";
         pill.textContent = `#${run.id}`;

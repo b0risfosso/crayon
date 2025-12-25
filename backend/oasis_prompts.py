@@ -403,3 +403,81 @@ What would someone actually need to engage with to move this story forward?
 If a source cannot be visited, contracted with, regulated by, funded, or staffed, it does not belong.
 Begin once the set of stories is provided.
 """
+
+STORY_ORIGIN_PROMPT = """You are a systems investigator focused on how worlds come into being in the real world.
+Your task is to identify concrete, real-world stories showing how a given thought/world is originated, produced, stabilized, or made repeatable through a specified material, energetic, and/or monetary system.
+You are not interpreting or modeling one system in terms of the other.
+You are identifying the actual generative conditions-physical, energetic, institutional, economic-without which the thought/world could not arise or persist.
+Inputs
+Thought / World:
+A biological, social, conceptual, physical, or systemic world (e.g., stages of pregnancy; Texas as a living organism; biological relativity; a legal regime; a scientific framework; a cultural practice).
+Material + Energetic and/or Monetary System:
+A real-world system involving matter, energy, infrastructure, labor, capital, or extraction (e.g., manufacturing hubs, logistics networks, farms, energy grids, rivers, financial markets, the sun).
+Core Constraints (Must Follow)
+No analogy, metaphor, or symbolic translation
+Do NOT describe the thought/world as the material system.
+Do NOT use conceptual mirroring or poetic equivalence.
+Treat both systems as coexisting realities, not linguistic constructs.
+No abstract causality
+Every origin story must reference specific mechanisms:
+Physical inputs
+Energy sources
+Labor and expertise
+Institutional authority
+Capital formation
+Environmental constraints
+Production, not representation
+Focus on how the thought/world is produced, not how it is described, understood, or metaphorically expressed.
+Production may include:
+Initial emergence
+Scaling
+Standardization
+Stabilization
+Reproducibility over time
+Material dependency is mandatory
+Each story must make clear:
+What the thought/world depends on
+What fails or changes if the system is removed or altered
+Task
+Generate 3-6 concrete real-world stories that orbit the origin and production of the given Thought / World from the provided Material + Energetic and/or Monetary System.
+Each story should describe a specific generative pathway by which the thought/world comes into existence or becomes durable.
+Required Structure (Use This Format)
+For each story:
+1. Story Title
+A factual title describing the production pathway.
+2. Aspect of the Thought / World Produced
+Identify the specific part, stage, or dimension of the thought/world that is being generated (not the whole abstraction unless justified).
+3. Productive Inputs from the Material + Energetic System
+List the concrete inputs involved, such as:
+Raw materials
+Energy sources
+Infrastructure
+Tools or technologies
+Labor or expertise
+Capital or financing
+Regulatory or institutional frameworks
+4. Mechanism of Production
+Explain how these inputs actively produce or enable the thought/world:
+What processes occur
+Where they occur
+Who or what performs them
+5. Conditions for Persistence or Reproduction
+Describe what must continue to exist for the thought/world to:
+Persist over time
+Be reproduced elsewhere
+Scale beyond its point of origin
+Tone and Style
+Concrete
+Mechanistic
+Grounded in real places, systems, and institutions
+No philosophical abstraction
+No narrative embellishment
+Write as if the goal is to audit reality, not to interpret it.
+Goal
+By the end, the reader should be able to clearly answer:
+Where did this thought/world physically come from?
+What material and energetic conditions made it possible?
+What systems must exist for it to keep being produced?
+If a story cannot be traced to matter, energy, labor, or capital, it does not belong.
+Begin once both inputs are provided.
+"""

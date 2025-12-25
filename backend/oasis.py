@@ -22,6 +22,7 @@ from oasis_prompts import (
     PROVENANCE_PROMPT,
     STORY_PROMPT,
     STORY_PROVENANCE_PROMPT,
+    STORY_ORIGIN_PROMPT,
 )
 
 try:
@@ -167,9 +168,9 @@ def build_provenance_prompt(bridge_text: str) -> str:
     return f"{PROVENANCE_PROMPT}\n{bridge_text}\n"
 
 
-def build_story_prompt(thought: str, entity_title: str, entity_description: str) -> str:
+def build_story_prompt(prompt_text: str, thought: str, entity_title: str, entity_description: str) -> str:
     return (
-        f"{STORY_PROMPT}\n"
+        f"{prompt_text}\n"
         "\nThought / World:\n"
         f"{thought}\n\n"
         "Material + Energetic System:\n"
@@ -313,6 +314,7 @@ def _store_story_run(
     sources_text: str,
     model_story: str,
     model_sources: str,
+    prompt_type: str,
     tokens_in_story: int,
     tokens_out_story: int,
     total_tokens_story: int,
@@ -336,6 +338,7 @@ def _store_story_run(
                 sources_text,
                 model_story,
                 model_sources,
+                prompt_type,
                 tokens_in_story,
                 tokens_out_story,
                 total_tokens_story,
@@ -344,7 +347,7 @@ def _store_story_run(
                 total_tokens_sources,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
             """,
             (
@@ -358,6 +361,7 @@ def _store_story_run(
                 sources_text,
                 model_story,
                 model_sources,
+                prompt_type,
                 tokens_in_story,
                 tokens_out_story,
                 total_tokens_story,
@@ -472,6 +476,16 @@ def _process_story_task(task: Dict[str, Any]) -> Dict[str, Any]:
     art_id = payload.get("art_id")
     color_id = payload.get("color_id")
     model = payload.get("model") or MODEL_DEFAULT
+    prompt_type = payload.get("prompt_type") or "connection"
+
+    prompt_map = {
+        "connection": STORY_PROMPT,
+        "origin": STORY_ORIGIN_PROMPT,
+    }
+    prompt_type = str(prompt_type)
+    prompt_text = prompt_map.get(prompt_type)
+    if prompt_text is None:
+        raise ValueError("prompt_type must be 'connection' or 'origin'")
 
     try:
         entity_id = int(entity_id)
@@ -492,7 +506,7 @@ def _process_story_task(task: Dict[str, Any]) -> Dict[str, Any]:
     if not entity_title:
         raise ValueError("entity title is required")
 
-    story_prompt = build_story_prompt(thought_text, entity_title, entity_description)
+    story_prompt = build_story_prompt(prompt_text, thought_text, entity_title, entity_description)
     story_text, _, tokens_in_story, tokens_out_story, total_tokens_story = run_llm(
         story_prompt,
         model=model,
@@ -515,6 +529,7 @@ def _process_story_task(task: Dict[str, Any]) -> Dict[str, Any]:
         sources_text=sources_text,
         model_story=model,
         model_sources=model,
+        prompt_type=prompt_type,
         tokens_in_story=tokens_in_story,
         tokens_out_story=tokens_out_story,
         total_tokens_story=total_tokens_story,
@@ -636,6 +651,9 @@ def enqueue_story() -> Any:
     for field in ("entity_id", "art_id", "color_id"):
         if field not in payload:
             abort(400, description=f"'{field}' is required")
+    prompt_type = payload.get("prompt_type")
+    if prompt_type is not None and prompt_type not in ("connection", "origin"):
+        abort(400, description="'prompt_type' must be 'connection' or 'origin' when provided")
     task = enqueue_story_task(payload)
     task["queue_size"] = TASK_QUEUE.qsize()
     return jsonify(task), 202
@@ -678,14 +696,13 @@ def list_story_runs() -> Any:
     entity_id = request.args.get("entity_id")
     art_id = request.args.get("art_id")
     color_id = request.args.get("color_id")
-    if entity_id is None or art_id is None or color_id is None:
-        abort(400, description="'entity_id', 'art_id', and 'color_id' are required")
+    if art_id is None or color_id is None:
+        abort(400, description="'art_id' and 'color_id' are required")
     try:
-        entity_id_int = int(entity_id)
         art_id_int = int(art_id)
         color_id_int = int(color_id)
     except Exception:
-        abort(400, description="'entity_id', 'art_id', and 'color_id' must be integers")
+        abort(400, description="'art_id' and 'color_id' must be integers")
 
     limit = request.args.get("limit", default=50, type=int)
     limit = max(1, min(limit, 200))
@@ -693,17 +710,34 @@ def list_story_runs() -> Any:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
-        rows = conn.execute(
-            """
+        if entity_id is not None:
+            try:
+                entity_id_int = int(entity_id)
+            except Exception:
+                abort(400, description="'entity_id' must be an integer")
+            rows = conn.execute(
+                """
             SELECT id, entity_id, entity_title, entity_description, art_id, color_id,
-                   story_text, sources_text, created_at
+                   story_text, sources_text, prompt_type, created_at
             FROM oasis_story_runs
             WHERE entity_id = ? AND art_id = ? AND color_id = ?
             ORDER BY created_at DESC, id DESC
             LIMIT ?
-            """,
-            (entity_id_int, art_id_int, color_id_int, limit),
-        ).fetchall()
+                """,
+                (entity_id_int, art_id_int, color_id_int, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+            SELECT id, entity_id, entity_title, entity_description, art_id, color_id,
+                   story_text, sources_text, prompt_type, created_at
+            FROM oasis_story_runs
+            WHERE art_id = ? AND color_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+                """,
+                (art_id_int, color_id_int, limit),
+            ).fetchall()
         return jsonify([dict(r) for r in rows])
     finally:
         conn.close()
