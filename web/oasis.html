@@ -30,6 +30,17 @@
     summary::-webkit-details-marker { display: none; }
     .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef3ff; color: #325ac0; font-size: 11px; border: 1px solid #d7e1ff; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .entity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 260px;
+      overflow-y: auto;
+      border-radius: 10px;
+      border: 1px solid #e5e5e5;
+      padding: 8px;
+      background: #f9fafb;
+    }
   </style>
 </head>
 <body>
@@ -59,7 +70,7 @@
       <form id="storyForm" class="stack">
         <div>
           <label>Entities (material / energetic / monetary system)</label>
-          <div id="entityList" class="stack" style="margin-top:6px;"></div>
+          <div id="entityList" class="entity-list" style="margin-top:6px;"></div>
           <div class="row" style="margin-top:8px;">
             <label for="randomCount" class="muted">Random N</label>
             <input id="randomCount" type="number" min="1" value="3" style="width:80px;" />
