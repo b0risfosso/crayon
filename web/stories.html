@@ -129,17 +129,26 @@
           meta.className = "muted";
           meta.textContent = `color ${row.color_id}`;
 
-          const actions = document.createElement("div");
-          actions.className = "row";
-          const openBtn = document.createElement("button");
-          openBtn.type = "button";
-          openBtn.className = "linkish";
-          openBtn.textContent = "Open in Oasis";
-          openBtn.onclick = () => {
-            const url = `/oasis.html?art_id=${encodeURIComponent(row.art_id)}&color_id=${encodeURIComponent(row.color_id)}`;
-            window.open(url, "_blank");
-          };
-          actions.appendChild(openBtn);
+        const actions = document.createElement("div");
+        actions.className = "row";
+        const openStoryBtn = document.createElement("button");
+        openStoryBtn.type = "button";
+        openStoryBtn.className = "linkish";
+        openStoryBtn.textContent = "Open story";
+        openStoryBtn.onclick = () => {
+          const url = `/story.html?run_id=${encodeURIComponent(row.id)}`;
+          window.open(url, "_blank");
+        };
+        const openBtn = document.createElement("button");
+        openBtn.type = "button";
+        openBtn.className = "linkish";
+        openBtn.textContent = "Open in Oasis";
+        openBtn.onclick = () => {
+          const url = `/oasis.html?art_id=${encodeURIComponent(row.art_id)}&color_id=${encodeURIComponent(row.color_id)}`;
+          window.open(url, "_blank");
+        };
+        actions.appendChild(openStoryBtn);
+        actions.appendChild(openBtn);
 
           const grid = document.createElement("div");
           grid.className = "grid-2";

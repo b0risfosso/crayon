@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Story</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #f7f7f7; color: #111; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 18px 48px; }
+    header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: 22px; }
+    .muted { color: #666; font-size: 13px; }
+    .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
+    .stack { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    pre { white-space: pre-wrap; margin: 0; line-height: 1.6; }
+    .grid-2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Story</h1>
+        <div id="meta" class="muted"></div>
+      </div>
+      <div class="muted" id="status"></div>
+    </header>
+
+    <section class="stack">
+      <div class="card">
+        <div class="muted">Art</div>
+        <pre id="artText">Loading art...</pre>
+      </div>
+      <div class="card">
+        <div class="muted">Color</div>
+        <pre id="colorText">Loading color...</pre>
+      </div>
+    </section>
+
+    <section class="grid-2" style="margin-top:14px;">
+      <div class="card">
+        <div class="muted">Story</div>
+        <pre id="storyText">Loading story...</pre>
+      </div>
+      <div class="card">
+        <div class="muted">Sources</div>
+        <pre id="sourcesText">Loading sources...</pre>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const runId = parseInt(params.get("run_id") || "", 10);
+
+    const metaEl = document.getElementById("meta");
+    const statusEl = document.getElementById("status");
+    const artText = document.getElementById("artText");
+    const colorText = document.getElementById("colorText");
+    const storyText = document.getElementById("storyText");
+    const sourcesText = document.getElementById("sourcesText");
+
+    if (!runId) {
+      statusEl.textContent = "Missing run_id.";
+      artText.textContent = "Missing run_id.";
+      colorText.textContent = "Missing run_id.";
+      storyText.textContent = "Missing run_id.";
+      sourcesText.textContent = "Missing run_id.";
+    } else {
+      loadStory();
+    }
+
+    async function loadStory() {
+      statusEl.textContent = "Loading...";
+      try {
+        const res = await fetch(`/oasis/story/runs/${runId}`);
+        if (!res.ok) throw new Error("Failed to load story run");
+        const run = await res.json();
+
+        metaEl.textContent = `#${run.id} · ${run.entity_title || "Entity"} · ${run.prompt_type || "connection"} · ${run.created_at || ""}`;
+
+        storyText.textContent = run.story_text || "";
+        sourcesText.textContent = run.sources_text || "";
+
+        await Promise.all([
+          loadArt(run.art_id),
+          loadColor(run.color_id),
+        ]);
+
+        statusEl.textContent = "";
+      } catch (err) {
+        statusEl.textContent = err.message || "Failed to load.";
+      }
+    }
+
+    async function loadArt(id) {
+      try {
+        const res = await fetch(`/art/api/art/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error("Failed to load art");
+        const data = await res.json();
+        artText.textContent = data.art || "";
+      } catch (err) {
+        artText.textContent = err.message || "Failed to load art.";
+      }
+    }
+
+    async function loadColor(id) {
+      try {
+        const res = await fetch(`/colors/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error("Failed to load color");
+        const data = await res.json();
+        colorText.textContent = data.output_text || "";
+      } catch (err) {
+        colorText.textContent = err.message || "Failed to load color.";
+      }
+    }
+  </script>
+</body>
+</html>

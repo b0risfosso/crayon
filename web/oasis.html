@@ -342,6 +342,14 @@
         const actionRow = document.createElement("div");
         actionRow.className = "row";
         actionRow.style.margin = "8px 0";
+        const openStoryBtn = document.createElement("button");
+        openStoryBtn.type = "button";
+        openStoryBtn.className = "linkish";
+        openStoryBtn.textContent = "Open story";
+        openStoryBtn.onclick = () => {
+          const url = `/story.html?run_id=${encodeURIComponent(run.id)}`;
+          window.open(url, "_blank");
+        };
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.textContent = "Delete";
@@ -355,6 +363,7 @@
             alert(err.message || "Could not delete.");
           }
         };
+        actionRow.appendChild(openStoryBtn);
         actionRow.appendChild(deleteBtn);
 
         const grid = document.createElement("div");

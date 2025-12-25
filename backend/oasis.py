@@ -782,6 +782,27 @@ def delete_story_run(run_id: int) -> Any:
         conn.close()
 
 
+@app.get("/oasis/story/runs/<int:run_id>")
+def get_story_run(run_id: int) -> Any:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT id, entity_id, entity_title, entity_description, art_id, color_id,
+                   thought_text, story_text, sources_text, prompt_type, created_at
+            FROM oasis_story_runs
+            WHERE id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+        if not row:
+            abort(404, description="story run not found")
+        return jsonify(dict(row))
+    finally:
+        conn.close()
+
+
 @app.get("/oasis/story/runs/all")
 def list_all_story_runs() -> Any:
     limit = request.args.get("limit", default=200, type=int)
