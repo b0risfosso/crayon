@@ -58,62 +58,112 @@
         const res = await fetch("/oasis/story/runs/all?limit=300");
         if (!res.ok) throw new Error("Failed to load stories");
         const rows = await res.json();
-        renderList(Array.isArray(rows) ? rows : []);
+        const groups = groupByArt(Array.isArray(rows) ? rows : []);
+        await hydrateArtText(groups);
+        renderList(groups);
       } catch (err) {
         listEl.textContent = err.message || "Could not load stories.";
       }
     }
 
-    function renderList(rows) {
+    function groupByArt(rows) {
+      const byArt = new Map();
+      rows.forEach((row) => {
+        const key = row.art_id ?? "unknown";
+        if (!byArt.has(key)) byArt.set(key, { art_id: key, art_text: "", stories: [] });
+        byArt.get(key).stories.push(row);
+      });
+      return Array.from(byArt.values());
+    }
+
+    async function hydrateArtText(groups) {
+      const requests = groups.map(async (group) => {
+        if (!group.art_id || group.art_id === "unknown") return;
+        try {
+          const res = await fetch(`/art/api/art/${encodeURIComponent(group.art_id)}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          group.art_text = data.art || "";
+        } catch (_err) {
+          // ignore failures
+        }
+      });
+      await Promise.all(requests);
+    }
+
+    function renderList(groups) {
       listEl.innerHTML = "";
-      if (!rows.length) {
+      if (!groups.length) {
         listEl.innerHTML = '<div class="muted">No stories found.</div>';
         return;
       }
 
-      rows.forEach((row) => {
-        const wrapper = document.createElement("details");
-        const summary = document.createElement("summary");
-        const promptLabel = row.prompt_type ? ` · ${row.prompt_type}` : "";
-        summary.textContent = `${row.entity_title || "Entity"}${promptLabel} · ${row.created_at || "unknown time"}`;
-        const pill = document.createElement("span");
-        pill.className = "pill";
-        pill.textContent = `#${row.id}`;
-        summary.appendChild(pill);
+      groups.forEach((group) => {
+        const section = document.createElement("div");
+        section.className = "card";
 
-        const meta = document.createElement("div");
-        meta.className = "muted";
-        meta.textContent = `art ${row.art_id} · color ${row.color_id}`;
+        const header = document.createElement("div");
+        header.className = "row";
+        const title = document.createElement("div");
+        title.style.fontWeight = "700";
+        title.textContent = `Art #${group.art_id}`;
+        header.appendChild(title);
 
-        const actions = document.createElement("div");
-        actions.className = "row";
-        const openBtn = document.createElement("button");
-        openBtn.type = "button";
-        openBtn.className = "linkish";
-        openBtn.textContent = "Open in Oasis";
-        openBtn.onclick = () => {
-          const url = `/oasis.html?art_id=${encodeURIComponent(row.art_id)}&color_id=${encodeURIComponent(row.color_id)}`;
-          window.open(url, "_blank");
-        };
-        actions.appendChild(openBtn);
+        const artText = document.createElement("pre");
+        artText.textContent = group.art_text || "(art text unavailable)";
 
-        const grid = document.createElement("div");
-        grid.className = "grid-2";
+        const storyList = document.createElement("div");
+        storyList.className = "list";
 
-        const storyBlock = document.createElement("pre");
-        storyBlock.textContent = row.story_text || "No story output.";
+        group.stories.forEach((row) => {
+          const wrapper = document.createElement("details");
+          const summary = document.createElement("summary");
+          const promptLabel = row.prompt_type ? ` · ${row.prompt_type}` : "";
+          summary.textContent = `${row.entity_title || "Entity"}${promptLabel} · ${row.created_at || "unknown time"}`;
+          const pill = document.createElement("span");
+          pill.className = "pill";
+          pill.textContent = `#${row.id}`;
+          summary.appendChild(pill);
 
-        const sourcesBlock = document.createElement("pre");
-        sourcesBlock.textContent = row.sources_text || "No sources output.";
+          const meta = document.createElement("div");
+          meta.className = "muted";
+          meta.textContent = `color ${row.color_id}`;
 
-        grid.appendChild(storyBlock);
-        grid.appendChild(sourcesBlock);
+          const actions = document.createElement("div");
+          actions.className = "row";
+          const openBtn = document.createElement("button");
+          openBtn.type = "button";
+          openBtn.className = "linkish";
+          openBtn.textContent = "Open in Oasis";
+          openBtn.onclick = () => {
+            const url = `/oasis.html?art_id=${encodeURIComponent(row.art_id)}&color_id=${encodeURIComponent(row.color_id)}`;
+            window.open(url, "_blank");
+          };
+          actions.appendChild(openBtn);
 
-        wrapper.appendChild(summary);
-        wrapper.appendChild(meta);
-        wrapper.appendChild(actions);
-        wrapper.appendChild(grid);
-        listEl.appendChild(wrapper);
+          const grid = document.createElement("div");
+          grid.className = "grid-2";
+
+          const storyBlock = document.createElement("pre");
+          storyBlock.textContent = row.story_text || "No story output.";
+
+          const sourcesBlock = document.createElement("pre");
+          sourcesBlock.textContent = row.sources_text || "No sources output.";
+
+          grid.appendChild(storyBlock);
+          grid.appendChild(sourcesBlock);
+
+          wrapper.appendChild(summary);
+          wrapper.appendChild(meta);
+          wrapper.appendChild(actions);
+          wrapper.appendChild(grid);
+          storyList.appendChild(wrapper);
+        });
+
+        section.appendChild(header);
+        section.appendChild(artText);
+        section.appendChild(storyList);
+        listEl.appendChild(section);
       });
     }
 
