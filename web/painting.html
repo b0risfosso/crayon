@@ -362,15 +362,6 @@
 
 
         // NEW: single button to open dirt3.html
-        const dirt3Btn = document.createElement('button');
-        dirt3Btn.textContent = 'Open Dirt';
-        dirt3Btn.onclick = (e) => {
-          e.stopPropagation();
-          const url = `/dirt3.html?art_id=${artId}&color_id=${c.id}`;
-          window.open(url, '_blank');
-        };
-        actionRow.appendChild(dirt3Btn);
-
         const oasisBtn = document.createElement('button');
         oasisBtn.textContent = 'Enter Oasis';
         oasisBtn.onclick = (e) => {

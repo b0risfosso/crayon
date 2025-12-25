@@ -803,6 +803,49 @@ def get_story_run(run_id: int) -> Any:
         conn.close()
 
 
+@app.get("/oasis/story/runs/<int:run_id>/notes")
+def list_story_notes(run_id: int) -> Any:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, story_run_id, note_text, created_at
+            FROM oasis_story_notes
+            WHERE story_run_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (run_id,),
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        conn.close()
+
+
+@app.post("/oasis/story/runs/<int:run_id>/notes")
+def create_story_note(run_id: int) -> Any:
+    payload = require_json()
+    note_text = payload.get("note_text")
+    if not isinstance(note_text, str) or not note_text.strip():
+        abort(400, description="'note_text' is required and must be a non-empty string")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            INSERT INTO oasis_story_notes (story_run_id, note_text, created_at)
+            VALUES (?, ?, ?)
+            RETURNING id, story_run_id, note_text, created_at
+            """,
+            (run_id, note_text.strip(), utc_now_iso()),
+        ).fetchone()
+        conn.commit()
+        return jsonify(dict(row)), 201
+    finally:
+        conn.close()
+
+
 @app.get("/oasis/story/runs/all")
 def list_all_story_runs() -> Any:
     limit = request.args.get("limit", default=200, type=int)

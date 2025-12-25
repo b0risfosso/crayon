@@ -51,6 +51,18 @@
         <pre id="sourcesText">Loading sources...</pre>
       </div>
     </section>
+
+    <section class="card" style="margin-top:14px;">
+      <div class="muted">Notes</div>
+      <div class="row" style="margin-top:8px;">
+        <textarea id="noteInput" placeholder="Add a note..."></textarea>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="saveNoteBtn" type="button">Save note</button>
+        <div id="noteStatus" class="muted"></div>
+      </div>
+      <div id="notesList" class="stack" style="margin-top:8px;"></div>
+    </section>
   </main>
 
   <script>
@@ -63,6 +75,10 @@
     const colorText = document.getElementById("colorText");
     const storyText = document.getElementById("storyText");
     const sourcesText = document.getElementById("sourcesText");
+    const noteInput = document.getElementById("noteInput");
+    const saveNoteBtn = document.getElementById("saveNoteBtn");
+    const noteStatus = document.getElementById("noteStatus");
+    const notesList = document.getElementById("notesList");
 
     if (!runId) {
       statusEl.textContent = "Missing run_id.";
@@ -81,7 +97,7 @@
         if (!res.ok) throw new Error("Failed to load story run");
         const run = await res.json();
 
-        metaEl.textContent = `#${run.id} · ${run.entity_title || "Entity"} · ${run.prompt_type || "connection"} · ${run.created_at || ""}`;
+        metaEl.textContent = `story ${run.id} · art ${run.art_id} · color ${run.color_id} · ${run.entity_title || "Entity"} · ${run.prompt_type || "connection"} · ${run.created_at || ""}`;
 
         storyText.textContent = run.story_text || "";
         sourcesText.textContent = run.sources_text || "";
@@ -89,6 +105,7 @@
         await Promise.all([
           loadArt(run.art_id),
           loadColor(run.color_id),
+          loadNotes(),
         ]);
 
         statusEl.textContent = "";
@@ -97,6 +114,62 @@
       }
     }
 
+    saveNoteBtn.addEventListener("click", async () => {
+      const text = noteInput.value.trim();
+      if (!text) {
+        noteStatus.textContent = "Enter a note first.";
+        return;
+      }
+      noteStatus.textContent = "Saving...";
+      try {
+        const res = await fetch(`/oasis/story/runs/${encodeURIComponent(runId)}/notes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note_text: text })
+        });
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || "Failed to save note");
+        }
+        noteInput.value = "";
+        noteStatus.textContent = "Saved.";
+        await loadNotes();
+      } catch (err) {
+        noteStatus.textContent = err.message || "Failed to save note.";
+      }
+    });
+
+    async function loadNotes() {
+      notesList.textContent = "Loading notes...";
+      try {
+        const res = await fetch(`/oasis/story/runs/${encodeURIComponent(runId)}/notes`);
+        if (!res.ok) throw new Error("Failed to load notes");
+        const rows = await res.json();
+        renderNotes(Array.isArray(rows) ? rows : []);
+      } catch (err) {
+        notesList.textContent = err.message || "Could not load notes.";
+      }
+    }
+
+    function renderNotes(rows) {
+      notesList.innerHTML = "";
+      if (!rows.length) {
+        notesList.innerHTML = '<div class="muted">No notes yet.</div>';
+        return;
+      }
+      rows.forEach((row) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        const meta = document.createElement("div");
+        meta.className = "muted";
+        meta.textContent = row.created_at || "";
+        const body = document.createElement("pre");
+        body.textContent = row.note_text || "";
+        card.appendChild(meta);
+        card.appendChild(body);
+        notesList.appendChild(card);
+      });
+    }
     async function loadArt(id) {
       try {
         const res = await fetch(`/art/api/art/${encodeURIComponent(id)}`);
