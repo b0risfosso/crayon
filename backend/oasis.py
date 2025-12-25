@@ -200,6 +200,16 @@ TASKS: Dict[str, Dict[str, Any]] = {}
 TASKS_LOCK = threading.Lock()
 
 
+def queue_stats() -> Dict[str, Any]:
+    with TASKS_LOCK:
+        counts = {"queued": 0, "running": 0, "done": 0, "error": 0}
+        for t in TASKS.values():
+            status = t.get("status")
+            if status in counts:
+                counts[status] += 1
+    return {"queue_size": TASK_QUEUE.qsize(), "tasks": counts, "concurrency": CONCURRENCY}
+
+
 def enqueue_bridge_task(payload: Dict[str, Any]) -> Dict[str, Any]:
     task = {
         "task_id": uuid4().hex,
@@ -783,11 +793,72 @@ def get_task(task_id: str) -> Any:
 
 @app.get("/oasis/llm/tasks")
 def list_tasks() -> Any:
+    status = request.args.get("status")
+    task_type = request.args.get("task_type")
+    include_error = request.args.get("include_error") == "1"
+
     limit = request.args.get("limit", default=200, type=int)
     limit = max(1, min(limit, 500))
+
     with TASKS_LOCK:
-        tasks = list(TASKS.values())[-limit:]
-    return jsonify(tasks)
+        items = []
+        for tid, meta in TASKS.items():
+            if status and meta.get("status") != status:
+                continue
+            if task_type and meta.get("task_type") != task_type:
+                continue
+
+            entry = dict(meta)
+            entry["task_id"] = tid
+            if not include_error and "error" in entry:
+                entry["has_error"] = True
+                entry.pop("error", None)
+            items.append(entry)
+
+    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    if limit > 0:
+        items = items[:limit]
+
+    return jsonify(
+        {
+            "queue": queue_stats(),
+            "count": len(items),
+            "tasks": items,
+        }
+    )
+
+
+@app.get("/oasis/llm/workers")
+def get_queue_workers() -> Any:
+    with TASKS_LOCK:
+        running = [t for t in TASKS.values() if t.get("status") == "running"]
+
+    workers: Dict[str, list[Dict[str, Any]]] = {}
+    for t in running:
+        wid = t.get("worker_id")
+        if wid is None:
+            continue
+        wid_str = str(wid)
+        payload = t.get("payload") or {}
+        workers.setdefault(wid_str, []).append(
+            {
+                "task_id": t.get("task_id"),
+                "task_type": t.get("task_type"),
+                "status": t.get("status"),
+                "entity_id": payload.get("entity_id"),
+                "art_id": payload.get("art_id"),
+                "color_id": payload.get("color_id"),
+                "created_at": t.get("created_at"),
+                "started_at": t.get("started_at"),
+            }
+        )
+
+    return jsonify(
+        {
+            "queue": queue_stats(),
+            "workers": workers,
+        }
+    )
 
 
 if __name__ == "__main__":

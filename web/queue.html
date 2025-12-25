@@ -232,6 +232,7 @@
               <option value="dirt">dirt /llm</option>
               <option value="instruments">instruments /llm</option>
               <option value="colors">colors</option>
+              <option value="oasis">oasis /llm</option>
             </select>
           </label>
           <div class="muted small" id="queue-endpoints-hint"></div>
@@ -355,6 +356,7 @@
         label: "instruments /llm",
       },
       colors: { tasks: "/colors/queue/tasks", workers: "/colors/queue/workers", label: "colors" },
+      oasis: { tasks: "/oasis/llm/tasks", workers: "/oasis/llm/workers", label: "oasis /llm" },
     };
 
     let TASKS_ENDPOINT = QUEUE_OPTIONS.dirt.tasks;
