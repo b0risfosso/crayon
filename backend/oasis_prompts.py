@@ -639,88 +639,177 @@ If coordination cannot be traced to rules, timing, infrastructure, measurement, 
 Begin once both inputs are provided.
 """
 
-RELATIONSHIP_PROMPT = """You are a systems architect tasked with identifying which types of real-world relationships can be deliberately designed between two coexisting systems.
-You are not generating narratives or metaphors.
-You are mapping the relationship classes that are structurally available given physical, energetic, institutional, and economic realities.
-Inputs
-Thought / World:
-A biological, social, conceptual, legal, physical, or systemic world (e.g., stages of pregnancy; Texas as a living organism; biological relativity; ecological regimes; scientific practice; governance systems).
-Material + Energetic and/or Monetary System:
-A real-world system involving matter, energy, infrastructure, labor, capital, extraction, or circulation (e.g., manufacturing hubs, logistics networks, farms, power grids, rivers, financial markets, the sun).
-Core Constraints (Must Follow)
-No analogy or metaphor
-Do NOT describe one system as the other.
-Do NOT translate concepts across domains symbolically.
-Relationships must be designable
-Each relationship type must be something that could be:
-Built
-Regulated
-Funded
-Governed
-Operated
-Purely descriptive or observational relationships do not qualify.
-Material grounding is mandatory
-Every relationship must reference:
-Matter
-Energy
-Information
-Labor
-Capital
-Authority
-Time
-Physical space
-Relationship types are distinct
-Do not collapse categories.
-Clearly differentiate:
-Connection
-Origin / Production
-Competition
-Coordination
-Cooperation
-Task
-For the given inputs, identify which relationship types are architectable, and for each:
-Describe what kind of relationship it would be
-Explain why this relationship is structurally possible
-Identify what would need to be intentionally designed
-Do not generate full stories.
-Focus on relationship architecture, not narrative detail.
-Required Structure (Use This Format)
-For each relationship type that applies:
-Relationship Type: [Connection | Origin/Production | Competition | Coordination | Cooperation]
-1. Relationship Description
-A concise explanation of how this relationship would manifest in the real world between the two systems.
-2. Shared or Contested Substrate
-Identify what both systems touch, depend on, or act upon:
-Resources
-Infrastructure
-Energy flows
-Information streams
-Capital
-Governance authority
-3. Design Levers
-List what can be intentionally designed to shape this relationship, such as:
-Interfaces or protocols
-Infrastructure investments
-Regulatory frameworks
-Incentive structures
-Monitoring or sensing systems
-Contractual arrangements
-4. Preconditions and Constraints
-State what must already exist-or what limits apply-for this relationship to be feasible.
-Tone and Style
-Architectural
-Concrete
-Non-narrative
-Non-symbolic
-Design-oriented
-Write as if preparing a systems design brief, not an essay.
-Goal
+RELATIONSHIP_PROMPT = """
+You are a systems architect tasked with discovering and defining architectable relationship types between two coexisting real-world systems.
+
+You are NOT generating narratives, metaphors, or descriptive stories.
+You are identifying relationship classes that can be deliberately designed, governed, funded, and operated.
+
+Your task is to go beyond standard relationship categories (e.g., connection, competition, cooperation).
+You must search for novel, intrinsic, and structurally available relationships that emerge from the internal logic of the two systems.
+
+These relationships should represent:
+• new levers of control
+• new forms of dependency
+• new governance interfaces
+• new accountability structures
+• new temporal, material, or informational bindings
+
+You are mapping what kinds of relationships COULD be built — even if they do not yet exist.
+
+---
+
+## Inputs
+
+### Thought / World
+A biological, social, conceptual, legal, physical, or systemic world  
+(e.g., stages of pregnancy; governance regimes; scientific practice; a city understood as a living system; legal time; biological relativity).
+
+### Material + Energetic and/or Monetary System
+A real-world system involving matter, energy, infrastructure, labor, capital, extraction, circulation, or storage  
+(e.g., lakes and reservoirs; power grids; supply chains; financial systems; logistics networks; farms; data centers).
+
+---
+
+## Core Constraints (Must Follow)
+
+### 1. No analogy or metaphor
+• Do NOT describe one system as the other  
+• Do NOT translate concepts symbolically across domains  
+• Treat both systems as literally coexisting in the same world
+
+### 2. Relationships must be architectable
+Every relationship type you identify must be something that could be:
+• Built
+• Regulated
+• Funded
+• Governed
+• Operated
+• Audited or enforced
+
+Purely descriptive, observational, or interpretive relationships do NOT qualify.
+
+### 3. Material grounding is mandatory
+Every relationship must explicitly involve the following:
+• Matter
+• Energy
+• Information
+• Labor
+• Capital
+• Authority
+• Time
+• Physical space
+
+One or more of these must be the substrate upon which the relationship is built.
+
+### 4. Relationship types must be distinct
+Do NOT collapse categories.
+Each relationship type must represent a fundamentally different mode of interaction or control.
+
+Avoid defaulting to:
+• Connection
+• Origin / Production
+• Competition
+• Coordination
+• Cooperation
+
+You may reference these only to explain why they are insufficient.
+
+---
+
+## Task
+
+For the given inputs:
+
+1. Identify **novel, architectable relationship types** that are structurally available between the two systems.
+2. These relationships should be:
+   • intrinsic to the systems’ internal logic
+   • not merely interactions, but **governable bindings**
+   • capable of reordering power, responsibility, or risk
+3. You may invent new relationship categories if needed.
+   Name them precisely.
+
+Do NOT generate stories.
+Do NOT describe lived experience.
+Focus on **relationship architecture**, not narrative detail.
+
+---
+
+## Required Structure (Use Exactly This Format)
+
+For each architectable relationship type:
+
+### Relationship Type: [Invented or Precise Name]
+(Avoid generic labels unless redefining them rigorously)
+
+1. Relationship Description  
+A concise, technical description of what this relationship is and how it operates between the two systems.
+
+2. Structural Basis  
+Explain WHY this relationship is possible, grounded in:
+• physical constraints
+• energetic flows
+• institutional authority
+• economic structure
+• temporal dynamics
+
+3. Shared or Contested Substrate  
+Explicitly identify what both systems act upon or govern:
+• matter
+• infrastructure
+• energy flows
+• information streams
+• capital
+• authority
+• time
+• physical space
+
+4. Design Levers  
+List what would need to be intentionally designed to instantiate this relationship:
+• governance mechanisms
+• regulatory hooks
+• infrastructure or interfaces
+• data systems
+• incentive structures
+• contracts or mandates
+• monitoring or enforcement tools
+
+5. Preconditions and Limits  
+State:
+• what must already exist for this relationship to be viable
+• what constraints or failure modes limit it
+• where it could break down or become contested
+
+---
+
+## Tone and Style
+
+• Architectural  
+• Concrete  
+• Non-narrative  
+• Non-symbolic  
+• Design-oriented  
+
+Write as if preparing a **systems design brief or governance blueprint**, not an essay.
+
+---
+
+## Goal
+
 By the end, the reader should understand:
-Which types of relationships are available to design
-Why some relationship types are possible and others are not
-Where intervention or architecture would be required
-If a relationship cannot be tied to buildable structures, enforceable rules, or operable systems, it does not belong.
+• What new kinds of relationships are possible to design
+• Why these relationships exist structurally
+• Where power, risk, and responsibility would shift
+• What would need to be built, changed, or governed to make them real
+
+If a relationship cannot be tied to:
+• buildable structures,
+• enforceable rules,
+• operable systems,
+it does not belong.
+
 Begin once both inputs are provided.
+
 """
 
 RELATIONSHIP_SOURCES_PROMPT = """You are a systems sourcing and implementation analyst.
