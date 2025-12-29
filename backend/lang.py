@@ -344,6 +344,100 @@ def usage_state():
         }
     )
 
+@app.get("/api/writings")
+def list_writings():
+    conn = _get_db()
+    rows = conn.execute(
+        """
+        SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
+               parent_writing_id, notes, created_at, updated_at
+        FROM writings
+        ORDER BY id DESC
+        """
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in rows])
+
+@app.post("/api/writings")
+def create_writing():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    description = (data.get("description") or "").strip()
+    parent_run_id = data.get("parent_run_id")
+    parent_text_a = (data.get("parent_text_a") or "").strip()
+    parent_text_b = (data.get("parent_text_b") or "").strip()
+    parent_writing_id = data.get("parent_writing_id")
+    notes = (data.get("notes") or "").strip()
+
+    if not name:
+        return jsonify({"error": "name required"}), 400
+
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO writings (
+            name, description, parent_run_id, parent_text_a, parent_text_b,
+            parent_writing_id, notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            name,
+            description,
+            parent_run_id,
+            parent_text_a,
+            parent_text_b,
+            parent_writing_id,
+            notes,
+        ),
+    )
+    conn.commit()
+    writing_id = cur.lastrowid
+    conn.close()
+    return jsonify({"id": writing_id})
+
+@app.patch("/api/writings/<int:writing_id>")
+def update_writing(writing_id: int):
+    data = request.get_json(silent=True) or {}
+    notes = data.get("notes")
+    if notes is None:
+        return jsonify({"error": "notes required"}), 400
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE writings
+        SET notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (notes, writing_id),
+    )
+    conn.commit()
+    updated = cur.rowcount
+    conn.close()
+    if not updated:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"updated": writing_id})
+
+@app.delete("/api/writings/<int:writing_id>")
+def delete_writing(writing_id: int):
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        DELETE FROM writings
+        WHERE id = ?
+        """,
+        (writing_id,),
+    )
+    conn.commit()
+    deleted = cur.rowcount
+    conn.close()
+    if not deleted:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"deleted": writing_id})
+
 if __name__ == "__main__":
     _ensure_workers()
     app.run(debug=True)
