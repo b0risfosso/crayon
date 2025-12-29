@@ -14,8 +14,9 @@
     .result { margin-top: 1.5rem; white-space: pre-wrap; }
     nav a { margin-right: 1rem; text-decoration: none; }
     .row { display: flex; gap: 0.5rem; align-items: center; }
-    select { width: 100%; padding: 0.5rem; font: inherit; }
     .muted { color: #555; font-size: 0.9rem; }
+    .list { border: 1px solid #ccc; padding: 0.5rem; max-height: 12rem; overflow: auto; }
+    .list label { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 400; margin: 0.35rem 0; }
   </style>
 </head>
 <body>
@@ -30,15 +31,9 @@
       <label for="text-a">Text A</label>
       <textarea id="text-a" name="text_a" required></textarea>
 
-      <label for="text-b">Text B</label>
-      <div class="row">
-        <select id="creation-select">
-          <option value="">Use custom text B</option>
-        </select>
-        <button type="button" id="delete-creation">Remove</button>
-      </div>
-      <textarea id="text-b" name="text_b" required></textarea>
-      <div class="muted">Select a creation to use it as text B, or enter custom text B above.</div>
+      <label>Text B (select one or more)</label>
+      <div id="creations-list" class="list"></div>
+      <button type="button" id="delete-creation">Remove Selected</button>
 
       <label for="new-creation">Add to creations</label>
       <div class="row">
@@ -57,35 +52,32 @@
     const form = document.getElementById('lang-form');
     const statusEl = document.getElementById('status');
     const resultEl = document.getElementById('result');
-    const creationSelect = document.getElementById('creation-select');
-    const textBEl = document.getElementById('text-b');
+    const creationsList = document.getElementById('creations-list');
     const newCreationEl = document.getElementById('new-creation');
     const addCreationBtn = document.getElementById('add-creation');
     const deleteCreationBtn = document.getElementById('delete-creation');
-
-    function setTextBState() {
-      const selected = creationSelect.value;
-      textBEl.disabled = Boolean(selected);
-      if (selected) {
-        textBEl.value = '';
-      }
-    }
 
     async function loadCreations() {
       try {
         const res = await fetch('/api/creations');
         if (!res.ok) throw new Error('Failed to load creations');
         const data = await res.json();
-        creationSelect.textContent = '';
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = 'Use custom text B';
-        creationSelect.appendChild(defaultOption);
+        creationsList.textContent = '';
+        if (!data.length) {
+          creationsList.textContent = 'No creations yet.';
+          return;
+        }
         data.forEach((item) => {
-          const option = document.createElement('option');
-          option.value = String(item.id);
-          option.textContent = item.text_b;
-          creationSelect.appendChild(option);
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = String(item.id);
+          checkbox.dataset.textB = item.text_b;
+          const span = document.createElement('span');
+          span.textContent = item.text_b;
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          creationsList.appendChild(label);
         });
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
@@ -97,34 +89,35 @@
       statusEl.textContent = 'writing...';
       resultEl.textContent = '';
 
-      const selectedId = creationSelect.value;
-      const payload = {
-        text_a: document.getElementById('text-a').value,
-        text_b: selectedId ? creationSelect.options[creationSelect.selectedIndex].text : textBEl.value,
-      };
+      const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
+      if (!selected.length) {
+        statusEl.textContent = 'Select at least one creation.';
+        return;
+      }
+      const textAValue = document.getElementById('text-a').value;
 
       try {
-        const res = await fetch('/api/lang', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Request failed');
-        }
-
-        const data = await res.json();
-        statusEl.textContent = '';
-        if (data && data.result) {
-          if (typeof data.result === 'object') {
-            resultEl.textContent = JSON.stringify(data.result, null, 2);
-          } else {
-            resultEl.textContent = data.result;
+        const results = await Promise.all(selected.map(async (checkbox) => {
+          const payload = {
+            text_a: textAValue,
+            text_b: checkbox.dataset.textB || '',
+          };
+          const res = await fetch('/api/lang', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Request failed');
           }
-        } else if (data && data.task_id) {
-          resultEl.textContent = `Queued task ${data.task_id}. Check /queue.html for status.`;
+          return res.json();
+        }));
+
+        statusEl.textContent = '';
+        const queued = results.filter((item) => item && item.task_id).map((item) => item.task_id);
+        if (queued.length) {
+          resultEl.textContent = `Queued tasks: ${queued.join(', ')}. Check /queue.html for status.`;
         } else {
           resultEl.textContent = '';
         }
@@ -132,8 +125,6 @@
         statusEl.textContent = `Error: ${err.message}`;
       }
     });
-
-    creationSelect.addEventListener('change', setTextBState);
 
     addCreationBtn.addEventListener('click', async () => {
       const value = newCreationEl.value.trim();
@@ -156,16 +147,16 @@
     });
 
     deleteCreationBtn.addEventListener('click', async () => {
-      const selectedId = creationSelect.value;
-      if (!selectedId) return;
+      const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
+      if (!selected.length) return;
       try {
-        const res = await fetch(`/api/creations/${selectedId}`, { method: 'DELETE' });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to delete creation');
-        }
-        creationSelect.value = '';
-        setTextBState();
+        await Promise.all(selected.map(async (checkbox) => {
+          const res = await fetch(`/api/creations/${checkbox.value}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to delete creation');
+          }
+        }));
         await loadCreations();
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
@@ -173,7 +164,6 @@
     });
 
     loadCreations();
-    setTextBState();
   </script>
 </body>
 </html>
