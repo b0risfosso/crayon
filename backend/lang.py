@@ -188,6 +188,57 @@ def list_lang():
 
     return jsonify(result)
 
+@app.get("/api/creations")
+def list_creations():
+    conn = _get_db()
+    rows = conn.execute(
+        """
+        SELECT id, text_b, created_at
+        FROM creations
+        ORDER BY id DESC
+        """
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in rows])
+
+@app.post("/api/creations")
+def create_creation():
+    data = request.get_json(silent=True) or {}
+    text_b = (data.get("text_b") or "").strip()
+    if not text_b:
+        return jsonify({"error": "text_b required"}), 400
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO creations (text_b)
+        VALUES (?)
+        """,
+        (text_b,),
+    )
+    conn.commit()
+    creation_id = cur.lastrowid
+    conn.close()
+    return jsonify({"id": creation_id, "text_b": text_b})
+
+@app.delete("/api/creations/<int:creation_id>")
+def delete_creation(creation_id: int):
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        DELETE FROM creations
+        WHERE id = ?
+        """,
+        (creation_id,),
+    )
+    conn.commit()
+    deleted = cur.rowcount
+    conn.close()
+    if not deleted:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"deleted": creation_id})
+
 @app.get("/api/queue")
 def queue_state():
     with task_lock:

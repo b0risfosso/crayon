@@ -13,6 +13,9 @@
     button { margin-top: 1rem; padding: 0.5rem 0.9rem; font: inherit; }
     .result { margin-top: 1.5rem; white-space: pre-wrap; }
     nav a { margin-right: 1rem; text-decoration: none; }
+    .row { display: flex; gap: 0.5rem; align-items: center; }
+    select { width: 100%; padding: 0.5rem; font: inherit; }
+    .muted { color: #555; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -28,7 +31,20 @@
       <textarea id="text-a" name="text_a" required></textarea>
 
       <label for="text-b">Text B</label>
+      <div class="row">
+        <select id="creation-select">
+          <option value="">Use custom text B</option>
+        </select>
+        <button type="button" id="delete-creation">Remove</button>
+      </div>
       <textarea id="text-b" name="text_b" required></textarea>
+      <div class="muted">Select a creation to use it as text B, or enter custom text B above.</div>
+
+      <label for="new-creation">Add to creations</label>
+      <div class="row">
+        <input id="new-creation" type="text" placeholder="New text B" />
+        <button type="button" id="add-creation">Add</button>
+      </div>
 
       <button type="submit">write</button>
     </form>
@@ -41,15 +57,50 @@
     const form = document.getElementById('lang-form');
     const statusEl = document.getElementById('status');
     const resultEl = document.getElementById('result');
+    const creationSelect = document.getElementById('creation-select');
+    const textBEl = document.getElementById('text-b');
+    const newCreationEl = document.getElementById('new-creation');
+    const addCreationBtn = document.getElementById('add-creation');
+    const deleteCreationBtn = document.getElementById('delete-creation');
+
+    function setTextBState() {
+      const selected = creationSelect.value;
+      textBEl.disabled = Boolean(selected);
+      if (selected) {
+        textBEl.value = '';
+      }
+    }
+
+    async function loadCreations() {
+      try {
+        const res = await fetch('/api/creations');
+        if (!res.ok) throw new Error('Failed to load creations');
+        const data = await res.json();
+        creationSelect.textContent = '';
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Use custom text B';
+        creationSelect.appendChild(defaultOption);
+        data.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = String(item.id);
+          option.textContent = item.text_b;
+          creationSelect.appendChild(option);
+        });
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       statusEl.textContent = 'writing...';
       resultEl.textContent = '';
 
+      const selectedId = creationSelect.value;
       const payload = {
         text_a: document.getElementById('text-a').value,
-        text_b: document.getElementById('text-b').value,
+        text_b: selectedId ? creationSelect.options[creationSelect.selectedIndex].text : textBEl.value,
       };
 
       try {
@@ -81,6 +132,48 @@
         statusEl.textContent = `Error: ${err.message}`;
       }
     });
+
+    creationSelect.addEventListener('change', setTextBState);
+
+    addCreationBtn.addEventListener('click', async () => {
+      const value = newCreationEl.value.trim();
+      if (!value) return;
+      try {
+        const res = await fetch('/api/creations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text_b: value }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to add creation');
+        }
+        newCreationEl.value = '';
+        await loadCreations();
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    deleteCreationBtn.addEventListener('click', async () => {
+      const selectedId = creationSelect.value;
+      if (!selectedId) return;
+      try {
+        const res = await fetch(`/api/creations/${selectedId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to delete creation');
+        }
+        creationSelect.value = '';
+        setTextBState();
+        await loadCreations();
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    loadCreations();
+    setTextBState();
   </script>
 </body>
 </html>
