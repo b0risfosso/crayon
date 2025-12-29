@@ -56,14 +56,23 @@
           const name = idea.name || '(untitled)';
           const descText = idea.desciription || '';
           link.textContent = name;
-          const params = new URLSearchParams({
-            run_id: String(run.id || ''),
-            text_a: run.text_a || '',
-            text_b: run.text_b || '',
-            name,
-            description: descText,
-          });
-          link.href = `/writing.html?${params.toString()}`;
+
+          if (idea.writing_id) {
+            // New path: writing created at LLM time
+            const params = new URLSearchParams({ writing_id: String(idea.writing_id) });
+            link.href = `/writing.html?${params.toString()}`;
+          } else {
+            // Fallback for older runs that don't have writing_id
+            const params = new URLSearchParams({
+              run_id: String(run.id || ''),
+              text_a: run.text_a || '',
+              text_b: run.text_b || '',
+              name,
+              description: descText,
+            });
+            link.href = `/writing.html?${params.toString()}`;
+          }
+
           const desc = document.createElement('div');
           desc.textContent = descText;
           ideaEl.appendChild(link);

@@ -45,6 +45,7 @@
     const runId = params.get('run_id') || '';
     const textA = params.get('text_a') || '';
     const textB = params.get('text_b') || '';
+    const writingIdParam = params.get('writing_id');  // NEW
 
     const statusEl = document.getElementById('status');
     const notesEl = document.getElementById('notes');
@@ -52,6 +53,7 @@
     const addNoteBtn = document.getElementById('add-note');
 
     let writingId = null;
+
 
     document.getElementById('idea-name').textContent = ideaName;
     document.getElementById('idea-desc').textContent = ideaDesc;
@@ -182,12 +184,43 @@
       }
     });
 
+    async function loadWritingById(id) {
+      try {
+        const res = await fetch(`/api/writings/${id}`);
+        if (!res.ok) {
+          throw new Error('Failed to load writing');
+        }
+        const data = await res.json();
+        writingId = data.id;
+        document.getElementById('idea-name').textContent = data.name || '(untitled)';
+        document.getElementById('idea-desc').textContent = data.description || '';
+        const metaParts = [];
+        if (data.parent_run_id) metaParts.push(`Run ${data.parent_run_id}`);
+        if (data.parent_text_a) metaParts.push(`Text A: ${data.parent_text_a}`);
+        if (data.parent_text_b) metaParts.push(`Text B: ${data.parent_text_b}`);
+        document.getElementById('meta').textContent = metaParts.join(' • ');
+        await loadNotes();
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
     async function init() {
-      await ensureWriting();
-      await loadNotes();
+      if (writingIdParam) {
+        // New path: direct writing_id
+        await loadWritingById(writingIdParam);
+      } else {
+        // Old path: use run_id + name + text_a + text_b to find or create
+        document.getElementById('idea-name').textContent = ideaName;
+        document.getElementById('idea-desc').textContent = ideaDesc;
+        document.getElementById('meta').textContent = runId ? `Run ${runId}` : '';
+        await ensureWriting();
+        await loadNotes();
+      }
     }
 
     init();
+
   </script>
 </body>
 </html>

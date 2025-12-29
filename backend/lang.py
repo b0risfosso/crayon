@@ -36,6 +36,7 @@ Text B: {text_b}
 class Idea(BaseModel):
     name: str
     desciription: str
+    writing_id: int | None = None
 
 class IdeaSet(BaseModel):
     ideas: list[Idea]
@@ -89,6 +90,7 @@ def _enqueue_task(text_a: str, text_b: str) -> int:
     task_queue.put(task_id)
     return task_id
 
+
 def _run_task(task: Task) -> None:
     text_input = INSTRUCTION_TEMPLATE.format(
         text_a=task.text_a,
@@ -108,22 +110,67 @@ def _run_task(task: Task) -> None:
         text_format=IdeaSet,
     )
 
-    event = response.output_parsed
-    output_json = json.dumps(event.model_dump(), ensure_ascii=True)
+    idea_set: IdeaSet = response.output_parsed
     _record_usage(model_name, response)
 
     conn = _get_db()
     cur = conn.cursor()
+
+    # 1) Create a run row first, with empty/placeholder response
     cur.execute(
         """
         INSERT INTO runs (instruction, text_a, text_b, prompt, response)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (INSTRUCTION_TEMPLATE, task.text_a, task.text_b, text_input, output_json),
+        (INSTRUCTION_TEMPLATE, task.text_a, task.text_b, text_input, None),
+    )
+    run_id = cur.lastrowid
+
+    # 2) For each idea, create a writing and attach writing_id
+    enriched_ideas: list[dict] = []
+    for idea in idea_set.ideas:
+        # Insert into writings table
+        cur.execute(
+            """
+            INSERT INTO writings (
+                name, description, parent_run_id, parent_text_a, parent_text_b,
+                parent_writing_id, notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                idea.name,
+                idea.desciription,       # matches your current field name
+                run_id,
+                task.text_a,
+                task.text_b,
+                None,                    # parent_writing_id
+                "",                      # notes
+            ),
+        )
+        writing_id = cur.lastrowid
+
+        idea_dict = idea.model_dump()
+        idea_dict["writing_id"] = writing_id
+        enriched_ideas.append(idea_dict)
+
+    # 3) Store enriched response JSON (with writing_id per idea)
+    enriched_response = {"ideas": enriched_ideas}
+    output_json = json.dumps(enriched_response, ensure_ascii=True)
+
+    cur.execute(
+        """
+        UPDATE runs
+        SET response = ?
+        WHERE id = ?
+        """,
+        (output_json, run_id),
     )
     conn.commit()
-    task.run_id = cur.lastrowid
     conn.close()
+
+    task.run_id = run_id
+
 
 def _extract_usage(response) -> tuple[int, int, int] | None:
     usage = getattr(response, "usage", None)
@@ -539,6 +586,24 @@ def delete_note(note_id: int):
     if not deleted:
         return jsonify({"error": "not found"}), 404
     return jsonify({"deleted": note_id})
+
+@app.get("/api/writings/<int:writing_id>")
+def get_writing(writing_id: int):
+    conn = _get_db()
+    row = conn.execute(
+        """
+        SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
+               parent_writing_id, notes, created_at, updated_at
+        FROM writings
+        WHERE id = ?
+        """,
+        (writing_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(dict(row))
+
 
 if __name__ == "__main__":
     _ensure_workers()
