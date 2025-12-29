@@ -6,10 +6,14 @@
   <title>Writing</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
-    main { max-width: 48rem; margin: 0 auto; }
+    main { max-width: 60rem; margin: 0 auto; }
     nav a { margin-right: 1rem; text-decoration: none; }
     h1 { font-size: 1.5rem; margin: 1rem 0 0.5rem; }
-    .desc { white-space: pre-wrap; }
+    .desc { white-space: pre-wrap; margin-bottom: 1rem; }
+    textarea { width: 100%; box-sizing: border-box; padding: 0.5rem; font: inherit; min-height: 4rem; }
+    button { margin-top: 0.5rem; padding: 0.45rem 0.8rem; font: inherit; }
+    .note { border-top: 1px solid #ccc; padding: 0.75rem 0; }
+    .muted { color: #555; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -17,19 +21,173 @@
     <nav>
       <a href="/index.html">Home</a>
       <a href="/lang.html">Runs</a>
+      <a href="/writings.html">Writings</a>
     </nav>
 
     <h1 id="idea-name">(untitled)</h1>
     <div id="idea-desc" class="desc"></div>
+    <div id="meta" class="muted"></div>
+
+    <section>
+      <h2>Notes</h2>
+      <label for="new-note">Add Note</label>
+      <textarea id="new-note"></textarea>
+      <button type="button" id="add-note">Add Note</button>
+      <div id="status" class="muted"></div>
+      <div id="notes"></div>
+    </section>
   </main>
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const name = params.get('name') || '(untitled)';
-    const desc = params.get('desc') || '';
+    const ideaName = params.get('name') || '(untitled)';
+    const ideaDesc = params.get('description') || '';
+    const runId = params.get('run_id') || '';
+    const textA = params.get('text_a') || '';
+    const textB = params.get('text_b') || '';
 
-    document.getElementById('idea-name').textContent = name;
-    document.getElementById('idea-desc').textContent = desc;
+    const statusEl = document.getElementById('status');
+    const notesEl = document.getElementById('notes');
+    const newNoteEl = document.getElementById('new-note');
+    const addNoteBtn = document.getElementById('add-note');
+
+    let writingId = null;
+
+    document.getElementById('idea-name').textContent = ideaName;
+    document.getElementById('idea-desc').textContent = ideaDesc;
+    document.getElementById('meta').textContent = runId ? `Run ${runId}` : '';
+
+    async function ensureWriting() {
+      try {
+        const lookup = await fetch(`/api/writings/lookup?run_id=${encodeURIComponent(runId)}&name=${encodeURIComponent(ideaName)}&text_a=${encodeURIComponent(textA)}&text_b=${encodeURIComponent(textB)}`);
+        if (lookup.ok) {
+          const data = await lookup.json();
+          writingId = data.id;
+          return;
+        }
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/writings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: ideaName,
+            description: ideaDesc,
+            parent_run_id: runId || null,
+            parent_text_a: textA,
+            parent_text_b: textB,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to create writing');
+        }
+        const data = await res.json();
+        writingId = data.id;
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    function renderNotes(notes) {
+      notesEl.textContent = '';
+      if (!notes.length) {
+        notesEl.textContent = 'No notes yet.';
+        return;
+      }
+      notes.forEach((note) => {
+        const container = document.createElement('div');
+        container.className = 'note';
+
+        const textarea = document.createElement('textarea');
+        textarea.value = note.content || '';
+        container.appendChild(textarea);
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.textContent = 'Save';
+        saveBtn.addEventListener('click', async () => {
+          try {
+            const res = await fetch(`/api/notes/${note.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content: textarea.value }),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Failed to update note');
+            }
+            statusEl.textContent = 'Note saved.';
+          } catch (err) {
+            statusEl.textContent = `Error: ${err.message}`;
+          }
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', async () => {
+          try {
+            const res = await fetch(`/api/notes/${note.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Failed to delete note');
+            }
+            await loadNotes();
+          } catch (err) {
+            statusEl.textContent = `Error: ${err.message}`;
+          }
+        });
+
+        container.appendChild(saveBtn);
+        container.appendChild(deleteBtn);
+        notesEl.appendChild(container);
+      });
+    }
+
+    async function loadNotes() {
+      if (!writingId) return;
+      try {
+        const res = await fetch(`/api/writings/${writingId}/notes`);
+        if (!res.ok) throw new Error('Failed to load notes');
+        const data = await res.json();
+        renderNotes(data);
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    addNoteBtn.addEventListener('click', async () => {
+      if (!writingId) return;
+      const content = newNoteEl.value.trim();
+      if (!content) return;
+      try {
+        const res = await fetch(`/api/writings/${writingId}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to create note');
+        }
+        newNoteEl.value = '';
+        await loadNotes();
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    async function init() {
+      await ensureWriting();
+      await loadNotes();
+    }
+
+    init();
   </script>
 </body>
 </html>

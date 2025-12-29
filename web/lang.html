@@ -44,7 +44,7 @@
       return groups;
     }
 
-    function renderIdeaSet(response) {
+    function renderIdeaSet(response, run) {
       const container = document.createElement('div');
       container.className = 'ideas';
 
@@ -56,7 +56,14 @@
           const name = idea.name || '(untitled)';
           const descText = idea.desciription || '';
           link.textContent = name;
-          link.href = `/writing.html?name=${encodeURIComponent(name)}&desc=${encodeURIComponent(descText)}`;
+          const params = new URLSearchParams({
+            run_id: String(run.id || ''),
+            text_a: run.text_a || '',
+            text_b: run.text_b || '',
+            name,
+            description: descText,
+          });
+          link.href = `/writing.html?${params.toString()}`;
           const desc = document.createElement('div');
           desc.textContent = descText;
           ideaEl.appendChild(link);
@@ -92,7 +99,7 @@
             meta.className = 'meta';
             meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
             textBDetails.appendChild(meta);
-            textBDetails.appendChild(renderIdeaSet(run.response));
+            textBDetails.appendChild(renderIdeaSet(run.response, run));
           });
 
           textADetails.appendChild(textBDetails);
