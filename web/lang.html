@@ -8,10 +8,13 @@
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
     main { max-width: 60rem; margin: 0 auto; }
     nav a { margin-right: 1rem; text-decoration: none; }
-    .run { border-top: 1px solid #ccc; padding: 1rem 0; }
-    .run h2 { font-size: 1rem; margin: 0 0 0.5rem; }
-    .meta { font-size: 0.9rem; color: #555; }
-    pre { white-space: pre-wrap; margin: 0.5rem 0 0; }
+    details { border-top: 1px solid #ccc; padding: 0.5rem 0; }
+    summary { cursor: pointer; font-weight: 600; }
+    .text-b { margin-left: 1rem; }
+    .meta { font-size: 0.9rem; color: #555; margin-left: 1rem; }
+    .ideas { margin-left: 2rem; }
+    .idea { margin: 0.5rem 0; }
+    pre { white-space: pre-wrap; margin: 0.5rem 0; }
   </style>
 </head>
 <body>
@@ -28,27 +31,72 @@
   <script>
     const languageEl = document.getElementById('language');
 
-    function renderRun(run) {
+    function groupRuns(runs) {
+      const groups = new Map();
+      runs.forEach((run) => {
+        const textA = run.text_a || '(no text A)';
+        if (!groups.has(textA)) groups.set(textA, new Map());
+        const byTextB = groups.get(textA);
+        const textB = run.text_b || '(no text B)';
+        if (!byTextB.has(textB)) byTextB.set(textB, []);
+        byTextB.get(textB).push(run);
+      });
+      return groups;
+    }
+
+    function renderIdeaSet(response) {
       const container = document.createElement('div');
-      container.className = 'run';
+      container.className = 'ideas';
 
-      const title = document.createElement('h2');
-      title.textContent = run.text_a || '(no text A)';
-
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
-
-      const response = document.createElement('pre');
-      if (run && typeof run.response === 'object') {
-        response.textContent = JSON.stringify(run.response, null, 2);
+      if (response && typeof response === 'object' && Array.isArray(response.ideas)) {
+        response.ideas.forEach((idea) => {
+          const ideaEl = document.createElement('div');
+          ideaEl.className = 'idea';
+          const title = document.createElement('div');
+          title.textContent = idea.name || '(untitled)';
+          const desc = document.createElement('div');
+          desc.textContent = idea.desciription || '';
+          ideaEl.appendChild(title);
+          ideaEl.appendChild(desc);
+          container.appendChild(ideaEl);
+        });
       } else {
-        response.textContent = run.response || '';
+        const pre = document.createElement('pre');
+        pre.textContent = typeof response === 'string' ? response : JSON.stringify(response, null, 2);
+        container.appendChild(pre);
       }
 
-      container.appendChild(title);
-      container.appendChild(meta);
-      container.appendChild(response);
+      return container;
+    }
+
+    function renderGrouped(groups) {
+      const container = document.createElement('div');
+      for (const [textA, byTextB] of groups.entries()) {
+        const textADetails = document.createElement('details');
+        const textASummary = document.createElement('summary');
+        textASummary.textContent = textA;
+        textADetails.appendChild(textASummary);
+
+        for (const [textB, runs] of byTextB.entries()) {
+          const textBDetails = document.createElement('details');
+          textBDetails.className = 'text-b';
+          const textBSummary = document.createElement('summary');
+          textBSummary.textContent = textB;
+          textBDetails.appendChild(textBSummary);
+
+          runs.forEach((run) => {
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
+            textBDetails.appendChild(meta);
+            textBDetails.appendChild(renderIdeaSet(run.response));
+          });
+
+          textADetails.appendChild(textBDetails);
+        }
+
+        container.appendChild(textADetails);
+      }
       return container;
     }
 
@@ -63,7 +111,8 @@
           languageEl.textContent = 'No language yet.';
           return;
         }
-        data.forEach((run) => languageEl.appendChild(renderRun(run)));
+        const grouped = groupRuns(data);
+        languageEl.appendChild(renderGrouped(grouped));
       } catch (err) {
         languageEl.textContent = `Error: ${err.message}`;
       }
