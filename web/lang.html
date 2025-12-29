@@ -52,11 +52,14 @@
         response.ideas.forEach((idea) => {
           const ideaEl = document.createElement('div');
           ideaEl.className = 'idea';
-          const title = document.createElement('div');
-          title.textContent = idea.name || '(untitled)';
+          const link = document.createElement('a');
+          const name = idea.name || '(untitled)';
+          const descText = idea.desciription || '';
+          link.textContent = name;
+          link.href = `/writing.html?name=${encodeURIComponent(name)}&desc=${encodeURIComponent(descText)}`;
           const desc = document.createElement('div');
-          desc.textContent = idea.desciription || '';
-          ideaEl.appendChild(title);
+          desc.textContent = descText;
+          ideaEl.appendChild(link);
           ideaEl.appendChild(desc);
           container.appendChild(ideaEl);
         });

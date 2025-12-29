@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Writing</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
+    main { max-width: 48rem; margin: 0 auto; }
+    nav a { margin-right: 1rem; text-decoration: none; }
+    h1 { font-size: 1.5rem; margin: 1rem 0 0.5rem; }
+    .desc { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <nav>
+      <a href="/index.html">Home</a>
+      <a href="/lang.html">Runs</a>
+    </nav>
+
+    <h1 id="idea-name">(untitled)</h1>
+    <div id="idea-desc" class="desc"></div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get('name') || '(untitled)';
+    const desc = params.get('desc') || '';
+
+    document.getElementById('idea-name').textContent = name;
+    document.getElementById('idea-desc').textContent = desc;
+  </script>
+</body>
+</html>
