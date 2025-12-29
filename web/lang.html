@@ -40,7 +40,11 @@
       meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
 
       const response = document.createElement('pre');
-      response.textContent = run.response || '';
+      if (run && typeof run.response === 'object') {
+        response.textContent = JSON.stringify(run.response, null, 2);
+      } else {
+        response.textContent = run.response || '';
+      }
 
       container.appendChild(title);
       container.appendChild(meta);

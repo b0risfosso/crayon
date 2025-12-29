@@ -30,7 +30,7 @@
       <label for="text-b">Text B</label>
       <textarea id="text-b" name="text_b" required></textarea>
 
-      <button type="submit">Run</button>
+      <button type="submit">write</button>
     </form>
 
     <div id="status"></div>
@@ -44,7 +44,7 @@
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      statusEl.textContent = 'Running...';
+      statusEl.textContent = 'writing...';
       resultEl.textContent = '';
 
       const payload = {
@@ -66,7 +66,11 @@
 
         const data = await res.json();
         statusEl.textContent = '';
-        resultEl.textContent = data.result || '';
+        if (data && typeof data.result === 'object') {
+          resultEl.textContent = JSON.stringify(data.result, null, 2);
+        } else {
+          resultEl.textContent = data.result || '';
+        }
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
       }

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from flask import Flask, jsonify, request
 from openai import OpenAI
+from pydantic import BaseModel
 
 DB_PATH = "/var/www/site/data/lang.db"
 
@@ -18,6 +20,13 @@ Draft a few ideas for the how the idea, system, or world in Text A can be built 
 
 Text B: {text_b}
 """
+
+class Idea(BaseModel):
+    name: str
+    desciription: str
+
+class IdeaSet(BaseModel):
+    ideas: list[Idea]
 
 def _get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -39,14 +48,21 @@ def run_lang():
         text_b=text_b
     ).strip()
 
-    response = client.responses.create(
+    response = client.responses.parse(
         model="gpt-5-mini-2025-08-07",
-        input=text_input,
+        input=[
+            {"role": "system", "content": "You are an expert idea generator."},
+            {
+                "role": "user",
+                "content": text_input,
+            },
+        ],
+        text_format=IdeaSet,
     )
 
-    output_text = getattr(response, "output_text", "")
-    if not output_text:
-        output_text = str(response)
+    event = response.output_parsed
+
+    output_json = json.dumps(event.model_dump(), ensure_ascii=True)
 
     conn = _get_db()
     cur = conn.cursor()
@@ -55,13 +71,13 @@ def run_lang():
         INSERT INTO runs (instruction, text_a, text_b, prompt, response)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (INSTRUCTION_TEMPLATE, text_a, text_b, text_input, output_text),
+        (INSTRUCTION_TEMPLATE, text_a, text_b, text_input, output_json),
     )
     conn.commit()
     run_id = cur.lastrowid
     conn.close()
 
-    return jsonify({"id": run_id, "result": output_text})
+    return jsonify({"id": run_id, "result": event.model_dump()})
 
 
 @app.get("/api/lang")
@@ -76,7 +92,17 @@ def list_lang():
     ).fetchall()
     conn.close()
 
-    return jsonify([dict(row) for row in rows])
+    result = []
+    for row in rows:
+        item = dict(row)
+        response_text = item.get("response") or ""
+        try:
+            item["response"] = json.loads(response_text)
+        except json.JSONDecodeError:
+            item["response"] = response_text
+        result.append(item)
+
+    return jsonify(result)
 
 
 if __name__ == "__main__":
