@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Queue</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
+    main { max-width: 60rem; margin: 0 auto; }
+    nav a { margin-right: 1rem; text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #ccc; vertical-align: top; }
+    th { font-weight: 600; }
+    .status { font-weight: 600; }
+    .small { color: #555; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <nav>
+      <a href="/index.html">Home</a>
+      <a href="/write.html">Write</a>
+      <a href="/lang.html">Runs</a>
+    </nav>
+
+    <h1>Queue</h1>
+    <div id="summary" class="small"></div>
+    <div id="queue"></div>
+  </main>
+
+  <script>
+    const summaryEl = document.getElementById('summary');
+    const queueEl = document.getElementById('queue');
+
+    function renderTable(tasks) {
+      if (!tasks.length) {
+        queueEl.textContent = 'Queue is empty.';
+        return;
+      }
+
+      const table = document.createElement('table');
+      const header = document.createElement('tr');
+      ['ID', 'Status', 'Text A', 'Text B', 'Created', 'Started', 'Finished', 'Run ID', 'Error'].forEach((title) => {
+        const th = document.createElement('th');
+        th.textContent = title;
+        header.appendChild(th);
+      });
+      table.appendChild(header);
+
+      tasks.forEach((task) => {
+        const row = document.createElement('tr');
+        const cells = [
+          task.id,
+          task.status,
+          task.text_a,
+          task.text_b,
+          task.created_at || '',
+          task.started_at || '',
+          task.finished_at || '',
+          task.run_id || '',
+          task.error || '',
+        ];
+        cells.forEach((value, index) => {
+          const td = document.createElement('td');
+          if (index === 1) td.className = 'status';
+          td.textContent = value;
+          row.appendChild(td);
+        });
+        table.appendChild(row);
+      });
+
+      queueEl.textContent = '';
+      queueEl.appendChild(table);
+    }
+
+    async function loadQueue() {
+      try {
+        const res = await fetch('/api/queue');
+        if (!res.ok) throw new Error('Failed to load queue');
+        const data = await res.json();
+        summaryEl.textContent = `Total ${data.total}, queued ${data.queued}, running ${data.running}, concurrency ${data.concurrency}`;
+        renderTable(data.tasks || []);
+      } catch (err) {
+        queueEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    loadQueue();
+    setInterval(loadQueue, 3000);
+  </script>
+</body>
+</html>

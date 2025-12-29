@@ -66,10 +66,16 @@
 
         const data = await res.json();
         statusEl.textContent = '';
-        if (data && typeof data.result === 'object') {
-          resultEl.textContent = JSON.stringify(data.result, null, 2);
+        if (data && data.result) {
+          if (typeof data.result === 'object') {
+            resultEl.textContent = JSON.stringify(data.result, null, 2);
+          } else {
+            resultEl.textContent = data.result;
+          }
+        } else if (data && data.task_id) {
+          resultEl.textContent = `Queued task ${data.task_id}. Check /queue.html for status.`;
         } else {
-          resultEl.textContent = data.result || '';
+          resultEl.textContent = '';
         }
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
