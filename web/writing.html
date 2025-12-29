@@ -220,7 +220,7 @@
           openBtn.textContent = 'Open writing';
           openBtn.addEventListener('click', () => {
             const url = `/writing.html?writing_id=${encodeURIComponent(note.child_writing_id)}`;
-            window.location.href = url;
+            window.open(url, '_blank');
           });
           buttonsRow.appendChild(openBtn);
         }
