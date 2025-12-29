@@ -10,6 +10,15 @@ app = Flask(__name__)
 client = OpenAI()
 
 
+INSTRUCTION_TEMPLATE = """
+Read the following text.
+Text A: {text_a}
+
+Draft a few ideas for the how the idea, system, or world in Text A can be built by, interacted with, influenced by, or be integrated into the concept, system, world found in Text B.
+
+Text B: {text_b}
+"""
+
 def _get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -19,14 +28,17 @@ def _get_db() -> sqlite3.Connection:
 @app.post("/api/lang")
 def run_lang():
     data = request.get_json(silent=True) or {}
-    instruction = (data.get("instruction") or "").strip()
     text_a = (data.get("text_a") or "").strip()
     text_b = (data.get("text_b") or "").strip()
 
-    if not (instruction or text_a or text_b):
-        return jsonify({"error": "instruction, text_a, or text_b required"}), 400
+    if not (text_a or text_b):
+        return jsonify({"error": "text_a or text_b required"}), 400
 
-    text_input = "\n\n".join([instruction, text_a, text_b]).strip()
+    text_input = INSTRUCTION_TEMPLATE.format(
+        text_a=text_a,
+        text_b=text_b
+    ).strip()
+
     response = client.responses.create(
         model="gpt-5-mini-2025-08-07",
         input=text_input,
@@ -43,7 +55,7 @@ def run_lang():
         INSERT INTO runs (instruction, text_a, text_b, prompt, response)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (instruction, text_a, text_b, text_input, output_text),
+        (INSTRUCTION_TEMPLATE, text_a, text_b, text_input, output_text),
     )
     conn.commit()
     run_id = cur.lastrowid

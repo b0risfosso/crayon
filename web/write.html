@@ -19,14 +19,11 @@
   <main>
     <nav>
       <a href="/index.html">Home</a>
-      <a href="/lang.html">Runs</a>
+      <a href="/lang.html">Lang</a>
     </nav>
 
     <h1>Write</h1>
     <form id="lang-form">
-      <label for="instruction">Instruction</label>
-      <textarea id="instruction" name="instruction" required></textarea>
-
       <label for="text-a">Text A</label>
       <textarea id="text-a" name="text_a" required></textarea>
 
@@ -51,7 +48,6 @@
       resultEl.textContent = '';
 
       const payload = {
-        instruction: document.getElementById('instruction').value,
         text_a: document.getElementById('text-a').value,
         text_b: document.getElementById('text-b').value,
       };
