@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Runs | Language</title>
+  <title>Language</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
     main { max-width: 60rem; margin: 0 auto; }
@@ -22,11 +22,11 @@
     </nav>
 
     <h1>Language</h1>
-    <div id="runs"></div>
+    <div id="language"></div>
   </main>
 
   <script>
-    const runsEl = document.getElementById('runs');
+    const languageEl = document.getElementById('language');
 
     function renderRun(run) {
       const container = document.createElement('div');
@@ -48,24 +48,24 @@
       return container;
     }
 
-    async function loadRuns() {
-      runsEl.textContent = 'Loading...';
+    async function loadlanguage() {
+      languageEl.textContent = 'Loading...';
       try {
         const res = await fetch('/api/lang');
-        if (!res.ok) throw new Error('Failed to load runs');
+        if (!res.ok) throw new Error('Failed to load language');
         const data = await res.json();
-        runsEl.textContent = '';
+        languageEl.textContent = '';
         if (!data.length) {
-          runsEl.textContent = 'No runs yet.';
+          languageEl.textContent = 'No language yet.';
           return;
         }
-        data.forEach((run) => runsEl.appendChild(renderRun(run)));
+        data.forEach((run) => languageEl.appendChild(renderRun(run)));
       } catch (err) {
-        runsEl.textContent = `Error: ${err.message}`;
+        languageEl.textContent = `Error: ${err.message}`;
       }
     }
 
-    loadRuns();
+    loadlanguage();
   </script>
 </body>
 </html>
