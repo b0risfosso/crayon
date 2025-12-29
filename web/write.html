@@ -35,6 +35,10 @@
 
       <label>Text B (select one or more)</label>
       <div id="creations-list" class="list"></div>
+      <div class="row">
+        <input id="random-count" type="number" min="1" placeholder="N" />
+        <button type="button" id="random-select">Select N random</button>
+      </div>
       <button type="button" id="delete-creation">Remove Selected</button>
 
       <label for="new-creation">Add to creations</label>
@@ -58,6 +62,8 @@
     const newCreationEl = document.getElementById('new-creation');
     const addCreationBtn = document.getElementById('add-creation');
     const deleteCreationBtn = document.getElementById('delete-creation');
+    const randomCountEl = document.getElementById('random-count');
+    const randomSelectBtn = document.getElementById('random-select');
 
     async function loadCreations() {
       try {
@@ -163,6 +169,29 @@
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
       }
+    });
+
+    randomSelectBtn.addEventListener('click', () => {
+      const checkboxes = Array.from(creationsList.querySelectorAll('input[type="checkbox"]'));
+      const count = Number.parseInt(randomCountEl.value, 10);
+      if (!checkboxes.length || !Number.isFinite(count) || count <= 0) {
+        return;
+      }
+
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+
+      const picks = Math.min(count, checkboxes.length);
+      const pool = [...checkboxes];
+      for (let i = pool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+
+      pool.slice(0, picks).forEach((checkbox) => {
+        checkbox.checked = true;
+      });
     });
 
     loadCreations();
