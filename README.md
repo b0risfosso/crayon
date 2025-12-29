@@ -1,1 +1,1 @@
-fantasiagenesis is a place where imagination and reality grow together. It is a place born of the heart, where imagination composes reality as a writer composes a story. fantasiagenesis grew from a process of collecting books and boxes of dirt, composing the worlds inside of these books using the dirt within these boxes and has continued to evolve into the active composition of stories, living systems, ideas, inside our reality: a membrane between mind and matter, through which imagination and reality grow together. 
+its the language!
