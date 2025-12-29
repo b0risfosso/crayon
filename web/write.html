@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Write | Language</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
+    main { max-width: 48rem; margin: 0 auto; }
+    label { display: block; font-weight: 600; margin: 1rem 0 0.25rem; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 0.5rem; font: inherit; }
+    textarea { min-height: 6rem; }
+    button { margin-top: 1rem; padding: 0.5rem 0.9rem; font: inherit; }
+    .result { margin-top: 1.5rem; white-space: pre-wrap; }
+    nav a { margin-right: 1rem; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <nav>
+      <a href="/index.html">Home</a>
+      <a href="/lang.html">Runs</a>
+    </nav>
+
+    <h1>Write</h1>
+    <form id="lang-form">
+      <label for="instruction">Instruction</label>
+      <textarea id="instruction" name="instruction" required></textarea>
+
+      <label for="text-a">Text A</label>
+      <textarea id="text-a" name="text_a" required></textarea>
+
+      <label for="text-b">Text B</label>
+      <textarea id="text-b" name="text_b" required></textarea>
+
+      <button type="submit">Run</button>
+    </form>
+
+    <div id="status"></div>
+    <div id="result" class="result"></div>
+  </main>
+
+  <script>
+    const form = document.getElementById('lang-form');
+    const statusEl = document.getElementById('status');
+    const resultEl = document.getElementById('result');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      statusEl.textContent = 'Running...';
+      resultEl.textContent = '';
+
+      const payload = {
+        instruction: document.getElementById('instruction').value,
+        text_a: document.getElementById('text-a').value,
+        text_b: document.getElementById('text-b').value,
+      };
+
+      try {
+        const res = await fetch('/api/lang', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Request failed');
+        }
+
+        const data = await res.json();
+        statusEl.textContent = '';
+        resultEl.textContent = data.result || '';
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+  </script>
+</body>
+</html>

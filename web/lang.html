@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Runs | Language</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
+    main { max-width: 60rem; margin: 0 auto; }
+    nav a { margin-right: 1rem; text-decoration: none; }
+    .run { border-top: 1px solid #ccc; padding: 1rem 0; }
+    .run h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    .meta { font-size: 0.9rem; color: #555; }
+    pre { white-space: pre-wrap; margin: 0.5rem 0 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <nav>
+      <a href="/index.html">Home</a>
+      <a href="/write.html">Write</a>
+    </nav>
+
+    <h1>Previous Runs</h1>
+    <div id="runs"></div>
+  </main>
+
+  <script>
+    const runsEl = document.getElementById('runs');
+
+    function renderRun(run) {
+      const container = document.createElement('div');
+      container.className = 'run';
+
+      const title = document.createElement('h2');
+      title.textContent = run.text_a || '(no text A)';
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
+
+      const response = document.createElement('pre');
+      response.textContent = run.response || '';
+
+      container.appendChild(title);
+      container.appendChild(meta);
+      container.appendChild(response);
+      return container;
+    }
+
+    async function loadRuns() {
+      runsEl.textContent = 'Loading...';
+      try {
+        const res = await fetch('/api/lang');
+        if (!res.ok) throw new Error('Failed to load runs');
+        const data = await res.json();
+        runsEl.textContent = '';
+        if (!data.length) {
+          runsEl.textContent = 'No runs yet.';
+          return;
+        }
+        data.forEach((run) => runsEl.appendChild(renderRun(run)));
+      } catch (err) {
+        runsEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    loadRuns();
+  </script>
+</body>
+</html>
