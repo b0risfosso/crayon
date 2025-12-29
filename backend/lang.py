@@ -11,6 +11,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 DB_PATH = "/var/www/site/data/lang.db"
+USAGE_DB_PATH = "/var/www/site/data/llm_usage.db"
 
 app = Flask(__name__)
 client = OpenAI()
@@ -56,8 +57,16 @@ def _get_db() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
+def _get_usage_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(USAGE_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+def _today_utc() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
 
 def _next_id() -> int:
     global _next_task_id
@@ -86,8 +95,9 @@ def _run_task(task: Task) -> None:
         text_b=task.text_b,
     ).strip()
 
+    model_name = "gpt-5-mini-2025-08-07"
     response = client.responses.parse(
-        model="gpt-5-mini-2025-08-07",
+        model=model_name,
         input=[
             {"role": "system", "content": "You are an expert idea generator."},
             {
@@ -100,6 +110,7 @@ def _run_task(task: Task) -> None:
 
     event = response.output_parsed
     output_json = json.dumps(event.model_dump(), ensure_ascii=True)
+    _record_usage(model_name, response)
 
     conn = _get_db()
     cur = conn.cursor()
@@ -112,6 +123,57 @@ def _run_task(task: Task) -> None:
     )
     conn.commit()
     task.run_id = cur.lastrowid
+    conn.close()
+
+def _extract_usage(response) -> tuple[int, int, int] | None:
+    usage = getattr(response, "usage", None)
+    if not usage:
+        return None
+    tokens_in = getattr(usage, "input_tokens", None)
+    tokens_out = getattr(usage, "output_tokens", None)
+    total_tokens = getattr(usage, "total_tokens", None)
+    if tokens_in is None or tokens_out is None or total_tokens is None:
+        return None
+    return int(tokens_in), int(tokens_out), int(total_tokens)
+
+def _record_usage(model_name: str, response) -> None:
+    usage = _extract_usage(response)
+    if not usage:
+        return
+    tokens_in, tokens_out, total_tokens = usage
+    usage_date = _today_utc()
+    conn = _get_usage_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO usage_log (usage_date, model, tokens_in, tokens_out, total_tokens)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (usage_date, model_name, tokens_in, tokens_out, total_tokens),
+    )
+    cur.execute(
+        """
+        INSERT INTO usage_daily (usage_date, model, tokens_in, tokens_out, total_tokens)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(usage_date, model) DO UPDATE SET
+          tokens_in = tokens_in + excluded.tokens_in,
+          tokens_out = tokens_out + excluded.tokens_out,
+          total_tokens = total_tokens + excluded.total_tokens
+        """,
+        (usage_date, model_name, tokens_in, tokens_out, total_tokens),
+    )
+    cur.execute(
+        """
+        INSERT INTO usage_all_time (model, tokens_in, tokens_out, total_tokens)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(model) DO UPDATE SET
+          tokens_in = tokens_in + excluded.tokens_in,
+          tokens_out = tokens_out + excluded.tokens_out,
+          total_tokens = total_tokens + excluded.total_tokens
+        """,
+        (model_name, tokens_in, tokens_out, total_tokens),
+    )
+    conn.commit()
     conn.close()
 
 def _worker_loop() -> None:
@@ -254,6 +316,31 @@ def queue_state():
             "running": running,
             "total": len(items),
             "tasks": sorted(items, key=lambda item: item["id"], reverse=True),
+        }
+    )
+
+@app.get("/api/usage")
+def usage_state():
+    conn = _get_usage_db()
+    daily = conn.execute(
+        """
+        SELECT usage_date, model, tokens_in, tokens_out, total_tokens
+        FROM usage_daily
+        ORDER BY usage_date DESC, model ASC
+        """
+    ).fetchall()
+    all_time = conn.execute(
+        """
+        SELECT model, tokens_in, tokens_out, total_tokens
+        FROM usage_all_time
+        ORDER BY model ASC
+        """
+    ).fetchall()
+    conn.close()
+    return jsonify(
+        {
+            "daily": [dict(row) for row in daily],
+            "all_time": [dict(row) for row in all_time],
         }
     )
 
