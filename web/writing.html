@@ -172,6 +172,9 @@
         textarea.value = note.content || '';
         container.appendChild(textarea);
 
+        const buttonsRow = document.createElement('div');
+        buttonsRow.className = 'row';
+
         const saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.textContent = 'Save';
@@ -191,6 +194,7 @@
             statusEl.textContent = `Error: ${err.message}`;
           }
         });
+        buttonsRow.appendChild(saveBtn);
 
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
@@ -207,12 +211,25 @@
             statusEl.textContent = `Error: ${err.message}`;
           }
         });
+        buttonsRow.appendChild(deleteBtn);
 
-        container.appendChild(saveBtn);
-        container.appendChild(deleteBtn);
+        // NEW: open this note as its own writing
+        if (note.child_writing_id) {
+          const openBtn = document.createElement('button');
+          openBtn.type = 'button';
+          openBtn.textContent = 'Open writing';
+          openBtn.addEventListener('click', () => {
+            const url = `/writing.html?writing_id=${encodeURIComponent(note.child_writing_id)}`;
+            window.location.href = url;
+          });
+          buttonsRow.appendChild(openBtn);
+        }
+
+        container.appendChild(buttonsRow);
         notesEl.appendChild(container);
       });
     }
+
 
     async function loadNotes() {
       if (!writingId) return;

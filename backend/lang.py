@@ -537,7 +537,7 @@ def list_notes(writing_id: int):
     conn = _get_db()
     rows = conn.execute(
         """
-        SELECT id, writing_id, content, created_at, updated_at
+        SELECT id, writing_id, content, child_writing_id, created_at, updated_at
         FROM writing_notes
         WHERE writing_id = ?
         ORDER BY id DESC
@@ -547,25 +547,83 @@ def list_notes(writing_id: int):
     conn.close()
     return jsonify([dict(row) for row in rows])
 
+
 @app.post("/api/writings/<int:writing_id>/notes")
 def create_note(writing_id: int):
     data = request.get_json(silent=True) or {}
     content = (data.get("content") or "").strip()
     if not content:
         return jsonify({"error": "content required"}), 400
+
     conn = _get_db()
     cur = conn.cursor()
+
+    # 1) Load parent writing for context
+    parent = conn.execute(
+        """
+        SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b
+        FROM writings
+        WHERE id = ?
+        """,
+        (writing_id,),
+    ).fetchone()
+    if not parent:
+        conn.close()
+        return jsonify({"error": "parent writing not found"}), 404
+
+    parent_run_id = parent["parent_run_id"]
+    parent_text_a = parent["parent_text_a"]
+    parent_text_b = parent["parent_text_b"]
+    parent_name = parent["name"] or "(untitled)"
+
+    # 2) Create child writing
+    # Name: first line of the note, or "Note on <parent>"
+    first_line = content.splitlines()[0].strip() if content.splitlines() else ""
+    if first_line:
+        child_name = first_line
+    else:
+        child_name = f"Note on {parent_name}"
+
     cur.execute(
         """
-        INSERT INTO writing_notes (writing_id, content)
-        VALUES (?, ?)
+        INSERT INTO writings (
+            name,
+            description,
+            parent_run_id,
+            parent_text_a,
+            parent_text_b,
+            parent_writing_id,
+            notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (writing_id, content),
+        (
+            child_name,
+            content,          # description = full note content
+            parent_run_id,
+            parent_text_a,
+            parent_text_b,
+            writing_id,       # this is the parent_writing_id
+            "",               # notes field (separate from note content)
+        ),
     )
+    child_writing_id = int(cur.lastrowid)
+
+    # 3) Create note row that points to the child writing
+    cur.execute(
+        """
+        INSERT INTO writing_notes (writing_id, content, child_writing_id)
+        VALUES (?, ?, ?)
+        """,
+        (writing_id, content, child_writing_id),
+    )
+    note_id = int(cur.lastrowid)
+
     conn.commit()
-    note_id = cur.lastrowid
     conn.close()
-    return jsonify({"id": note_id})
+
+    return jsonify({"id": note_id, "child_writing_id": child_writing_id})
+
 
 @app.patch("/api/notes/<int:note_id>")
 def update_note(note_id: int):
