@@ -17,6 +17,7 @@
     .muted { color: #555; font-size: 0.9rem; }
     .list { border: 1px solid #ccc; padding: 0.5rem; max-height: 12rem; overflow: auto; }
     .list label { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 400; margin: 0.35rem 0; }
+    .list label span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
   </style>
 </head>
 <body>
@@ -74,7 +75,7 @@
           checkbox.value = String(item.id);
           checkbox.dataset.textB = item.text_b;
           const span = document.createElement('span');
-          span.textContent = item.text_b;
+          span.textContent = item.text_b || '(empty)';
           label.appendChild(checkbox);
           label.appendChild(span);
           creationsList.appendChild(label);
