@@ -14,6 +14,16 @@
     button { margin-top: 0.5rem; padding: 0.45rem 0.8rem; font: inherit; }
     .note { border-top: 1px solid #ccc; padding: 0.75rem 0; }
     .muted { color: #555; font-size: 0.9rem; }
+    .row { display: flex; gap: 0.5rem; align-items: center; }
+    .list { border: 1px solid #ccc; padding: 0.5rem; max-height: 12rem; overflow: auto; }
+    .list label { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 400; margin: 0.35rem 0; }
+    .list label span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .result { margin-top: 0.75rem; white-space: pre-wrap; }
+    details { border-top: 1px solid #ccc; padding: 0.5rem 0; }
+    summary { cursor: pointer; font-weight: 600; }
+    .meta { font-size: 0.9rem; color: #555; margin-left: 1rem; }
+    .ideas { margin-left: 1rem; }
+    .idea { margin: 0.5rem 0; }
   </style>
 </head>
 <body>
@@ -29,6 +39,37 @@
     <div id="meta" class="muted"></div>
 
     <section>
+      <h2>Generate ideas</h2>
+      <form id="write-form">
+        <label for="text-a">Text A</label>
+        <textarea id="text-a" name="text_a" readonly></textarea>
+
+        <label>Text B (select one or more)</label>
+        <div id="creations-list" class="list"></div>
+        <div class="row">
+          <input id="random-count" type="number" min="1" placeholder="N" />
+          <button type="button" id="random-select">Select N random</button>
+        </div>
+        <button type="button" id="delete-creation">Remove Selected</button>
+
+        <label for="new-creation">Add to creations</label>
+        <div class="row">
+          <input id="new-creation" type="text" placeholder="New text B" />
+          <button type="button" id="add-creation">Add</button>
+        </div>
+
+        <button type="submit">write</button>
+      </form>
+      <div id="write-status" class="muted"></div>
+      <div id="write-result" class="result"></div>
+    </section>
+
+    <section>
+      <h2>Runs for this writing</h2>
+      <div id="writing-runs"></div>
+    </section>
+
+    <section>
       <h2>Notes</h2>
       <label for="new-note">Add Note</label>
       <textarea id="new-note"></textarea>
@@ -40,31 +81,53 @@
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const ideaName = params.get('name') || '(untitled)';
-    const ideaDesc = params.get('description') || '';
+    const ideaNameParam = params.get('name') || '(untitled)';
+    const ideaDescParam = params.get('description') || '';
     const runId = params.get('run_id') || '';
     const textA = params.get('text_a') || '';
     const textB = params.get('text_b') || '';
-    const writingIdParam = params.get('writing_id');  // NEW
+    const writingIdParam = params.get('writing_id');
 
     const statusEl = document.getElementById('status');
     const notesEl = document.getElementById('notes');
     const newNoteEl = document.getElementById('new-note');
     const addNoteBtn = document.getElementById('add-note');
+    const textAEl = document.getElementById('text-a');
+    const form = document.getElementById('write-form');
+    const writeStatusEl = document.getElementById('write-status');
+    const writeResultEl = document.getElementById('write-result');
+    const runsEl = document.getElementById('writing-runs');
+    const creationsList = document.getElementById('creations-list');
+    const newCreationEl = document.getElementById('new-creation');
+    const addCreationBtn = document.getElementById('add-creation');
+    const deleteCreationBtn = document.getElementById('delete-creation');
+    const randomCountEl = document.getElementById('random-count');
+    const randomSelectBtn = document.getElementById('random-select');
 
     let writingId = null;
+    let currentName = ideaNameParam;
+    let currentDesc = ideaDescParam;
 
+    function composeTextA(name, description) {
+      if (name && description) return `${name}\n\n${description}`;
+      return name || description || '';
+    }
 
-    document.getElementById('idea-name').textContent = ideaName;
-    document.getElementById('idea-desc').textContent = ideaDesc;
-    document.getElementById('meta').textContent = runId ? `Run ${runId}` : '';
+    function updateHeading() {
+      document.getElementById('idea-name').textContent = currentName || '(untitled)';
+      document.getElementById('idea-desc').textContent = currentDesc || '';
+      textAEl.value = composeTextA(currentName, currentDesc);
+    }
 
     async function ensureWriting() {
       try {
-        const lookup = await fetch(`/api/writings/lookup?run_id=${encodeURIComponent(runId)}&name=${encodeURIComponent(ideaName)}&text_a=${encodeURIComponent(textA)}&text_b=${encodeURIComponent(textB)}`);
+        const lookup = await fetch(`/api/writings/lookup?run_id=${encodeURIComponent(runId)}&name=${encodeURIComponent(currentName)}&text_a=${encodeURIComponent(textA)}&text_b=${encodeURIComponent(textB)}`);
         if (lookup.ok) {
           const data = await lookup.json();
           writingId = data.id;
+          currentName = data.name || currentName;
+          currentDesc = data.description || currentDesc;
+          updateHeading();
           return;
         }
       } catch (err) {
@@ -77,8 +140,8 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: ideaName,
-            description: ideaDesc,
+            name: currentName,
+            description: currentDesc,
             parent_run_id: runId || null,
             parent_text_a: textA,
             parent_text_b: textB,
@@ -163,6 +226,108 @@
       }
     }
 
+    function renderIdeaSet(response, run) {
+      const container = document.createElement('div');
+      container.className = 'ideas';
+
+      if (response && typeof response === 'object' && Array.isArray(response.ideas)) {
+        response.ideas.forEach((idea) => {
+          const ideaEl = document.createElement('div');
+          ideaEl.className = 'idea';
+          const link = document.createElement('a');
+          const name = idea.name || '(untitled)';
+          const descText = idea.desciription || '';
+          link.textContent = name;
+          if (idea.writing_id) {
+            const params = new URLSearchParams({ writing_id: String(idea.writing_id) });
+            link.href = `/writing.html?${params.toString()}`;
+          } else {
+            const params = new URLSearchParams({
+              run_id: String(run.id || ''),
+              text_a: run.text_a || '',
+              text_b: run.text_b || '',
+              name,
+              description: descText,
+            });
+            link.href = `/writing.html?${params.toString()}`;
+          }
+
+          const desc = document.createElement('div');
+          desc.textContent = descText;
+          ideaEl.appendChild(link);
+          ideaEl.appendChild(desc);
+          container.appendChild(ideaEl);
+        });
+      } else {
+        const pre = document.createElement('pre');
+        pre.textContent = typeof response === 'string' ? response : JSON.stringify(response, null, 2);
+        container.appendChild(pre);
+      }
+
+      return container;
+    }
+
+    function renderRuns(runs) {
+      runsEl.textContent = '';
+      if (!runs.length) {
+        runsEl.textContent = 'No runs yet.';
+        return;
+      }
+      runs.forEach((run) => {
+        const runDetails = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = run.text_b || '(no text B)';
+        runDetails.appendChild(summary);
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
+        runDetails.appendChild(meta);
+        runDetails.appendChild(renderIdeaSet(run.response, run));
+        runsEl.appendChild(runDetails);
+      });
+    }
+
+    async function loadRuns() {
+      if (!writingId) return;
+      runsEl.textContent = 'Loading...';
+      try {
+        const res = await fetch(`/api/lang?parent_writing_id=${encodeURIComponent(writingId)}`);
+        if (!res.ok) throw new Error('Failed to load runs');
+        const data = await res.json();
+        renderRuns(data);
+      } catch (err) {
+        runsEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function loadCreations() {
+      try {
+        const res = await fetch('/api/creations');
+        if (!res.ok) throw new Error('Failed to load creations');
+        const data = await res.json();
+        creationsList.textContent = '';
+        if (!data.length) {
+          creationsList.textContent = 'No creations yet.';
+          return;
+        }
+        data.forEach((item) => {
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = String(item.id);
+          checkbox.dataset.textB = item.text_b;
+          const span = document.createElement('span');
+          span.textContent = item.text_b || '(empty)';
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          creationsList.appendChild(label);
+        });
+      } catch (err) {
+        writeStatusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
     addNoteBtn.addEventListener('click', async () => {
       if (!writingId) return;
       const content = newNoteEl.value.trim();
@@ -184,6 +349,114 @@
       }
     });
 
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      writeStatusEl.textContent = 'writing...';
+      writeResultEl.textContent = '';
+
+      if (!writingId) {
+        writeStatusEl.textContent = 'Writing is not ready yet.';
+        return;
+      }
+
+      const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
+      if (!selected.length) {
+        writeStatusEl.textContent = 'Select at least one creation.';
+        return;
+      }
+
+      try {
+        const results = await Promise.all(selected.map(async (checkbox) => {
+          const payload = {
+            text_a: textAEl.value,
+            text_b: checkbox.dataset.textB || '',
+            parent_writing_id: writingId,
+          };
+          const res = await fetch('/api/lang', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Request failed');
+          }
+          return res.json();
+        }));
+
+        writeStatusEl.textContent = '';
+        const queued = results.filter((item) => item && item.task_id).map((item) => item.task_id);
+        if (queued.length) {
+          writeResultEl.textContent = `Queued tasks: ${queued.join(', ')}. Check /queue.html for status.`;
+        } else {
+          writeResultEl.textContent = '';
+        }
+        await loadRuns();
+      } catch (err) {
+        writeStatusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    addCreationBtn.addEventListener('click', async () => {
+      const value = newCreationEl.value.trim();
+      if (!value) return;
+      try {
+        const res = await fetch('/api/creations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text_b: value }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to add creation');
+        }
+        newCreationEl.value = '';
+        await loadCreations();
+      } catch (err) {
+        writeStatusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    deleteCreationBtn.addEventListener('click', async () => {
+      const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
+      if (!selected.length) return;
+      try {
+        await Promise.all(selected.map(async (checkbox) => {
+          const res = await fetch(`/api/creations/${checkbox.value}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to delete creation');
+          }
+        }));
+        await loadCreations();
+      } catch (err) {
+        writeStatusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    randomSelectBtn.addEventListener('click', () => {
+      const checkboxes = Array.from(creationsList.querySelectorAll('input[type="checkbox"]'));
+      const count = Number.parseInt(randomCountEl.value, 10);
+      if (!checkboxes.length || !Number.isFinite(count) || count <= 0) {
+        return;
+      }
+
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+
+      const picks = Math.min(count, checkboxes.length);
+      const pool = [...checkboxes];
+      for (let i = pool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+
+      pool.slice(0, picks).forEach((checkbox) => {
+        checkbox.checked = true;
+      });
+    });
+
     async function loadWritingById(id) {
       try {
         const res = await fetch(`/api/writings/${id}`);
@@ -192,8 +465,9 @@
         }
         const data = await res.json();
         writingId = data.id;
-        document.getElementById('idea-name').textContent = data.name || '(untitled)';
-        document.getElementById('idea-desc').textContent = data.description || '';
+        currentName = data.name || '(untitled)';
+        currentDesc = data.description || '';
+        updateHeading();
         const metaParts = [];
         if (data.parent_run_id) metaParts.push(`Run ${data.parent_run_id}`);
         if (data.parent_text_a) metaParts.push(`Text A: ${data.parent_text_a}`);
@@ -211,12 +485,15 @@
         await loadWritingById(writingIdParam);
       } else {
         // Old path: use run_id + name + text_a + text_b to find or create
-        document.getElementById('idea-name').textContent = ideaName;
-        document.getElementById('idea-desc').textContent = ideaDesc;
+        currentName = ideaNameParam;
+        currentDesc = ideaDescParam;
+        updateHeading();
         document.getElementById('meta').textContent = runId ? `Run ${runId}` : '';
         await ensureWriting();
-        await loadNotes();
       }
+      await loadCreations();
+      await loadNotes();
+      await loadRuns();
     }
 
     init();

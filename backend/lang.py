@@ -46,6 +46,7 @@ class Task:
     id: int
     text_a: str
     text_b: str
+    parent_writing_id: int | None
     status: str
     created_at: str
     started_at: str | None = None
@@ -76,12 +77,13 @@ def _next_id() -> int:
         _next_task_id += 1
         return task_id
 
-def _enqueue_task(text_a: str, text_b: str) -> int:
+def _enqueue_task(text_a: str, text_b: str, parent_writing_id: int | None) -> int:
     task_id = _next_id()
     task = Task(
         id=task_id,
         text_a=text_a,
         text_b=text_b,
+        parent_writing_id=parent_writing_id,
         status="queued",
         created_at=_now_iso(),
     )
@@ -119,10 +121,10 @@ def _run_task(task: Task) -> None:
     # 1) Create a run row first, with empty/placeholder response
     cur.execute(
         """
-        INSERT INTO runs (instruction, text_a, text_b, prompt, response)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO runs (instruction, text_a, text_b, parent_writing_id, prompt, response)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (INSTRUCTION_TEMPLATE, task.text_a, task.text_b, text_input, None),
+        (INSTRUCTION_TEMPLATE, task.text_a, task.text_b, task.parent_writing_id, text_input, None),
     )
     run_id = cur.lastrowid
 
@@ -144,7 +146,7 @@ def _run_task(task: Task) -> None:
                 run_id,
                 task.text_a,
                 task.text_b,
-                None,                    # parent_writing_id
+                task.parent_writing_id,
                 "",                      # notes
             ),
         )
@@ -266,23 +268,42 @@ def run_lang():
     data = request.get_json(silent=True) or {}
     text_a = (data.get("text_a") or "").strip()
     text_b = (data.get("text_b") or "").strip()
+    parent_writing_id = data.get("parent_writing_id")
+    if parent_writing_id is not None:
+        try:
+            parent_writing_id = int(parent_writing_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "parent_writing_id must be an integer"}), 400
 
     if not (text_a or text_b):
         return jsonify({"error": "text_a or text_b required"}), 400
-    task_id = _enqueue_task(text_a=text_a, text_b=text_b)
+    task_id = _enqueue_task(text_a=text_a, text_b=text_b, parent_writing_id=parent_writing_id)
     return jsonify({"task_id": task_id, "status": "queued"}), 202
 
 
 @app.get("/api/lang")
 def list_lang():
+    parent_writing_id = request.args.get("parent_writing_id", type=int)
     conn = _get_db()
-    rows = conn.execute(
-        """
-        SELECT id, instruction, text_a, text_b, response, created_at
-        FROM runs
-        ORDER BY id DESC
-        """
-    ).fetchall()
+    if parent_writing_id is None:
+        rows = conn.execute(
+            """
+            SELECT id, instruction, text_a, text_b, parent_writing_id, response, created_at
+            FROM runs
+            WHERE parent_writing_id IS NULL
+            ORDER BY id DESC
+            """
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, instruction, text_a, text_b, parent_writing_id, response, created_at
+            FROM runs
+            WHERE parent_writing_id = ?
+            ORDER BY id DESC
+            """,
+            (parent_writing_id,),
+        ).fetchall()
     conn.close()
 
     result = []
