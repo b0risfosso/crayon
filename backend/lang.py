@@ -573,6 +573,7 @@ def create_note(writing_id: int):
     name = (data.get("name") or "").strip()
     description = (data.get("description") or "").strip()
     content = (data.get("content") or "").strip()
+    type_value = (data.get("type") or "").strip() or None
     if not (name or description or content):
         return jsonify({"error": "content or name/description required"}), 400
 
@@ -624,18 +625,20 @@ def create_note(writing_id: int):
             parent_text_a,
             parent_text_b,
             parent_writing_id,
-            notes
+            notes,
+            type
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             child_name,
-            description,      # description = child writing description only
+            description,
             parent_run_id,
             parent_text_a,
             parent_text_b,
-            writing_id,       # this is the parent_writing_id
-            "",               # notes field (separate from note content)
+            writing_id,
+            "",
+            type_value,
         ),
     )
     child_writing_id = int(cur.lastrowid)
@@ -729,6 +732,22 @@ def get_writing(writing_id: int):
     if not row:
         return jsonify({"error": "not found"}), 404
     return jsonify(dict(row))
+
+
+@app.get("/api/writing-types")
+def list_writing_types():
+    conn = _get_db()
+    rows = conn.execute(
+        """
+        SELECT DISTINCT type
+        FROM writings
+        WHERE type IS NOT NULL AND type <> ''
+        ORDER BY type
+        """
+    ).fetchall()
+    conn.close()
+    return jsonify([row["type"] for row in rows])
+
 
 
 if __name__ == "__main__":

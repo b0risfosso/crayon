@@ -11,6 +11,7 @@
     h1 { font-size: 1.5rem; margin: 1rem 0 0.5rem; }
     .desc { white-space: pre-wrap; margin-bottom: 1rem; }
     textarea { width: 100%; box-sizing: border-box; padding: 0.5rem; font: inherit; min-height: 4rem; }
+    input[type="text"], select { width: 100%; box-sizing: border-box; padding: 0.5rem; font: inherit; }
     button { margin-top: 0.5rem; padding: 0.45rem 0.8rem; font: inherit; }
     .note { border-top: 1px solid #ccc; padding: 0.75rem 0; }
     .muted { color: #555; font-size: 0.9rem; }
@@ -75,6 +76,11 @@
       <input id="new-note-name" type="text" />
       <label for="new-note-desc">Add Child Writing Description</label>
       <textarea id="new-note-desc"></textarea>
+      <label for="note-type-select">Child Writing Type</label>
+      <div class="row">
+        <select id="note-type-select"></select>
+        <input id="note-type-custom" type="text" placeholder="Or enter custom type" />
+      </div>
       <button type="button" id="add-note">Add Child Writing</button>
       <div id="status" class="muted"></div>
       <div id="notes"></div>
@@ -95,6 +101,8 @@
     const newNoteNameEl = document.getElementById('new-note-name');
     const newNoteDescEl = document.getElementById('new-note-desc');
     const addNoteBtn = document.getElementById('add-note');
+    const noteTypeSelect = document.getElementById('note-type-select');
+    const noteTypeCustomEl = document.getElementById('note-type-custom');
     const textAEl = document.getElementById('text-a');
     const form = document.getElementById('write-form');
     const writeStatusEl = document.getElementById('write-status');
@@ -234,7 +242,7 @@
         });
         buttonsRow.appendChild(deleteBtn);
 
-        // NEW: open this note as its own writing
+        // Open this note as its own writing
         if (note.child_writing_id) {
           const openBtn = document.createElement('button');
           openBtn.type = 'button';
@@ -251,7 +259,6 @@
       });
     }
 
-
     async function loadNotes() {
       if (!writingId) return;
       try {
@@ -261,6 +268,33 @@
         renderNotes(data);
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function loadTypes() {
+      try {
+        const res = await fetch('/api/writing-types');
+        if (!res.ok) throw new Error('Failed to load types');
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+
+        // Clear and add placeholder
+        noteTypeSelect.textContent = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '(no type)';
+        noteTypeSelect.appendChild(placeholder);
+
+        data.forEach((type) => {
+          if (!type) return;
+          const option = document.createElement('option');
+          option.value = type;
+          option.textContent = type;
+          noteTypeSelect.appendChild(option);
+        });
+      } catch (err) {
+        // Fail softly; just log so the rest of the page still works
+        console.error('Failed to load writing types', err);
       }
     }
 
@@ -276,10 +310,13 @@
           const name = idea.name || '(untitled)';
           const descText = idea.desciription || '';
           link.textContent = name;
+
           if (idea.writing_id) {
+            // New path: writing created at LLM time
             const params = new URLSearchParams({ writing_id: String(idea.writing_id) });
             link.href = `/writing.html?${params.toString()}`;
           } else {
+            // Fallback for older runs that don't have writing_id
             const params = new URLSearchParams({
               run_id: String(run.id || ''),
               text_a: run.text_a || '',
@@ -321,6 +358,7 @@
         meta.className = 'meta';
         meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
         runDetails.appendChild(meta);
+
         runDetails.appendChild(renderIdeaSet(run.response, run));
         runsEl.appendChild(runDetails);
       });
@@ -333,6 +371,11 @@
         const res = await fetch(`/api/lang?parent_writing_id=${encodeURIComponent(writingId)}`);
         if (!res.ok) throw new Error('Failed to load runs');
         const data = await res.json();
+        runsEl.textContent = '';
+        if (!data.length) {
+          runsEl.textContent = 'No runs yet.';
+          return;
+        }
         renderRuns(data);
       } catch (err) {
         runsEl.textContent = `Error: ${err.message}`;
@@ -340,8 +383,9 @@
     }
 
     async function loadCreations() {
+      if (!writingId) return;
       try {
-        const res = await fetch('/api/creations');
+        const res = await fetch(`/api/creations?writing_id=${encodeURIComponent(writingId)}`);
         if (!res.ok) throw new Error('Failed to load creations');
         const data = await res.json();
         creationsList.textContent = '';
@@ -370,12 +414,19 @@
       if (!writingId) return;
       const nameValue = newNoteNameEl.value.trim();
       const descValue = newNoteDescEl.value.trim();
+      const selectedType = (noteTypeSelect.value || '').trim();
+      const customType = (noteTypeCustomEl.value || '').trim();
+      const typeValue = customType || selectedType;
       if (!nameValue && !descValue) return;
       try {
+        const payload = { name: nameValue, description: descValue };
+        if (typeValue) {
+          payload.type = typeValue;
+        }
         const res = await fetch(`/api/writings/${writingId}/notes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: nameValue, description: descValue }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -383,6 +434,8 @@
         }
         newNoteNameEl.value = '';
         newNoteDescEl.value = '';
+        noteTypeSelect.value = '';
+        noteTypeCustomEl.value = '';
         await loadNotes();
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
@@ -399,52 +452,65 @@
         return;
       }
 
-      const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
+      const selected = Array.from(
+        creationsList.querySelectorAll('input[type="checkbox"]:checked')
+      );
       if (!selected.length) {
         writeStatusEl.textContent = 'Select at least one creation.';
         return;
       }
 
+      const textAValue = textAEl.value.trim();
+      if (!textAValue) {
+        writeStatusEl.textContent = 'Text A is empty.';
+        return;
+      }
+
       try {
-        const results = await Promise.all(selected.map(async (checkbox) => {
-          const payload = {
-            text_a: textAEl.value,
-            text_b: checkbox.dataset.textB || '',
-            parent_writing_id: writingId,
-          };
-          const res = await fetch('/api/lang', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Request failed');
-          }
-          return res.json();
-        }));
+        const results = await Promise.all(
+          selected.map(async (checkbox) => {
+            const payload = {
+              text_a: textAValue,
+              text_b: checkbox.dataset.textB || '',
+              parent_writing_id: writingId,
+            };
+            const res = await fetch('/api/lang', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Request failed');
+            }
+            return res.json();
+          })
+        );
 
         writeStatusEl.textContent = '';
-        const queued = results.filter((item) => item && item.task_id).map((item) => item.task_id);
+        const queued = results
+          .filter((item) => item && item.task_id)
+          .map((item) => item.task_id);
         if (queued.length) {
-          writeResultEl.textContent = `Queued tasks: ${queued.join(', ')}. Check /queue.html for status.`;
+          writeResultEl.textContent =
+            `Queued tasks: ${queued.join(', ')}. Check /queue.html for status.`;
         } else {
           writeResultEl.textContent = '';
         }
-        await loadRuns();
       } catch (err) {
         writeStatusEl.textContent = `Error: ${err.message}`;
       }
     });
 
     addCreationBtn.addEventListener('click', async () => {
+      if (!writingId) return;
       const value = newCreationEl.value.trim();
       if (!value) return;
       try {
         const res = await fetch('/api/creations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text_b: value }),
+          body: JSON.stringify({ text_b: value, writing_id: writingId }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -458,16 +524,22 @@
     });
 
     deleteCreationBtn.addEventListener('click', async () => {
-      const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
+      const selected = Array.from(
+        creationsList.querySelectorAll('input[type="checkbox"]:checked')
+      );
       if (!selected.length) return;
       try {
-        await Promise.all(selected.map(async (checkbox) => {
-          const res = await fetch(`/api/creations/${checkbox.value}`, { method: 'DELETE' });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Failed to delete creation');
-          }
-        }));
+        await Promise.all(
+          selected.map(async (checkbox) => {
+            const res = await fetch(`/api/creations/${checkbox.value}`, {
+              method: 'DELETE',
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Failed to delete creation');
+            }
+          })
+        );
         await loadCreations();
       } catch (err) {
         writeStatusEl.textContent = `Error: ${err.message}`;
@@ -475,7 +547,9 @@
     });
 
     randomSelectBtn.addEventListener('click', () => {
-      const checkboxes = Array.from(creationsList.querySelectorAll('input[type="checkbox"]'));
+      const checkboxes = Array.from(
+        creationsList.querySelectorAll('input[type="checkbox"]')
+      );
       const count = Number.parseInt(randomCountEl.value, 10);
       if (!checkboxes.length || !Number.isFinite(count) || count <= 0) {
         return;
@@ -499,21 +573,16 @@
 
     async function loadWritingById(id) {
       try {
-        const res = await fetch(`/api/writings/${id}`);
-        if (!res.ok) {
-          throw new Error('Failed to load writing');
-        }
+        const res = await fetch(`/api/writings/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error('Failed to load writing');
         const data = await res.json();
         writingId = data.id;
-        currentName = data.name || '(untitled)';
-        currentDesc = data.description || '';
+        currentName = data.name || currentName;
+        currentDesc = data.description || currentDesc;
         updateHeading();
-        const metaParts = [];
-        if (data.parent_run_id) metaParts.push(`Run ${data.parent_run_id}`);
-        if (data.parent_text_a) metaParts.push(`Text A: ${data.parent_text_a}`);
-        if (data.parent_text_b) metaParts.push(`Text B: ${data.parent_text_b}`);
-        document.getElementById('meta').textContent = metaParts.join(' • ');
-        await loadNotes();
+        document.getElementById('meta').textContent = data.created_at
+          ? `Created ${data.created_at}`
+          : '';
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
       }
@@ -531,13 +600,13 @@
         document.getElementById('meta').textContent = runId ? `Run ${runId}` : '';
         await ensureWriting();
       }
+      await loadTypes();
       await loadCreations();
       await loadNotes();
       await loadRuns();
     }
 
     init();
-
   </script>
 </body>
 </html>
