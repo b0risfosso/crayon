@@ -284,13 +284,22 @@ def run_lang():
 @app.get("/api/lang")
 def list_lang():
     parent_writing_id = request.args.get("parent_writing_id", type=int)
+    include_children = request.args.get("include_children")
     conn = _get_db()
-    if parent_writing_id is None:
+    if parent_writing_id is None and not include_children:
         rows = conn.execute(
             """
             SELECT id, instruction, text_a, text_b, parent_writing_id, response, created_at
             FROM runs
             WHERE parent_writing_id IS NULL
+            ORDER BY id DESC
+            """
+        ).fetchall()
+    elif parent_writing_id is None:
+        rows = conn.execute(
+            """
+            SELECT id, instruction, text_a, text_b, parent_writing_id, response, created_at
+            FROM runs
             ORDER BY id DESC
             """
         ).fetchall()

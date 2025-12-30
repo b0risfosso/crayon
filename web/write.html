@@ -64,6 +64,36 @@
     const deleteCreationBtn = document.getElementById('delete-creation');
     const randomCountEl = document.getElementById('random-count');
     const randomSelectBtn = document.getElementById('random-select');
+    let lastTextA = '';
+    let lastWritingId = null;
+
+    function splitTextA(text) {
+      const lines = text.split(/\r?\n/);
+      const name = (lines.shift() || '').trim() || '(untitled)';
+      const description = lines.join('\n').trim();
+      return { name, description };
+    }
+
+    async function ensureParentWriting(textAValue) {
+      if (textAValue === lastTextA && lastWritingId) {
+        return lastWritingId;
+      }
+
+      const { name, description } = splitTextA(textAValue);
+      const res = await fetch('/api/writings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create writing');
+      }
+      const data = await res.json();
+      lastTextA = textAValue;
+      lastWritingId = data.id;
+      return data.id;
+    }
 
     async function loadCreations() {
       try {
@@ -105,10 +135,12 @@
       const textAValue = document.getElementById('text-a').value;
 
       try {
+        const parentWritingId = await ensureParentWriting(textAValue);
         const results = await Promise.all(selected.map(async (checkbox) => {
           const payload = {
             text_a: textAValue,
             text_b: checkbox.dataset.textB || '',
+            parent_writing_id: parentWritingId,
           };
           const res = await fetch('/api/lang', {
             method: 'POST',

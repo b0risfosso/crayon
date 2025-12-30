@@ -35,11 +35,15 @@
       const groups = new Map();
       runs.forEach((run) => {
         const textA = run.text_a || '(no text A)';
-        if (!groups.has(textA)) groups.set(textA, new Map());
-        const byTextB = groups.get(textA);
+        const writingId = run.parent_writing_id || null;
+        const groupKey = writingId ? `id:${writingId}` : `text:${textA}`;
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, { textA, writingId, byTextB: new Map() });
+        }
+        const group = groups.get(groupKey);
         const textB = run.text_b || '(no text B)';
-        if (!byTextB.has(textB)) byTextB.set(textB, []);
-        byTextB.get(textB).push(run);
+        if (!group.byTextB.has(textB)) group.byTextB.set(textB, []);
+        group.byTextB.get(textB).push(run);
       });
       return groups;
     }
@@ -90,10 +94,18 @@
 
     function renderGrouped(groups) {
       const container = document.createElement('div');
-      for (const [textA, byTextB] of groups.entries()) {
+      for (const group of groups.values()) {
+        const { textA, writingId, byTextB } = group;
         const textADetails = document.createElement('details');
         const textASummary = document.createElement('summary');
-        textASummary.textContent = textA;
+        if (writingId) {
+          const link = document.createElement('a');
+          link.href = `/writing.html?writing_id=${encodeURIComponent(writingId)}`;
+          link.textContent = textA;
+          textASummary.appendChild(link);
+        } else {
+          textASummary.textContent = textA;
+        }
         textADetails.appendChild(textASummary);
 
         for (const [textB, runs] of byTextB.entries()) {
@@ -122,7 +134,7 @@
     async function loadlanguage() {
       languageEl.textContent = 'Loading...';
       try {
-        const res = await fetch('/api/lang');
+        const res = await fetch('/api/lang?include_children=1');
         if (!res.ok) throw new Error('Failed to load language');
         const data = await res.json();
         languageEl.textContent = '';
