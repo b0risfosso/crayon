@@ -48,7 +48,7 @@
 
         <label>Text B (select one or more)</label>
         <div id="creations-list" class="list"></div>
-        
+
         <div class="row">
           <input id="random-count" type="number" min="1" placeholder="N" />
           <button type="button" id="random-select">Select N random</button>
@@ -525,9 +525,9 @@ addTypeListBtn.addEventListener('click', async () => {
     }
 
     async function loadCreations() {
-      if (!writingId) return;
+      // no need to wait for writingId
       try {
-        const res = await fetch(`/api/creations?writing_id=${encodeURIComponent(writingId)}`);
+        const res = await fetch('/api/creations');   // ← changed
         if (!res.ok) throw new Error('Failed to load creations');
         const data = await res.json();
         creationsList.textContent = '';
