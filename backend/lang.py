@@ -135,19 +135,26 @@ def _run_task(task: Task) -> None:
         cur.execute(
             """
             INSERT INTO writings (
-                name, description, parent_run_id, parent_text_a, parent_text_b,
-                parent_writing_id, notes
+                name,
+                description,
+                parent_run_id,
+                parent_text_a,
+                parent_text_b,
+                parent_writing_id,
+                notes,
+                type
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 idea.name,
-                idea.desciription,       # matches your current field name
+                idea.desciription,
                 run_id,
                 task.text_a,
                 task.text_b,
                 task.parent_writing_id,
-                "",                      # notes
+                "",
+                "words",   # <<< NEW
             ),
         )
         writing_id = cur.lastrowid
@@ -427,7 +434,7 @@ def list_writings():
     rows = conn.execute(
         """
         SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
-               parent_writing_id, notes, created_at, updated_at
+               parent_writing_id, notes, type, created_at, updated_at
         FROM writings
         ORDER BY id DESC
         """
@@ -448,7 +455,7 @@ def lookup_writing():
     row = conn.execute(
         """
         SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
-               parent_writing_id, notes, created_at, updated_at
+               parent_writing_id, notes, type, created_at, updated_at
         FROM writings
         WHERE parent_run_id = ? AND name = ? AND parent_text_a = ? AND parent_text_b = ?
         ORDER BY id DESC
@@ -471,6 +478,7 @@ def create_writing():
     parent_text_b = (data.get("parent_text_b") or "").strip()
     parent_writing_id = data.get("parent_writing_id")
     notes = (data.get("notes") or "").strip()
+    type_ = (data.get("type") or "").strip() or None  # NEW
 
     if not name:
         return jsonify({"error": "name required"}), 400
@@ -481,9 +489,9 @@ def create_writing():
         """
         INSERT INTO writings (
             name, description, parent_run_id, parent_text_a, parent_text_b,
-            parent_writing_id, notes
+            parent_writing_id, notes, type
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             name,
@@ -493,12 +501,14 @@ def create_writing():
             parent_text_b,
             parent_writing_id,
             notes,
+            type_,   # NEW
         ),
     )
     conn.commit()
     writing_id = cur.lastrowid
     conn.close()
     return jsonify({"id": writing_id})
+
 
 @app.patch("/api/writings/<int:writing_id>")
 def update_writing(writing_id: int):
@@ -709,7 +719,7 @@ def get_writing(writing_id: int):
     row = conn.execute(
         """
         SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
-               parent_writing_id, notes, created_at, updated_at
+               parent_writing_id, notes, type, created_at, updated_at
         FROM writings
         WHERE id = ?
         """,

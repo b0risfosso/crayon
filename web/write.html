@@ -15,9 +15,8 @@
     .result { margin-top: 1.5rem; white-space: pre-wrap; }
     nav a { margin-right: 1rem; text-decoration: none; }
     .row { display: flex; gap: 0.5rem; align-items: center; }
-    .muted { color: #555; font-size: 0.9rem; }
-    .list { border: 1px solid #ccc; padding: 0.5rem; max-height: 12rem; overflow: auto; }
-    .list label { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 400; margin: 0.35rem 0; }
+    .list { border: 1px solid #ccc; padding: 0.5rem; max-height: 12rem; overflow: auto; margin-top: 0.5rem; }
+    .list label { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 400; margin: 0.25rem 0; }
     .list label span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
   </style>
 </head>
@@ -25,22 +24,26 @@
   <main>
     <nav>
       <a href="/index.html">Home</a>
-      <a href="/lang.html">Lang</a>
+      <a href="/lang.html">Runs</a>
     </nav>
 
     <h1>Write</h1>
+
     <form id="lang-form">
       <label for="text-a-name">Text A Name</label>
-      <input id="text-a-name" name="text_a_name" type="text" required />
+      <input id="text-a-name" type="text" />
+
       <label for="text-a-desc">Text A Description</label>
-      <textarea id="text-a-desc" name="text_a_desc"></textarea>
+      <textarea id="text-a-desc"></textarea>
 
       <label>Text B (select one or more)</label>
       <div id="creations-list" class="list"></div>
+
       <div class="row">
         <input id="random-count" type="number" min="1" placeholder="N" />
         <button type="button" id="random-select">Select N random</button>
       </div>
+
       <button type="button" id="delete-creation">Remove Selected</button>
 
       <label for="new-creation">Add to creations</label>
@@ -75,6 +78,7 @@
       if (trimmedName && trimmedDesc) return `${trimmedName}\n\n${trimmedDesc}`;
       return trimmedName || trimmedDesc || '';
     }
+
     let lastTextA = '';
     let lastWritingId = null;
 
@@ -94,7 +98,8 @@
       const res = await fetch('/api/writings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        // NOTE: tag these as root writings
+        body: JSON.stringify({ name, description, type: 'lang' }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
