@@ -8,17 +8,10 @@
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
     main { max-width: 60rem; margin: 0 auto; }
     nav a { margin-right: 1rem; text-decoration: none; }
+    h1 { margin: 1rem 0; }
     details { border-top: 1px solid #ccc; padding: 0.5rem 0; }
     summary { cursor: pointer; font-weight: 600; }
-    .text-a-summary { display: flex; align-items: center; gap: 1rem; }
-    .text-a-summary span { flex: 1; text-align: left; }
-    .text-a-summary button { margin-left: auto; }
-    .text-a-summary button { font: inherit; padding: 0.2rem 0.5rem; }
-    .text-b { margin-left: 1rem; }
     .meta { font-size: 0.9rem; color: #555; margin-left: 1rem; }
-    .ideas { margin-left: 2rem; }
-    .idea { margin: 0.5rem 0; }
-    pre { white-space: pre-wrap; margin: 0.5rem 0; }
   </style>
 </head>
 <body>
@@ -28,141 +21,72 @@
       <a href="/write.html">Write</a>
     </nav>
 
-    <h1>Language</h1>
+    <h1>Language Writings</h1>
+
     <div id="language"></div>
   </main>
 
   <script>
     const languageEl = document.getElementById('language');
 
-    function groupRuns(runs) {
-      const groups = new Map();
-      runs.forEach((run) => {
-        const textA = run.text_a || '(no text A)';
-        const writingId = run.parent_writing_id || null;
-        const groupKey = writingId ? `id:${writingId}` : `text:${textA}`;
-        if (!groups.has(groupKey)) {
-          groups.set(groupKey, { textA, writingId, byTextB: new Map() });
-        }
-        const group = groups.get(groupKey);
-        const textB = run.text_b || '(no text B)';
-        if (!group.byTextB.has(textB)) group.byTextB.set(textB, []);
-        group.byTextB.get(textB).push(run);
-      });
-      return groups;
-    }
+    function renderWritings(writings) {
+      languageEl.textContent = '';
+      if (!writings.length) {
+        languageEl.textContent = 'No language writings yet.';
+        return;
+      }
 
-    function renderIdeaSet(response, run) {
-      const container = document.createElement('div');
-      container.className = 'ideas';
+      writings.forEach((w) => {
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
 
-      if (response && typeof response === 'object' && Array.isArray(response.ideas)) {
-        response.ideas.forEach((idea) => {
-          const ideaEl = document.createElement('div');
-          ideaEl.className = 'idea';
-          const link = document.createElement('a');
-          const name = idea.name || '(untitled)';
-          const descText = idea.desciription || '';
-          link.textContent = name;
+        const name = w.name || '(untitled)';
+        summary.textContent = name;
 
-          if (idea.writing_id) {
-            // New path: writing created at LLM time
-            const params = new URLSearchParams({ writing_id: String(idea.writing_id) });
-            link.href = `/writing.html?${params.toString()}`;
-          } else {
-            // Fallback for older runs that don't have writing_id
-            const params = new URLSearchParams({
-              run_id: String(run.id || ''),
-              text_a: run.text_a || '',
-              text_b: run.text_b || '',
-              name,
-              description: descText,
-            });
-            link.href = `/writing.html?${params.toString()}`;
-          }
-
-          const desc = document.createElement('div');
-          desc.textContent = descText;
-          ideaEl.appendChild(link);
-          ideaEl.appendChild(desc);
-          container.appendChild(ideaEl);
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.textContent = 'Open';
+        openBtn.style.marginLeft = '0.75rem';
+        openBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          window.open(`/writing.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
         });
-      } else {
-        const pre = document.createElement('pre');
-        pre.textContent = typeof response === 'string' ? response : JSON.stringify(response, null, 2);
-        container.appendChild(pre);
-      }
 
-      return container;
+        summary.appendChild(openBtn);
+        details.appendChild(summary);
+
+        const desc = document.createElement('div');
+        desc.textContent = w.description || '';
+        details.appendChild(desc);
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = w.created_at ? `Created ${w.created_at}` : '';
+        details.appendChild(meta);
+
+        languageEl.appendChild(details);
+      });
     }
 
-    function renderGrouped(groups) {
-      const container = document.createElement('div');
-      for (const group of groups.values()) {
-        const { textA, writingId, byTextB } = group;
-        const textADetails = document.createElement('details');
-        const textASummary = document.createElement('summary');
-        textASummary.className = 'text-a-summary';
-        if (writingId) {
-          const label = document.createElement('span');
-          label.textContent = textA;
-          textASummary.appendChild(label);
-          const openBtn = document.createElement('button');
-          openBtn.type = 'button';
-          openBtn.textContent = 'Open';
-          openBtn.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            window.open(`/writing.html?writing_id=${encodeURIComponent(writingId)}`, '_blank');
-          });
-          textASummary.appendChild(openBtn);
-        } else {
-          textASummary.textContent = textA;
-        }
-        textADetails.appendChild(textASummary);
-
-        for (const [textB, runs] of byTextB.entries()) {
-          const textBDetails = document.createElement('details');
-          textBDetails.className = 'text-b';
-          const textBSummary = document.createElement('summary');
-          textBSummary.textContent = textB;
-          textBDetails.appendChild(textBSummary);
-
-          runs.forEach((run) => {
-            const meta = document.createElement('div');
-            meta.className = 'meta';
-            meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
-            textBDetails.appendChild(meta);
-            textBDetails.appendChild(renderIdeaSet(run.response, run));
-          });
-
-          textADetails.appendChild(textBDetails);
-        }
-
-        container.appendChild(textADetails);
-      }
-      return container;
-    }
-
-    async function loadlanguage() {
+    async function loadLanguage() {
       languageEl.textContent = 'Loading...';
+
       try {
-        const res = await fetch('/api/lang?include_children=1');
-        if (!res.ok) throw new Error('Failed to load language');
+        const res = await fetch('/api/writings');
+        if (!res.ok) throw new Error('Failed to load writings');
         const data = await res.json();
-        languageEl.textContent = '';
-        if (!data.length) {
-          languageEl.textContent = 'No language yet.';
-          return;
-        }
-        const grouped = groupRuns(data);
-        languageEl.appendChild(renderGrouped(grouped));
+
+        // Only writings with type === "lang"
+        const filtered = data.filter(w => w.type === 'lang');
+
+        renderWritings(filtered);
       } catch (err) {
         languageEl.textContent = `Error: ${err.message}`;
       }
     }
 
-    loadlanguage();
+    loadLanguage();
   </script>
 </body>
 </html>
