@@ -3,25 +3,97 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Language</title>
+  <title>lang</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
-    main { max-width: 60rem; margin: 0 auto; }
-    nav a { margin-right: 1rem; text-decoration: none; }
-    h1 { margin: 1rem 0; }
-    details { border-top: 1px solid #ccc; padding: 0.5rem 0; }
-    summary { cursor: pointer; font-weight: 600; }
-    .meta { font-size: 0.9rem; color: #555; margin-left: 1rem; }
+    :root {
+      --border-color: #000;
+      --text-muted: #444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 2rem;
+      line-height: 1.5;
+      background: #fff;
+      color: #000;
+    }
+
+    main {
+      max-width: 60rem;
+      margin: 0 auto;
+      border: 1px solid var(--border-color);
+      padding: 1.5rem;
+    }
+
+    nav {
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #000;
+      border: 1px solid var(--border-color);
+      padding: 0.25rem 0.6rem;
+    }
+
+    nav a:hover {
+      background: #000;
+      color: #fff;
+    }
+
+    h1 {
+      margin: 0 0 1rem;
+    }
+
+    #language {
+      margin-top: 1rem;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .writing-item {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+    }
+
+    .writing-item:hover {
+      background: #000;
+      color: #fff;
+    }
+
+    .writing-item:hover .meta {
+      color: #fff;
+    }
+
+    .writing-title {
+      font-weight: 600;
+    }
+
+    .writing-desc {
+      margin-top: 0.25rem;
+    }
+
+    .meta {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
   </style>
 </head>
 <body>
   <main>
     <nav>
-      <a href="/index.html">Home</a>
-      <a href="/write.html">Write</a>
+      <a href="/index.html">home</a>
+      <a href="/write.html">write</a>
     </nav>
 
-    <h1>Language Writings</h1>
+    <h1>lang</h1>
 
     <div id="language"></div>
   </main>
@@ -37,35 +109,32 @@
       }
 
       writings.forEach((w) => {
-        const details = document.createElement('details');
-        const summary = document.createElement('summary');
+        const item = document.createElement('div');
+        item.className = 'writing-item';
 
         const name = w.name || '(untitled)';
-        summary.textContent = name;
+        const title = document.createElement('div');
+        title.className = 'writing-title';
+        title.textContent = name;
+        item.appendChild(title);
 
-        const openBtn = document.createElement('button');
-        openBtn.type = 'button';
-        openBtn.textContent = 'Open';
-        openBtn.style.marginLeft = '0.75rem';
-        openBtn.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          window.open(`/writing.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
-        });
-
-        summary.appendChild(openBtn);
-        details.appendChild(summary);
-
-        const desc = document.createElement('div');
-        desc.textContent = w.description || '';
-        details.appendChild(desc);
+        if (w.description) {
+          const desc = document.createElement('div');
+          desc.className = 'writing-desc';
+          desc.textContent = w.description;
+          item.appendChild(desc);
+        }
 
         const meta = document.createElement('div');
         meta.className = 'meta';
         meta.textContent = w.created_at ? `Created ${w.created_at}` : '';
-        details.appendChild(meta);
+        item.appendChild(meta);
 
-        languageEl.appendChild(details);
+        item.addEventListener('click', () => {
+          window.open(`/writing.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
+        });
+
+        languageEl.appendChild(item);
       });
     }
 
