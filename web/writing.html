@@ -70,10 +70,12 @@
     </section>
 
     <section>
-      <h2>Notes</h2>
-      <label for="new-note">Add Note</label>
-      <textarea id="new-note"></textarea>
-      <button type="button" id="add-note">Add Note</button>
+      <h2>Child writing</h2>
+      <label for="new-note-name">Add Child Writing Name</label>
+      <input id="new-note-name" type="text" />
+      <label for="new-note-desc">Add Child Writing Description</label>
+      <textarea id="new-note-desc"></textarea>
+      <button type="button" id="add-note">Add Child Writing</button>
       <div id="status" class="muted"></div>
       <div id="notes"></div>
     </section>
@@ -90,7 +92,8 @@
 
     const statusEl = document.getElementById('status');
     const notesEl = document.getElementById('notes');
-    const newNoteEl = document.getElementById('new-note');
+    const newNoteNameEl = document.getElementById('new-note-name');
+    const newNoteDescEl = document.getElementById('new-note-desc');
     const addNoteBtn = document.getElementById('add-note');
     const textAEl = document.getElementById('text-a');
     const form = document.getElementById('write-form');
@@ -111,6 +114,22 @@
     function composeTextA(name, description) {
       if (name && description) return `${name}\n\n${description}`;
       return name || description || '';
+    }
+
+    function splitNoteContent(content) {
+      const text = (content || '').trim();
+      if (!text) return { name: '', description: '' };
+      const lines = text.split(/\r?\n/);
+      const name = (lines.shift() || '').trim();
+      const description = lines.join('\n').trim();
+      return { name, description };
+    }
+
+    function composeNoteContent(name, description) {
+      const trimmedName = (name || '').trim();
+      const trimmedDesc = (description || '').trim();
+      if (trimmedName && trimmedDesc) return `${trimmedName}\n\n${trimmedDesc}`;
+      return trimmedName || trimmedDesc || '';
     }
 
     function updateHeading() {
@@ -168,8 +187,14 @@
         const container = document.createElement('div');
         container.className = 'note';
 
+        const { name, description } = splitNoteContent(note.content);
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = name;
+        container.appendChild(nameInput);
+
         const textarea = document.createElement('textarea');
-        textarea.value = note.content || '';
+        textarea.value = description;
         container.appendChild(textarea);
 
         const buttonsRow = document.createElement('div');
@@ -180,10 +205,11 @@
         saveBtn.textContent = 'Save';
         saveBtn.addEventListener('click', async () => {
           try {
+            const content = composeNoteContent(nameInput.value, textarea.value);
             const res = await fetch(`/api/notes/${note.id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ content: textarea.value }),
+              body: JSON.stringify({ content }),
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
@@ -347,7 +373,7 @@
 
     addNoteBtn.addEventListener('click', async () => {
       if (!writingId) return;
-      const content = newNoteEl.value.trim();
+      const content = composeNoteContent(newNoteNameEl.value, newNoteDescEl.value);
       if (!content) return;
       try {
         const res = await fetch(`/api/writings/${writingId}/notes`, {
@@ -359,7 +385,8 @@
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || 'Failed to create note');
         }
-        newNoteEl.value = '';
+        newNoteNameEl.value = '';
+        newNoteDescEl.value = '';
         await loadNotes();
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;

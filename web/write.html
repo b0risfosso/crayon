@@ -30,8 +30,10 @@
 
     <h1>Write</h1>
     <form id="lang-form">
-      <label for="text-a">Text A</label>
-      <textarea id="text-a" name="text_a" required></textarea>
+      <label for="text-a-name">Text A Name</label>
+      <input id="text-a-name" name="text_a_name" type="text" required />
+      <label for="text-a-desc">Text A Description</label>
+      <textarea id="text-a-desc" name="text_a_desc"></textarea>
 
       <label>Text B (select one or more)</label>
       <div id="creations-list" class="list"></div>
@@ -64,6 +66,15 @@
     const deleteCreationBtn = document.getElementById('delete-creation');
     const randomCountEl = document.getElementById('random-count');
     const randomSelectBtn = document.getElementById('random-select');
+    const textANameEl = document.getElementById('text-a-name');
+    const textADescEl = document.getElementById('text-a-desc');
+
+    function composeTextA(name, description) {
+      const trimmedName = (name || '').trim();
+      const trimmedDesc = (description || '').trim();
+      if (trimmedName && trimmedDesc) return `${trimmedName}\n\n${trimmedDesc}`;
+      return trimmedName || trimmedDesc || '';
+    }
     let lastTextA = '';
     let lastWritingId = null;
 
@@ -132,7 +143,7 @@
         statusEl.textContent = 'Select at least one creation.';
         return;
       }
-      const textAValue = document.getElementById('text-a').value;
+      const textAValue = composeTextA(textANameEl.value, textADescEl.value);
 
       try {
         const parentWritingId = await ensureParentWriting(textAValue);
