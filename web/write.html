@@ -232,6 +232,15 @@
       flex-direction: column;
     }
   }
+
+  .primary-wide {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
 </style>
 
 
@@ -307,7 +316,11 @@
       <button type="button" id="add-creation">Add</button>
 
 
-      <button type="submit">write</button>
+      <div style="margin-top: 0.75rem;">
+        <button type="submit" id="write-button" class="primary-wide">
+          write
+        </button>
+      </div>
     </form>
 
     <div id="status"></div>
