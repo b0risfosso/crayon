@@ -336,36 +336,74 @@ def list_lang():
 
 @app.get("/api/creations")
 def list_creations():
+    writing_id = request.args.get("writing_id", type=int)
+
     conn = _get_db()
-    rows = conn.execute(
-        """
-        SELECT id, text_b, created_at
-        FROM creations
-        ORDER BY id DESC
-        """
-    ).fetchall()
+    if writing_id:
+        # Creations attached to a specific writing
+        rows = conn.execute(
+            """
+            SELECT id, description AS text_b, created_at
+            FROM writings
+            WHERE type = 'creations' AND parent_writing_id = ?
+            ORDER BY id DESC
+            """,
+            (writing_id,),
+        ).fetchall()
+    else:
+        # Global creations
+        rows = conn.execute(
+            """
+            SELECT id, description AS text_b, created_at
+            FROM writings
+            WHERE type = 'creations'
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
     conn.close()
     return jsonify([dict(row) for row in rows])
+
 
 @app.post("/api/creations")
 def create_creation():
     data = request.get_json(silent=True) or {}
     text_b = (data.get("text_b") or "").strip()
+    # optional: allow client to pass a nicer name or parent_writing_id
+    name = (data.get("name") or "").strip()
+    parent_writing_id = data.get("writing_id") or data.get("parent_writing_id")
+
     if not text_b:
         return jsonify({"error": "text_b required"}), 400
+
+    # Default a name if none was provided
+    if not name:
+        first_line = text_b.splitlines()[0].strip()
+        name = first_line[:100] or "Creation"
+
     conn = _get_db()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO creations (text_b)
-        VALUES (?)
+        INSERT INTO writings (
+            name,
+            description,
+            parent_run_id,
+            parent_text_a,
+            parent_text_b,
+            parent_writing_id,
+            notes,
+            type
+        )
+        VALUES (?, ?, NULL, '', '', ?, '', 'creations')
         """,
-        (text_b,),
+        (name, text_b, parent_writing_id),
     )
     conn.commit()
     creation_id = cur.lastrowid
     conn.close()
     return jsonify({"id": creation_id, "text_b": text_b})
+
 
 @app.delete("/api/creations/<int:creation_id>")
 def delete_creation(creation_id: int):
@@ -373,8 +411,8 @@ def delete_creation(creation_id: int):
     cur = conn.cursor()
     cur.execute(
         """
-        DELETE FROM creations
-        WHERE id = ?
+        DELETE FROM writings
+        WHERE id = ? AND type = 'creations'
         """,
         (creation_id,),
     )
@@ -384,6 +422,7 @@ def delete_creation(creation_id: int):
     if not deleted:
         return jsonify({"error": "not found"}), 404
     return jsonify({"deleted": creation_id})
+
 
 @app.get("/api/queue")
 def queue_state():
@@ -430,17 +469,33 @@ def usage_state():
 
 @app.get("/api/writings")
 def list_writings():
+    type_filter = (request.args.get("type") or "").strip() or None
+
     conn = _get_db()
-    rows = conn.execute(
-        """
-        SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
-               parent_writing_id, notes, type, created_at, updated_at
-        FROM writings
-        ORDER BY id DESC
-        """
-    ).fetchall()
+    if type_filter:
+        rows = conn.execute(
+            """
+            SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
+                   parent_writing_id, notes, type, created_at, updated_at
+            FROM writings
+            WHERE type = ?
+            ORDER BY id DESC
+            """,
+            (type_filter,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, name, description, parent_run_id, parent_text_a, parent_text_b,
+                   parent_writing_id, notes, type, created_at, updated_at
+            FROM writings
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
     conn.close()
     return jsonify([dict(row) for row in rows])
+
 
 @app.get("/api/writings/lookup")
 def lookup_writing():

@@ -54,6 +54,9 @@
         </div>
         <button type="button" id="delete-creation">Remove Selected</button>
 
+        <label>Text B from language writings</label>
+        <div id="lang-writings-list" class="list"></div>
+
         <label for="new-creation">Add to creations</label>
         <div class="row">
           <input id="new-creation" type="text" placeholder="New text B" />
@@ -127,6 +130,9 @@
 
     const eraseBtn = document.getElementById('erase-writing');
 
+    const langWritingsList = document.getElementById('lang-writings-list');
+
+
     function composeTextA(name, description) {
       if (name && description) return `${name}\n\n${description}`;
       return name || description || '';
@@ -185,6 +191,37 @@
         statusEl.textContent = `Error: ${err.message}`;
       }
     }
+
+    async function loadLangWritings() {
+      try {
+        const res = await fetch('/api/writings?type=lang');
+        if (!res.ok) throw new Error('Failed to load language writings');
+        const data = await res.json();
+
+        langWritingsList.textContent = '';
+        if (!data.length) {
+          langWritingsList.textContent = 'No language writings yet.';
+          return;
+        }
+
+        data.forEach((item) => {
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = String(item.id);
+          checkbox.dataset.name = item.name || '';
+          checkbox.dataset.description = item.description || '';
+          const span = document.createElement('span');
+          span.textContent = item.name || '(untitled)'; // name only
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          langWritingsList.appendChild(label);
+        });
+      } catch (err) {
+        writeStatusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
 
     function renderNotes(notes) {
       notesEl.textContent = '';
@@ -491,11 +528,15 @@
         return;
       }
 
-      const selected = Array.from(
+      const selectedCreations = Array.from(
         creationsList.querySelectorAll('input[type="checkbox"]:checked')
       );
-      if (!selected.length) {
-        writeStatusEl.textContent = 'Select at least one creation.';
+      const selectedLang = Array.from(
+        langWritingsList.querySelectorAll('input[type="checkbox"]:checked')
+      );
+
+      if (!selectedCreations.length && !selectedLang.length) {
+        writeStatusEl.textContent = 'Select at least one Text B (creation or language writing).';
         return;
       }
 
@@ -506,13 +547,31 @@
       }
 
       try {
+        const jobs = [];
+
+        // 1) creations: raw text_b
+        selectedCreations.forEach((checkbox) => {
+          jobs.push({
+            text_a: textAValue,
+            text_b: checkbox.dataset.textB || '',
+            parent_writing_id: writingId,
+          });
+        });
+
+        // 2) lang writings: name + description as text_b
+        selectedLang.forEach((checkbox) => {
+          const name = checkbox.dataset.name || '';
+          const description = checkbox.dataset.description || '';
+          const textBValue = composeTextA(name, description);
+          jobs.push({
+            text_a: textAValue,
+            text_b: textBValue,
+            parent_writing_id: writingId,
+          });
+        });
+
         const results = await Promise.all(
-          selected.map(async (checkbox) => {
-            const payload = {
-              text_a: textAValue,
-              text_b: checkbox.dataset.textB || '',
-              parent_writing_id: writingId,
-            };
+          jobs.map(async (payload) => {
             const res = await fetch('/api/lang', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -525,6 +584,8 @@
             return res.json();
           })
         );
+
+
 
         writeStatusEl.textContent = '';
         const queued = results
@@ -641,8 +702,10 @@
       }
       await loadTypes();
       await loadCreations();
+      await loadLangWritings();
       await loadNotes();
       await loadRuns();
+      
     }
 
     init();

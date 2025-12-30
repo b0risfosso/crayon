@@ -46,6 +46,9 @@
 
       <button type="button" id="delete-creation">Remove Selected</button>
 
+      <label>Text B from language writings</label>
+      <div id="lang-writings-list" class="list"></div>
+
       <label for="new-creation">Add to creations</label>
       <div class="row">
         <input id="new-creation" type="text" placeholder="New text B" />
@@ -71,6 +74,9 @@
     const randomSelectBtn = document.getElementById('random-select');
     const textANameEl = document.getElementById('text-a-name');
     const textADescEl = document.getElementById('text-a-desc');
+
+    const langWritingsList = document.getElementById('lang-writings-list');
+
 
     function composeTextA(name, description) {
       const trimmedName = (name || '').trim();
@@ -138,49 +144,110 @@
       }
     }
 
+    async function loadLangWritings() {
+      try {
+        const res = await fetch('/api/writings?type=lang');
+        if (!res.ok) throw new Error('Failed to load language writings');
+        const data = await res.json();
+
+        langWritingsList.textContent = '';
+        if (!data.length) {
+          langWritingsList.textContent = 'No language writings yet.';
+          return;
+        }
+
+        data.forEach((item) => {
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = String(item.id);
+          // we only *display* the name, but we store desc for later
+          checkbox.dataset.name = item.name || '';
+          checkbox.dataset.description = item.description || '';
+          const span = document.createElement('span');
+          span.textContent = item.name || '(untitled)'; // name only
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          langWritingsList.appendChild(label);
+        });
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       statusEl.textContent = 'writing...';
       resultEl.textContent = '';
 
-      const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
-      if (!selected.length) {
-        statusEl.textContent = 'Select at least one creation.';
-        return;
-      }
-      const textAValue = composeTextA(textANameEl.value, textADescEl.value);
+      const selectedCreations = Array.from(
+  creationsList.querySelectorAll('input[type="checkbox"]:checked')
+);
+const selectedLang = Array.from(
+  langWritingsList.querySelectorAll('input[type="checkbox"]:checked')
+);
 
-      try {
-        const parentWritingId = await ensureParentWriting(textAValue);
-        const results = await Promise.all(selected.map(async (checkbox) => {
-          const payload = {
-            text_a: textAValue,
-            text_b: checkbox.dataset.textB || '',
-            parent_writing_id: parentWritingId,
-          };
-          const res = await fetch('/api/lang', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Request failed');
-          }
-          return res.json();
-        }));
+if (!selectedCreations.length && !selectedLang.length) {
+  statusEl.textContent = 'Select at least one Text B (creation or language writing).';
+  return;
+}
 
-        statusEl.textContent = '';
-        const queued = results.filter((item) => item && item.task_id).map((item) => item.task_id);
-        if (queued.length) {
-          resultEl.textContent = `Queued tasks: ${queued.join(', ')}. Check /queue.html for status.`;
-        } else {
-          resultEl.textContent = '';
-        }
-      } catch (err) {
-        statusEl.textContent = `Error: ${err.message}`;
-      }
+const textAValue = composeTextA(textANameEl.value, textADescEl.value);
+
+try {
+  const parentWritingId = await ensureParentWriting(textAValue);
+
+  // Build all jobs (from both lists)
+  const jobs = [];
+
+  // 1) creations: use raw text_b as before
+  selectedCreations.forEach((checkbox) => {
+    jobs.push({
+      text_a: textAValue,
+      text_b: checkbox.dataset.textB || '',
+      parent_writing_id: parentWritingId,
     });
+  });
+
+  // 2) lang writings: use name + description as text_b
+  selectedLang.forEach((checkbox) => {
+    const name = checkbox.dataset.name || '';
+    const description = checkbox.dataset.description || '';
+    const textBValue = composeTextA(name, description); // same formatting
+    jobs.push({
+      text_a: textAValue,
+      text_b: textBValue,
+      parent_writing_id: parentWritingId,
+    });
+  });
+
+  const results = await Promise.all(
+    jobs.map(async (payload) => {
+      const res = await fetch('/api/lang', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Request failed');
+      }
+      return res.json();
+    })
+  );
+
+      statusEl.textContent = '';
+      const queued = results.filter((item) => item && item.task_id).map((item) => item.task_id);
+      if (queued.length) {
+        resultEl.textContent = `Queued tasks: ${queued.join(', ')}. Check /queue.html for status.`;
+      } else {
+        resultEl.textContent = '';
+      }
+    } catch (err) {
+      statusEl.textContent = `Error: ${err.message}`;
+    }
+});
 
     addCreationBtn.addEventListener('click', async () => {
       const value = newCreationEl.value.trim();
@@ -243,6 +310,7 @@
     });
 
     loadCreations();
+    loadLangWritings();
   </script>
 </body>
 </html>
