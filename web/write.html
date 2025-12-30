@@ -46,14 +46,34 @@
 
       <button type="button" id="delete-creation">Remove Selected</button>
 
+      <label>Text B (select one or more)</label>
+      <div id="creations-list" class="list"></div>
+
+      <div class="row">
+        <input id="random-count" type="number" min="1" placeholder="N" />
+        <button type="button" id="random-select">Select N random</button>
+      </div>
+      <button type="button" id="delete-creation">Remove Selected</button>
+
       <label>Text B from language writings</label>
       <div id="lang-writings-list" class="list"></div>
 
-      <label for="new-creation">Add to creations</label>
+      <!-- NEW: type-based Text B lists -->
+      <label>Text B from other writing types</label>
       <div class="row">
-        <input id="new-creation" type="text" placeholder="New text B" />
-        <button type="button" id="add-creation">Add</button>
+        <select id="textb-type-select">
+          <option value="">Select type…</option>
+        </select>
+        <button type="button" id="add-type-list">Add type list</button>
       </div>
+      <div id="type-lists-container"></div>
+      <!-- END NEW -->
+
+      <label>Add to creations</label>
+      <input id="new-creation-name" type="text" placeholder="Creation name" />
+      <textarea id="new-creation-desc" placeholder="Creation description"></textarea>
+      <button type="button" id="add-creation">Add</button>
+
 
       <button type="submit">write</button>
     </form>
@@ -67,7 +87,8 @@
     const statusEl = document.getElementById('status');
     const resultEl = document.getElementById('result');
     const creationsList = document.getElementById('creations-list');
-    const newCreationEl = document.getElementById('new-creation');
+    const newCreationNameEl = document.getElementById('new-creation-name');
+    const newCreationDescEl = document.getElementById('new-creation-desc');
     const addCreationBtn = document.getElementById('add-creation');
     const deleteCreationBtn = document.getElementById('delete-creation');
     const randomCountEl = document.getElementById('random-count');
@@ -76,6 +97,10 @@
     const textADescEl = document.getElementById('text-a-desc');
 
     const langWritingsList = document.getElementById('lang-writings-list');
+    const textBTypeSelect = document.getElementById('textb-type-select');
+    const addTypeListBtn = document.getElementById('add-type-list');
+    const typeListsContainer = document.getElementById('type-lists-container');
+
 
 
     function composeTextA(name, description) {
@@ -132,17 +157,104 @@
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.value = String(item.id);
-          checkbox.dataset.textB = item.text_b;
+
+          // store name + description
+          checkbox.dataset.name = item.name || '';
+          checkbox.dataset.description = item.description || '';
+
           const span = document.createElement('span');
-          span.textContent = item.text_b || '(empty)';
+          span.textContent = item.name || '(untitled)'; // show name only
           label.appendChild(checkbox);
           label.appendChild(span);
           creationsList.appendChild(label);
         });
+
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
       }
     }
+
+    async function loadTextBTypes() {
+      try {
+        const res = await fetch('/api/writing-types');
+        if (!res.ok) throw new Error('Failed to load writing types');
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+
+        // Clear but keep the first placeholder option
+        textBTypeSelect.textContent = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select type…';
+        textBTypeSelect.appendChild(placeholder);
+
+        data.forEach((type) => {
+          if (!type) return;
+          // Optional: skip types that already have dedicated lists
+          if (type === 'creations' || type === 'lang') return;
+
+          const option = document.createElement('option');
+          option.value = type;
+          option.textContent = type;
+          textBTypeSelect.appendChild(option);
+        });
+      } catch (err) {
+        statusEl.textContent = `Error loading types: ${err.message}`;
+      }
+    }
+
+    async function addTypeList(type) {
+      if (!type) return;
+
+      // Prevent duplicate lists for the same type
+      const existing = typeListsContainer.querySelector(`[data-type-list="${type}"]`);
+      if (existing) return;
+
+      const wrapper = document.createElement('div');
+      wrapper.dataset.typeList = type;
+      wrapper.className = 'type-list-block';
+
+      const label = document.createElement('div');
+      label.textContent = `Text B from type: ${type}`;
+      wrapper.appendChild(label);
+
+      const list = document.createElement('div');
+      list.className = 'list';
+      wrapper.appendChild(list);
+
+      typeListsContainer.appendChild(wrapper);
+
+      try {
+        const res = await fetch(`/api/writings?type=${encodeURIComponent(type)}`);
+        if (!res.ok) throw new Error(`Failed to load writings for type ${type}`);
+        const data = await res.json();
+
+        list.textContent = '';
+        if (!data.length) {
+          list.textContent = `No writings with type "${type}".`;
+          return;
+        }
+
+        data.forEach((item) => {
+          const row = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = String(item.id);
+          checkbox.dataset.name = item.name || '';
+          checkbox.dataset.description = item.description || '';
+
+          const span = document.createElement('span');
+          span.textContent = item.name || '(untitled)';
+          row.appendChild(checkbox);
+          row.appendChild(span);
+          list.appendChild(row);
+        });
+      } catch (err) {
+        list.textContent = `Error: ${err.message}`;
+      }
+    }
+
+
 
     async function loadLangWritings() {
       try {
@@ -188,8 +300,12 @@ const selectedLang = Array.from(
   langWritingsList.querySelectorAll('input[type="checkbox"]:checked')
 );
 
-if (!selectedCreations.length && !selectedLang.length) {
-  statusEl.textContent = 'Select at least one Text B (creation or language writing).';
+const selectedTyped = Array.from(
+  typeListsContainer.querySelectorAll('input[type="checkbox"]:checked')
+);
+
+if (!selectedCreations.length && !selectedLang.length && !selectedTyped.length) {
+  statusEl.textContent = 'Select at least one Text B (creation, lang, or typed writing).';
   return;
 }
 
@@ -203,12 +319,16 @@ try {
 
   // 1) creations: use raw text_b as before
   selectedCreations.forEach((checkbox) => {
+    const name = checkbox.dataset.name || '';
+    const description = checkbox.dataset.description || '';
+    const textBValue = composeTextA(name, description);
     jobs.push({
       text_a: textAValue,
-      text_b: checkbox.dataset.textB || '',
+      text_b: textBValue,
       parent_writing_id: parentWritingId,
     });
   });
+
 
   // 2) lang writings: use name + description as text_b
   selectedLang.forEach((checkbox) => {
@@ -221,6 +341,19 @@ try {
       parent_writing_id: parentWritingId,
     });
   });
+
+  // 3) type-based lists: name + description
+selectedTyped.forEach((checkbox) => {
+  const name = checkbox.dataset.name || '';
+  const description = checkbox.dataset.description || '';
+  const textBValue = composeTextA(name, description);
+  jobs.push({
+    text_a: textAValue,
+    text_b: textBValue,
+    parent_writing_id: parentWritingId,
+  });
+});
+
 
   const results = await Promise.all(
     jobs.map(async (payload) => {
@@ -250,24 +383,27 @@ try {
 });
 
     addCreationBtn.addEventListener('click', async () => {
-      const value = newCreationEl.value.trim();
-      if (!value) return;
+      const name = newCreationNameEl.value.trim();
+      const description = newCreationDescEl.value.trim();
+      if (!name && !description) return;
       try {
         const res = await fetch('/api/creations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text_b: value }),
+          body: JSON.stringify({ name, description }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || 'Failed to add creation');
         }
-        newCreationEl.value = '';
+        newCreationNameEl.value = '';
+        newCreationDescEl.value = '';
         await loadCreations();
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
       }
     });
+
 
     deleteCreationBtn.addEventListener('click', async () => {
       const selected = Array.from(creationsList.querySelectorAll('input[type="checkbox"]:checked'));
@@ -309,8 +445,19 @@ try {
       });
     });
 
+    addTypeListBtn.addEventListener('click', async () => {
+      const type = textBTypeSelect.value;
+      if (!type) {
+        statusEl.textContent = 'Choose a type first.';
+        return;
+      }
+      await addTypeList(type);
+    });
+
+
     loadCreations();
     loadLangWritings();
+    loadTextBTypes();
   </script>
 </body>
 </html>

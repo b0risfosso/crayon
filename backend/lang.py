@@ -340,10 +340,13 @@ def list_creations():
 
     conn = _get_db()
     if writing_id:
-        # Creations attached to a specific writing
         rows = conn.execute(
             """
-            SELECT id, description AS text_b, created_at
+            SELECT id,
+                   name,
+                   description,
+                   description AS text_b,
+                   created_at
             FROM writings
             WHERE type = 'creations' AND parent_writing_id = ?
             ORDER BY id DESC
@@ -351,10 +354,13 @@ def list_creations():
             (writing_id,),
         ).fetchall()
     else:
-        # Global creations
         rows = conn.execute(
             """
-            SELECT id, description AS text_b, created_at
+            SELECT id,
+                   name,
+                   description,
+                   description AS text_b,
+                   created_at
             FROM writings
             WHERE type = 'creations'
             ORDER BY id DESC
@@ -365,20 +371,20 @@ def list_creations():
     return jsonify([dict(row) for row in rows])
 
 
+
 @app.post("/api/creations")
 def create_creation():
     data = request.get_json(silent=True) or {}
-    text_b = (data.get("text_b") or "").strip()
-    # optional: allow client to pass a nicer name or parent_writing_id
     name = (data.get("name") or "").strip()
+    description = (data.get("description") or "").strip()
     parent_writing_id = data.get("writing_id") or data.get("parent_writing_id")
 
-    if not text_b:
-        return jsonify({"error": "text_b required"}), 400
+    if not name and not description:
+        return jsonify({"error": "name or description required"}), 400
 
-    # Default a name if none was provided
+    # Default name if missing
     if not name:
-        first_line = text_b.splitlines()[0].strip()
+        first_line = description.splitlines()[0].strip()
         name = first_line[:100] or "Creation"
 
     conn = _get_db()
@@ -397,12 +403,15 @@ def create_creation():
         )
         VALUES (?, ?, NULL, '', '', ?, '', 'creations')
         """,
-        (name, text_b, parent_writing_id),
+        (name, description, parent_writing_id),
     )
     conn.commit()
     creation_id = cur.lastrowid
     conn.close()
-    return jsonify({"id": creation_id, "text_b": text_b})
+    return jsonify(
+        {"id": creation_id, "name": name, "description": description, "text_b": description}
+    )
+
 
 
 @app.delete("/api/creations/<int:creation_id>")
@@ -495,6 +504,7 @@ def list_writings():
 
     conn.close()
     return jsonify([dict(row) for row in rows])
+
 
 
 @app.get("/api/writings/lookup")
@@ -802,6 +812,7 @@ def list_writing_types():
     ).fetchall()
     conn.close()
     return jsonify([row["type"] for row in rows])
+
 
 
 @app.delete("/api/writings/<int:writing_id>/erase")
