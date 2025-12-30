@@ -560,9 +560,11 @@ def list_notes(writing_id: int):
 @app.post("/api/writings/<int:writing_id>/notes")
 def create_note(writing_id: int):
     data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    description = (data.get("description") or "").strip()
     content = (data.get("content") or "").strip()
-    if not content:
-        return jsonify({"error": "content required"}), 400
+    if not (name or description or content):
+        return jsonify({"error": "content or name/description required"}), 400
 
     conn = _get_db()
     cur = conn.cursor()
@@ -585,13 +587,23 @@ def create_note(writing_id: int):
     parent_text_b = parent["parent_text_b"]
     parent_name = parent["name"] or "(untitled)"
 
-    # 2) Create child writing
-    # Name: first line of the note, or "Note on <parent>"
-    first_line = content.splitlines()[0].strip() if content.splitlines() else ""
-    if first_line:
-        child_name = first_line
+    # 2) Normalize name/description for child writing
+    if not (name or description):
+        lines = content.splitlines()
+        name = (lines[0] if lines else "").strip()
+        description = "\n".join(lines[1:]).strip()
+
+    if name:
+        child_name = name
+    elif description:
+        child_name = description.splitlines()[0].strip()
     else:
         child_name = f"Note on {parent_name}"
+
+    if name and description:
+        note_content = f"{name}\n\n{description}"
+    else:
+        note_content = name or description or content
 
     cur.execute(
         """
@@ -608,7 +620,7 @@ def create_note(writing_id: int):
         """,
         (
             child_name,
-            content,          # description = full note content
+            description,      # description = child writing description only
             parent_run_id,
             parent_text_a,
             parent_text_b,
@@ -624,7 +636,7 @@ def create_note(writing_id: int):
         INSERT INTO writing_notes (writing_id, content, child_writing_id)
         VALUES (?, ?, ?)
         """,
-        (writing_id, content, child_writing_id),
+        (writing_id, note_content, child_writing_id),
     )
     note_id = int(cur.lastrowid)
 
@@ -637,9 +649,25 @@ def create_note(writing_id: int):
 @app.patch("/api/notes/<int:note_id>")
 def update_note(note_id: int):
     data = request.get_json(silent=True) or {}
+    name = data.get("name")
+    description = data.get("description")
     content = data.get("content")
-    if content is None:
-        return jsonify({"error": "content required"}), 400
+    if content is None and name is None and description is None:
+        return jsonify({"error": "content or name/description required"}), 400
+
+    if name is not None or description is not None:
+        name_value = (name or "").strip()
+        description_value = (description or "").strip()
+        if not (name_value or description_value):
+            return jsonify({"error": "name or description required"}), 400
+        if name_value and description_value:
+            content_value = f"{name_value}\n\n{description_value}"
+        else:
+            content_value = name_value or description_value
+    else:
+        if content is None:
+            return jsonify({"error": "content required"}), 400
+        content_value = content
     conn = _get_db()
     cur = conn.cursor()
     cur.execute(
@@ -648,7 +676,7 @@ def update_note(note_id: int):
         SET content = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
-        (content, note_id),
+        (content_value, note_id),
     )
     conn.commit()
     updated = cur.rowcount
