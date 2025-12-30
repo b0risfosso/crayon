@@ -125,11 +125,6 @@
           item.appendChild(desc);
         }
 
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        meta.textContent = w.created_at ? `Created ${w.created_at}` : '';
-        item.appendChild(meta);
-
         item.addEventListener('click', () => {
           window.open(`/writing.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
         });
