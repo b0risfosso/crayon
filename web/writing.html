@@ -6,10 +6,9 @@
   <title>Writing</title>
 <style>
   :root {
-    --border-color: #e2e8f0;
-    --bg-soft: #f8fafc;
-    --bg-main: #ffffff;
-    --text-muted: #64748b;
+    --border-color: #000;
+    --bg-main: #fff;
+    --text-muted: #444;
   }
 
   * {
@@ -20,18 +19,18 @@
     font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     margin: 0;
     padding: 2rem 1.5rem;
-    background: #0f172a;
-    color: #0f172a;
+    background: #fff;
+    color: #000;
     line-height: 1.5;
   }
 
   main {
     max-width: 64rem;
     margin: 0 auto;
-    background: var(--bg-main);
-    border-radius: 0.75rem;
+    background: #fff;
+    border: 1px solid #000;
     padding: 1.75rem 1.5rem 2.5rem;
-    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+    box-shadow: none;
   }
 
   nav {
@@ -44,15 +43,14 @@
 
   nav a {
     text-decoration: none;
-    color: var(--text-muted);
+    color: #000;
     padding: 0.25rem 0.6rem;
-    border-radius: 999px;
-    border: 1px solid transparent;
+    border: 1px solid #000;
   }
 
   nav a:hover {
-    border-color: var(--border-color);
-    background: var(--bg-soft);
+    background: #000;
+    color: #fff;
   }
 
   h1 {
@@ -65,20 +63,6 @@
     margin: 1.5rem 0 0.75rem;
   }
 
-  .desc {
-    white-space: pre-wrap;
-    margin-bottom: 0.35rem;
-  }
-
-  #meta {
-    margin-bottom: 1rem;
-  }
-
-  .muted {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-  }
-
   label {
     display: block;
     font-weight: 600;
@@ -86,57 +70,58 @@
     font-size: 0.95rem;
   }
 
-  textarea {
+  textarea,
+  input,
+  select {
     width: 100%;
     padding: 0.55rem 0.7rem;
     font: inherit;
-    min-height: 4rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--border-color);
-    background: var(--bg-soft);
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    border-radius: 0;
+  }
+
+  textarea {
     resize: vertical;
   }
 
-  input[type="text"],
-  select,
-  input[type="number"] {
-    width: 100%;
-    padding: 0.55rem 0.7rem;
-    font: inherit;
-    border-radius: 0.5rem;
-    border: 1px solid var(--border-color);
-    background: var(--bg-soft);
+  input[type="checkbox"] {
+    width: auto;
   }
 
   input[type="number"] {
-    max-width: 6rem;
+    width: 6rem;
   }
 
   button {
     padding: 0.5rem 0.9rem;
     font: inherit;
-    border-radius: 999px;
-    border: 1px solid #1d4ed8;
-    background: #2563eb;
-    color: #ffffff;
+    border: 1px solid #000;
+    background: #000;
+    color: #fff;
     cursor: pointer;
-    font-size: 0.95rem;
-    white-space: nowrap;
+    border-radius: 0;
   }
 
   button.secondary {
-    background: transparent;
-    color: #1d4ed8;
-    border-color: #bfdbfe;
+    background: #fff;
+    color: #000;
+  }
+
+  button:hover:not(:disabled) {
+    background: #fff;
+    color: #000;
+  }
+
+  button.secondary:hover {
+    background: #000;
+    color: #fff;
   }
 
   button:disabled {
     opacity: 0.6;
     cursor: default;
-  }
-
-  button:hover:not(:disabled) {
-    filter: brightness(1.05);
   }
 
   .row {
@@ -151,30 +136,35 @@
     white-space: pre-wrap;
   }
 
-  /* Cards / sections */
+  .muted {
+    color: #444;
+    font-size: 0.9rem;
+  }
+
+  /* Section cards (now simple boxes, sharp edge) */
   .section-card {
-    border-radius: 0.75rem;
+    border: 1px solid #000;
     padding: 1rem 1.1rem;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: #fff;
     margin-bottom: 0.75rem;
+    border-radius: 0;
   }
 
   .section-title {
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 700;
     margin-bottom: 0.6rem;
   }
 
   /* Lists */
   .list {
-    border: 1px solid var(--border-color);
+    border: 1px solid #000;
     padding: 0.5rem;
     max-height: 14rem;
     overflow: auto;
-    border-radius: 0.5rem;
-    background: var(--bg-soft);
+    background: #fff;
     font-size: 0.9rem;
+    border-radius: 0;
   }
 
   .list label {
@@ -191,7 +181,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* Text B layout: three columns */
+  /* Text B layout */
   .textb-layout {
     display: flex;
     gap: 1rem;
@@ -205,77 +195,32 @@
 
   .textb-column-title {
     font-size: 0.9rem;
-    font-weight: 600;
+    font-weight: 700;
     margin-bottom: 0.35rem;
   }
 
-  .textb-column small {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 0.25rem;
-  }
-
-  .type-list-block {
-    margin-top: 0.5rem;
-  }
-
-  .type-list-block > div:first-child {
-    font-size: 0.85rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  /* Notes editing */
-  .note {
-    border-top: 1px solid var(--border-color);
-    padding: 0.75rem 0;
-  }
-
   details {
-    border-radius: 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid #000;
     padding: 0.45rem 0.7rem 0.6rem;
-    background: var(--bg-soft);
+    background: #fff;
     margin-bottom: 0.5rem;
+    border-radius: 0;
   }
 
   summary {
     cursor: pointer;
     font-weight: 600;
-    outline: none;
   }
 
-  .meta {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    margin: 0.35rem 0 0.3rem;
-  }
-
-  .ideas {
-    margin-left: 0.5rem;
-    margin-top: 0.25rem;
-  }
-
-  .idea {
-    margin: 0.4rem 0;
-  }
-
-  .idea a {
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  .idea a:hover {
-    text-decoration: underline;
-  }
-
-  /* Erase button */
   #erase-writing {
-    margin-top: 1rem;
-    background: #b91c1c;
-    border-color: #7f1d1d;
+    background: #000;
+    border-color: #000;
     color: #fff;
+  }
+
+  #erase-writing:hover {
+    background: #fff;
+    color: #000;
   }
 
   @media (max-width: 900px) {
@@ -288,6 +233,7 @@
     }
   }
 </style>
+
 
 </head>
 <body>
