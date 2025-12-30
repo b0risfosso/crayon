@@ -39,8 +39,13 @@
     <div id="idea-desc" class="desc"></div>
     <div id="meta" class="muted"></div>
 
+    <!-- NEW: erase button -->
+    <button id="erase-writing" type="button" style="margin: 0.5rem 0; background: #c00; color: #fff;">
+      Erase writing (and children)
+    </button>
+
     <section>
-      <h2>Generate ideas</h2>
+      <h2>Write</h2>
       <form id="write-form">
         <label for="text-a">Text A</label>
         <textarea id="text-a" name="text_a" readonly></textarea>
@@ -118,6 +123,8 @@
     let writingId = null;
     let currentName = ideaNameParam;
     let currentDesc = ideaDescParam;
+
+    const eraseBtn = document.getElementById('erase-writing');
 
     function composeTextA(name, description) {
       if (name && description) return `${name}\n\n${description}`;
@@ -224,6 +231,37 @@
           }
         });
         buttonsRow.appendChild(saveBtn);
+
+        eraseBtn.addEventListener('click', async () => {
+          if (!writingId) {
+            alert('Writing is not loaded yet.');
+            return;
+          }
+
+          const confirmed = window.confirm(
+            'Erase this writing and ALL of its child writings, notes, and runs? This cannot be undone.'
+          );
+          if (!confirmed) return;
+
+          try {
+            const res = await fetch(`/api/writings/${encodeURIComponent(writingId)}/erase`, {
+              method: 'DELETE',
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Failed to erase writing');
+            }
+
+            // Optionally, you can inspect the deleted IDs:
+            // const data = await res.json();
+
+            // After successful erase, send user somewhere safe
+            window.location.href = '/writings.html'; // or '/lang.html' or '/index.html'
+          } catch (err) {
+            statusEl.textContent = `Error: ${err.message}`;
+          }
+        });
+
 
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';

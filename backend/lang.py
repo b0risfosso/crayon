@@ -749,6 +749,72 @@ def list_writing_types():
     return jsonify([row["type"] for row in rows])
 
 
+@app.delete("/api/writings/<int:writing_id>/erase")
+def erase_writing(writing_id: int):
+    """
+    Recursively delete a writing and all its descendants, plus related runs and notes.
+    """
+    conn = _get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # 1) Build the tree of all descendant writings
+    cur.execute(
+        """
+        WITH RECURSIVE tree(id) AS (
+            SELECT id FROM writings WHERE id = ?
+            UNION ALL
+            SELECT w.id
+            FROM writings w
+            JOIN tree t ON w.parent_writing_id = t.id
+        )
+        SELECT id FROM tree
+        """,
+        (writing_id,),
+    )
+    rows = cur.fetchall()
+    if not rows:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+
+    ids = [row["id"] for row in rows]
+    placeholders = ",".join("?" for _ in ids)
+
+    # 2) Delete notes that either belong to or point to these writings
+    cur.execute(
+        f"""
+        DELETE FROM writing_notes
+        WHERE writing_id IN ({placeholders})
+           OR child_writing_id IN ({placeholders})
+        """,
+        ids + ids,
+    )
+
+    # 3) Delete runs whose parent_writing_id is any of these writings
+    cur.execute(
+        f"""
+        DELETE FROM runs
+        WHERE parent_writing_id IN ({placeholders})
+        """,
+        ids,
+    )
+
+    # 4) Finally, delete the writings themselves
+    cur.execute(
+        f"""
+        DELETE FROM writings
+        WHERE id IN ({placeholders})
+        """,
+        ids,
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"deleted_ids": ids})
+
+
+
 
 if __name__ == "__main__":
     _ensure_workers()
