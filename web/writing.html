@@ -4,28 +4,291 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Writing</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; line-height: 1.5; }
-    main { max-width: 60rem; margin: 0 auto; }
-    nav a { margin-right: 1rem; text-decoration: none; }
-    h1 { font-size: 1.5rem; margin: 1rem 0 0.5rem; }
-    .desc { white-space: pre-wrap; margin-bottom: 1rem; }
-    textarea { width: 100%; box-sizing: border-box; padding: 0.5rem; font: inherit; min-height: 4rem; }
-    input[type="text"], select { width: 100%; box-sizing: border-box; padding: 0.5rem; font: inherit; }
-    button { margin-top: 0.5rem; padding: 0.45rem 0.8rem; font: inherit; }
-    .note { border-top: 1px solid #ccc; padding: 0.75rem 0; }
-    .muted { color: #555; font-size: 0.9rem; }
-    .row { display: flex; gap: 0.5rem; align-items: center; }
-    .list { border: 1px solid #ccc; padding: 0.5rem; max-height: 12rem; overflow: auto; }
-    .list label { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 400; margin: 0.35rem 0; }
-    .list label span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .result { margin-top: 0.75rem; white-space: pre-wrap; }
-    details { border-top: 1px solid #ccc; padding: 0.5rem 0; }
-    summary { cursor: pointer; font-weight: 600; }
-    .meta { font-size: 0.9rem; color: #555; margin-left: 1rem; }
-    .ideas { margin-left: 1rem; }
-    .idea { margin: 0.5rem 0; }
-  </style>
+<style>
+  :root {
+    --border-color: #e2e8f0;
+    --bg-soft: #f8fafc;
+    --bg-main: #ffffff;
+    --text-muted: #64748b;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    margin: 0;
+    padding: 2rem 1.5rem;
+    background: #0f172a;
+    color: #0f172a;
+    line-height: 1.5;
+  }
+
+  main {
+    max-width: 64rem;
+    margin: 0 auto;
+    background: var(--bg-main);
+    border-radius: 0.75rem;
+    padding: 1.75rem 1.5rem 2.5rem;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+  }
+
+  nav {
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    font-size: 0.9rem;
+  }
+
+  nav a {
+    text-decoration: none;
+    color: var(--text-muted);
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+
+  nav a:hover {
+    border-color: var(--border-color);
+    background: var(--bg-soft);
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    margin: 0 0 0.4rem;
+  }
+
+  h2 {
+    font-size: 1.1rem;
+    margin: 1.5rem 0 0.75rem;
+  }
+
+  .desc {
+    white-space: pre-wrap;
+    margin-bottom: 0.35rem;
+  }
+
+  #meta {
+    margin-bottom: 1rem;
+  }
+
+  .muted {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    font-size: 0.95rem;
+  }
+
+  textarea {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+    min-height: 4rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-soft);
+    resize: vertical;
+  }
+
+  input[type="text"],
+  select,
+  input[type="number"] {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-soft);
+  }
+
+  input[type="number"] {
+    max-width: 6rem;
+  }
+
+  button {
+    padding: 0.5rem 0.9rem;
+    font: inherit;
+    border-radius: 999px;
+    border: 1px solid #1d4ed8;
+    background: #2563eb;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  button.secondary {
+    background: transparent;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+  }
+
+  button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  button:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+
+  .row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .result {
+    margin-top: 0.75rem;
+    white-space: pre-wrap;
+  }
+
+  /* Cards / sections */
+  .section-card {
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
+
+  /* Lists */
+  .list {
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    max-height: 14rem;
+    overflow: auto;
+    border-radius: 0.5rem;
+    background: var(--bg-soft);
+    font-size: 0.9rem;
+  }
+
+  .list label {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    font-weight: 400;
+    margin: 0.25rem 0;
+  }
+
+  .list label span {
+    flex: 1;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* Text B layout: three columns */
+  .textb-layout {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .textb-column {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .textb-column-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
+
+  .textb-column small {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+  }
+
+  .type-list-block {
+    margin-top: 0.5rem;
+  }
+
+  .type-list-block > div:first-child {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  /* Notes editing */
+  .note {
+    border-top: 1px solid var(--border-color);
+    padding: 0.75rem 0;
+  }
+
+  details {
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    padding: 0.45rem 0.7rem 0.6rem;
+    background: var(--bg-soft);
+    margin-bottom: 0.5rem;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    outline: none;
+  }
+
+  .meta {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin: 0.35rem 0 0.3rem;
+  }
+
+  .ideas {
+    margin-left: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .idea {
+    margin: 0.4rem 0;
+  }
+
+  .idea a {
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .idea a:hover {
+    text-decoration: underline;
+  }
+
+  /* Erase button */
+  #erase-writing {
+    margin-top: 1rem;
+    background: #b91c1c;
+    border-color: #7f1d1d;
+    color: #fff;
+  }
+
+  @media (max-width: 900px) {
+    main {
+      padding: 1.25rem 1rem 1.75rem;
+    }
+
+    .textb-layout {
+      flex-direction: column;
+    }
+  }
+</style>
+
 </head>
 <body>
   <main>
@@ -40,47 +303,112 @@
     <div id="meta" class="muted"></div>
 
 
-    <section>
+        <section>
       <h2>Write</h2>
       <form id="write-form">
-        <label for="text-a">Text A</label>
-        <textarea id="text-a" name="text_a" readonly></textarea>
-
-        <label>Text B (select one or more)</label>
-        <div id="creations-list" class="list"></div>
-
-        <div class="row">
-          <input id="random-count" type="number" min="1" placeholder="N" />
-          <button type="button" id="random-select">Select N random</button>
+        <!-- Text A card -->
+        <div class="section-card">
+          <div class="section-title">Text A</div>
+          <label for="text-a">Text A</label>
+          <textarea id="text-a" name="text_a" readonly></textarea>
+          <div class="muted" style="margin-top: 0.25rem;">
+            This is the base text for this writing.
+          </div>
         </div>
-        <button type="button" id="delete-creation">Remove Selected</button>
 
-        <label>Text B from language writings</label>
-        <div id="lang-writings-list" class="list"></div>
+        <!-- Text B sources card -->
+        <div class="section-card">
+          <div class="section-title">Text B sources</div>
 
-        <!-- NEW: type-based Text B lists -->
-        <label>Text B from other writing types</label>
-        <div class="row">
-          <select id="textb-type-select">
-            <option value="">Select type…</option>
-          </select>
-          <button type="button" id="add-type-list">Add type list</button>
+          <div class="textb-layout">
+            <!-- Column 1: Creations -->
+            <div class="textb-column">
+              <div class="textb-column-title">From creations</div>
+              <small>Select one or more saved creations.</small>
+
+              <div id="creations-list" class="list"></div>
+
+              <div class="row" style="margin-top: 0.5rem;">
+                <input id="random-count" type="number" min="1" placeholder="N" />
+                <button type="button" id="random-select" class="secondary">
+                  Select N random
+                </button>
+              </div>
+
+              <button
+                type="button"
+                id="delete-creation"
+                class="secondary"
+                style="margin-top: 0.4rem;"
+              >
+                Remove selected
+              </button>
+            </div>
+
+            <!-- Column 2: Language writings -->
+            <div class="textb-column">
+              <div class="textb-column-title">From language writings</div>
+              <small>Use previous language writings as Text B.</small>
+
+              <div id="lang-writings-list" class="list"></div>
+            </div>
+
+            <!-- Column 3: Other writing types -->
+            <div class="textb-column">
+              <div class="textb-column-title">From other types</div>
+              <small>Add and select Text B from any other writing type.</small>
+
+              <div class="row" style="margin-bottom: 0.35rem;">
+                <select id="textb-type-select">
+                  <option value="">Select type…</option>
+                </select>
+                <button type="button" id="add-type-list" class="secondary">
+                  Add
+                </button>
+              </div>
+
+              <div id="type-lists-container"></div>
+            </div>
+          </div>
+
+          <div class="muted" style="margin-top: 0.75rem;">
+            Select at least one Text B source to run this writing.
+          </div>
         </div>
-        <div id="type-lists-container"></div>
-        <!-- END NEW -->
 
+        <!-- Add to creations card -->
+        <div class="section-card">
+          <div class="section-title">Add to creations</div>
+          <label for="new-creation-name">Creation name</label>
+          <input
+            id="new-creation-name"
+            type="text"
+            placeholder="Creation name"
+          />
 
-        <label>Add to creations</label>
-        <input id="new-creation-name" type="text" placeholder="Creation name" />
-        <textarea id="new-creation-desc" placeholder="Creation description"></textarea>
-        <button type="button" id="add-creation">Add</button>
+          <label for="new-creation-desc" style="margin-top: 0.6rem;">Creation description</label>
+          <textarea
+            id="new-creation-desc"
+            placeholder="Creation description"
+          ></textarea>
 
+          <div class="row" style="margin-top: 0.5rem;">
+            <button type="button" id="add-creation" class="secondary">
+              Add creation
+            </button>
+          </div>
+        </div>
 
-        <button type="submit">write</button>
+        <!-- Submit row -->
+        <div class="row" style="margin-top: 0.75rem; justify-content: flex-end;">
+          <button type="submit">Write</button>
+        </div>
       </form>
+
       <div id="write-status" class="muted"></div>
       <div id="write-result" class="result"></div>
     </section>
+
 
     <section>
       <h2>Runs for this writing</h2>
