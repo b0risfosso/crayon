@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Roots – Lang Writings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --bg: #050710;
+      --fg: #f4f4f9;
+      --accent: #9b5cff;
+      --accent-soft: #9b5cff22;
+      --card-bg: #0b0f1c;
+      --card-border: #ffffff22;
+      --card-border-hover: #9b5cff66;
+      --muted: #a5a7c8;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #141b33 0, #050710 50%, #02030a 100%);
+      color: var(--fg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 14px 20px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      backdrop-filter: blur(10px);
+      background: linear-gradient(to bottom, #050710ee, #050710cc);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    header .subtitle {
+      font-size: 13px;
+      opacity: 0.78;
+    }
+
+    #count-label {
+      font-weight: 600;
+    }
+
+    #header-right {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .pill {
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.13);
+      padding: 4px 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.75;
+      white-space: nowrap;
+    }
+
+    #search-input {
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 6px 11px;
+      font-size: 13px;
+      background: #050816;
+      color: var(--fg);
+      min-width: 200px;
+    }
+
+    #search-input::placeholder {
+      color: rgba(196,198,225,0.6);
+    }
+
+    #main {
+      flex: 1;
+      padding: 16px 18px 18px;
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .card {
+      position: relative;
+      border-radius: 18px;
+      padding: 12px 13px 12px;
+      background: radial-gradient(circle at top left, #182038 0, #050814 55%, #050710 100%);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      transition: transform 0.12s ease-out, box-shadow 0.12s ease-out,
+                  border-color 0.12s ease-out, background 0.12s ease-out;
+    }
+
+    .card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 22px 50px rgba(0,0,0,0.6);
+      border-color: var(--card-border-hover);
+      background: radial-gradient(circle at top left, #222b4b 0, #050814 60%, #050710 100%);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .root-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      margin-top: 4px;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(155, 92, 255, 0.7);
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0;
+      word-break: break-word;
+    }
+
+    .card-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 2px 8px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(5,8,22,0.9);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(196,198,225,0.82);
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: rgba(228,229,244,0.86);
+      line-height: 1.35;
+      max-height: 3.8em;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .card-desc::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 40%;
+      height: 1.4em;
+      background: linear-gradient(to right, transparent, #050710dd);
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .card button {
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(12,15,32,0.9);
+      color: rgba(231,232,252,0.95);
+      padding: 3px 9px;
+      font-size: 11px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .card button.primary {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(27,16,65,0.8);
+    }
+
+    .card button:hover {
+      background: rgba(23,27,60,0.9);
+    }
+
+    .card button.primary:hover {
+      background: var(--accent-soft);
+    }
+
+    #empty-state {
+      margin-top: 40px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    #empty-state strong {
+      color: var(--fg);
+    }
+
+    @media (max-width: 700px) {
+      header {
+        align-items: flex-start;
+      }
+      #header-right {
+        margin-left: 0;
+      }
+      #main {
+        padding: 12px 12px 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Roots</h1>
+    <div class="subtitle">
+      All <code>lang</code> writings as starting points for growth trees.
+      <span id="count-label"></span>
+    </div>
+  </div>
+
+  <div id="header-right">
+    <span class="pill">Click a card to see its growth tree</span>
+    <input id="search-input" type="search" placeholder="Filter by title or description…">
+  </div>
+</header>
+
+<div id="main">
+  <div id="grid"></div>
+  <div id="empty-state" style="display:none;">
+    <p>
+      <strong>No lang roots found.</strong><br>
+      Create a writing with <code>type = "lang"</code> to see it here.
+    </p>
+  </div>
+</div>
+
+<script>
+  async function fetchWritings() {
+    const res = await fetch("/api/writings");
+    if (!res.ok) {
+      throw new Error("Failed to fetch writings");
+    }
+    return await res.json();
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "";
+    // SQLite DEFAULT CURRENT_TIMESTAMP is usually "YYYY-MM-DD HH:MM:SS"
+    try {
+      const d = new Date(iso.replace(" ", "T"));
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  function shorten(str, max) {
+    if (!str) return "";
+    if (str.length <= max) return str;
+    return str.slice(0, max - 1) + "…";
+  }
+
+  function renderRoots(writings, filterText) {
+    const grid = document.getElementById("grid");
+    const empty = document.getElementById("empty-state");
+    const countLabel = document.getElementById("count-label");
+
+    while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+    const ft = (filterText || "").toLowerCase().trim();
+    let filtered = writings.filter(w => w.type === "lang");
+
+    if (ft) {
+      filtered = filtered.filter(w => {
+        const name = (w.name || "").toLowerCase();
+        const desc = (w.description || "").toLowerCase();
+        return name.includes(ft) || desc.includes(ft);
+      });
+    }
+
+    // Sort newest first by created_at (fallback to id)
+    filtered.sort((a, b) => {
+      const ad = a.created_at || "";
+      const bd = b.created_at || "";
+      if (ad && bd) return ad < bd ? 1 : -1;
+      return (b.id || 0) - (a.id || 0);
+    });
+
+    if (filtered.length === 0) {
+      empty.style.display = "block";
+      countLabel.textContent = "";
+      return;
+    }
+
+    empty.style.display = "none";
+    countLabel.textContent = ` · ${filtered.length} root${filtered.length !== 1 ? "s" : ""}`;
+
+    for (const w of filtered) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.dataset.id = w.id;
+
+      const header = document.createElement("div");
+      header.className = "card-header";
+
+      const dot = document.createElement("div");
+      dot.className = "root-dot";
+
+      const title = document.createElement("h2");
+      title.className = "card-title";
+      title.textContent = w.name || "(unnamed lang root)";
+
+      header.appendChild(dot);
+      header.appendChild(title);
+      card.appendChild(header);
+
+      const meta = document.createElement("div");
+      meta.className = "card-meta";
+      const left = document.createElement("span");
+      left.textContent = formatDate(w.created_at) || "Created at unknown";
+      const right = document.createElement("span");
+      right.innerHTML = `<span class="badge">type: lang</span>`;
+      meta.appendChild(left);
+      meta.appendChild(right);
+      card.appendChild(meta);
+
+      if (w.description) {
+        const desc = document.createElement("div");
+        desc.className = "card-desc";
+        desc.textContent = shorten(w.description, 220);
+        card.appendChild(desc);
+      }
+
+      const footer = document.createElement("div");
+      footer.className = "card-footer";
+
+      const openTreeBtn = document.createElement("button");
+      openTreeBtn.className = "primary";
+      openTreeBtn.textContent = "Growth tree";
+
+      const openWritingBtn = document.createElement("button");
+      openWritingBtn.textContent = "Open writing";
+
+      footer.appendChild(openTreeBtn);
+      footer.appendChild(openWritingBtn);
+      card.appendChild(footer);
+
+      // Click entire card -> tree
+      card.addEventListener("click", (evt) => {
+        // If we clicked one of the buttons, they have their own handler,
+        // but still go to the same place by default.
+        if (evt.target.tagName.toLowerCase() === "button") return;
+        window.open(`/tree.html?root_id=${w.id}`, "_blank");
+      });
+
+      openTreeBtn.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        window.open(`/tree.html?root_id=${w.id}`, "_blank");
+      });
+
+      openWritingBtn.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        window.open(`/writing.html?writing_id=${w.id}`, "_blank");
+      });
+
+      grid.appendChild(card);
+    }
+  }
+
+  (async function init() {
+    const searchInput = document.getElementById("search-input");
+
+    let allWritings = [];
+    try {
+      allWritings = await fetchWritings();
+    } catch (err) {
+      console.error(err);
+      document.getElementById("empty-state").style.display = "block";
+      document.getElementById("empty-state").innerHTML =
+        "<p><strong>Error loading roots.</strong><br>Check the console for details.</p>";
+      return;
+    }
+
+    renderRoots(allWritings, "");
+
+    searchInput.addEventListener("input", () => {
+      renderRoots(allWritings, searchInput.value);
+    });
+  })();
+</script>
+
+</body>
+</html>
