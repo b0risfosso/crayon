@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Writing Growth Tree</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --bg: #050710;
+      --fg: #f4f4f9;
+      --accent: #9b5cff;
+      --accent-soft: #9b5cff22;
+      --edge: #ffffff33;
+      --node-root: #ffd166;
+      --node-default: #9b5cff;
+      --node-hover: #ffffff;
+      --node-border: #ffffff88;
+      --panel-bg: #0b0f1c;
+      --panel-border: #ffffff22;
+      --control-bg: #111727;
+      --control-border: #ffffff33;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #141b33 0, #050710 50%, #02030a 100%);
+      color: var(--fg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 12px 20px 8px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 16px;
+      border-bottom: 1px solid var(--panel-border);
+      backdrop-filter: blur(10px);
+      background: linear-gradient(to bottom, #050710ee, #050710cc);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    header .subtitle {
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    #root-title {
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    #controls {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #c7c8d9;
+    }
+
+    .control-group input[type="number"],
+    .control-group input[type="range"] {
+      background: var(--control-bg);
+      border-radius: 999px;
+      border: 1px solid var(--control-border);
+      padding: 4px 8px;
+      color: var(--fg);
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      width: 120px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+      padding: 4px 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.75;
+    }
+
+    .link-btn {
+      border-radius: 999px;
+      border: 1px solid var(--accent);
+      padding: 4px 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .link-btn:hover {
+      background: var(--accent-soft);
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+      min-height: 0;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto;
+      }
+    }
+
+    #canvas-container {
+      position: relative;
+      overflow: hidden;
+      border-right: 1px solid var(--panel-border);
+    }
+
+    #tree-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: radial-gradient(circle at center, #101426 0, #050710 60%);
+    }
+
+    /* Sidebar info panel */
+    #info-panel {
+      border-left: 1px solid var(--panel-border);
+      background: linear-gradient(160deg, #050710 0, #050710 40%, #0b0f1c 100%);
+      padding: 12px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    #info-panel h2 {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin: 0 0 4px;
+      opacity: 0.8;
+    }
+
+    #info-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--panel-border);
+    }
+
+    #info-panel .stat-row:last-of-type {
+      border-bottom: none;
+    }
+
+    #info-panel .stat-label {
+      opacity: 0.7;
+    }
+
+    #info-panel .stat-value {
+      font-weight: 600;
+    }
+
+    #type-legend {
+      margin-top: 4px;
+      font-size: 11px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .type-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #101426;
+      border: 1px solid #ffffff22;
+      white-space: nowrap;
+    }
+
+    .type-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    #node-details {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px solid var(--panel-border);
+      font-size: 12px;
+      max-height: 50vh;
+      overflow: auto;
+    }
+
+    #node-details .muted {
+      opacity: 0.7;
+      font-size: 11px;
+    }
+
+    #node-details h3 {
+      font-size: 13px;
+      margin: 4px 0 4px;
+    }
+
+    #node-details p {
+      margin: 0 0 6px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+
+    #node-details button {
+      margin-top: 4px;
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 999px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+    }
+
+    #node-details button:hover {
+      background: var(--accent-soft);
+    }
+
+    /* SVG styling */
+    .edge {
+      stroke: var(--edge);
+      stroke-width: 1;
+      stroke-linecap: round;
+      opacity: 0.9;
+    }
+
+    .node {
+      cursor: pointer;
+      transition: transform 0.15s ease-out;
+    }
+
+    .node circle {
+      fill: var(--node-default);
+      stroke: var(--node-border);
+      stroke-width: 1;
+      filter: drop-shadow(0 0 4px #000000aa);
+    }
+
+    .node.root circle {
+      fill: var(--node-root);
+    }
+
+    .node:hover circle {
+      fill: var(--node-hover);
+      stroke: #ffffff;
+      stroke-width: 1.2;
+    }
+
+    .node-label {
+      fill: #ffffffdd;
+      font-size: 10px;
+      text-anchor: middle;
+      pointer-events: none;
+      dominant-baseline: hanging;
+    }
+
+    .node-type-dot {
+      fill: #ffffffaa;
+    }
+
+    .node-ring {
+      fill: none;
+      stroke: var(--accent-soft);
+      stroke-width: 1;
+      stroke-dasharray: 4 6;
+    }
+
+    /* Tooltip */
+    #tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: #101426;
+      border-radius: 8px;
+      padding: 4px 7px;
+      font-size: 11px;
+      color: var(--fg);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      opacity: 0;
+      transform: translate(-50%, -120%);
+      transition: opacity 0.12s ease-out;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Growth Tree</h1>
+    <div class="subtitle">
+      Root: <span id="root-title">Loading…</span>
+    </div>
+  </div>
+
+  <div id="controls">
+    <span class="pill">Writings growth visualizer</span>
+
+    <div class="control-group">
+      <label for="depth-input">Max depth</label>
+      <input id="depth-input" type="number" min="1" max="12" value="6">
+    </div>
+
+    <div class="control-group">
+      <label for="zoom-input">Zoom</label>
+      <input id="zoom-input" type="range" min="30" max="200" value="100">
+    </div>
+
+    <button id="to-writing-btn" class="link-btn">Open root writing</button>
+  </div>
+</header>
+
+<main>
+  <div id="canvas-container">
+    <svg id="tree-svg"></svg>
+  </div>
+
+  <aside id="info-panel">
+    <div>
+      <h2>Overview</h2>
+      <div class="stat-row">
+        <span class="stat-label">Total writings in tree</span>
+        <span class="stat-value" id="stat-total">–</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Max depth observed</span>
+        <span class="stat-value" id="stat-depth">–</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Distinct types</span>
+        <span class="stat-value" id="stat-types">–</span>
+      </div>
+      <div id="type-legend"></div>
+    </div>
+
+    <div id="node-details">
+      <div class="muted">Hover a node to inspect it. Click to open its writing page.</div>
+    </div>
+  </aside>
+</main>
+
+<div id="tooltip"></div>
+
+<script>
+  // --- Utility helpers ------------------------------------------------------
+
+  function getQueryParams() {
+    const params = {};
+    const search = window.location.search.substring(1);
+    if (!search) return params;
+    for (const pair of search.split("&")) {
+      const [k, v] = pair.split("=");
+      if (!k) continue;
+      params[decodeURIComponent(k)] = decodeURIComponent(v || "");
+    }
+    return params;
+  }
+
+  function shorten(str, max = 32) {
+    if (!str) return "";
+    if (str.length <= max) return str;
+    return str.slice(0, max - 1) + "…";
+  }
+
+  function groupBy(arr, keyFn) {
+    const map = new Map();
+    for (const item of arr) {
+      const key = keyFn(item);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(item);
+    }
+    return map;
+  }
+
+  // Assign consistent colors to writing types
+  const typeColorCache = new Map();
+  const palette = [
+    "#9b5cff", "#4cc9f0", "#f72585", "#ffd166",
+    "#4ade80", "#ff6b6b", "#f97316", "#38bdf8",
+    "#e879f9", "#22c55e", "#facc15"
+  ];
+  function colorForType(type, isRoot) {
+    if (isRoot) return getComputedStyle(document.documentElement)
+      .getPropertyValue("--node-root") || "#ffd166";
+    if (!type) return "#9b5cff";
+    if (!typeColorCache.has(type)) {
+      const idx = typeColorCache.size % palette.length;
+      typeColorCache.set(type, palette[idx]);
+    }
+    return typeColorCache.get(type);
+  }
+
+  // --- Data fetching & tree building ----------------------------------------
+
+  async function fetchAllWritings() {
+    const res = await fetch("/api/writings");
+    if (!res.ok) {
+      throw new Error("Failed to fetch writings");
+    }
+    return await res.json();
+  }
+
+  function buildTree(rootId, writings) {
+    const byId = new Map();
+    for (const w of writings) {
+      byId.set(w.id, w);
+    }
+    const childrenByParent = groupBy(writings, w => w.parent_writing_id || 0);
+
+    if (!byId.has(rootId)) {
+      throw new Error("Root writing not found");
+    }
+
+    const nodes = [];
+    const edges = [];
+    const queue = [{ id: rootId, depth: 0, parentId: null }];
+
+    const visited = new Set();
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (visited.has(current.id)) continue;
+      visited.add(current.id);
+
+      const w = byId.get(current.id);
+      if (!w) continue;
+
+      const node = {
+        id: w.id,
+        name: w.name || "(unnamed)",
+        description: w.description || "",
+        type: w.type || "",
+        parentId: current.parentId,
+        depth: current.depth
+      };
+      nodes.push(node);
+
+      if (current.parentId != null) {
+        edges.push({ from: current.parentId, to: current.id });
+      }
+
+      const children = childrenByParent.get(w.id) || [];
+      for (const child of children) {
+        queue.push({
+          id: child.id,
+          depth: current.depth + 1,
+          parentId: w.id
+        });
+      }
+    }
+
+    return { nodes, edges };
+  }
+
+  // --- Layout: radial rings -------------------------------------------------
+
+  function computeLayout(nodes, edges, maxDepthToDraw, width, height) {
+    const depthGroups = groupBy(
+      nodes.filter(n => n.depth <= maxDepthToDraw),
+      n => n.depth
+    );
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    // Choose radii so we don't crowd edges
+    const maxDepthObserved = Math.max(...nodes.map(n => n.depth), 0);
+    const depthLimit = Math.min(maxDepthToDraw, maxDepthObserved);
+    const maxRadius = Math.min(width, height) * 0.45;
+    const radiusStep = depthLimit === 0 ? 0 : maxRadius / (depthLimit + 0.75);
+
+    const positionedNodes = new Map();
+
+    // Place root
+    const rootGroup = depthGroups.get(0) || [];
+    if (rootGroup.length === 1) {
+      const root = rootGroup[0];
+      positionedNodes.set(root.id, {
+        ...root,
+        x: centerX,
+        y: centerY
+      });
+    } else {
+      // If there are multiple depth-0 nodes, spread them in a tiny circle
+      const r0 = radiusStep * 0.2;
+      rootGroup.forEach((node, i) => {
+        const angle = (2 * Math.PI * i) / rootGroup.length;
+        positionedNodes.set(node.id, {
+          ...node,
+          x: centerX + r0 * Math.cos(angle),
+          y: centerY + r0 * Math.sin(angle)
+        });
+      });
+    }
+
+    // Place deeper levels
+    for (let d = 1; d <= depthLimit; d++) {
+      const group = depthGroups.get(d) || [];
+      if (group.length === 0) continue;
+
+      const radius = radiusStep * (d + 0.2);
+      const count = group.length;
+
+      group.forEach((node, i) => {
+        const angle = (2 * Math.PI * i) / count - Math.PI / 2; // start at top
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        positionedNodes.set(node.id, {
+          ...node,
+          x,
+          y
+        });
+      });
+    }
+
+    const positionedEdges = edges
+      .filter(e =>
+        positionedNodes.has(e.from) && positionedNodes.has(e.to)
+      )
+      .map(e => ({
+        ...e,
+        fromNode: positionedNodes.get(e.from),
+        toNode: positionedNodes.get(e.to)
+      }));
+
+    return { positionedNodes, positionedEdges, centerX, centerY, radiusStep, depthLimit };
+  }
+
+  // --- Rendering ------------------------------------------------------------
+
+  function renderTree(svg, layout, rootId) {
+    const {
+      positionedNodes,
+      positionedEdges,
+      centerX,
+      centerY,
+      radiusStep,
+      depthLimit
+    } = layout;
+
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const width = svg.clientWidth || svg.parentElement.clientWidth;
+    const height = svg.clientHeight || svg.parentElement.clientHeight;
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    const bgDefs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const radialGrad = document.createElementNS(svg.namespaceURI, "radialGradient");
+    radialGrad.setAttribute("id", "radialGlow");
+    radialGrad.setAttribute("cx", "50%");
+    radialGrad.setAttribute("cy", "50%");
+    radialGrad.setAttribute("r", "60%");
+    radialGrad.innerHTML = `
+      <stop offset="0%" stop-color="#ffffff22"/>
+      <stop offset="50%" stop-color="#9b5cff11"/>
+      <stop offset="100%" stop-color="#00000000"/>
+    `;
+    bgDefs.appendChild(radialGrad);
+    svg.appendChild(bgDefs);
+
+    const glowCircle = document.createElementNS(svg.namespaceURI, "circle");
+    glowCircle.setAttribute("cx", centerX);
+    glowCircle.setAttribute("cy", centerY);
+    glowCircle.setAttribute("r", radiusStep * (depthLimit + 0.6));
+    glowCircle.setAttribute("fill", "url(#radialGlow)");
+    svg.appendChild(glowCircle);
+
+    // depth rings
+    for (let d = 1; d <= depthLimit; d++) {
+      const ring = document.createElementNS(svg.namespaceURI, "circle");
+      ring.setAttribute("cx", centerX);
+      ring.setAttribute("cy", centerY);
+      ring.setAttribute("r", radiusStep * (d + 0.2));
+      ring.setAttribute("class", "node-ring");
+      svg.appendChild(ring);
+    }
+
+    const edgesGroup = document.createElementNS(svg.namespaceURI, "g");
+    edgesGroup.setAttribute("stroke-linecap", "round");
+    svg.appendChild(edgesGroup);
+
+    const nodesGroup = document.createElementNS(svg.namespaceURI, "g");
+    svg.appendChild(nodesGroup);
+
+    for (const edge of positionedEdges) {
+      const line = document.createElementNS(svg.namespaceURI, "line");
+      line.setAttribute("x1", edge.fromNode.x);
+      line.setAttribute("y1", edge.fromNode.y);
+      line.setAttribute("x2", edge.toNode.x);
+      line.setAttribute("y2", edge.toNode.y);
+      line.setAttribute("class", "edge");
+      edgesGroup.appendChild(line);
+    }
+
+    const allNodes = Array.from(positionedNodes.values());
+    const tooltip = document.getElementById("tooltip");
+    const detailsEl = document.getElementById("node-details");
+
+    function showTooltip(evt, node) {
+      tooltip.textContent = node.name;
+      tooltip.style.left = evt.clientX + "px";
+      tooltip.style.top = evt.clientY + "px";
+      tooltip.style.opacity = "1";
+    }
+
+    function hideTooltip() {
+      tooltip.style.opacity = "0";
+    }
+
+    function showNodeDetails(node) {
+      const typeDisplay = node.type || "(no type)";
+      detailsEl.innerHTML = `
+        <div class="muted">Selected writing</div>
+        <h3>${node.name || "(unnamed writing)"}</h3>
+        <div class="muted">Type: ${typeDisplay}</div>
+        <div class="muted">Depth: ${node.depth}</div>
+        <p>${node.description ? node.description : "<span class='muted'>(no description)</span>"}</p>
+        <button data-id="${node.id}">Open this writing</button>
+      `;
+      const btn = detailsEl.querySelector("button");
+      btn.addEventListener("click", () => {
+        window.open(`/writing.html?writing_id=${node.id}`, "_blank");
+      });
+    }
+
+    for (const node of allNodes) {
+      const g = document.createElementNS(svg.namespaceURI, "g");
+      g.setAttribute("class", "node" + (node.id === rootId ? " root" : ""));
+      g.setAttribute("data-id", node.id);
+      g.setAttribute("transform", `translate(${node.x}, ${node.y})`);
+
+      const circle = document.createElementNS(svg.namespaceURI, "circle");
+      circle.setAttribute("r", node.id === rootId ? 9 : 6);
+      circle.setAttribute("fill", colorForType(node.type, node.id === rootId));
+      circle.setAttribute("stroke", "#ffffff88");
+      circle.setAttribute("stroke-width", node.id === rootId ? 1.4 : 1);
+      g.appendChild(circle);
+
+      const typeDot = document.createElementNS(svg.namespaceURI, "circle");
+      typeDot.setAttribute("cx", node.id === rootId ? 0 : 0);
+      typeDot.setAttribute("cy", node.id === rootId ? -10 : -8);
+      typeDot.setAttribute("r", 1.8);
+      typeDot.setAttribute("fill", colorForType(node.type, node.id === rootId));
+      typeDot.setAttribute("class", "node-type-dot");
+      g.appendChild(typeDot);
+
+      const label = document.createElementNS(svg.namespaceURI, "text");
+      label.setAttribute("class", "node-label");
+      label.setAttribute("y", node.id === rootId ? 11 : 9);
+      label.textContent = shorten(node.name || "(unnamed)", 20);
+      g.appendChild(label);
+
+      g.addEventListener("mousemove", evt => showTooltip(evt, node));
+      g.addEventListener("mouseleave", hideTooltip);
+      g.addEventListener("click", () => {
+        showNodeDetails(node);
+      });
+
+      nodesGroup.appendChild(g);
+    }
+  }
+
+  // --- Stats & legend -------------------------------------------------------
+
+  function updateStats(nodes) {
+    const totalEl = document.getElementById("stat-total");
+    const depthEl = document.getElementById("stat-depth");
+    const typesEl = document.getElementById("stat-types");
+    const legendEl = document.getElementById("type-legend");
+
+    if (!nodes.length) {
+      totalEl.textContent = "0";
+      depthEl.textContent = "0";
+      typesEl.textContent = "0";
+      legendEl.innerHTML = "";
+      return;
+    }
+
+    totalEl.textContent = nodes.length.toString();
+    const maxDepth = Math.max(...nodes.map(n => n.depth || 0), 0);
+    depthEl.textContent = maxDepth.toString();
+
+    const typeSet = new Set(nodes.map(n => n.type || "(no type)"));
+    typesEl.textContent = typeSet.size.toString();
+
+    legendEl.innerHTML = "";
+    for (const type of typeSet) {
+      const pill = document.createElement("div");
+      pill.className = "type-pill";
+      const swatch = document.createElement("span");
+      swatch.className = "type-swatch";
+      swatch.style.backgroundColor = colorForType(type === "(no type)" ? "" : type, false);
+      const label = document.createElement("span");
+      label.textContent = type;
+      pill.appendChild(swatch);
+      pill.appendChild(label);
+      legendEl.appendChild(pill);
+    }
+  }
+
+  // --- Main init -----------------------------------------------------------
+
+  (async function init() {
+    const params = getQueryParams();
+    const rootId = params.root_id ? Number(params.root_id) : NaN;
+
+    if (!rootId || Number.isNaN(rootId)) {
+      document.getElementById("root-title").textContent =
+        "No root_id provided (?root_id=123)";
+      return;
+    }
+
+    const svg = document.getElementById("tree-svg");
+    const depthInput = document.getElementById("depth-input");
+    const zoomInput = document.getElementById("zoom-input");
+    const rootTitleEl = document.getElementById("root-title");
+    const toWritingBtn = document.getElementById("to-writing-btn");
+
+    toWritingBtn.addEventListener("click", () => {
+      window.open(`/writing.html?writing_id=${rootId}`, "_blank");
+    });
+
+    let treeData;
+    try {
+      const writings = await fetchAllWritings();
+      treeData = buildTree(rootId, writings);
+    } catch (err) {
+      console.error(err);
+      rootTitleEl.textContent = "Error loading tree";
+      return;
+    }
+
+    const rootNode = treeData.nodes.find(n => n.id === rootId);
+    rootTitleEl.textContent = rootNode ? rootNode.name : `Writing #${rootId}`;
+    updateStats(treeData.nodes);
+
+    function draw() {
+      const rect = svg.getBoundingClientRect();
+      const maxDepthToDraw = Number(depthInput.value) || 6;
+      const layout = computeLayout(
+        treeData.nodes,
+        treeData.edges,
+        maxDepthToDraw,
+        rect.width || 800,
+        rect.height || 600
+      );
+      renderTree(svg, layout, rootId);
+
+      const zoomPct = Number(zoomInput.value) || 100;
+      const scale = zoomPct / 100;
+      svg.style.transformOrigin = "50% 50%";
+      svg.style.transform = `scale(${scale})`;
+    }
+
+    depthInput.addEventListener("change", draw);
+    zoomInput.addEventListener("input", draw);
+    window.addEventListener("resize", () => {
+      draw();
+    });
+
+    // first draw
+    draw();
+  })();
+</script>
+
+</body>
+</html>
