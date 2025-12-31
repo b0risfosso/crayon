@@ -404,7 +404,7 @@
     </section>
 
     <!-- NEW: erase button -->
-    <div id="erase-container"></div>
+    <div id="erase-container">
       <button id="erase-writing" type="button" style="margin: 0.5rem 0; background: #c00; color: #fff;">
         Erase writing (and children)
       </button>
@@ -585,6 +585,7 @@
         const container = document.createElement('div');
         container.className = 'note';
 
+        const typeText = note.type ? `Type: ${note.type}` : 'Type: (none)';
         const { name, description } = splitNoteContent(note.content);
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
