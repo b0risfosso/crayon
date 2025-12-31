@@ -41,18 +41,29 @@ class Idea(BaseModel):
 class IdeaSet(BaseModel):
     ideas: list[Idea]
 
+class GeneratedChild(BaseModel):
+    title: str
+    text: str
+
 @dataclass
 class Task:
     id: int
+    kind: str  # "lang" (existing) or "prompt_child" (new)
     text_a: str
     text_b: str
     parent_writing_id: int | None
     status: str
     created_at: str
+    # New fields for prompt-child tasks
+    prompt_id: int | None = None
+    prompt_text: str | None = None
+    output_type: str | None = None
+    # Existing bookkeeping
     started_at: str | None = None
     finished_at: str | None = None
     error: str | None = None
     run_id: int | None = None
+
 
 def _get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -79,13 +90,15 @@ def _next_id() -> int:
 
 def _enqueue_task(text_a: str, text_b: str, parent_writing_id: int | None) -> int:
     task_id = _next_id()
+    created_at = _now_iso()
     task = Task(
         id=task_id,
+        kind="lang",
         text_a=text_a,
         text_b=text_b,
         parent_writing_id=parent_writing_id,
         status="queued",
-        created_at=_now_iso(),
+        created_at=created_at,
     )
     with task_lock:
         tasks[task_id] = task
@@ -93,7 +106,42 @@ def _enqueue_task(text_a: str, text_b: str, parent_writing_id: int | None) -> in
     return task_id
 
 
+def _enqueue_prompt_task(
+    *,
+    writing_id: int,
+    prompt_id: int | None,
+    prompt_text: str,
+    output_type: str | None,
+) -> int:
+    task_id = _next_id()
+    created_at = _now_iso()
+    task = Task(
+        id=task_id,
+        kind="prompt_child",
+        text_a="",   # not used directly
+        text_b="",   # not used directly
+        parent_writing_id=writing_id,
+        status="queued",
+        created_at=created_at,
+        prompt_id=prompt_id,
+        prompt_text=prompt_text,
+        output_type=output_type,
+    )
+    with task_lock:
+        tasks[task_id] = task
+    task_queue.put(task_id)
+    return task_id
+
+
+
 def _run_task(task: Task) -> None:
+    if task.kind == "prompt_child":
+        _run_prompt_child_task(task)
+    else:
+        _run_lang_task(task)
+
+
+def _run_lang_task(task: Task) -> None:
     text_input = INSTRUCTION_TEMPLATE.format(
         text_a=task.text_a,
         text_b=task.text_b,
@@ -104,10 +152,7 @@ def _run_task(task: Task) -> None:
         model=model_name,
         input=[
             {"role": "system", "content": "You are an expert idea generator."},
-            {
-                "role": "user",
-                "content": text_input,
-            },
+            {"role": "user", "content": text_input},
         ],
         text_format=IdeaSet,
     )
@@ -118,7 +163,7 @@ def _run_task(task: Task) -> None:
     conn = _get_db()
     cur = conn.cursor()
 
-    # 1) Create a run row first, with empty/placeholder response
+    # 1) Insert run row (prompt_id left NULL)
     cur.execute(
         """
         INSERT INTO runs (instruction, text_a, text_b, parent_writing_id, prompt, response)
@@ -128,10 +173,9 @@ def _run_task(task: Task) -> None:
     )
     run_id = cur.lastrowid
 
-    # 2) For each idea, create a writing and attach writing_id
+    # 2) Create writings for each idea (this is what you already have)
     enriched_ideas: list[dict] = []
     for idea in idea_set.ideas:
-        # Insert into writings table
         cur.execute(
             """
             INSERT INTO writings (
@@ -154,27 +198,183 @@ def _run_task(task: Task) -> None:
                 task.text_b,
                 task.parent_writing_id,
                 "",
-                "words",   # <<< NEW
+                "words",
             ),
         )
-        writing_id = cur.lastrowid
-
+        writing_id = int(cur.lastrowid)
         idea_dict = idea.model_dump()
         idea_dict["writing_id"] = writing_id
         enriched_ideas.append(idea_dict)
 
-    # 3) Store enriched response JSON (with writing_id per idea)
-    enriched_response = {"ideas": enriched_ideas}
-    output_json = json.dumps(enriched_response, ensure_ascii=True)
-
+    # 3) Store response JSON
     cur.execute(
         """
         UPDATE runs
         SET response = ?
         WHERE id = ?
         """,
-        (output_json, run_id),
+        (json.dumps({"ideas": enriched_ideas}), run_id),
     )
+    conn.commit()
+    conn.close()
+
+    task.run_id = run_id
+
+def _first_line(text: str | None) -> str:
+    if not text:
+        return ""
+    return (text.splitlines()[0] or "").strip()
+
+
+def _run_prompt_child_task(task: Task) -> None:
+    if task.parent_writing_id is None:
+        raise ValueError("prompt_child task requires parent_writing_id (writing_id)")
+
+    prompt_text = (task.prompt_text or "").strip()
+    if not prompt_text:
+        raise ValueError("prompt_text is required for prompt_child task")
+
+    conn = _get_db()
+    cur = conn.cursor()
+
+    # 1) Load the input writing
+    parent = conn.execute(
+        """
+        SELECT id, name, description, parent_text_a, parent_text_b
+        FROM writings
+        WHERE id = ?
+        """,
+        (task.parent_writing_id,),
+    ).fetchone()
+    if not parent:
+        conn.close()
+        raise ValueError(f"Writing {task.parent_writing_id} not found")
+
+    writing_id = int(parent["id"])
+    writing_name = parent["name"] or "(untitled)"
+    writing_desc = parent["description"] or ""
+    parent_text_a = parent["parent_text_a"] or ""
+    parent_text_b = parent["parent_text_b"] or ""
+
+    title_a = _first_line(parent_text_a)
+    title_b = _first_line(parent_text_b)
+
+    # 2) Build the final prompt to the LLM
+    context_parts: list[str] = []
+    if title_a:
+        context_parts.append(f"Parent Text A title: {title_a}")
+    if title_b:
+        context_parts.append(f"Parent Text B title: {title_b}")
+    context_parts.append(f"Writing name: {writing_name}")
+    if writing_desc:
+        context_parts.append(f"Writing description:\n{writing_desc}")
+
+    context_block = "\n\n".join(context_parts)
+    final_prompt = prompt_text.strip()
+    if context_block:
+        final_prompt = f"{final_prompt.strip()}\n\n---\n\n{context_block}"
+
+    model_name = "gpt-5-mini-2025-08-07"
+    response = client.responses.parse(
+        model=model_name,
+        input=[
+            {"role": "system", "content": "You are a helpful writing assistant."},
+            {"role": "user", "content": final_prompt},
+        ],
+        text_format=GeneratedChild,
+    )
+
+    output: GeneratedChild = response.output_parsed
+    _record_usage(model_name, response)
+
+    # 3) Insert a run row with prompt_id
+    cur.execute(
+        """
+        INSERT INTO runs (
+            instruction,
+            text_a,
+            text_b,
+            parent_writing_id,
+            prompt,
+            response,
+            prompt_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "prompt_child",       # instruction label
+            context_block,        # text_a = context we fed in
+            "",                   # text_b unused
+            writing_id,           # parent writing
+            final_prompt,         # full prompt text actually sent to LLM
+            None,                 # response will be filled below
+            task.prompt_id,       # NEW: link back to prompts.id
+        ),
+    )
+    run_id = int(cur.lastrowid)
+
+    # 4) Create the child writing
+    parent_text_a_for_child = f"{writing_name}\n\n{writing_desc}".strip()
+    child_type = (task.output_type or "").strip() or "words"
+
+    cur.execute(
+        """
+        INSERT INTO writings (
+            name,
+            description,
+            parent_run_id,
+            parent_text_a,
+            parent_text_b,
+            parent_writing_id,
+            notes,
+            type
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            output.title,
+            output.text,
+            run_id,
+            parent_text_a_for_child,  # parent text A = name + description of input writing
+            "",                       # parent text B = empty per your requirement
+            writing_id,               # parent writing id
+            "",
+            child_type,
+        ),
+    )
+    child_writing_id = int(cur.lastrowid)
+
+    # 5) Create a writing_note pointing at this child writing
+    note_content = f"{output.title}\n\n{output.text}".strip()
+    cur.execute(
+        """
+        INSERT INTO writing_notes (writing_id, content, child_writing_id)
+        VALUES (?, ?, ?)
+        """,
+        (writing_id, note_content, child_writing_id),
+    )
+    note_id = int(cur.lastrowid)  # not used further but useful to keep
+
+    # 6) Save the structured response into the run
+    cur.execute(
+        """
+        UPDATE runs
+        SET response = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(
+                {
+                    "title": output.title,
+                    "text": output.text,
+                    "child_writing_id": child_writing_id,
+                    "note_id": note_id,
+                }
+            ),
+            run_id,
+        ),
+    )
+
     conn.commit()
     conn.close()
 
@@ -891,6 +1091,82 @@ def erase_writing(writing_id: int):
 
     return jsonify({"deleted_ids": ids})
 
+
+@app.get("/api/prompts/input-types")
+def list_prompt_input_types():
+    conn = _get_db()
+    rows = conn.execute(
+        """
+        SELECT DISTINCT input_type
+        FROM prompts
+        WHERE input_type IS NOT NULL AND input_type <> ''
+        ORDER BY input_type
+        """
+    ).fetchall()
+    conn.close()
+    return jsonify([row["input_type"] for row in rows])
+
+
+@app.get("/api/prompts")
+def list_prompts():
+    input_type = (request.args.get("input_type") or "").strip() or None
+    conn = _get_db()
+    if input_type:
+        rows = conn.execute(
+            """
+            SELECT id, input_type, prompt_text, output_type
+            FROM prompts
+            WHERE input_type = ?
+            ORDER BY id
+            """,
+            (input_type,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, input_type, prompt_text, output_type
+            FROM prompts
+            ORDER BY id
+            """
+        ).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in rows])
+
+
+@app.post("/api/writings/<int:writing_id>/prompt-run")
+def run_prompt_for_writing(writing_id: int):
+    data = request.get_json(silent=True) or {}
+    prompt_id = data.get("prompt_id")
+    if prompt_id is not None:
+        try:
+            prompt_id = int(prompt_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "prompt_id must be an integer or null"}), 400
+
+    prompt_text = (data.get("prompt_text") or "").strip()
+    output_type = (data.get("output_type") or "").strip() or None
+
+    if not prompt_text:
+        return jsonify({"error": "prompt_text is required"}), 400
+
+    # Verify writing exists
+    conn = _get_db()
+    row = conn.execute(
+        "SELECT id FROM writings WHERE id = ?",
+        (writing_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "writing not found"}), 404
+
+    task_id = _enqueue_prompt_task(
+        writing_id=writing_id,
+        prompt_id=prompt_id,
+        prompt_text=prompt_text,
+        output_type=output_type,
+    )
+
+    return jsonify({"task_id": task_id, "status": "queued"}), 202
 
 
 

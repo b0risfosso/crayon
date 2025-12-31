@@ -260,9 +260,9 @@
 <body>
   <main>
     <nav>
-      <a href="/index.html">Home</a>
-      <a href="/lang.html">Runs</a>
-      <a href="/writings.html">Writings</a>
+      <a href="/index.html">home</a>
+      <a href="/write.html">write</a>
+      <a href="/lang.html">lang</a>
     </nav>
 
     <h1 id="idea-name">(untitled)</h1>
@@ -387,8 +387,38 @@
       <div id="writing-runs"></div>
     </section>
 
+        <section id="llm-child-section">
+      <h2>Generate child writing with LLM</h2>
+
+      <div class="section-card">
+        <div class="section-title">Prompt input type</div>
+        <select id="prompt-input-type"></select>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">Prompt</div>
+        <select id="prompt-select"></select>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">Prompt details</div>
+        <label for="prompt-text">Prompt text</label>
+        <textarea id="prompt-text" rows="4"></textarea>
+
+        <label for="prompt-output-type">Output type</label>
+        <input id="prompt-output-type" type="text" />
+        <div class="muted" style="margin-top: 0.25rem;">
+          You can edit the prompt text and output type for this run. The stored prompt remains unchanged.
+        </div>
+      </div>
+
+      <button type="button" id="run-prompt-task">Generate child writing</button>
+      <div id="prompt-status" class="muted"></div>
+    </section>
+
+
     <section>
-      <h2>Child writing</h2>
+      <h2>Child writings</h2>
       <label for="new-note-name">Add Child Writing Name</label>
       <input id="new-note-name" type="text" />
       <label for="new-note-desc">Add Child Writing Description</label>
@@ -448,6 +478,9 @@
     let currentName = ideaNameParam;
     let currentDesc = ideaDescParam;
 
+    let currentType = '';
+
+
     const eraseBtn = document.getElementById('erase-writing');
 
     const langWritingsList = document.getElementById('lang-writings-list');
@@ -455,6 +488,14 @@
     const textBTypeSelect = document.getElementById('textb-type-select');
     const addTypeListBtn = document.getElementById('add-type-list');
     const typeListsContainer = document.getElementById('type-lists-container');
+
+    const promptInputTypeSelect = document.getElementById('prompt-input-type');
+    const promptSelect = document.getElementById('prompt-select');
+    const promptTextEl = document.getElementById('prompt-text');
+    const promptOutputTypeEl = document.getElementById('prompt-output-type');
+    const runPromptBtn = document.getElementById('run-prompt-task');
+    const promptStatusEl = document.getElementById('prompt-status');
+
 
 
 
@@ -513,6 +554,9 @@
           writingId = data.id;
           currentName = data.name || currentName;
           currentDesc = data.description || currentDesc;
+          if (data.type) {
+          currentType = data.type;
+        }
           updateHeading();
           return;
         }
@@ -718,6 +762,91 @@
         console.error('Failed to load writing types', err);
       }
     }
+
+        async function loadPromptInputTypes(initialType) {
+      try {
+        const res = await fetch('/api/prompts/input-types');
+        if (!res.ok) throw new Error('Failed to load prompt input types');
+        const types = await res.json();
+
+        promptInputTypeSelect.textContent = '';
+        if (!types.length) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = '(no prompt types configured)';
+          promptInputTypeSelect.appendChild(opt);
+          promptSelect.textContent = '';
+          return;
+        }
+
+        types.forEach((t) => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          promptInputTypeSelect.appendChild(opt);
+        });
+
+        // Default to current writing type if present, else first option
+        const preferred = (initialType || '').trim();
+        if (preferred && types.includes(preferred)) {
+          promptInputTypeSelect.value = preferred;
+        }
+
+        await loadPromptsForCurrentInputType();
+      } catch (err) {
+        console.error('Failed to load prompt input types', err);
+        promptStatusEl.textContent = `Error loading prompt types: ${err.message}`;
+      }
+    }
+
+    async function loadPromptsForCurrentInputType() {
+      const inputType = (promptInputTypeSelect.value || '').trim();
+      promptSelect.textContent = '';
+      promptTextEl.value = '';
+      promptOutputTypeEl.value = '';
+
+      const url =
+        inputType
+          ? `/api/prompts?input_type=${encodeURIComponent(inputType)}`
+          : '/api/prompts';
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load prompts');
+        const prompts = await res.json();
+
+        if (!prompts.length) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = '(no prompts for this type)';
+          promptSelect.appendChild(opt);
+          return;
+        }
+
+        prompts.forEach((p) => {
+          const opt = document.createElement('option');
+          opt.value = String(p.id);
+          opt.textContent = p.prompt_text.split('\n')[0].slice(0, 60) || `(prompt #${p.id})`;
+          opt.dataset.promptText = p.prompt_text || '';
+          opt.dataset.outputType = p.output_type || '';
+          promptSelect.appendChild(opt);
+        });
+
+        // Apply first prompt by default
+        applySelectedPrompt();
+      } catch (err) {
+        console.error('Failed to load prompts', err);
+        promptStatusEl.textContent = `Error loading prompts: ${err.message}`;
+      }
+    }
+
+    function applySelectedPrompt() {
+      const selected = promptSelect.selectedOptions[0];
+      if (!selected) return;
+      promptTextEl.value = selected.dataset.promptText || '';
+      promptOutputTypeEl.value = selected.dataset.outputType || '';
+    }
+
 
     async function addTypeList(type) {
       if (!type) return;
@@ -1145,6 +1274,7 @@ addTypeListBtn.addEventListener('click', async () => {
         writingId = data.id;
         currentName = data.name || currentName;
         currentDesc = data.description || currentDesc;
+        currentType = data.type || '';  
         updateHeading();
         document.getElementById('meta').textContent = data.created_at
           ? `Created ${data.created_at}`
@@ -1158,19 +1288,66 @@ addTypeListBtn.addEventListener('click', async () => {
       }
     }
 
+        promptInputTypeSelect.addEventListener('change', () => {
+          loadPromptsForCurrentInputType();
+        });
+
+        promptSelect.addEventListener('change', () => {
+          applySelectedPrompt();
+        });
+
+            runPromptBtn.addEventListener('click', async () => {
+      if (!writingId) {
+        promptStatusEl.textContent = 'Writing is not ready yet.';
+        return;
+      }
+      const selected = promptSelect.selectedOptions[0] || null;
+      const promptIdValue = selected && selected.value ? Number.parseInt(selected.value, 10) : null;
+      const promptText = promptTextEl.value.trim();
+      const outputType = promptOutputTypeEl.value.trim();
+
+      if (!promptText) {
+        promptStatusEl.textContent = 'Prompt text is empty.';
+        return;
+      }
+
+      try {
+        promptStatusEl.textContent = 'Queuing LLM task...';
+
+        const res = await fetch(`/api/writings/${encodeURIComponent(writingId)}/prompt-run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt_id: Number.isFinite(promptIdValue) ? promptIdValue : null,
+            prompt_text: promptText,
+            output_type: outputType || null,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to queue prompt task');
+        }
+        const data = await res.json();
+        promptStatusEl.textContent =
+          `Queued task ${data.task_id}. Check /queue.html for status.`;
+      } catch (err) {
+        promptStatusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+
+
     async function init() {
       if (writingIdParam) {
         // New path: direct writing_id
         await loadWritingById(writingIdParam);
       } else {
-        // Old path: use run_id + name + text_a + text_b to find or create
+        // Old path...
         currentName = ideaNameParam;
         currentDesc = ideaDescParam;
         updateHeading();
         document.getElementById('meta').textContent = runId ? `Run ${runId}` : '';
         await ensureWriting();
-
-        // We know the parent texts from the URL in this path
         renderParentTexts(textA, textB);
       }
       await loadTypes();
@@ -1178,7 +1355,9 @@ addTypeListBtn.addEventListener('click', async () => {
       await loadLangWritings();
       await loadNotes();
       await loadRuns();
+      await loadPromptInputTypes(currentType);   // <--- add this
     }
+
 
 
     init();
