@@ -78,8 +78,7 @@
     }
 
     input[type="text"],
-    textarea,
-    select {
+    textarea {
       width: 100%;
       padding: 0.4rem 0.5rem;
       border-radius: 4px;
@@ -96,7 +95,7 @@
       font: inherit;
       border-radius: 4px;
       border: 1px solid #000;
-      padding: 0.4rem 0.8rem;
+      padding: 0.3rem 0.8rem;
       cursor: pointer;
       background: #000;
       color: #fff;
@@ -110,6 +109,22 @@
     button.secondary:hover {
       background: #000;
       color: #fff;
+    }
+
+    button.danger {
+      background: #fff;
+      color: #b00020;
+      border-color: #b00020;
+    }
+
+    button.danger:hover {
+      background: #b00020;
+      color: #fff;
+    }
+
+    button.small {
+      font-size: 0.8rem;
+      padding: 0.2rem 0.5rem;
     }
 
     button:disabled {
@@ -138,7 +153,7 @@
     }
 
     .list-item {
-      padding: 0.25rem 0;
+      padding: 0.45rem 0;
       border-bottom: 1px solid #eee;
     }
 
@@ -170,16 +185,49 @@
       font-size: 0.85rem;
       cursor: pointer;
       background: #fff;
-      color: #000;     /* ← force black text */
+      color: #000;
     }
 
     .type-chip:hover {
-      background: #000;
-      color: #fff;
+      background: #f5f5f5;
+      color: #000;
     }
 
-    .type-chip.active-target {
-      border-style: dashed;
+    .prompt-display-text {
+      font-size: 0.9rem;
+      margin-top: 0.15rem;
+      white-space: pre-wrap;
+    }
+
+    .prompt-edit {
+      margin-top: 0.4rem;
+      padding: 0.4rem;
+      border-radius: 4px;
+      border: 1px dashed #aaa;
+      background: #fafafa;
+    }
+
+    .prompt-edit label {
+      margin-top: 0.3rem;
+    }
+
+    .prompt-edit textarea {
+      min-height: 4rem;
+    }
+
+    .prompt-actions {
+      margin-top: 0.4rem;
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .prompt-display-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
     }
   </style>
 </head>
@@ -222,7 +270,7 @@
     <section>
       <h2>Prompts</h2>
 
-      <!-- NEW: existing writing types (from writings table, via /api/writing-types) -->
+      <!-- Writing types from writings table -->
       <div class="section-card">
         <div class="section-title">Existing writing types</div>
         <div class="muted">
@@ -379,30 +427,173 @@
         }
 
         data.forEach((p) => {
-          const div = document.createElement('div');
-          div.className = 'list-item';
-
-          const title = document.createElement('div');
-          title.className = 'list-title';
-          title.textContent = `[${p.input_type}] → ${p.output_type}`;
-          div.appendChild(title);
-
-          const text = document.createElement('div');
-          text.textContent = p.prompt_text;
-          text.style.fontSize = '0.9rem';
-          text.style.marginTop = '0.15rem';
-          div.appendChild(text);
-
-          const meta = document.createElement('div');
-          meta.className = 'list-meta';
-          meta.textContent = `#${p.id}`;
-          div.appendChild(meta);
-
-          promptsListEl.appendChild(div);
+          promptsListEl.appendChild(renderPromptItem(p));
         });
       } catch (err) {
         promptsListEl.textContent = `Error: ${err.message}`;
       }
+    }
+
+    function renderPromptItem(p) {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+
+      // Display mode
+      const display = document.createElement('div');
+      const header = document.createElement('div');
+      header.className = 'prompt-display-header';
+
+      const title = document.createElement('div');
+      title.className = 'list-title';
+      title.textContent = `[${p.input_type}] → ${p.output_type}`;
+      header.appendChild(title);
+
+      const buttons = document.createElement('div');
+      buttons.className = 'row';
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'small secondary';
+      editBtn.textContent = 'Edit';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'small danger';
+      deleteBtn.textContent = 'Delete';
+
+      buttons.appendChild(editBtn);
+      buttons.appendChild(deleteBtn);
+
+      header.appendChild(buttons);
+      display.appendChild(header);
+
+      const text = document.createElement('div');
+      text.className = 'prompt-display-text';
+      text.textContent = p.prompt_text;
+      display.appendChild(text);
+
+      const meta = document.createElement('div');
+      meta.className = 'list-meta';
+      meta.textContent = `#${p.id}`;
+      display.appendChild(meta);
+
+      // Edit mode
+      const edit = document.createElement('div');
+      edit.className = 'prompt-edit';
+      edit.style.display = 'none';
+
+      const inputLabel = document.createElement('label');
+      inputLabel.textContent = 'Input type';
+      const inputField = document.createElement('input');
+      inputField.type = 'text';
+      inputField.value = p.input_type;
+
+      const outputLabel = document.createElement('label');
+      outputLabel.textContent = 'Output type';
+      const outputField = document.createElement('input');
+      outputField.type = 'text';
+      outputField.value = p.output_type;
+
+      const promptLabel = document.createElement('label');
+      promptLabel.textContent = 'Prompt text';
+      const promptField = document.createElement('textarea');
+      promptField.value = p.prompt_text;
+
+      edit.appendChild(inputLabel);
+      edit.appendChild(inputField);
+      edit.appendChild(outputLabel);
+      edit.appendChild(outputField);
+      edit.appendChild(promptLabel);
+      edit.appendChild(promptField);
+
+      const editActions = document.createElement('div');
+      editActions.className = 'prompt-actions';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'small';
+      saveBtn.textContent = 'Save';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'small secondary';
+      cancelBtn.textContent = 'Cancel';
+
+      editActions.appendChild(saveBtn);
+      editActions.appendChild(cancelBtn);
+      edit.appendChild(editActions);
+
+      // Wire up actions
+      editBtn.addEventListener('click', () => {
+        inputField.value = p.input_type;
+        outputField.value = p.output_type;
+        promptField.value = p.prompt_text;
+        display.style.display = 'none';
+        edit.style.display = 'block';
+      });
+
+      cancelBtn.addEventListener('click', () => {
+        edit.style.display = 'none';
+        display.style.display = 'block';
+      });
+
+      saveBtn.addEventListener('click', async () => {
+        const newInput = inputField.value.trim();
+        const newOutput = outputField.value.trim();
+        const newPromptText = promptField.value.trim();
+
+        if (!newInput || !newOutput || !newPromptText) {
+          alert('Input type, output type, and prompt text are required.');
+          return;
+        }
+
+        try {
+          saveBtn.disabled = true;
+          const res = await fetch(`/api/prompts/${encodeURIComponent(p.id)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              input_type: newInput,
+              output_type: newOutput,
+              prompt_text: newPromptText,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to update prompt');
+          }
+          const updated = await res.json();
+          // Re-render list to reflect changes
+          await loadPrompts();
+        } catch (err) {
+          alert(`Error updating prompt: ${err.message}`);
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      deleteBtn.addEventListener('click', async () => {
+        if (!confirm(`Delete prompt #${p.id}?`)) return;
+        try {
+          deleteBtn.disabled = true;
+          const res = await fetch(`/api/prompts/${encodeURIComponent(p.id)}`, {
+            method: 'DELETE',
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to delete prompt');
+          }
+          await loadPrompts();
+        } catch (err) {
+          alert(`Error deleting prompt: ${err.message}`);
+        } finally {
+          deleteBtn.disabled = false;
+        }
+      });
+
+      div.appendChild(display);
+      div.appendChild(edit);
+      return div;
     }
 
     async function addPrompt() {
@@ -447,7 +638,7 @@
       }
     }
 
-    // NEW: load all distinct types from writings table via /api/writing-types
+    // Writing types from writings table via /api/writing-types
     async function loadWritingTypes() {
       typesListEl.textContent = 'Loading…';
       try {
@@ -497,7 +688,7 @@
     (async function init() {
       await loadCreations();
       await loadPrompts();
-      await loadWritingTypes(); // show all types from writings table
+      await loadWritingTypes();
     })();
   </script>
 </body>

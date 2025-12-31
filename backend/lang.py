@@ -1198,6 +1198,53 @@ def create_prompt():
     return jsonify(dict(row)), 201
 
 
+@app.put("/api/prompts/<int:prompt_id>")
+def update_prompt(prompt_id: int):
+    data = request.get_json(silent=True) or {}
+    input_type = (data.get("input_type") or "").strip()
+    prompt_text = (data.get("prompt_text") or "").strip()
+    output_type = (data.get("output_type") or "").strip()
+
+    if not input_type or not prompt_text or not output_type:
+        return jsonify({"error": "input_type, prompt_text, and output_type are required"}), 400
+
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE prompts
+        SET input_type = ?, prompt_text = ?, output_type = ?
+        WHERE id = ?
+        """,
+        (input_type, prompt_text, output_type, prompt_id),
+    )
+    if cur.rowcount == 0:
+        conn.close()
+        return jsonify({"error": "prompt not found"}), 404
+
+    row = conn.execute(
+        "SELECT id, input_type, prompt_text, output_type FROM prompts WHERE id = ?",
+        (prompt_id,),
+    ).fetchone()
+    conn.commit()
+    conn.close()
+    return jsonify(dict(row))
+
+
+@app.delete("/api/prompts/<int:prompt_id>")
+def delete_prompt(prompt_id: int):
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
+    if cur.rowcount == 0:
+        conn.close()
+        return jsonify({"error": "prompt not found"}), 404
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "deleted", "id": prompt_id})
+
+
+
 
 if __name__ == "__main__":
     _ensure_workers()
