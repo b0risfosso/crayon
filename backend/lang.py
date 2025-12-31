@@ -272,7 +272,7 @@ def _run_prompt_child_task(task: Task) -> None:
     context_block = "\n\n".join(context_parts)
     final_prompt = prompt_text.strip()
     if context_block:
-        final_prompt = f"{final_prompt.strip()}\n\n---\n\nINPUT:\n\n{context_block}"
+        final_prompt = f"{final_prompt.strip()}\n\n---\n\nTEXT:\n\n{context_block}"
 
     model_name = "gpt-5-mini-2025-08-07"
     response = client.responses.parse(
