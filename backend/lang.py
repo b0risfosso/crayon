@@ -262,23 +262,23 @@ def _run_prompt_child_task(task: Task) -> None:
     # 2) Build the final prompt to the LLM
     context_parts: list[str] = []
     if title_a:
-        context_parts.append(f"Parent Text A title: {title_a}")
+        context_parts.append(f"{title_a}")
     if title_b:
-        context_parts.append(f"Parent Text B title: {title_b}")
-    context_parts.append(f"Writing name: {writing_name}")
+        context_parts.append(f"{title_b}")
+    context_parts.append(f"{writing_name}")
     if writing_desc:
-        context_parts.append(f"Writing description:\n{writing_desc}")
+        context_parts.append(f"\n{writing_desc}")
 
     context_block = "\n\n".join(context_parts)
     final_prompt = prompt_text.strip()
     if context_block:
-        final_prompt = f"{final_prompt.strip()}\n\n---\n\n{context_block}"
+        final_prompt = f"{final_prompt.strip()}\n\n---\n\nINPUT:\n\n{context_block}"
 
     model_name = "gpt-5-mini-2025-08-07"
     response = client.responses.parse(
         model=model_name,
         input=[
-            {"role": "system", "content": "You are a helpful writing assistant."},
+            {"role": "system", "content": "You are a expert. Complete the task as requested."},
             {"role": "user", "content": final_prompt},
         ],
         text_format=GeneratedChild,
