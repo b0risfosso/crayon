@@ -616,6 +616,7 @@ def delete_writing(writing_id: int):
         return jsonify({"error": "not found"}), 404
     return jsonify({"deleted": writing_id})
 
+
 @app.get("/api/writings/<int:writing_id>/notes")
 def list_notes(writing_id: int):
     conn = _get_db()
@@ -628,11 +629,10 @@ def list_notes(writing_id: int):
             n.child_writing_id,
             n.created_at,
             n.updated_at,
-            n.type AS note_type,
             w.type AS child_type
         FROM writing_notes AS n
         LEFT JOIN writings AS w
-          ON n.child_writing_id = w.id
+          ON w.id = n.child_writing_id
         WHERE n.writing_id = ?
         ORDER BY n.id DESC
         """,
@@ -640,6 +640,7 @@ def list_notes(writing_id: int):
     ).fetchall()
     conn.close()
     return jsonify([dict(row) for row in rows])
+
 
 
 

@@ -585,12 +585,12 @@
         const container = document.createElement('div');
         container.className = 'note';
 
-        const typeText = note.type ? `Type: ${note.type}` : 'Type: (none)';
+        const typeText = note.child_type ? `Type: ${note.child_type}` : 'Type: (none)';
         const typeEl = document.createElement('div');
         typeEl.className = 'muted';
         typeEl.textContent = typeText;
         container.appendChild(typeEl);
-        
+
 
         const { name, description } = splitNoteContent(note.content);
         const nameInput = document.createElement('input');
