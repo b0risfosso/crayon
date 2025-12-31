@@ -929,11 +929,20 @@ addTypeListBtn.addEventListener('click', async () => {
 
     function renderRuns(runs) {
       runsEl.textContent = '';
-      if (!runs.length) {
+
+      const filtered = runs.filter(run => {
+        // Either we rely on prompt_id or instruction value
+        if (run.prompt_id) return false;
+        if (run.instruction === 'prompt_child') return false;
+        return true;
+      });
+
+      if (!filtered.length) {
         runsEl.textContent = 'No runs yet.';
         return;
       }
-      runs.forEach((run) => {
+
+      filtered.forEach((run) => {
         const runDetails = document.createElement('details');
         const summary = document.createElement('summary');
         summary.textContent = run.text_b || '(no text B)';
