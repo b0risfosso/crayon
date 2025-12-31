@@ -621,15 +621,26 @@ def list_notes(writing_id: int):
     conn = _get_db()
     rows = conn.execute(
         """
-        SELECT id, writing_id, content, child_writing_id, created_at, updated_at
-        FROM writing_notes
-        WHERE writing_id = ?
-        ORDER BY id DESC
+        SELECT
+            n.id,
+            n.writing_id,
+            n.content,
+            n.child_writing_id,
+            n.created_at,
+            n.updated_at,
+            n.type AS note_type,
+            w.type AS child_type
+        FROM writing_notes AS n
+        LEFT JOIN writings AS w
+          ON n.child_writing_id = w.id
+        WHERE n.writing_id = ?
+        ORDER BY n.id DESC
         """,
         (writing_id,),
     ).fetchall()
     conn.close()
     return jsonify([dict(row) for row in rows])
+
 
 
 @app.post("/api/writings/<int:writing_id>/notes")
