@@ -232,6 +232,27 @@
       flex-direction: column;
     }
   }
+
+  #erase-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+#erase-container button {
+  background: #b00000;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#erase-container button:hover {
+  background: #c00000;
+}
+
 </style>
 
 
@@ -247,6 +268,11 @@
     <h1 id="idea-name">(untitled)</h1>
     <div id="idea-desc" class="desc"></div>
     <div id="meta" class="muted"></div>
+
+    <div id="type-line" class="muted" style="margin-top: 0.25rem;"></div>
+
+    <div id="parent-text" class="muted" style="margin-top: 0.25rem; display: none;"></div>
+
 
 
         <section>
@@ -378,9 +404,11 @@
     </section>
 
     <!-- NEW: erase button -->
-    <button id="erase-writing" type="button" style="margin: 0.5rem 0; background: #c00; color: #fff;">
-      Erase writing (and children)
-    </button>
+    <div id="erase-container"></div>
+      <button id="erase-writing" type="button" style="margin: 0.5rem 0; background: #c00; color: #fff;">
+        Erase writing (and children)
+      </button>
+    </div>
   </main>
 
   <script>
@@ -412,6 +440,10 @@
     const randomCountEl = document.getElementById('random-count');
     const randomSelectBtn = document.getElementById('random-select');
 
+    const parentTextEl = document.getElementById('parent-text');
+    const typeLineEl = document.getElementById('type-line');
+
+
     let writingId = null;
     let currentName = ideaNameParam;
     let currentDesc = ideaDescParam;
@@ -439,6 +471,33 @@
       const description = lines.join('\n').trim();
       return { name, description };
     }
+    
+    function firstLine(text) {
+      const t = (text || '').trim();
+      if (!t) return '';
+      return t.split(/\r?\n/)[0];
+    }
+
+    function renderParentTexts(parentTextA, parentTextB) {
+      if (!parentTextEl) return;
+
+      const lineA = firstLine(parentTextA);
+      const lineB = firstLine(parentTextB);
+
+      if (!lineA && !lineB) {
+        parentTextEl.textContent = '';
+        parentTextEl.style.display = 'none';
+        return;
+      }
+
+      const parts = [];
+      if (lineA) parts.push(`A: ${lineA}`);
+      if (lineB) parts.push(`B: ${lineB}`);
+
+      parentTextEl.textContent = `Parent text — ${parts.join(' | ')}`;
+      parentTextEl.style.display = '';
+    }
+
 
     function updateHeading() {
       document.getElementById('idea-name').textContent = currentName || '(untitled)';
@@ -817,9 +876,13 @@ addTypeListBtn.addEventListener('click', async () => {
           checkbox.dataset.name = item.name || '';
           checkbox.dataset.description = item.description || '';
           const span = document.createElement('span');
-          span.textContent = item.name || '(untitled)';
+          const name = item.name || '(untitled)';
+          const type = item.type ? ` — ${item.type}` : '';
+          span.textContent = name + type;
+
           label.appendChild(checkbox);
           label.appendChild(span);
+
           creationsList.appendChild(label);
         });
       } catch (err) {
@@ -1079,6 +1142,10 @@ addTypeListBtn.addEventListener('click', async () => {
         document.getElementById('meta').textContent = data.created_at
           ? `Created ${data.created_at}`
           : '';
+
+        typeLineEl.textContent = data.type ? `Type: ${data.type}` : 'Type: (none)';
+        renderParentTexts(data.parent_text_a, data.parent_text_b);
+
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
       }
@@ -1095,14 +1162,17 @@ addTypeListBtn.addEventListener('click', async () => {
         updateHeading();
         document.getElementById('meta').textContent = runId ? `Run ${runId}` : '';
         await ensureWriting();
+
+        // We know the parent texts from the URL in this path
+        renderParentTexts(textA, textB);
       }
       await loadTypes();
       await loadCreations();
       await loadLangWritings();
       await loadNotes();
       await loadRuns();
-      
     }
+
 
     init();
   </script>
