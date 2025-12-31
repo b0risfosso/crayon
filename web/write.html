@@ -310,12 +310,6 @@
       </div>
 
 
-      <label>Add to creations</label>
-      <input id="new-creation-name" type="text" placeholder="Creation name" />
-      <textarea id="new-creation-desc" placeholder="Creation description"></textarea>
-      <button type="button" id="add-creation">Add</button>
-
-
       <div style="margin-top: 0.75rem;">
         <button type="submit" id="write-button" class="primary-wide">
           write
@@ -332,9 +326,6 @@
     const statusEl = document.getElementById('status');
     const resultEl = document.getElementById('result');
     const creationsList = document.getElementById('creations-list');
-    const newCreationNameEl = document.getElementById('new-creation-name');
-    const newCreationDescEl = document.getElementById('new-creation-desc');
-    const addCreationBtn = document.getElementById('add-creation');
     const deleteCreationBtn = document.getElementById('delete-creation');
     const randomCountEl = document.getElementById('random-count');
     const randomSelectBtn = document.getElementById('random-select');
@@ -627,27 +618,6 @@ selectedTyped.forEach((checkbox) => {
     }
 });
 
-    addCreationBtn.addEventListener('click', async () => {
-      const name = newCreationNameEl.value.trim();
-      const description = newCreationDescEl.value.trim();
-      if (!name && !description) return;
-      try {
-        const res = await fetch('/api/creations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, description }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to add creation');
-        }
-        newCreationNameEl.value = '';
-        newCreationDescEl.value = '';
-        await loadCreations();
-      } catch (err) {
-        statusEl.textContent = `Error: ${err.message}`;
-      }
-    });
 
 
     deleteCreationBtn.addEventListener('click', async () => {

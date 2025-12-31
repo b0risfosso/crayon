@@ -348,29 +348,6 @@
           </div>
         </div>
 
-        <!-- Add to creations card -->
-        <div class="section-card">
-          <div class="section-title">Add to creations</div>
-          <label for="new-creation-name">Creation name</label>
-          <input
-            id="new-creation-name"
-            type="text"
-            placeholder="Creation name"
-          />
-
-          <label for="new-creation-desc" style="margin-top: 0.6rem;">Creation description</label>
-          <textarea
-            id="new-creation-desc"
-            placeholder="Creation description"
-          ></textarea>
-
-          <div class="row" style="margin-top: 0.5rem;">
-            <button type="button" id="add-creation" class="secondary">
-              Add creation
-            </button>
-          </div>
-        </div>
-
         <!-- Submit row -->
         <div class="row" style="margin-top: 0.75rem; justify-content: flex-end;">
           <button type="submit">Write</button>
@@ -463,9 +440,6 @@
     const writeResultEl = document.getElementById('write-result');
     const runsEl = document.getElementById('writing-runs');
     const creationsList = document.getElementById('creations-list');
-    const newCreationNameEl = document.getElementById('new-creation-name');
-    const newCreationDescEl = document.getElementById('new-creation-desc');
-    const addCreationBtn = document.getElementById('add-creation');
     const deleteCreationBtn = document.getElementById('delete-creation');
     const randomCountEl = document.getElementById('random-count');
     const randomSelectBtn = document.getElementById('random-select');
@@ -1189,29 +1163,6 @@ addTypeListBtn.addEventListener('click', async () => {
         } else {
           writeResultEl.textContent = '';
         }
-      } catch (err) {
-        writeStatusEl.textContent = `Error: ${err.message}`;
-      }
-    });
-
-    addCreationBtn.addEventListener('click', async () => {
-      if (!writingId) return;
-      const name = newCreationNameEl.value.trim();
-      const description = newCreationDescEl.value.trim();
-      if (!name && !description) return;
-      try {
-        const res = await fetch('/api/creations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, description, writing_id: writingId }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to add creation');
-        }
-        newCreationNameEl.value = '';
-        newCreationDescEl.value = '';
-        await loadCreations();
       } catch (err) {
         writeStatusEl.textContent = `Error: ${err.message}`;
       }

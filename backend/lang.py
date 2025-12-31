@@ -1169,6 +1169,35 @@ def run_prompt_for_writing(writing_id: int):
     return jsonify({"task_id": task_id, "status": "queued"}), 202
 
 
+@app.post("/api/prompts")
+def create_prompt():
+    data = request.get_json(silent=True) or {}
+    input_type = (data.get("input_type") or "").strip()
+    prompt_text = (data.get("prompt_text") or "").strip()
+    output_type = (data.get("output_type") or "").strip()
+
+    if not input_type or not prompt_text or not output_type:
+        return jsonify({"error": "input_type, prompt_text, and output_type are required"}), 400
+
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO prompts (input_type, prompt_text, output_type)
+        VALUES (?, ?, ?)
+        """,
+        (input_type, prompt_text, output_type),
+    )
+    prompt_id = cur.lastrowid
+    row = conn.execute(
+        "SELECT id, input_type, prompt_text, output_type FROM prompts WHERE id = ?",
+        (prompt_id,),
+    ).fetchone()
+    conn.commit()
+    conn.close()
+    return jsonify(dict(row)), 201
+
+
 
 if __name__ == "__main__":
     _ensure_workers()
