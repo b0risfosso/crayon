@@ -152,6 +152,34 @@
       color: var(--text-muted);
       margin-top: 0.15rem;
     }
+
+    /* Type chips list (for writing types) */
+    .types-list {
+      max-height: none;
+      border-top: none;
+      padding-top: 0.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .type-chip {
+      border: 1px solid #000;
+      border-radius: 999px;
+      padding: 0.15rem 0.6rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      background: #fff;
+    }
+
+    .type-chip:hover {
+      background: #000;
+      color: #fff;
+    }
+
+    .type-chip.active-target {
+      border-style: dashed;
+    }
   </style>
 </head>
 <body>
@@ -192,6 +220,17 @@
     <!-- Prompts -->
     <section>
       <h2>Prompts</h2>
+
+      <!-- NEW: existing writing types (from writings table, via /api/writing-types) -->
+      <div class="section-card">
+        <div class="section-title">Existing writing types</div>
+        <div class="muted">
+          These are all distinct <code>type</code> values in the <code>writings</code> table.
+          Click a type to fill the <strong>Input type</strong> or
+          <strong>Output type</strong> fields (whichever you last focused).
+        </div>
+        <div id="types-list" class="types-list"></div>
+      </div>
 
       <div class="section-card">
         <div class="section-title">Add prompt</div>
@@ -242,6 +281,19 @@
     const addPromptBtn = document.getElementById('add-prompt-btn');
     const promptStatusEl = document.getElementById('prompt-status');
     const promptsListEl = document.getElementById('prompts-list');
+
+    const typesListEl = document.getElementById('types-list');
+
+    // Track which field (input or output type) is the current target for type clicks
+    let lastTypeTarget = 'input'; // 'input' or 'output'
+
+    promptInputTypeEl.addEventListener('focus', () => {
+      lastTypeTarget = 'input';
+    });
+
+    promptOutputTypeEl.addEventListener('focus', () => {
+      lastTypeTarget = 'output';
+    });
 
     async function loadCreations() {
       creationsListEl.textContent = 'Loading…';
@@ -394,12 +446,57 @@
       }
     }
 
+    // NEW: load all distinct types from writings table via /api/writing-types
+    async function loadWritingTypes() {
+      typesListEl.textContent = 'Loading…';
+      try {
+        const res = await fetch('/api/writing-types');
+        if (!res.ok) throw new Error('Failed to load writing types');
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          typesListEl.textContent = 'No types data.';
+          return;
+        }
+
+        const types = data.filter((t) => t && typeof t === 'string');
+        typesListEl.textContent = '';
+
+        if (!types.length) {
+          const span = document.createElement('span');
+          span.className = 'muted';
+          span.textContent = 'No writing types yet.';
+          typesListEl.appendChild(span);
+          return;
+        }
+
+        types.forEach((type) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'type-chip';
+          chip.textContent = type;
+          chip.addEventListener('click', () => {
+            if (lastTypeTarget === 'output') {
+              promptOutputTypeEl.value = type;
+              promptOutputTypeEl.focus();
+            } else {
+              promptInputTypeEl.value = type;
+              promptInputTypeEl.focus();
+            }
+          });
+          typesListEl.appendChild(chip);
+        });
+      } catch (err) {
+        typesListEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
     addCreationBtn.addEventListener('click', addCreation);
     addPromptBtn.addEventListener('click', addPrompt);
 
     (async function init() {
       await loadCreations();
       await loadPrompts();
+      await loadWritingTypes(); // show all types from writings table
     })();
   </script>
 </body>
