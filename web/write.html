@@ -422,33 +422,63 @@
 
     async function loadTextBTypes() {
       try {
-        const res = await fetch('/api/writing-types');
-        if (!res.ok) throw new Error('Failed to load writing types');
+        const res = await fetch('/api/writing-types/stats');
+        if (!res.ok) throw new Error('Failed to load writing type stats');
         const data = await res.json();
         if (!Array.isArray(data)) return;
 
-        // We no longer require manual type selection here, but keep a placeholder
+        // We keep the hidden select for compatibility but don't really use it
         textBTypeSelect.textContent = '';
         const placeholder = document.createElement('option');
         placeholder.value = '';
         placeholder.textContent = 'Select type…';
         textBTypeSelect.appendChild(placeholder);
 
-        // All non-special types should be auto-added as hidden lists
+        // Clear any existing list
+        typeListsContainer.textContent = '';
+
+        // Build summary blocks for all non-special types
         const types = data.filter(
-          (type) => type && type !== 'creations' && type !== 'lang'
+          (item) =>
+            item &&
+            item.type &&
+            item.type !== 'creations' &&
+            item.type !== 'lang'
         );
 
-        await Promise.all(types.map((type) => addTypeList(type)));
+        types.forEach((item) => {
+          const type = item.type;
+          const count = item.count || 0;
 
-        updateAllTypeSummaries();
+          const wrapper = document.createElement('div');
+          wrapper.dataset.typeList = type;
+          wrapper.dataset.total = String(count);
+          wrapper.className = 'type-list-block';
+
+          const summary = document.createElement('div');
+          summary.className = 'type-summary';
+          summary.innerHTML = `
+            <strong>${type}</strong>:
+            <span class="type-total">${count}</span> writings,
+            <span class="type-selected">0</span> selected
+          `;
+          wrapper.appendChild(summary);
+
+          // Hidden container to hold ONLY selected writings as checkboxes
+          const selectedContainer = document.createElement('div');
+          selectedContainer.className = 'type-selected-container type-list-hidden';
+          wrapper.appendChild(selectedContainer);
+
+          typeListsContainer.appendChild(wrapper);
+        });
       } catch (err) {
         statusEl.textContent = `Error loading types: ${err.message}`;
       }
     }
 
 
-        async function addTypeList(type) {
+
+    async function addTypeList(type) {
       if (!type) return;
 
       // Prevent duplicate blocks for the same type
@@ -521,20 +551,42 @@
     function updateAllTypeSummaries() {
       const blocks = typeListsContainer.querySelectorAll('.type-list-block');
       blocks.forEach((block) => {
-        const list = block.querySelector('.list');
+        const selectedContainer =
+          block.querySelector('.type-selected-container') ||
+          block.querySelector('.list'); // fallback if needed
+
         const totalSpan = block.querySelector('.type-total');
         const selectedSpan = block.querySelector('.type-selected');
-        if (!list || !totalSpan || !selectedSpan) return;
+        if (!selectedSpan) return;
+
+        // total comes from the data attribute, not from checkbox count
+        if (totalSpan && block.dataset.total != null) {
+          totalSpan.textContent = block.dataset.total;
+        }
+
+        if (!selectedContainer) {
+          selectedSpan.textContent = '0';
+          return;
+        }
 
         const checkboxes = Array.from(
-          list.querySelectorAll('input[type="checkbox"]')
+          selectedContainer.querySelectorAll('input[type="checkbox"]')
         );
-        totalSpan.textContent = String(checkboxes.length);
+
         selectedSpan.textContent = String(
           checkboxes.filter((cb) => cb.checked).length
         );
       });
     }
+
+    // If anything in the hidden containers is toggled (future-proof),
+    // keep summaries in sync.
+    typeListsContainer.addEventListener('change', (event) => {
+      if (event.target && event.target.matches('input[type="checkbox"]')) {
+        updateAllTypeSummaries();
+      }
+    });
+
 
     // If anything in the hidden lists is manually toggled (future-proof),
     // keep summaries in sync.
@@ -692,88 +744,134 @@ selectedTyped.forEach((checkbox) => {
       }
     });
 
-    randomSelectBtn.addEventListener('click', () => {
+    randomSelectBtn.addEventListener('click', async () => {
       const count = Number.parseInt(randomCountEl.value, 10);
       if (!Number.isFinite(count) || count <= 0) {
         return;
       }
 
-      // Clear all existing selections
+      statusEl.textContent = 'Selecting random writings...';
+
+      // 1) Clear all existing selections
+      //    a) Creations + lang: just uncheck
       [
         ...creationsList.querySelectorAll('input[type="checkbox"]'),
         ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
-        ...typeListsContainer.querySelectorAll('input[type="checkbox"]'),
       ].forEach((cb) => {
         cb.checked = false;
       });
 
-      // Build groups: creations, lang, and each type list
-      const groups = [];
+      //    b) Other types: remove any previously created selected checkboxes
+      typeListsContainer
+        .querySelectorAll('.type-selected-container')
+        .forEach((container) => {
+          container.textContent = '';
+        });
 
-      const creationsCbs = [
-        ...creationsList.querySelectorAll('input[type="checkbox"]'),
-      ];
-      if (creationsCbs.length) {
-        groups.push({ name: 'creations', checkboxes: creationsCbs });
-      }
-
-      const langCbs = [
-        ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
-      ];
-      if (langCbs.length) {
-        groups.push({ name: 'lang', checkboxes: langCbs });
-      }
-
-      // Each type list is a .list inside a [data-type-list="TYPE"] wrapper
-            // Each type list is a .list inside a [data-type-list="TYPE"] wrapper.
-      // We want: one group for the largest type, one group for all other types combined.
-      const typeWrappers = [
-        ...typeListsContainer.querySelectorAll('[data-type-list]')
-      ];
-
-      if (typeWrappers.length) {
-        // Build an array of { wrapper, cbs } for all types that have checkboxes
-        const typeGroups = typeWrappers
-          .map((wrapper) => {
-            const listEl = wrapper.querySelector('.list');
-            const cbs = listEl
-              ? [...listEl.querySelectorAll('input[type="checkbox"]')]
-              : [];
-            return { wrapper, cbs };
-          })
-          .filter((g) => g.cbs.length);
-
-        if (typeGroups.length) {
-          // Find the type with the most writings (this will be your "Type W")
-          let largest = typeGroups[0];
-          for (let i = 1; i < typeGroups.length; i += 1) {
-            if (typeGroups[i].cbs.length > largest.cbs.length) {
-              largest = typeGroups[i];
-            }
-          }
-
-          // Collect all other types' checkboxes into one combined group
-          const otherCbs = [];
-          typeGroups.forEach((g) => {
-            if (g === largest) return;
-            otherCbs.push(...g.cbs);
-          });
-
-          // Group for the largest type
-          groups.push({
-            name: largest.wrapper.dataset.typeList || 'largest-type',
-            checkboxes: [...largest.cbs],
-          });
-
-          // Group for all other (smaller) types combined
-          if (otherCbs.length) {
-            groups.push({
-              name: 'other-types',
-              checkboxes: otherCbs,
-            });
-          }
+      try {
+        // 2) Ask the backend for a balanced selection
+        const res = await fetch(
+          `/api/writings/random-balanced?total=${encodeURIComponent(count)}`
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Random selection failed');
         }
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          throw new Error('Unexpected response from random-balanced');
+        }
+
+        // 3) Mark the returned writings as selected in the UI
+        data.forEach((item) => {
+          const id = String(item.id);
+          const type = item.type || '';
+          const name = item.name || '';
+          const description = item.description || '';
+
+          if (type === 'creations') {
+            // Find the existing creations checkbox
+            const cb = creationsList.querySelector(
+              `input[type="checkbox"][value="${id}"]`
+            );
+            if (cb) {
+              cb.checked = true;
+              cb.dataset.name = name;
+              cb.dataset.description = description;
+            }
+            return;
+          }
+
+          if (type === 'lang') {
+            // Find the existing lang checkbox
+            const cb = langWritingsList.querySelector(
+              `input[type="checkbox"][value="${id}"]`
+            );
+            if (cb) {
+              cb.checked = true;
+              cb.dataset.name = name;
+              cb.dataset.description = description;
+            }
+            return;
+          }
+
+          // Other types: create hidden checkboxes in their own container
+          let block = typeListsContainer.querySelector(
+            `[data-type-list="${type}"]`
+          );
+
+          // If this type wasn't in the initial stats (rare), create a block
+          if (!block) {
+            block = document.createElement('div');
+            block.dataset.typeList = type;
+            block.dataset.total = '0';
+            block.className = 'type-list-block';
+
+            const summary = document.createElement('div');
+            summary.className = 'type-summary';
+            summary.innerHTML = `
+              <strong>${type}</strong>:
+              <span class="type-total">0</span> writings,
+              <span class="type-selected">0</span> selected
+            `;
+            block.appendChild(summary);
+
+            const selectedContainer = document.createElement('div');
+            selectedContainer.className =
+              'type-selected-container type-list-hidden';
+            block.appendChild(selectedContainer);
+
+            typeListsContainer.appendChild(block);
+          }
+
+          const selectedContainer =
+            block.querySelector('.type-selected-container');
+
+          if (!selectedContainer) return;
+
+          const label = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = id;
+          cb.checked = true; // pre-selected
+          cb.dataset.name = name;
+          cb.dataset.description = description;
+
+          const span = document.createElement('span');
+          span.textContent = name || '(untitled)';
+
+          label.appendChild(cb);
+          label.appendChild(span);
+          selectedContainer.appendChild(label);
+        });
+
+        updateAllTypeSummaries();
+        statusEl.textContent = '';
+      } catch (err) {
+        statusEl.textContent = `Error selecting random writings: ${err.message}`;
       }
+    });
+
 
 
       if (!groups.length) {

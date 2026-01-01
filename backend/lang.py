@@ -1539,6 +1539,207 @@ def run_gargantua_for_writing(writing_id: int):
 
     return jsonify({"task_id": task_id, "status": "queued"}), 202
 
+@app.get("/api/writing-types/stats")
+def list_writing_type_stats():
+    """
+    Return [{type: str, count: int}, ...] for all writing types.
+    """
+    conn = _get_db()
+    rows = conn.execute(
+        """
+        SELECT type, COUNT(*) AS count
+        FROM writings
+        WHERE type IS NOT NULL AND type <> ''
+        GROUP BY type
+        ORDER BY type
+        """
+    ).fetchall()
+    conn.close()
+    return jsonify([{"type": row["type"], "count": row["count"]} for row in rows])
+
+
+@app.get("/api/writings/random-balanced")
+def random_writings_balanced():
+    """
+    Return a balanced random selection of writings across groups:
+    - creations
+    - lang
+    - largest other type (Type W)
+    - all remaining types combined
+
+    Query params:
+      total: int (required) – total number of writings to return
+    """
+    total = request.args.get("total", type=int)
+    if total is None or total <= 0:
+        return jsonify({"error": "total must be a positive integer"}), 400
+
+    conn = _get_db()
+    conn.row_factory = sqlite3.Row
+
+    # Get counts per type
+    rows = conn.execute(
+        """
+        SELECT type, COUNT(*) AS count
+        FROM writings
+        WHERE type IS NOT NULL AND type <> ''
+        GROUP BY type
+        """
+    ).fetchall()
+
+    counts_by_type = {row["type"]: row["count"] for row in rows}
+
+    def get_count(t: str) -> int:
+        return counts_by_type.get(t, 0)
+
+    groups: list[dict] = []
+
+    # Group 1: creations
+    creations_count = get_count("creations")
+    if creations_count > 0:
+        groups.append(
+            {
+                "name": "creations",
+                "types": ["creations"],
+                "count": creations_count,
+                "quota": 0,
+            }
+        )
+
+    # Group 2: lang
+    lang_count = get_count("lang")
+    if lang_count > 0:
+        groups.append(
+            {
+                "name": "lang",
+                "types": ["lang"],
+                "count": lang_count,
+                "quota": 0,
+            }
+        )
+
+    # Other types
+    other_type_names = [
+        t for t in counts_by_type.keys() if t not in ("creations", "lang")
+    ]
+
+    largest_type: str | None = None
+    largest_count = 0
+    for t in other_type_names:
+        c = counts_by_type[t]
+        if c > largest_count:
+            largest_count = c
+            largest_type = t
+
+    # Group 3: largest other type (Type W)
+    if largest_type is not None and largest_count > 0:
+        groups.append(
+            {
+                "name": largest_type,
+                "types": [largest_type],
+                "count": largest_count,
+                "quota": 0,
+            }
+        )
+
+    # Group 4: all remaining small types combined (X + Y + Z ...)
+    small_types = [t for t in other_type_names if t != largest_type]
+    if small_types:
+        small_total = sum(counts_by_type[t] for t in small_types)
+        if small_total > 0:
+            groups.append(
+                {
+                    "name": "other-types",
+                    "types": small_types,
+                    "count": small_total,
+                    "quota": 0,
+                }
+            )
+
+    if not groups:
+        conn.close()
+        return jsonify([])
+
+    # Cap total by total available
+    total_available = sum(g["count"] for g in groups)
+    if total > total_available:
+        total = total_available
+
+    if total <= 0:
+        conn.close()
+        return jsonify([])
+
+    # Initial fair quotas by group
+    num_groups = len(groups)
+    base = total // num_groups
+    remainder = total % num_groups
+
+    for i, g in enumerate(groups):
+        desired = base + (1 if i < remainder else 0)
+        g["quota"] = min(g["count"], desired)
+
+    assigned = sum(g["quota"] for g in groups)
+    need = total - assigned
+
+    # Re-distribute remaining quota to groups that still have capacity
+    while need > 0:
+        made_progress = False
+        for g in groups:
+            if need <= 0:
+                break
+            capacity = g["count"] - g["quota"]
+            if capacity > 0:
+                g["quota"] += 1
+                need -= 1
+                made_progress = True
+        if not made_progress:
+            break  # no more capacity anywhere
+
+    # Now actually sample from the DB
+    selected_rows: list[dict] = []
+    for g in groups:
+        q = g["quota"]
+        if q <= 0:
+            continue
+        types = g["types"]
+        if len(types) == 1:
+            type_ = types[0]
+            rows = conn.execute(
+                """
+                SELECT id, name, description, type
+                FROM writings
+                WHERE type = ?
+                ORDER BY RANDOM()
+                LIMIT ?
+                """,
+                (type_, q),
+            ).fetchall()
+        else:
+            placeholders = ",".join("?" for _ in types)
+            params = list(types) + [q]
+            rows = conn.execute(
+                f"""
+                SELECT id, name, description, type
+                FROM writings
+                WHERE type IN ({placeholders})
+                ORDER BY RANDOM()
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+
+        for row in rows:
+            selected_rows.append(
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "description": row["description"],
+                    "type": row["type"],
+                }
+            )
+
+    conn.close()
+    return jsonify(selected_rows)
 
 
 if __name__ == "__main__":
