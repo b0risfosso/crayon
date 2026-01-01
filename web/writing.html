@@ -1239,33 +1239,92 @@
     });
 
     randomSelectBtn.addEventListener('click', () => {
-      const checkboxes = [
-        ...creationsList.querySelectorAll('input[type="checkbox"]'),
-        ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
-        ...typeListsContainer.querySelectorAll('input[type="checkbox"]'),
-      ];
       const count = Number.parseInt(randomCountEl.value, 10);
-      if (!checkboxes.length || !Number.isFinite(count) || count <= 0) {
+      if (!Number.isFinite(count) || count <= 0) {
         return;
       }
 
-      checkboxes.forEach((checkbox) => {
-        checkbox.checked = false;
+      // Clear all existing selections
+      [
+        ...creationsList.querySelectorAll('input[type="checkbox"]'),
+        ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
+        ...typeListsContainer.querySelectorAll('input[type="checkbox"]'),
+      ].forEach((cb) => {
+        cb.checked = false;
       });
 
-      const picks = Math.min(count, checkboxes.length);
-      const pool = [...checkboxes];
-      for (let i = pool.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
+      // Build groups: creations, lang, and each type list
+      const groups = [];
+
+      const creationsCbs = [
+        ...creationsList.querySelectorAll('input[type="checkbox"]'),
+      ];
+      if (creationsCbs.length) {
+        groups.push({ name: 'creations', checkboxes: creationsCbs });
       }
 
-      pool.slice(0, picks).forEach((checkbox) => {
-        checkbox.checked = true;
+      const langCbs = [
+        ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
+      ];
+      if (langCbs.length) {
+        groups.push({ name: 'lang', checkboxes: langCbs });
+      }
+
+      // Each type list is a .list inside a [data-type-list="TYPE"] wrapper
+      typeListsContainer.querySelectorAll('[data-type-list]').forEach((wrapper) => {
+        const listEl = wrapper.querySelector('.list');
+        if (!listEl) return;
+        const cbs = [...listEl.querySelectorAll('input[type="checkbox"]')];
+        if (!cbs.length) return;
+        const typeName = wrapper.dataset.typeList || 'other';
+        groups.push({ name: typeName, checkboxes: cbs });
       });
 
-      updateAllTypeSummaries();
+      if (!groups.length) {
+        return;
+      }
+
+      // Total available across all groups
+      let totalAvailable = groups.reduce(
+        (sum, g) => sum + g.checkboxes.length,
+        0
+      );
+      let remaining = Math.min(count, totalAvailable);
+
+      // Fisher–Yates shuffle for each group
+      const shuffle = (arr) => {
+        for (let i = arr.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      };
+      groups.forEach((g) => shuffle(g.checkboxes));
+
+      // Round-robin selection across groups
+      let idx = 0;
+      while (remaining > 0 && groups.length > 0) {
+        const group = groups[idx];
+        const cb = group.checkboxes.pop();
+        if (cb) {
+          cb.checked = true;
+          remaining -= 1;
+          totalAvailable -= 1;
+        }
+
+        // If this group is exhausted, remove it
+        if (!group.checkboxes.length) {
+          groups.splice(idx, 1);
+          if (!groups.length) break;
+          idx %= groups.length;
+        } else {
+          idx = (idx + 1) % groups.length;
+        }
+      }
+
+      // If you have a summary updater, call it here:
+      // updateAllTypeSummaries();
     });
+
 
 
     async function loadWritingById(id) {
