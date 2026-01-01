@@ -448,13 +448,6 @@
     const addTypeListBtn = document.getElementById('add-type-list');
     const typeListsContainer = document.getElementById('type-lists-container');
 
-    const promptInputTypeSelect = document.getElementById('prompt-input-type');
-    const promptSelect = document.getElementById('prompt-select');
-    const promptTextEl = document.getElementById('prompt-text');
-    const promptOutputTypeEl = document.getElementById('prompt-output-type');
-    const runPromptBtn = document.getElementById('run-prompt-task');
-    const promptStatusEl = document.getElementById('prompt-status');
-
     const gargantuaSelect = document.getElementById('gargantua-select');
     const gargantuaMetaEl = document.getElementById('gargantua-meta');
     const gargantuaStatusEl = document.getElementById('gargantua-status');
@@ -1248,45 +1241,6 @@ addTypeListBtn.addEventListener('click', async () => {
         statusEl.textContent = `Error: ${err.message}`;
       }
     }
-
-      runPromptBtn.addEventListener('click', async () => {
-      if (!writingId) {
-        promptStatusEl.textContent = 'Writing is not ready yet.';
-        return;
-      }
-      const selected = promptSelect.selectedOptions[0] || null;
-      const promptIdValue = selected && selected.value ? Number.parseInt(selected.value, 10) : null;
-      const promptText = promptTextEl.value.trim();
-      const outputType = promptOutputTypeEl.value.trim();
-
-      if (!promptText) {
-        promptStatusEl.textContent = 'Prompt text is empty.';
-        return;
-      }
-
-      try {
-        promptStatusEl.textContent = 'Queuing LLM task...';
-
-        const res = await fetch(`/api/writings/${encodeURIComponent(writingId)}/prompt-run`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt_id: Number.isFinite(promptIdValue) ? promptIdValue : null,
-            prompt_text: promptText,
-            output_type: outputType || null,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to queue prompt task');
-        }
-        const data = await res.json();
-        promptStatusEl.textContent =
-          `Queued task ${data.task_id}. Check /queue.html for status.`;
-      } catch (err) {
-        promptStatusEl.textContent = `Error: ${err.message}`;
-      }
-    });
 
 
 
