@@ -253,6 +253,25 @@
   background: #c00000;
 }
 
+  .type-list-block {
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .type-summary {
+    padding: 0.25rem 0;
+  }
+
+  .type-summary strong {
+    font-weight: 600;
+  }
+
+  /* Hide per-writing rows for other types */
+  .type-list-hidden {
+    display: none;
+  }
+
+
 </style>
 
 
@@ -715,14 +734,14 @@
       }
     }
 
-    async function loadTypes() {
+        async function loadTypes() {
       try {
         const res = await fetch('/api/writing-types');
         if (!res.ok) throw new Error('Failed to load types');
         const data = await res.json();
         if (!Array.isArray(data)) return;
 
-        // Fill noteTypeSelect
+        // Still fill noteTypeSelect as before
         noteTypeSelect.textContent = '';
         const placeholder = document.createElement('option');
         placeholder.value = '';
@@ -737,45 +756,52 @@
           noteTypeSelect.appendChild(opt);
         });
 
-        // Fill Text B type select
+        // For Text B selection: instead of user adding types manually,
+        // auto-create hidden lists for all non-special types.
         textBTypeSelect.textContent = '';
         const tbPlaceholder = document.createElement('option');
         tbPlaceholder.value = '';
         tbPlaceholder.textContent = 'Select type…';
         textBTypeSelect.appendChild(tbPlaceholder);
 
-        data.forEach((type) => {
-          if (!type) return;
-          // Optional: skip types with dedicated lists
-          if (type === 'creations' || type === 'lang') return;
-          const opt = document.createElement('option');
-          opt.value = type;
-          opt.textContent = type;
-          textBTypeSelect.appendChild(opt);
-        });
+        const otherTypes = data.filter(
+          (type) => type && type !== 'creations' && type !== 'lang'
+        );
+
+        await Promise.all(otherTypes.map((type) => addTypeList(type)));
+
+        updateAllTypeSummaries();
       } catch (err) {
         console.error('Failed to load writing types', err);
       }
     }
 
 
-
     async function addTypeList(type) {
       if (!type) return;
 
-      const existing = typeListsContainer.querySelector(`[data-type-list="${type}"]`);
-      if (existing) return;
+      const existing = typeListsContainer.querySelector(
+        `[data-type-list="${type}"]`
+      );
+      if (existing) return existing;
 
       const wrapper = document.createElement('div');
       wrapper.dataset.typeList = type;
       wrapper.className = 'type-list-block';
 
-      const label = document.createElement('div');
-      label.textContent = `Text B from type: ${type}`;
-      wrapper.appendChild(label);
+      // Summary row (visible)
+      const summary = document.createElement('div');
+      summary.className = 'type-summary';
+      summary.innerHTML = `
+        <strong>${type}</strong>:
+        <span class="type-total">0</span> writings,
+        <span class="type-selected">0</span> selected
+      `;
+      wrapper.appendChild(summary);
 
+      // Hidden list of actual writings
       const list = document.createElement('div');
-      list.className = 'list';
+      list.className = 'list type-list-hidden';
       wrapper.appendChild(list);
 
       typeListsContainer.appendChild(wrapper);
@@ -786,9 +812,13 @@
         const data = await res.json();
 
         list.textContent = '';
+        const totalSpan = summary.querySelector('.type-total');
+        const selectedSpan = summary.querySelector('.type-selected');
+
         if (!data.length) {
-          list.textContent = `No writings with type "${type}".`;
-          return;
+          totalSpan.textContent = '0';
+          selectedSpan.textContent = '0';
+          return wrapper;
         }
 
         data.forEach((item) => {
@@ -805,19 +835,50 @@
           row.appendChild(span);
           list.appendChild(row);
         });
+
+        totalSpan.textContent = String(data.length);
+        selectedSpan.textContent = '0';
       } catch (err) {
         list.textContent = `Error: ${err.message}`;
       }
+
+      return wrapper;
     }
 
-addTypeListBtn.addEventListener('click', async () => {
-  const type = textBTypeSelect.value;
-  if (!type) {
-    writeStatusEl.textContent = 'Choose a type first.';
-    return;
-  }
-  await addTypeList(type);
-});
+
+    addTypeListBtn.addEventListener('click', async () => {
+      const type = textBTypeSelect.value;
+      if (!type) {
+        writeStatusEl.textContent = 'Choose a type first.';
+        return;
+      }
+      await addTypeList(type);
+    });
+
+    function updateAllTypeSummaries() {
+      const blocks = typeListsContainer.querySelectorAll('.type-list-block');
+      blocks.forEach((block) => {
+        const list = block.querySelector('.list');
+        const totalSpan = block.querySelector('.type-total');
+        const selectedSpan = block.querySelector('.type-selected');
+        if (!list || !totalSpan || !selectedSpan) return;
+
+        const checkboxes = Array.from(
+          list.querySelectorAll('input[type="checkbox"]')
+        );
+        totalSpan.textContent = String(checkboxes.length);
+        selectedSpan.textContent = String(
+          checkboxes.filter((cb) => cb.checked).length
+        );
+      });
+    }
+
+    typeListsContainer.addEventListener('change', (event) => {
+      if (event.target && event.target.matches('input[type="checkbox"]')) {
+        updateAllTypeSummaries();
+      }
+    });
+
 
 
 
@@ -1196,9 +1257,11 @@ addTypeListBtn.addEventListener('click', async () => {
     });
 
     randomSelectBtn.addEventListener('click', () => {
-      const checkboxes = Array.from(
-        creationsList.querySelectorAll('input[type="checkbox"]')
-      );
+      const checkboxes = [
+        ...creationsList.querySelectorAll('input[type="checkbox"]'),
+        ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
+        ...typeListsContainer.querySelectorAll('input[type="checkbox"]'),
+      ];
       const count = Number.parseInt(randomCountEl.value, 10);
       if (!checkboxes.length || !Number.isFinite(count) || count <= 0) {
         return;
@@ -1218,7 +1281,10 @@ addTypeListBtn.addEventListener('click', async () => {
       pool.slice(0, picks).forEach((checkbox) => {
         checkbox.checked = true;
       });
+
+      updateAllTypeSummaries();
     });
+
 
     async function loadWritingById(id) {
       try {

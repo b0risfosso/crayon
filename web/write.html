@@ -241,6 +241,25 @@
   font-weight: 700;
 }
 
+  .type-list-block {
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .type-summary {
+    padding: 0.25rem 0;
+  }
+
+  .type-summary strong {
+    font-weight: 600;
+  }
+
+  /* Hide per-writing rows for other types */
+  .type-list-hidden {
+    display: none;
+  }
+
+
 </style>
 
 
@@ -293,16 +312,6 @@
           <!-- Column 3: Other types -->
           <div class="textb-column">
             <div class="textb-column-title">From other types</div>
-            <small>Add and select Text B from any other writing type.</small>
-
-            <div class="row" style="margin-bottom: 0.35rem;">
-              <select id="textb-type-select">
-                <option value="">Select type…</option>
-              </select>
-              <button type="button" id="add-type-list" class="secondary">
-                Add
-              </button>
-            </div>
 
             <div id="type-lists-container"></div>
           </div>
@@ -334,7 +343,6 @@
 
     const langWritingsList = document.getElementById('lang-writings-list');
     const textBTypeSelect = document.getElementById('textb-type-select');
-    const addTypeListBtn = document.getElementById('add-type-list');
     const typeListsContainer = document.getElementById('type-lists-container');
 
 
@@ -417,45 +425,53 @@
         const data = await res.json();
         if (!Array.isArray(data)) return;
 
-        // Clear but keep the first placeholder option
+        // We no longer require manual type selection here, but keep a placeholder
         textBTypeSelect.textContent = '';
         const placeholder = document.createElement('option');
         placeholder.value = '';
         placeholder.textContent = 'Select type…';
         textBTypeSelect.appendChild(placeholder);
 
-        data.forEach((type) => {
-          if (!type) return;
-          // Optional: skip types that already have dedicated lists
-          if (type === 'creations' || type === 'lang') return;
+        // All non-special types should be auto-added as hidden lists
+        const types = data.filter(
+          (type) => type && type !== 'creations' && type !== 'lang'
+        );
 
-          const option = document.createElement('option');
-          option.value = type;
-          option.textContent = type;
-          textBTypeSelect.appendChild(option);
-        });
+        await Promise.all(types.map((type) => addTypeList(type)));
+
+        updateAllTypeSummaries();
       } catch (err) {
         statusEl.textContent = `Error loading types: ${err.message}`;
       }
     }
 
-    async function addTypeList(type) {
+
+        async function addTypeList(type) {
       if (!type) return;
 
-      // Prevent duplicate lists for the same type
-      const existing = typeListsContainer.querySelector(`[data-type-list="${type}"]`);
-      if (existing) return;
+      // Prevent duplicate blocks for the same type
+      const existing = typeListsContainer.querySelector(
+        `[data-type-list="${type}"]`
+      );
+      if (existing) return existing;
 
       const wrapper = document.createElement('div');
       wrapper.dataset.typeList = type;
       wrapper.className = 'type-list-block';
 
-      const label = document.createElement('div');
-      label.textContent = `Text B from type: ${type}`;
-      wrapper.appendChild(label);
+      // Summary row (visible)
+      const summary = document.createElement('div');
+      summary.className = 'type-summary';
+      summary.innerHTML = `
+        <strong>${type}</strong>:
+        <span class="type-total">0</span> writings,
+        <span class="type-selected">0</span> selected
+      `;
+      wrapper.appendChild(summary);
 
+      // Actual list of writings (hidden, still used for selection)
       const list = document.createElement('div');
-      list.className = 'list';
+      list.className = 'list type-list-hidden';
       wrapper.appendChild(list);
 
       typeListsContainer.appendChild(wrapper);
@@ -466,9 +482,14 @@
         const data = await res.json();
 
         list.textContent = '';
+
+        const totalSpan = summary.querySelector('.type-total');
+        const selectedSpan = summary.querySelector('.type-selected');
+
         if (!data.length) {
-          list.textContent = `No writings with type "${type}".`;
-          return;
+          totalSpan.textContent = '0';
+          selectedSpan.textContent = '0';
+          return wrapper;
         }
 
         data.forEach((item) => {
@@ -485,10 +506,42 @@
           row.appendChild(span);
           list.appendChild(row);
         });
+
+        totalSpan.textContent = String(data.length);
+        selectedSpan.textContent = '0';
       } catch (err) {
         list.textContent = `Error: ${err.message}`;
       }
+
+      return wrapper;
     }
+
+    function updateAllTypeSummaries() {
+      const blocks = typeListsContainer.querySelectorAll('.type-list-block');
+      blocks.forEach((block) => {
+        const list = block.querySelector('.list');
+        const totalSpan = block.querySelector('.type-total');
+        const selectedSpan = block.querySelector('.type-selected');
+        if (!list || !totalSpan || !selectedSpan) return;
+
+        const checkboxes = Array.from(
+          list.querySelectorAll('input[type="checkbox"]')
+        );
+        totalSpan.textContent = String(checkboxes.length);
+        selectedSpan.textContent = String(
+          checkboxes.filter((cb) => cb.checked).length
+        );
+      });
+    }
+
+    // If anything in the hidden lists is manually toggled (future-proof),
+    // keep summaries in sync.
+    typeListsContainer.addEventListener('change', (event) => {
+      if (event.target && event.target.matches('input[type="checkbox"]')) {
+        updateAllTypeSummaries();
+      }
+    });
+
 
 
 
@@ -641,6 +694,7 @@ selectedTyped.forEach((checkbox) => {
       const checkboxes = [
         ...creationsList.querySelectorAll('input[type="checkbox"]'),
         ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
+        ...typeListsContainer.querySelectorAll('input[type="checkbox"]'),
       ];
       const count = Number.parseInt(randomCountEl.value, 10);
       if (!checkboxes.length || !Number.isFinite(count) || count <= 0) {
@@ -661,15 +715,8 @@ selectedTyped.forEach((checkbox) => {
       pool.slice(0, picks).forEach((checkbox) => {
         checkbox.checked = true;
       });
-    });
 
-    addTypeListBtn.addEventListener('click', async () => {
-      const type = textBTypeSelect.value;
-      if (!type) {
-        statusEl.textContent = 'Choose a type first.';
-        return;
-      }
-      await addTypeList(type);
+      updateAllTypeSummaries();
     });
 
 
