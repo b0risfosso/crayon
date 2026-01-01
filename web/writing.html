@@ -364,34 +364,19 @@
       <div id="writing-runs"></div>
     </section>
 
-        <section id="llm-child-section">
-      <h2>Generate child writing with LLM</h2>
+    <section id="llm-child-section">
+      <h2>Generate child writing (gargantua)</h2>
 
       <div class="section-card">
-        <div class="section-title">Prompt input type</div>
-        <select id="prompt-input-type"></select>
+        <div class="section-title">gargantua entry</div>
+        <select id="gargantua-select"></select>
+        <div id="gargantua-meta" class="muted" style="margin-top: 0.25rem;"></div>
       </div>
 
-      <div class="section-card">
-        <div class="section-title">Prompt</div>
-        <select id="prompt-select"></select>
-      </div>
-
-      <div class="section-card">
-        <div class="section-title">Prompt details</div>
-        <label for="prompt-text">Prompt text</label>
-        <textarea id="prompt-text" rows="4"></textarea>
-
-        <label for="prompt-output-type">Output type</label>
-        <input id="prompt-output-type" type="text" />
-        <div class="muted" style="margin-top: 0.25rem;">
-          You can edit the prompt text and output type for this run. The stored prompt remains unchanged.
-        </div>
-      </div>
-
-      <button type="button" id="run-prompt-task">Generate child writing</button>
-      <div id="prompt-status" class="muted"></div>
+      <button type="button" id="run-gargantua-task">Generate child writing</button>
+      <div id="gargantua-status" class="muted"></div>
     </section>
+
 
 
     <section>
@@ -469,6 +454,12 @@
     const promptOutputTypeEl = document.getElementById('prompt-output-type');
     const runPromptBtn = document.getElementById('run-prompt-task');
     const promptStatusEl = document.getElementById('prompt-status');
+
+    const gargantuaSelect = document.getElementById('gargantua-select');
+    const gargantuaMetaEl = document.getElementById('gargantua-meta');
+    const gargantuaStatusEl = document.getElementById('gargantua-status');
+    const runGargantuaBtn = document.getElementById('run-gargantua-task');
+
 
 
 
@@ -561,6 +552,43 @@
         statusEl.textContent = `Error: ${err.message}`;
       }
     }
+
+    async function loadGargantuaEntries() {
+      if (!gargantuaSelect) return;
+
+      gargantuaSelect.innerHTML = '';
+      gargantuaMetaEl.textContent = 'Loading…';
+
+      try {
+        const res = await fetch('/api/gargantua');
+        if (!res.ok) throw new Error('Failed to load gargantua entries');
+        const data = await res.json();
+
+        gargantuaSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select gargantua entry…';
+        gargantuaSelect.appendChild(placeholder);
+
+        if (!data.length) {
+          gargantuaMetaEl.textContent = 'No gargantua entries yet.';
+          return;
+        }
+
+        data.forEach((g) => {
+          const opt = document.createElement('option');
+          opt.value = String(g.id);
+          opt.textContent = g.name || `(id ${g.id})`;
+          opt.dataset.type = g.type || '';
+          gargantuaSelect.appendChild(opt);
+        });
+
+        gargantuaMetaEl.textContent = 'Pick an entry; its type will be used for the child writing.';
+      } catch (err) {
+        gargantuaMetaEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
 
     async function loadLangWritings() {
       try {
@@ -737,89 +765,6 @@
       }
     }
 
-        async function loadPromptInputTypes(initialType) {
-      try {
-        const res = await fetch('/api/prompts/input-types');
-        if (!res.ok) throw new Error('Failed to load prompt input types');
-        const types = await res.json();
-
-        promptInputTypeSelect.textContent = '';
-        if (!types.length) {
-          const opt = document.createElement('option');
-          opt.value = '';
-          opt.textContent = '(no prompt types configured)';
-          promptInputTypeSelect.appendChild(opt);
-          promptSelect.textContent = '';
-          return;
-        }
-
-        types.forEach((t) => {
-          const opt = document.createElement('option');
-          opt.value = t;
-          opt.textContent = t;
-          promptInputTypeSelect.appendChild(opt);
-        });
-
-        // Default to current writing type if present, else first option
-        const preferred = (initialType || '').trim();
-        if (preferred && types.includes(preferred)) {
-          promptInputTypeSelect.value = preferred;
-        }
-
-        await loadPromptsForCurrentInputType();
-      } catch (err) {
-        console.error('Failed to load prompt input types', err);
-        promptStatusEl.textContent = `Error loading prompt types: ${err.message}`;
-      }
-    }
-
-    async function loadPromptsForCurrentInputType() {
-      const inputType = (promptInputTypeSelect.value || '').trim();
-      promptSelect.textContent = '';
-      promptTextEl.value = '';
-      promptOutputTypeEl.value = '';
-
-      const url =
-        inputType
-          ? `/api/prompts?input_type=${encodeURIComponent(inputType)}`
-          : '/api/prompts';
-
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to load prompts');
-        const prompts = await res.json();
-
-        if (!prompts.length) {
-          const opt = document.createElement('option');
-          opt.value = '';
-          opt.textContent = '(no prompts for this type)';
-          promptSelect.appendChild(opt);
-          return;
-        }
-
-        prompts.forEach((p) => {
-          const opt = document.createElement('option');
-          opt.value = String(p.id);
-          opt.textContent = p.prompt_text.split('\n')[0].slice(0, 60) || `(prompt #${p.id})`;
-          opt.dataset.promptText = p.prompt_text || '';
-          opt.dataset.outputType = p.output_type || '';
-          promptSelect.appendChild(opt);
-        });
-
-        // Apply first prompt by default
-        applySelectedPrompt();
-      } catch (err) {
-        console.error('Failed to load prompts', err);
-        promptStatusEl.textContent = `Error loading prompts: ${err.message}`;
-      }
-    }
-
-    function applySelectedPrompt() {
-      const selected = promptSelect.selectedOptions[0];
-      if (!selected) return;
-      promptTextEl.value = selected.dataset.promptText || '';
-      promptOutputTypeEl.value = selected.dataset.outputType || '';
-    }
 
 
     async function addTypeList(type) {
@@ -1008,6 +953,62 @@ addTypeListBtn.addEventListener('click', async () => {
         writeStatusEl.textContent = `Error: ${err.message}`;
       }
     }
+
+    if (gargantuaSelect) {
+      gargantuaSelect.addEventListener('change', () => {
+        const selected = gargantuaSelect.selectedOptions[0];
+        if (!selected || !selected.value) {
+          gargantuaMetaEl.textContent = '';
+          return;
+        }
+        const type = selected.dataset.type || '';
+        gargantuaMetaEl.textContent = type
+          ? `Child writing type: ${type}`
+          : 'Child writing type: (none)';
+      });
+    }
+
+    if (runGargantuaBtn) {
+      runGargantuaBtn.addEventListener('click', async () => {
+        if (!writingId) {
+          gargantuaStatusEl.textContent = 'Writing is not ready yet.';
+          return;
+        }
+
+        const selected = gargantuaSelect && gargantuaSelect.selectedOptions[0];
+        const gargantuaIdValue = selected && selected.value
+          ? Number.parseInt(selected.value, 10)
+          : NaN;
+
+        if (!Number.isFinite(gargantuaIdValue)) {
+          gargantuaStatusEl.textContent = 'Select a gargantua entry first.';
+          return;
+        }
+
+        try {
+          gargantuaStatusEl.textContent = 'Queuing LLM task…';
+
+          const res = await fetch(`/api/writings/${encodeURIComponent(writingId)}/gargantua-run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gargantua_id: gargantuaIdValue }),
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to queue gargantua task');
+          }
+
+          const data = await res.json();
+          gargantuaStatusEl.textContent =
+            `Queued task ${data.task_id}. Check /queue.html for status.`;
+        } catch (err) {
+          gargantuaStatusEl.textContent = `Error: ${err.message}`;
+        }
+      });
+    }
+
+
 
     eraseBtn.addEventListener('click', async () => {
           if (!writingId) {
@@ -1248,15 +1249,7 @@ addTypeListBtn.addEventListener('click', async () => {
       }
     }
 
-        promptInputTypeSelect.addEventListener('change', () => {
-          loadPromptsForCurrentInputType();
-        });
-
-        promptSelect.addEventListener('change', () => {
-          applySelectedPrompt();
-        });
-
-            runPromptBtn.addEventListener('click', async () => {
+      runPromptBtn.addEventListener('click', async () => {
       if (!writingId) {
         promptStatusEl.textContent = 'Writing is not ready yet.';
         return;
@@ -1315,7 +1308,7 @@ addTypeListBtn.addEventListener('click', async () => {
       await loadLangWritings();
       await loadNotes();
       await loadRuns();
-      await loadPromptInputTypes(currentType);   // <--- add this
+      await loadGargantuaEntries(); 
     }
 
 

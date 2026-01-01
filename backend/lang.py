@@ -33,6 +33,13 @@ Draft a few ideas for the how the idea, system, or world in Text A can be built 
 Text B: {text_b}
 """
 
+GARGANTUA_PROMPT_TEMPLATE = """
+If we treat {gargantua} as the system/platform/entity that creates, operates, enacts, and interacts with things: What can go into and/or interact with {gargantua} (inputs), and what can come out and be used from {gargantua} (outputs) to support the creation, operation, enactment, and interaction with the following? What operations can be performed in/on {gargantua} to support the creation, operation, enactment, and interaction with the following?
+
+{text_input}
+""".strip()
+
+
 class Idea(BaseModel):
     name: str
     desciription: str
@@ -48,21 +55,24 @@ class GeneratedChild(BaseModel):
 @dataclass
 class Task:
     id: int
-    kind: str  # "lang" (existing) or "prompt_child" (new)
+    kind: str  # "lang", "prompt_child", "gargantua_child"
     text_a: str
     text_b: str
     parent_writing_id: int | None
     status: str
     created_at: str
-    # New fields for prompt-child tasks
+    # prompt-child fields
     prompt_id: int | None = None
     prompt_text: str | None = None
     output_type: str | None = None
-    # Existing bookkeeping
+    # NEW: gargantua
+    gargantua_id: int | None = None
+    # bookkeeping
     started_at: str | None = None
     finished_at: str | None = None
     error: str | None = None
     run_id: int | None = None
+
 
 
 def _get_db() -> sqlite3.Connection:
@@ -132,11 +142,34 @@ def _enqueue_prompt_task(
     task_queue.put(task_id)
     return task_id
 
+def _enqueue_gargantua_task(
+    *,
+    writing_id: int,
+    gargantua_id: int,
+) -> int:
+    task_id = _next_id()
+    created_at = _now_iso()
+    task = Task(
+        id=task_id,
+        kind="gargantua_child",
+        text_a="",
+        text_b="",
+        parent_writing_id=writing_id,
+        status="queued",
+        created_at=created_at,
+        gargantua_id=gargantua_id,
+    )
+    with task_lock:
+        tasks[task_id] = task
+    task_queue.put(task_id)
+    return task_id
 
 
 def _run_task(task: Task) -> None:
     if task.kind == "prompt_child":
         _run_prompt_child_task(task)
+    elif task.kind == "gargantua_child":
+        _run_gargantua_child_task(task)
     else:
         _run_lang_task(task)
 
@@ -369,6 +402,182 @@ def _run_prompt_child_task(task: Task) -> None:
                     "text": output.text,
                     "child_writing_id": child_writing_id,
                     "note_id": note_id,
+                }
+            ),
+            run_id,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+    task.run_id = run_id
+
+
+def _run_gargantua_child_task(task: Task) -> None:
+    if task.parent_writing_id is None:
+        raise ValueError("gargantua_child task requires parent_writing_id (writing_id)")
+    if task.gargantua_id is None:
+        raise ValueError("gargantua_child task requires gargantua_id")
+
+    conn = _get_db()
+    cur = conn.cursor()
+
+    # 1) Load the input writing (same as prompt_child)
+    parent = conn.execute(
+        """
+        SELECT id, name, description, parent_text_a, parent_text_b
+        FROM writings
+        WHERE id = ?
+        """,
+        (task.parent_writing_id,),
+    ).fetchone()
+    if not parent:
+        conn.close()
+        raise ValueError(f"Writing {task.parent_writing_id} not found")
+
+    writing_id = int(parent["id"])
+    writing_name = parent["name"] or "(untitled)"
+    writing_desc = parent["description"] or ""
+    parent_text_a = parent["parent_text_a"] or ""
+    parent_text_b = parent["parent_text_b"] or ""
+
+    title_a = _first_line(parent_text_a)
+    title_b = _first_line(parent_text_b)
+
+    # Build context_block exactly like before
+    context_parts: list[str] = []
+    if title_a:
+        context_parts.append(f"{title_a}")
+    if title_b:
+        context_parts.append(f"{title_b}")
+    context_parts.append(f"{writing_name}")
+    if writing_desc:
+        context_parts.append(f"\n{writing_desc}")
+
+    context_block = "\n\n".join(context_parts)
+
+    # 2) Load gargantua row
+    garg = conn.execute(
+        """
+        SELECT id, name, text, type
+        FROM gargantua
+        WHERE id = ?
+        """,
+        (task.gargantua_id,),
+    ).fetchone()
+    if not garg:
+        conn.close()
+        raise ValueError(f"gargantua {task.gargantua_id} not found")
+
+    garg_text = garg["text"] or ""
+    garg_type = (garg["type"] or "").strip() or "words"
+
+    # 3) Build final prompt using your template
+    final_prompt = GARGANTUA_PROMPT_TEMPLATE.format(
+        gargantua=garg_text,
+        text_input=context_block,
+    )
+
+    model_name = "gpt-5-mini-2025-08-07"
+    response = client.responses.parse(
+        model=model_name,
+        input=[
+            {
+                "role": "system",
+                "content": "You are an expert. Complete the task as requested.",
+            },
+            {"role": "user", "content": final_prompt},
+        ],
+        text_format=GeneratedChild,
+    )
+
+    output: GeneratedChild = response.output_parsed
+    _record_usage(model_name, response)
+
+    # 4) Insert run row (recording context and gargantua text)
+    cur.execute(
+        """
+        INSERT INTO runs (
+            instruction,
+            text_a,
+            text_b,
+            parent_writing_id,
+            prompt,
+            response,
+            prompt_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "gargantua_child",   # instruction
+            context_block,       # text_a = context
+            garg_text,           # text_b = gargantua definition
+            writing_id,
+            final_prompt,        # full prompt sent to LLM
+            None,                # response JSON filled below
+            None,                # no prompt_id (not from prompts table)
+        ),
+    )
+    run_id = int(cur.lastrowid)
+
+    # 5) Create the child writing; type from gargantua.type
+    parent_text_a_for_child = f"{writing_name}\n\n{writing_desc}".strip()
+    child_type = garg_type
+
+    cur.execute(
+        """
+        INSERT INTO writings (
+            name,
+            description,
+            parent_run_id,
+            parent_text_a,
+            parent_text_b,
+            parent_writing_id,
+            notes,
+            type
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            output.title,
+            output.text,
+            run_id,
+            parent_text_a_for_child,
+            "",             # parent_text_b empty as before
+            writing_id,
+            "",
+            child_type,     # <-- from gargantua.type
+        ),
+    )
+    child_writing_id = int(cur.lastrowid)
+
+    # 6) writing_note pointing at this child
+    note_content = f"{output.title}\n\n{output.text}".strip()
+    cur.execute(
+        """
+        INSERT INTO writing_notes (writing_id, content, child_writing_id)
+        VALUES (?, ?, ?)
+        """,
+        (writing_id, note_content, child_writing_id),
+    )
+    note_id = int(cur.lastrowid)
+
+    # 7) Save structured response JSON into run
+    cur.execute(
+        """
+        UPDATE runs
+        SET response = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(
+                {
+                    "title": output.title,
+                    "text": output.text,
+                    "child_writing_id": child_writing_id,
+                    "note_id": note_id,
+                    "gargantua_id": task.gargantua_id,
                 }
             ),
             run_id,
@@ -1243,6 +1452,92 @@ def delete_prompt(prompt_id: int):
     conn.close()
     return jsonify({"status": "deleted", "id": prompt_id})
 
+
+@app.get("/api/gargantua")
+def list_gargantua():
+    conn = _get_db()
+    rows = conn.execute(
+        """
+        SELECT id, name, text, type, created_at, updated_at
+        FROM gargantua
+        ORDER BY id DESC
+        """
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in rows])
+
+
+@app.post("/api/gargantua")
+def create_gargantua():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    text = (data.get("text") or "").strip()
+    type_ = (data.get("type") or "").strip()
+
+    if not name or not text or not type_:
+        return jsonify({"error": "name, text, and type are required"}), 400
+
+    conn = _get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO gargantua (name, text, type)
+        VALUES (?, ?, ?)
+        """,
+        (name, text, type_),
+    )
+    gargantua_id = cur.lastrowid
+    row = conn.execute(
+        """
+        SELECT id, name, text, type, created_at, updated_at
+        FROM gargantua
+        WHERE id = ?
+        """,
+        (gargantua_id,),
+    ).fetchone()
+    conn.commit()
+    conn.close()
+    return jsonify(dict(row)), 201
+
+
+@app.post("/api/writings/<int:writing_id>/gargantua-run")
+def run_gargantua_for_writing(writing_id: int):
+    data = request.get_json(silent=True) or {}
+    gargantua_id = data.get("gargantua_id")
+
+    try:
+        gargantua_id = int(gargantua_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "gargantua_id must be an integer"}), 400
+
+    conn = _get_db()
+
+    # verify writing exists
+    row = conn.execute(
+        "SELECT id FROM writings WHERE id = ?",
+        (writing_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "writing not found"}), 404
+
+    # optional: verify gargantua exists now (errors faster)
+    g_row = conn.execute(
+        "SELECT id FROM gargantua WHERE id = ?",
+        (gargantua_id,),
+    ).fetchone()
+    if not g_row:
+        conn.close()
+        return jsonify({"error": "gargantua entry not found"}), 404
+
+    conn.close()
+
+    task_id = _enqueue_gargantua_task(
+        writing_id=writing_id,
+        gargantua_id=gargantua_id,
+    )
+
+    return jsonify({"task_id": task_id, "status": "queued"}), 202
 
 
 
