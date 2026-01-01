@@ -725,14 +725,56 @@ selectedTyped.forEach((checkbox) => {
       }
 
       // Each type list is a .list inside a [data-type-list="TYPE"] wrapper
-      typeListsContainer.querySelectorAll('[data-type-list]').forEach((wrapper) => {
-        const listEl = wrapper.querySelector('.list');
-        if (!listEl) return;
-        const cbs = [...listEl.querySelectorAll('input[type="checkbox"]')];
-        if (!cbs.length) return;
-        const typeName = wrapper.dataset.typeList || 'other';
-        groups.push({ name: typeName, checkboxes: cbs });
-      });
+            // Each type list is a .list inside a [data-type-list="TYPE"] wrapper.
+      // We want: one group for the largest type, one group for all other types combined.
+      const typeWrappers = [
+        ...typeListsContainer.querySelectorAll('[data-type-list]')
+      ];
+
+      if (typeWrappers.length) {
+        // Build an array of { wrapper, cbs } for all types that have checkboxes
+        const typeGroups = typeWrappers
+          .map((wrapper) => {
+            const listEl = wrapper.querySelector('.list');
+            const cbs = listEl
+              ? [...listEl.querySelectorAll('input[type="checkbox"]')]
+              : [];
+            return { wrapper, cbs };
+          })
+          .filter((g) => g.cbs.length);
+
+        if (typeGroups.length) {
+          // Find the type with the most writings (this will be your "Type W")
+          let largest = typeGroups[0];
+          for (let i = 1; i < typeGroups.length; i += 1) {
+            if (typeGroups[i].cbs.length > largest.cbs.length) {
+              largest = typeGroups[i];
+            }
+          }
+
+          // Collect all other types' checkboxes into one combined group
+          const otherCbs = [];
+          typeGroups.forEach((g) => {
+            if (g === largest) return;
+            otherCbs.push(...g.cbs);
+          });
+
+          // Group for the largest type
+          groups.push({
+            name: largest.wrapper.dataset.typeList || 'largest-type',
+            checkboxes: [...largest.cbs],
+          });
+
+          // Group for all other (smaller) types combined
+          if (otherCbs.length) {
+            groups.push({
+              name: 'other-types',
+              checkboxes: otherCbs,
+            });
+          }
+        }
+      }
+
 
       if (!groups.length) {
         return;
