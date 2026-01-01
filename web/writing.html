@@ -972,7 +972,8 @@
       filtered.forEach((run) => {
         const runDetails = document.createElement('details');
         const summary = document.createElement('summary');
-        summary.textContent = run.text_b || '(no text B)';
+        const summaryText = firstLine(run.text_b);
+        summary.textContent = summaryText || '(no text B)';
         runDetails.appendChild(summary);
 
         const meta = document.createElement('div');
