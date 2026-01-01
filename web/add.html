@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Add | Creations & Prompts</title>
+  <title>Add | Creations & Gargantua</title>
   <style>
     :root {
       --border-color: #000;
@@ -240,7 +240,8 @@
       <a href="/add.html"><strong>Add</strong></a>
     </nav>
 
-    <h1>Add creations & prompts</h1>
+    <h1>Add creations & gargantua</h1>
+
 
     <!-- Creations -->
     <section>
@@ -267,54 +268,59 @@
     </section>
 
     <!-- Prompts -->
-    <section>
-      <h2>Prompts</h2>
+     <section>
+      <h2>Gargantua entries</h2>
 
       <!-- Writing types from writings table -->
       <div class="section-card">
         <div class="section-title">Existing writing types</div>
         <div class="muted">
           These are all distinct <code>type</code> values in the <code>writings</code> table.
-          Click a type to fill the <strong>Input type</strong> or
-          <strong>Output type</strong> fields (whichever you last focused).
+          Click a type to fill the <strong>Gargantua type</strong> field.
         </div>
         <div id="types-list" class="types-list"></div>
       </div>
 
       <div class="section-card">
-        <div class="section-title">Add prompt</div>
+        <div class="section-title">Add gargantua entry</div>
+        <div class="muted">
+          Each gargantua entry has a <strong>name</strong>, <strong>text</strong> (used as
+          <code>{gargantua}</code> in the prompt), and a <strong>type</strong>
+          (used as the <code>type</code> of generated child writings).
+        </div>
 
-        <label for="prompt-input-type">Input type</label>
+        <label for="gargantua-name">Name</label>
         <input
-          id="prompt-input-type"
+          id="gargantua-name"
           type="text"
-          placeholder="e.g. lang, words, summary, outline"
+          placeholder="Short label for this gargantua entry..."
         />
 
-        <label for="prompt-output-type">Output type</label>
-        <input
-          id="prompt-output-type"
-          type="text"
-          placeholder="e.g. words, outline, summary"
-        />
-
-        <label for="prompt-text">Prompt text</label>
+        <label for="gargantua-text">Text</label>
         <textarea
-          id="prompt-text"
-          placeholder="Write the instruction that will be sent to the LLM..."
+          id="gargantua-text"
+          placeholder="Definition / description of the {gargantua} system..."
         ></textarea>
 
+        <label for="gargantua-type">Type</label>
+        <input
+          id="gargantua-type"
+          type="text"
+          placeholder="Type to assign to generated child writings (click a writing type above to fill)..."
+        />
+
         <div class="row" style="margin-top: 0.5rem;">
-          <button type="button" id="add-prompt-btn">Add prompt</button>
+          <button type="button" id="add-gargantua-btn">Add gargantua entry</button>
         </div>
-        <div id="prompt-status" class="muted" style="margin-top: 0.35rem;"></div>
+        <div id="gargantua-status" class="muted" style="margin-top: 0.35rem;"></div>
       </div>
 
       <div class="section-card">
-        <div class="section-title">Existing prompts</div>
-        <div id="prompts-list" class="list"></div>
+        <div class="section-title">Existing gargantua entries</div>
+        <div id="gargantua-list" class="list"></div>
       </div>
     </section>
+
   </main>
 
   <script>
@@ -324,26 +330,18 @@
     const creationStatusEl = document.getElementById('creation-status');
     const creationsListEl = document.getElementById('creations-list');
 
-    const promptInputTypeEl = document.getElementById('prompt-input-type');
-    const promptOutputTypeEl = document.getElementById('prompt-output-type');
-    const promptTextEl = document.getElementById('prompt-text');
-    const addPromptBtn = document.getElementById('add-prompt-btn');
-    const promptStatusEl = document.getElementById('prompt-status');
-    const promptsListEl = document.getElementById('prompts-list');
+    const gargantuaNameEl = document.getElementById('gargantua-name');
+    const gargantuaTextEl = document.getElementById('gargantua-text');
+    const gargantuaTypeEl = document.getElementById('gargantua-type');
+    const addGargantuaBtn = document.getElementById('add-gargantua-btn');
+    const gargantuaStatusEl = document.getElementById('gargantua-status');
+    const gargantuaListEl = document.getElementById('gargantua-list');
 
     const typesListEl = document.getElementById('types-list');
 
-    // Track which field (input or output type) is the current target for type clicks
-    let lastTypeTarget = 'input'; // 'input' or 'output'
-
-    promptInputTypeEl.addEventListener('focus', () => {
-      lastTypeTarget = 'input';
-    });
-
-    promptOutputTypeEl.addEventListener('focus', () => {
-      lastTypeTarget = 'output';
-    });
-
+    //
+    // Creations
+    //
     async function loadCreations() {
       creationsListEl.textContent = 'Loading…';
       try {
@@ -389,10 +387,12 @@
     async function addCreation() {
       const name = creationNameEl.value.trim();
       const description = creationDescEl.value.trim();
+
       if (!name && !description) {
         creationStatusEl.textContent = 'Enter a name or description first.';
         return;
       }
+
       creationStatusEl.textContent = 'Saving…';
       try {
         const res = await fetch('/api/creations', {
@@ -413,28 +413,31 @@
       }
     }
 
-    async function loadPrompts() {
-      promptsListEl.textContent = 'Loading…';
+    //
+    // Gargantua
+    //
+    async function loadGargantua() {
+      gargantuaListEl.textContent = 'Loading…';
       try {
-        const res = await fetch('/api/prompts');
-        if (!res.ok) throw new Error('Failed to load prompts');
+        const res = await fetch('/api/gargantua');
+        if (!res.ok) throw new Error('Failed to load gargantua entries');
         const data = await res.json();
 
-        promptsListEl.textContent = '';
+        gargantuaListEl.textContent = '';
         if (!data.length) {
-          promptsListEl.textContent = 'No prompts yet.';
+          gargantuaListEl.textContent = 'No gargantua entries yet.';
           return;
         }
 
-        data.forEach((p) => {
-          promptsListEl.appendChild(renderPromptItem(p));
+        data.forEach((g) => {
+          gargantuaListEl.appendChild(renderGargantuaItem(g));
         });
       } catch (err) {
-        promptsListEl.textContent = `Error: ${err.message}`;
+        gargantuaListEl.textContent = `Error: ${err.message}`;
       }
     }
 
-    function renderPromptItem(p) {
+    function renderGargantuaItem(g) {
       const div = document.createElement('div');
       div.className = 'list-item';
 
@@ -445,7 +448,8 @@
 
       const title = document.createElement('div');
       title.className = 'list-title';
-      title.textContent = `[${p.input_type}] → ${p.output_type}`;
+      const typeLabel = g.type ? ` [type: ${g.type}]` : '';
+      title.textContent = g.name ? `${g.name}${typeLabel}` : `(id ${g.id})${typeLabel}`;
       header.appendChild(title);
 
       const buttons = document.createElement('div');
@@ -463,18 +467,17 @@
 
       buttons.appendChild(editBtn);
       buttons.appendChild(deleteBtn);
-
       header.appendChild(buttons);
       display.appendChild(header);
 
       const text = document.createElement('div');
       text.className = 'prompt-display-text';
-      text.textContent = p.prompt_text;
+      text.textContent = g.text || '';
       display.appendChild(text);
 
       const meta = document.createElement('div');
       meta.className = 'list-meta';
-      meta.textContent = `#${p.id}`;
+      meta.textContent = `#${g.id} · created ${g.created_at || ''}`;
       display.appendChild(meta);
 
       // Edit mode
@@ -482,29 +485,29 @@
       edit.className = 'prompt-edit';
       edit.style.display = 'none';
 
-      const inputLabel = document.createElement('label');
-      inputLabel.textContent = 'Input type';
-      const inputField = document.createElement('input');
-      inputField.type = 'text';
-      inputField.value = p.input_type;
+      const nameLabel = document.createElement('label');
+      nameLabel.textContent = 'Name';
+      const nameField = document.createElement('input');
+      nameField.type = 'text';
+      nameField.value = g.name || '';
 
-      const outputLabel = document.createElement('label');
-      outputLabel.textContent = 'Output type';
-      const outputField = document.createElement('input');
-      outputField.type = 'text';
-      outputField.value = p.output_type;
+      const typeLabelEdit = document.createElement('label');
+      typeLabelEdit.textContent = 'Type';
+      const typeField = document.createElement('input');
+      typeField.type = 'text';
+      typeField.value = g.type || '';
 
-      const promptLabel = document.createElement('label');
-      promptLabel.textContent = 'Prompt text';
-      const promptField = document.createElement('textarea');
-      promptField.value = p.prompt_text;
+      const textLabel = document.createElement('label');
+      textLabel.textContent = 'Text';
+      const textField = document.createElement('textarea');
+      textField.value = g.text || '';
 
-      edit.appendChild(inputLabel);
-      edit.appendChild(inputField);
-      edit.appendChild(outputLabel);
-      edit.appendChild(outputField);
-      edit.appendChild(promptLabel);
-      edit.appendChild(promptField);
+      edit.appendChild(nameLabel);
+      edit.appendChild(nameField);
+      edit.appendChild(typeLabelEdit);
+      edit.appendChild(typeField);
+      edit.appendChild(textLabel);
+      edit.appendChild(textField);
 
       const editActions = document.createElement('div');
       editActions.className = 'prompt-actions';
@@ -525,9 +528,9 @@
 
       // Wire up actions
       editBtn.addEventListener('click', () => {
-        inputField.value = p.input_type;
-        outputField.value = p.output_type;
-        promptField.value = p.prompt_text;
+        nameField.value = g.name || '';
+        typeField.value = g.type || '';
+        textField.value = g.text || '';
         display.style.display = 'none';
         edit.style.display = 'block';
       });
@@ -538,54 +541,52 @@
       });
 
       saveBtn.addEventListener('click', async () => {
-        const newInput = inputField.value.trim();
-        const newOutput = outputField.value.trim();
-        const newPromptText = promptField.value.trim();
+        const newName = nameField.value.trim();
+        const newType = typeField.value.trim();
+        const newText = textField.value.trim();
 
-        if (!newInput || !newOutput || !newPromptText) {
-          alert('Input type, output type, and prompt text are required.');
+        if (!newName || !newText || !newType) {
+          alert('Name, type, and text are required.');
           return;
         }
 
         try {
           saveBtn.disabled = true;
-          const res = await fetch(`/api/prompts/${encodeURIComponent(p.id)}`, {
+          const res = await fetch(`/api/gargantua/${encodeURIComponent(g.id)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              input_type: newInput,
-              output_type: newOutput,
-              prompt_text: newPromptText,
+              name: newName,
+              type: newType,
+              text: newText,
             }),
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Failed to update prompt');
+            throw new Error(err.error || 'Failed to update gargantua entry');
           }
-          const updated = await res.json();
-          // Re-render list to reflect changes
-          await loadPrompts();
+          await loadGargantua();
         } catch (err) {
-          alert(`Error updating prompt: ${err.message}`);
+          alert(`Error updating gargantua entry: ${err.message}`);
         } finally {
           saveBtn.disabled = false;
         }
       });
 
       deleteBtn.addEventListener('click', async () => {
-        if (!confirm(`Delete prompt #${p.id}?`)) return;
+        if (!confirm(`Delete gargantua entry #${g.id}?`)) return;
         try {
           deleteBtn.disabled = true;
-          const res = await fetch(`/api/prompts/${encodeURIComponent(p.id)}`, {
+          const res = await fetch(`/api/gargantua/${encodeURIComponent(g.id)}`, {
             method: 'DELETE',
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Failed to delete prompt');
+            throw new Error(err.error || 'Failed to delete gargantua entry');
           }
-          await loadPrompts();
+          await loadGargantua();
         } catch (err) {
-          alert(`Error deleting prompt: ${err.message}`);
+          alert(`Error deleting gargantua entry: ${err.message}`);
         } finally {
           deleteBtn.disabled = false;
         }
@@ -596,49 +597,48 @@
       return div;
     }
 
-    async function addPrompt() {
-      const inputType = promptInputTypeEl.value.trim();
-      const outputType = promptOutputTypeEl.value.trim();
-      const promptText = promptTextEl.value.trim();
+    async function addGargantua() {
+      const name = gargantuaNameEl.value.trim();
+      const text = gargantuaTextEl.value.trim();
+      const type = gargantuaTypeEl.value.trim();
 
-      if (!inputType) {
-        promptStatusEl.textContent = 'Input type is required.';
+      if (!name) {
+        gargantuaStatusEl.textContent = 'Name is required.';
         return;
       }
-      if (!outputType) {
-        promptStatusEl.textContent = 'Output type is required.';
+      if (!text) {
+        gargantuaStatusEl.textContent = 'Text is required.';
         return;
       }
-      if (!promptText) {
-        promptStatusEl.textContent = 'Prompt text is required.';
+      if (!type) {
+        gargantuaStatusEl.textContent = 'Type is required.';
         return;
       }
 
-      promptStatusEl.textContent = 'Saving…';
+      gargantuaStatusEl.textContent = 'Saving…';
       try {
-        const res = await fetch('/api/prompts', {
+        const res = await fetch('/api/gargantua', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            input_type: inputType,
-            output_type: outputType,
-            prompt_text: promptText,
-          }),
+          body: JSON.stringify({ name, text, type }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to add prompt');
+          throw new Error(err.error || 'Failed to add gargantua entry');
         }
-
-        promptStatusEl.textContent = 'Prompt added.';
-        promptTextEl.value = '';
-        await loadPrompts();
+        gargantuaNameEl.value = '';
+        gargantuaTextEl.value = '';
+        // keep type so you can add multiple entries with same type
+        gargantuaStatusEl.textContent = 'Gargantua entry added.';
+        await loadGargantua();
       } catch (err) {
-        promptStatusEl.textContent = `Error: ${err.message}`;
+        gargantuaStatusEl.textContent = `Error: ${err.message}`;
       }
     }
 
-    // Writing types from writings table via /api/writing-types
+    //
+    // Writing types helper
+    //
     async function loadWritingTypes() {
       typesListEl.textContent = 'Loading…';
       try {
@@ -667,13 +667,8 @@
           chip.className = 'type-chip';
           chip.textContent = type;
           chip.addEventListener('click', () => {
-            if (lastTypeTarget === 'output') {
-              promptOutputTypeEl.value = type;
-              promptOutputTypeEl.focus();
-            } else {
-              promptInputTypeEl.value = type;
-              promptInputTypeEl.focus();
-            }
+            gargantuaTypeEl.value = type;
+            gargantuaTypeEl.focus();
           });
           typesListEl.appendChild(chip);
         });
@@ -683,13 +678,14 @@
     }
 
     addCreationBtn.addEventListener('click', addCreation);
-    addPromptBtn.addEventListener('click', addPrompt);
+    addGargantuaBtn.addEventListener('click', addGargantua);
 
     (async function init() {
       await loadCreations();
-      await loadPrompts();
+      await loadGargantua();
       await loadWritingTypes();
     })();
   </script>
+
 </body>
 </html>
