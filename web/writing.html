@@ -384,7 +384,21 @@
 
       <div class="section-card">
         <div class="section-title">gargantua entry</div>
-        <select id="gargantua-select" multiple size="5"></select>
+        <div class="textb-layout">
+          <div class="textb-column">
+            <div class="textb-column-title">From gargantua entries</div>
+            <small>Select one or more entries.</small>
+
+            <div id="gargantua-list" class="list"></div>
+
+            <div class="row" style="margin-top: 0.5rem;">
+              <input id="gargantua-random-count" type="number" min="1" placeholder="N" />
+              <button type="button" id="gargantua-random-select" class="secondary">
+                Select N random
+              </button>
+            </div>
+          </div>
+        </div>
         <div id="gargantua-meta" class="muted" style="margin-top: 0.25rem;"></div>
       </div>
 
@@ -462,10 +476,12 @@
     const textBTypeSelect = document.getElementById('textb-type-select');
     const typeListsContainer = document.getElementById('type-lists-container');
 
-    const gargantuaSelect = document.getElementById('gargantua-select');
+    const gargantuaList = document.getElementById('gargantua-list');
     const gargantuaMetaEl = document.getElementById('gargantua-meta');
     const gargantuaStatusEl = document.getElementById('gargantua-status');
     const runGargantuaBtn = document.getElementById('run-gargantua-task');
+    const gargantuaRandomCountEl = document.getElementById('gargantua-random-count');
+    const gargantuaRandomSelectBtn = document.getElementById('gargantua-random-select');
 
 
 
@@ -561,9 +577,9 @@
     }
 
     async function loadGargantuaEntries() {
-      if (!gargantuaSelect) return;
+      if (!gargantuaList) return;
 
-      gargantuaSelect.innerHTML = '';
+      gargantuaList.innerHTML = '';
       gargantuaMetaEl.textContent = 'Loading…';
 
       try {
@@ -571,18 +587,22 @@
         if (!res.ok) throw new Error('Failed to load gargantua entries');
         const data = await res.json();
 
-        gargantuaSelect.innerHTML = '';
         if (!data.length) {
           gargantuaMetaEl.textContent = 'No gargantua entries yet.';
           return;
         }
 
         data.forEach((g) => {
-          const opt = document.createElement('option');
-          opt.value = String(g.id);
-          opt.textContent = g.name || `(id ${g.id})`;
-          opt.dataset.type = g.type || '';
-          gargantuaSelect.appendChild(opt);
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = String(g.id);
+          checkbox.dataset.type = g.type || '';
+          const span = document.createElement('span');
+          span.textContent = g.name || `(id ${g.id})`;
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          gargantuaList.appendChild(label);
         });
 
         gargantuaMetaEl.textContent = 'Pick one or more entries; each selection will create a child writing.';
@@ -1036,9 +1056,14 @@
       }
     }
 
-    if (gargantuaSelect) {
-      gargantuaSelect.addEventListener('change', () => {
-        const selected = Array.from(gargantuaSelect.selectedOptions);
+    if (gargantuaList) {
+      gargantuaList.addEventListener('change', (event) => {
+        if (!event.target || !event.target.matches('input[type="checkbox"]')) {
+          return;
+        }
+        const selected = Array.from(
+          gargantuaList.querySelectorAll('input[type="checkbox"]:checked')
+        );
         if (!selected.length) {
           gargantuaMetaEl.textContent = '';
           return;
@@ -1046,7 +1071,7 @@
         const types = Array.from(
           new Set(
             selected
-              .map((option) => (option.dataset.type || '').trim())
+              .map((checkbox) => (checkbox.dataset.type || '').trim())
               .filter(Boolean)
           )
         );
@@ -1063,11 +1088,13 @@
           return;
         }
 
-        const selectedOptions = gargantuaSelect
-          ? Array.from(gargantuaSelect.selectedOptions)
+        const selectedOptions = gargantuaList
+          ? Array.from(
+              gargantuaList.querySelectorAll('input[type="checkbox"]:checked')
+            )
           : [];
         const gargantuaIds = selectedOptions
-          .map((option) => Number.parseInt(option.value, 10))
+          .map((checkbox) => Number.parseInt(checkbox.value, 10))
           .filter((value) => Number.isFinite(value));
 
         if (!gargantuaIds.length) {
@@ -1105,6 +1132,48 @@
         } catch (err) {
           gargantuaStatusEl.textContent = `Error: ${err.message}`;
         }
+      });
+    }
+
+    if (gargantuaRandomSelectBtn) {
+      gargantuaRandomSelectBtn.addEventListener('click', () => {
+        if (!gargantuaList) return;
+        const count = Number.parseInt(gargantuaRandomCountEl.value, 10);
+        if (!Number.isFinite(count) || count <= 0) {
+          return;
+        }
+
+        const checkboxes = Array.from(
+          gargantuaList.querySelectorAll('input[type="checkbox"]')
+        );
+        checkboxes.forEach((cb) => {
+          cb.checked = false;
+        });
+
+        if (!checkboxes.length) return;
+        const targetCount = Math.min(count, checkboxes.length);
+        const pool = checkboxes.slice();
+
+        for (let i = pool.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+
+        pool.slice(0, targetCount).forEach((cb) => {
+          cb.checked = true;
+        });
+
+        const selected = pool.slice(0, targetCount);
+        const types = Array.from(
+          new Set(
+            selected
+              .map((checkbox) => (checkbox.dataset.type || '').trim())
+              .filter(Boolean)
+          )
+        );
+        gargantuaMetaEl.textContent = types.length
+          ? `Child writing types: ${types.join(', ')}`
+          : 'Child writing types: (none)';
       });
     }
 
