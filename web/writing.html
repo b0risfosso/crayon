@@ -455,7 +455,6 @@
     const langWritingsList = document.getElementById('lang-writings-list');
 
     const textBTypeSelect = document.getElementById('textb-type-select');
-    const addTypeListBtn = document.getElementById('add-type-list');
     const typeListsContainer = document.getElementById('type-lists-container');
 
     const gargantuaSelect = document.getElementById('gargantua-select');
@@ -836,15 +835,6 @@
       return wrapper;
     }
 
-
-    addTypeListBtn.addEventListener('click', async () => {
-      const type = textBTypeSelect.value;
-      if (!type) {
-        writeStatusEl.textContent = 'Choose a type first.';
-        return;
-      }
-      await addTypeList(type);
-    });
 
     function updateAllTypeSummaries() {
       const blocks = typeListsContainer.querySelectorAll('.type-list-block');
