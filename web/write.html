@@ -638,7 +638,10 @@ selectedTyped.forEach((checkbox) => {
     });
 
     randomSelectBtn.addEventListener('click', () => {
-      const checkboxes = Array.from(creationsList.querySelectorAll('input[type="checkbox"]'));
+      const checkboxes = [
+        ...creationsList.querySelectorAll('input[type="checkbox"]'),
+        ...langWritingsList.querySelectorAll('input[type="checkbox"]'),
+      ];
       const count = Number.parseInt(randomCountEl.value, 10);
       if (!checkboxes.length || !Number.isFinite(count) || count <= 0) {
         return;
