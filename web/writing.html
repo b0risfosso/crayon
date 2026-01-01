@@ -384,7 +384,7 @@
 
       <div class="section-card">
         <div class="section-title">gargantua entry</div>
-        <select id="gargantua-select"></select>
+        <select id="gargantua-select" multiple size="5"></select>
         <div id="gargantua-meta" class="muted" style="margin-top: 0.25rem;"></div>
       </div>
 
@@ -572,11 +572,6 @@
         const data = await res.json();
 
         gargantuaSelect.innerHTML = '';
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = 'Select gargantua entry…';
-        gargantuaSelect.appendChild(placeholder);
-
         if (!data.length) {
           gargantuaMetaEl.textContent = 'No gargantua entries yet.';
           return;
@@ -590,7 +585,7 @@
           gargantuaSelect.appendChild(opt);
         });
 
-        gargantuaMetaEl.textContent = 'Pick an entry; its type will be used for the child writing.';
+        gargantuaMetaEl.textContent = 'Pick one or more entries; each selection will create a child writing.';
       } catch (err) {
         gargantuaMetaEl.textContent = `Error: ${err.message}`;
       }
@@ -1043,15 +1038,21 @@
 
     if (gargantuaSelect) {
       gargantuaSelect.addEventListener('change', () => {
-        const selected = gargantuaSelect.selectedOptions[0];
-        if (!selected || !selected.value) {
+        const selected = Array.from(gargantuaSelect.selectedOptions);
+        if (!selected.length) {
           gargantuaMetaEl.textContent = '';
           return;
         }
-        const type = selected.dataset.type || '';
-        gargantuaMetaEl.textContent = type
-          ? `Child writing type: ${type}`
-          : 'Child writing type: (none)';
+        const types = Array.from(
+          new Set(
+            selected
+              .map((option) => (option.dataset.type || '').trim())
+              .filter(Boolean)
+          )
+        );
+        gargantuaMetaEl.textContent = types.length
+          ? `Child writing types: ${types.join(', ')}`
+          : 'Child writing types: (none)';
       });
     }
 
@@ -1062,33 +1063,45 @@
           return;
         }
 
-        const selected = gargantuaSelect && gargantuaSelect.selectedOptions[0];
-        const gargantuaIdValue = selected && selected.value
-          ? Number.parseInt(selected.value, 10)
-          : NaN;
+        const selectedOptions = gargantuaSelect
+          ? Array.from(gargantuaSelect.selectedOptions)
+          : [];
+        const gargantuaIds = selectedOptions
+          .map((option) => Number.parseInt(option.value, 10))
+          .filter((value) => Number.isFinite(value));
 
-        if (!Number.isFinite(gargantuaIdValue)) {
-          gargantuaStatusEl.textContent = 'Select a gargantua entry first.';
+        if (!gargantuaIds.length) {
+          gargantuaStatusEl.textContent = 'Select at least one gargantua entry.';
           return;
         }
 
         try {
-          gargantuaStatusEl.textContent = 'Queuing LLM task…';
+          gargantuaStatusEl.textContent = 'Queuing LLM tasks…';
 
-          const res = await fetch(`/api/writings/${encodeURIComponent(writingId)}/gargantua-run`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ gargantua_id: gargantuaIdValue }),
-          });
+          const results = await Promise.all(
+            gargantuaIds.map(async (gargantuaId) => {
+              const res = await fetch(`/api/writings/${encodeURIComponent(writingId)}/gargantua-run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gargantua_id: gargantuaId }),
+              });
 
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Failed to queue gargantua task');
-          }
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Failed to queue gargantua task ${gargantuaId}`);
+              }
 
-          const data = await res.json();
-          gargantuaStatusEl.textContent =
-            `Queued task ${data.task_id}. Check /queue.html for status.`;
+              return res.json();
+            })
+          );
+
+          const queued = results
+            .filter((item) => item && item.task_id)
+            .map((item) => item.task_id);
+
+          gargantuaStatusEl.textContent = queued.length
+            ? `Queued tasks ${queued.join(', ')}. Check /queue.html for status.`
+            : 'Tasks queued. Check /queue.html for status.';
         } catch (err) {
           gargantuaStatusEl.textContent = `Error: ${err.message}`;
         }
