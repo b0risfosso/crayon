@@ -51,6 +51,13 @@
       border:1px solid #000; padding:0.05rem 0.4rem; font-size:0.8rem;
       display:inline-block;
     }
+
+    input[type="number"]{
+  width:6rem;
+  padding:0.55rem 0.7rem;
+  border:1px solid #000;
+}
+
   </style>
 </head>
 <body>
@@ -96,9 +103,18 @@
       <div class="section-card">
         <div class="section-title">gargantua entry</div>
         <div class="muted">Select one or more entries.</div>
+      
         <div id="gargantua-list" class="list" style="margin-top:0.5rem;"></div>
+      
+        <div class="row" style="margin-top:0.5rem;">
+          <input id="gargantua-random-count" type="number" min="1" placeholder="N" />
+          <button type="button" id="gargantua-random-select" class="secondary">Select N random</button>
+          <button type="button" id="gargantua-clear" class="secondary">Clear gargantua</button>
+        </div>
+      
         <div id="gargantua-meta" class="muted" style="margin-top:0.35rem;"></div>
       </div>
+      
 
       <button type="button" id="run-gargantua">Queue gargantua tasks</button>
       <div id="status" class="muted" style="margin-top:0.35rem;"></div>
@@ -124,6 +140,17 @@
     const selectAllBtn = document.getElementById('select-all');
     const clearSelectedBtn = document.getElementById('clear-selected');
     const runBtn = document.getElementById('run-gargantua');
+
+    const gargantuaRandomCountEl = document.getElementById('gargantua-random-count');
+const gargantuaRandomSelectBtn = document.getElementById('gargantua-random-select');
+const gargantuaClearBtn = document.getElementById('gargantua-clear');
+
+const randomPerWritingEnabledEl = document.getElementById('gargantua-random-per-writing-enabled');
+const randomPerWritingCountEl = document.getElementById('gargantua-random-per-writing-count');
+const randomPoolCheckedEl = document.getElementById('gargantua-random-pool-checked');
+const randomPreviewEl = document.getElementById('gargantua-random-preview');
+
+
 
     let writingId = null;
 
@@ -187,6 +214,58 @@
         wMetaEl.textContent = `Error: ${err.message}`;
       }
     }
+
+    function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function getAllGargantuaIds() {
+  return Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]'))
+    .map(cb => Number.parseInt(cb.value, 10))
+    .filter(v => Number.isFinite(v));
+}
+
+function getCheckedGargantuaIds() {
+  return Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]:checked'))
+    .map(cb => Number.parseInt(cb.value, 10))
+    .filter(v => Number.isFinite(v));
+}
+
+function pickNRandom(poolIds, n) {
+  const pool = poolIds.slice();
+  shuffleInPlace(pool);
+  return pool.slice(0, Math.min(n, pool.length));
+}
+
+function updateRandomPreview() {
+  if (!randomPerWritingEnabledEl.checked) {
+    randomPreviewEl.textContent = '';
+    return;
+  }
+  const n = Number.parseInt(randomPerWritingCountEl.value, 10);
+  const useChecked = !!randomPoolCheckedEl.checked;
+
+  if (!Number.isFinite(n) || n <= 0) {
+    randomPreviewEl.textContent = 'Random per writing enabled: set “N per writing” > 0.';
+    return;
+  }
+
+  const poolIds = useChecked ? getCheckedGargantuaIds() : getAllGargantuaIds();
+  randomPreviewEl.textContent =
+    poolIds.length
+      ? `Random per writing: will pick ${Math.min(n, poolIds.length)} of ${poolIds.length} gargantua entr${poolIds.length === 1 ? 'y' : 'ies'} per writing.`
+      : `Random per writing: no gargantua entries available in the pool.`;
+}
+
+
+randomPerWritingEnabledEl?.addEventListener('change', updateRandomPreview);
+randomPerWritingCountEl?.addEventListener('input', updateRandomPreview);
+randomPoolCheckedEl?.addEventListener('change', updateRandomPreview);
+gargantuaListEl?.addEventListener('change', updateRandomPreview);
+
 
     function renderRuns(runs) {
       runsEl.textContent = '';
@@ -305,13 +384,10 @@
 
         gargantuaMetaEl.textContent = 'Pick one or more entries; each selection will create child writings.';
         gargantuaListEl.addEventListener('change', () => {
-          const selected = Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]:checked'));
-          const types = uniqInts([]); // dummy to avoid lint
-          const typeList = Array.from(new Set(selected.map(cb => (cb.dataset.type || '').trim()).filter(Boolean)));
-          gargantuaMetaEl.textContent = typeList.length
-            ? `Child writing types: ${typeList.join(', ')}`
-            : 'Child writing types: (none)';
-        });
+        updateGargantuaMetaFromSelection();
+        updateRandomPreview();
+});
+
       } catch (err) {
         gargantuaMetaEl.textContent = `Error: ${err.message}`;
       }
@@ -341,53 +417,132 @@
     }
 
     if (runBtn) {
-      runBtn.addEventListener('click', async () => {
-        if (!writingId) {
-          statusEl.textContent = 'Writing is not ready yet.';
-          return;
-        }
+        runBtn.addEventListener('click', async () => {
+  if (!writingId) {
+    statusEl.textContent = 'Writing is not ready yet.';
+    return;
+  }
 
-        const gargantuaIds = getSelectedGargantuaIds();
-        if (!gargantuaIds.length) {
-          statusEl.textContent = 'Select at least one gargantua entry.';
-          return;
-        }
+  const selectedIdeaIds = getSelectedIdeaWritingIds();
+  const targetWritingIds = uniqInts([writingId, ...selectedIdeaIds]);
 
-        const selectedIdeaIds = getSelectedIdeaWritingIds();
+  const randomPerWritingEnabled = !!randomPerWritingEnabledEl.checked;
+  const nPerWriting = Number.parseInt(randomPerWritingCountEl.value, 10);
+  const useCheckedPool = !!randomPoolCheckedEl.checked;
 
-        // Targets = current writing + selected children/ideas
-        const targetWritingIds = uniqInts([writingId, ...selectedIdeaIds]);
+  // Determine gargantua ids per writing
+  let globalGargantuaIds = [];
 
-        const totalTasks = targetWritingIds.length * gargantuaIds.length;
-
-        try {
-          statusEl.textContent = `Queuing ${totalTasks} task(s)…`;
-
-          const results = [];
-          for (const targetId of targetWritingIds) {
-            for (const gargId of gargantuaIds) {
-              const res = await fetch(`/api/writings/${encodeURIComponent(targetId)}/gargantua-run`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gargantua_id: gargId }),
-              });
-              if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || `Failed to queue gargantua task (writing ${targetId}, gargantua ${gargId})`);
-              }
-              results.push(await res.json());
-            }
-          }
-
-          const queued = results.filter(r => r && r.task_id).map(r => r.task_id);
-          statusEl.textContent = queued.length
-            ? `Queued tasks ${queued.join(', ')}. Check /queue.html for status.`
-            : 'Tasks queued. Check /queue.html for status.';
-        } catch (err) {
-          statusEl.textContent = `Error: ${err.message}`;
-        }
-      });
+  if (!randomPerWritingEnabled) {
+    // Old behavior: one shared selection for all target writings
+    globalGargantuaIds = getSelectedGargantuaIds();
+    if (!globalGargantuaIds.length) {
+      statusEl.textContent = 'Select at least one gargantua entry (or enable Random per writing).';
+      return;
     }
+  } else {
+    // Random per writing: validate N and pool
+    if (!Number.isFinite(nPerWriting) || nPerWriting <= 0) {
+      statusEl.textContent = 'Random per writing is enabled: set “N per writing” > 0.';
+      return;
+    }
+    const poolIds = useCheckedPool ? getCheckedGargantuaIds() : getAllGargantuaIds();
+    if (!poolIds.length) {
+      statusEl.textContent = useCheckedPool
+        ? 'Random per writing is enabled with “Use only checked pool”, but no gargantua entries are checked.'
+        : 'Random per writing is enabled, but there are no gargantua entries.';
+      return;
+    }
+  }
+
+  // Compute total tasks for status message
+  const poolForCount = useCheckedPool ? getCheckedGargantuaIds() : getAllGargantuaIds();
+  const perWritingCount = randomPerWritingEnabled ? Math.min(nPerWriting, poolForCount.length) : globalGargantuaIds.length;
+  const totalTasks = targetWritingIds.length * perWritingCount;
+
+  try {
+    statusEl.textContent = `Queuing ${totalTasks} task(s)…`;
+
+    const results = [];
+    for (const targetId of targetWritingIds) {
+      const gargantuaIdsForThisWriting = randomPerWritingEnabled
+        ? pickNRandom(poolForCount, nPerWriting)
+        : globalGargantuaIds;
+
+      for (const gargId of gargantuaIdsForThisWriting) {
+        const res = await fetch(`/api/writings/${encodeURIComponent(targetId)}/gargantua-run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gargantua_id: gargId }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Failed to queue gargantua task (writing ${targetId}, gargantua ${gargId})`);
+        }
+        results.push(await res.json());
+      }
+    }
+
+    const queued = results.filter(r => r && r.task_id).map(r => r.task_id);
+    statusEl.textContent = queued.length
+      ? `Queued tasks ${queued.join(', ')}. Check /queue.html for status.`
+      : 'Tasks queued. Check /queue.html for status.';
+  } catch (err) {
+    statusEl.textContent = `Error: ${err.message}`;
+  }
+});
+
+    }
+
+    function clearGargantuaSelection() {
+  Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]'))
+    .forEach(cb => cb.checked = false);
+  gargantuaMetaEl.textContent = 'Child writing types: (none)';
+}
+
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function updateGargantuaMetaFromSelection() {
+  const selected = Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]:checked'));
+  const typeList = Array.from(new Set(selected.map(cb => (cb.dataset.type || '').trim()).filter(Boolean)));
+  gargantuaMetaEl.textContent = typeList.length
+    ? `Child writing types: ${typeList.join(', ')}`
+    : 'Child writing types: (none)';
+}
+
+if (gargantuaClearBtn) {
+  gargantuaClearBtn.addEventListener('click', () => {
+    clearGargantuaSelection();
+  });
+}
+
+if (gargantuaRandomSelectBtn) {
+  gargantuaRandomSelectBtn.addEventListener('click', () => {
+    const n = Number.parseInt(gargantuaRandomCountEl.value, 10);
+    if (!Number.isFinite(n) || n <= 0) return;
+
+    const checkboxes = Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]'));
+    if (!checkboxes.length) return;
+
+    // clear existing selection
+    checkboxes.forEach(cb => cb.checked = false);
+
+    // pick N random (cap at length)
+    shuffleInPlace(checkboxes);
+    const k = Math.min(n, checkboxes.length);
+    for (let i = 0; i < k; i += 1) {
+      checkboxes[i].checked = true;
+    }
+
+    updateGargantuaMetaFromSelection();
+  });
+}
+
 
     (async function init() {
       await loadWriting();
