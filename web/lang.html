@@ -84,6 +84,20 @@
       color: var(--text-muted);
       margin-top: 0.25rem;
     }
+
+    nav button {
+      padding: 0.25rem 0.6rem;
+      border: 1px solid var(--border-color);
+      background: #000;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    nav button:hover {
+      background: #fff;
+      color: #000;
+    }
+
   </style>
 </head>
 <body>
@@ -91,6 +105,10 @@
     <nav>
       <a href="/index.html">home</a>
       <a href="/write.html">write</a>
+
+      <button type="button" id="download-lang-btn" style="margin-left:auto;">
+        Download lang
+      </button>
     </nav>
 
     <h1>lang</h1>
@@ -100,6 +118,8 @@
 
   <script>
     const languageEl = document.getElementById('language');
+    const downloadLangBtn = document.getElementById('download-lang-btn');
+
 
     function renderWritings(writings) {
       languageEl.textContent = '';
@@ -137,7 +157,7 @@
       languageEl.textContent = 'Loading...';
 
       try {
-        const res = await fetch('/api/writings');
+        const res = await fetch('/api/writings?type=lang');
         if (!res.ok) throw new Error('Failed to load writings');
         const data = await res.json();
 
@@ -149,6 +169,41 @@
         languageEl.textContent = `Error: ${err.message}`;
       }
     }
+
+    async function downloadLangExport() {
+      try {
+        const res = await fetch('/api/export/lang');
+        if (!res.ok) {
+          throw new Error(`Export failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        const blob = new Blob(
+          [JSON.stringify(data, null, 2)],
+          { type: 'application/json' }
+        );
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        a.href = url;
+        a.download = `lang_export_${ts}.json`;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert('Failed to download lang export: ' + err.message);
+      }
+    }
+
+    if (downloadLangBtn) {
+      downloadLangBtn.addEventListener('click', downloadLangExport);
+    }
+
 
     loadLanguage();
   </script>

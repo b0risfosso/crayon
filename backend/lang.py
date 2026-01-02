@@ -1742,6 +1742,68 @@ def random_writings_balanced():
     return jsonify(selected_rows)
 
 
+@app.get("/api/export/lang")
+def export_lang():
+    """
+    Export all writings as a tree, with
+    type='lang' writings as roots and their
+    descendant writings as children.
+    """
+    conn = _get_db()
+    rows = conn.execute(
+        """
+        SELECT id, name, description,
+               parent_run_id, parent_text_a, parent_text_b,
+               parent_writing_id, notes, type,
+               created_at, updated_at
+        FROM writings
+        ORDER BY id
+        """
+    ).fetchall()
+    conn.close()
+
+    # Build a map of id -> node with children list
+    nodes: dict[int, dict] = {}
+    for row in rows:
+        node = {
+            "id": row["id"],
+            "name": row["name"],
+            "description": row["description"],
+            "parent_run_id": row["parent_run_id"],
+            "parent_text_a": row["parent_text_a"],
+            "parent_text_b": row["parent_text_b"],
+            "parent_writing_id": row["parent_writing_id"],
+            "notes": row["notes"],
+            "type": row["type"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "children": [],
+        }
+        nodes[row["id"]] = node
+
+    # Attach children via parent_writing_id
+    for row in rows:
+        parent_id = row["parent_writing_id"]
+        if parent_id is not None and parent_id in nodes:
+            parent = nodes[parent_id]
+            child = nodes[row["id"]]
+            parent["children"].append(child)
+
+    # Root writings: type='lang' and no parent_writing_id
+    roots = [
+        node
+        for node in nodes.values()
+        if node["type"] == "lang" and node["parent_writing_id"] is None
+    ]
+
+    payload = {
+        "exported_at": _now_iso(),
+        "roots": roots,
+    }
+    return jsonify(payload)
+
+
+
 if __name__ == "__main__":
     _ensure_workers()
     app.run(debug=True)
