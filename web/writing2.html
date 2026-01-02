@@ -114,6 +114,21 @@
       
         <div id="gargantua-meta" class="muted" style="margin-top:0.35rem;"></div>
       </div>
+
+      <div class="row" style="margin-top:0.5rem;">
+        <input id="gargantua-random-per-writing-count" type="number" min="0" placeholder="N per writing" />
+        <label class="muted" style="display:flex; gap:0.35rem; align-items:center;">
+          <input id="gargantua-random-per-writing-enabled" type="checkbox" />
+          Random per writing
+        </label>
+      
+        <label class="muted" style="display:flex; gap:0.35rem; align-items:center;">
+          <input id="gargantua-random-pool-checked" type="checkbox" />
+          Use only checked pool
+        </label>
+      </div>
+      <div id="gargantua-random-preview" class="muted" style="margin-top:0.35rem;"></div>
+      
       
 
       <button type="button" id="run-gargantua">Queue gargantua tasks</button>
@@ -241,6 +256,7 @@ function pickNRandom(poolIds, n) {
 }
 
 function updateRandomPreview() {
+    if (!randomPerWritingEnabledEl || !randomPreviewEl || !randomPerWritingCountEl || !randomPoolCheckedEl) return;
   if (!randomPerWritingEnabledEl.checked) {
     randomPreviewEl.textContent = '';
     return;
@@ -500,12 +516,6 @@ gargantuaListEl?.addEventListener('change', updateRandomPreview);
   gargantuaMetaEl.textContent = 'Child writing types: (none)';
 }
 
-function shuffleInPlace(arr) {
-  for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-}
 
 function updateGargantuaMetaFromSelection() {
   const selected = Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]:checked'));
@@ -518,6 +528,7 @@ function updateGargantuaMetaFromSelection() {
 if (gargantuaClearBtn) {
   gargantuaClearBtn.addEventListener('click', () => {
     clearGargantuaSelection();
+    updateRandomPreview();
   });
 }
 
