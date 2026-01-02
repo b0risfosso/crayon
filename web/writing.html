@@ -980,6 +980,7 @@
         // Either we rely on prompt_id or instruction value
         if (run.prompt_id) return false;
         if (run.instruction === 'prompt_child') return false;
+        if (run.gargantua_id) return false;
         return true;
       });
 
