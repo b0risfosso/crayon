@@ -145,9 +145,36 @@
           item.appendChild(desc);
         }
 
-        item.addEventListener('click', () => {
-          window.open(`/writing.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
-        });
+        const actions = document.createElement('div');
+actions.style.marginTop = '0.5rem';
+actions.className = 'row';
+
+const open1 = document.createElement('button');
+open1.type = 'button';
+open1.textContent = 'Open (writing)';
+open1.addEventListener('click', (e) => {
+  e.stopPropagation();
+  window.open(`/writing.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
+});
+
+const open2 = document.createElement('button');
+open2.type = 'button';
+open2.className = 'secondary';
+open2.textContent = 'Open (writing2)';
+open2.addEventListener('click', (e) => {
+  e.stopPropagation();
+  window.open(`/writing2.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
+});
+
+actions.appendChild(open1);
+actions.appendChild(open2);
+item.appendChild(actions);
+
+// Optional: keep clicking the row opening writing.html
+item.addEventListener('click', () => {
+  window.open(`/writing.html?writing_id=${encodeURIComponent(w.id)}`, '_blank');
+});
+
 
         languageEl.appendChild(item);
       });

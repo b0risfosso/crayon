@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>writing2</title>
+  <style>
+    :root { --border-color:#000; --text-muted:#444; }
+    * { box-sizing:border-box; }
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      margin:0; padding:2rem 1.5rem; background:#fff; color:#000; line-height:1.5;
+    }
+    main{
+      max-width:64rem; margin:0 auto; border:1px solid var(--border-color);
+      padding:1.75rem 1.5rem 2.5rem;
+    }
+    nav{ margin-bottom:1.5rem; display:flex; gap:0.75rem; align-items:center; }
+    nav a{
+      text-decoration:none; color:#000; border:1px solid var(--border-color);
+      padding:0.25rem 0.6rem;
+    }
+    nav a:hover{ background:#000; color:#fff; }
+    h1{ font-size:1.6rem; margin:0 0 0.4rem; }
+    h2{ font-size:1.1rem; margin:1.5rem 0 0.75rem; }
+    .muted{ color:var(--text-muted); font-size:0.9rem; }
+    .section-card{ border:1px solid #000; padding:1rem 1.1rem; background:#fff; margin-bottom:0.75rem; }
+    .section-title{ font-size:0.95rem; font-weight:700; margin-bottom:0.6rem; }
+    .row{ display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; }
+    button{
+      padding:0.5rem 0.9rem; font:inherit; border:1px solid #000;
+      background:#000; color:#fff; cursor:pointer;
+    }
+    button.secondary{ background:#fff; color:#000; }
+    button:hover:not(:disabled){ background:#fff; color:#000; }
+    button.secondary:hover{ background:#000; color:#fff; }
+    button:disabled{ opacity:0.6; cursor:default; }
+
+    .list{
+      border:1px solid #000; padding:0.5rem; max-height:14rem; overflow:auto;
+      background:#fff; font-size:0.9rem;
+    }
+    .list label{ display:flex; gap:0.5rem; align-items:flex-start; margin:0.25rem 0; }
+    .list label span{ flex:1; white-space:pre-wrap; overflow-wrap:anywhere; }
+    details{ border:1px solid #000; padding:0.45rem 0.7rem 0.6rem; margin-bottom:0.5rem; }
+    summary{ cursor:pointer; font-weight:600; }
+    .idea-row{ display:flex; gap:0.5rem; align-items:flex-start; margin:0.25rem 0; }
+    .idea-row a{ color:#000; }
+    .idea-row a:hover{ background:#000; color:#fff; }
+    .pill{
+      border:1px solid #000; padding:0.05rem 0.4rem; font-size:0.8rem;
+      display:inline-block;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <nav>
+      <a href="/index.html">home</a>
+      <a href="/write.html">write</a>
+      <a href="/lang.html">lang</a>
+    </nav>
+
+    <h1 id="w-name">(untitled)</h1>
+    <div id="w-desc"></div>
+    <div id="w-meta" class="muted"></div>
+    <div id="w-type" class="muted" style="margin-top:0.25rem;"></div>
+
+    <section>
+      <h2>Runs for this writing</h2>
+      <div class="muted" style="margin-bottom:0.5rem;">
+        Select any idea writings below. When you run gargantua, it will run for the
+        <strong>current writing</strong> plus any selected writings.
+      </div>
+
+      <div class="row" style="margin-bottom:0.5rem; justify-content:flex-end;">
+        <button type="button" class="secondary" id="select-all">Select all visible</button>
+        <button type="button" class="secondary" id="clear-selected">Clear selected</button>
+      </div>
+
+      <div id="runs"></div>
+    </section>
+
+    <section>
+      <h2>Generate child writing (gargantua)</h2>
+
+      <div class="section-card">
+        <div class="section-title">Target writings</div>
+        <div class="muted">
+          Always includes <span class="pill">current writing</span>.
+          Select additional targets from runs above.
+        </div>
+        <div id="targets-summary" class="muted" style="margin-top:0.35rem;"></div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">gargantua entry</div>
+        <div class="muted">Select one or more entries.</div>
+        <div id="gargantua-list" class="list" style="margin-top:0.5rem;"></div>
+        <div id="gargantua-meta" class="muted" style="margin-top:0.35rem;"></div>
+      </div>
+
+      <button type="button" id="run-gargantua">Queue gargantua tasks</button>
+      <div id="status" class="muted" style="margin-top:0.35rem;"></div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const writingIdParam = params.get('writing_id');
+
+    const wNameEl = document.getElementById('w-name');
+    const wDescEl = document.getElementById('w-desc');
+    const wMetaEl = document.getElementById('w-meta');
+    const wTypeEl = document.getElementById('w-type');
+
+    const runsEl = document.getElementById('runs');
+    const targetsSummaryEl = document.getElementById('targets-summary');
+
+    const gargantuaListEl = document.getElementById('gargantua-list');
+    const gargantuaMetaEl = document.getElementById('gargantua-meta');
+    const statusEl = document.getElementById('status');
+
+    const selectAllBtn = document.getElementById('select-all');
+    const clearSelectedBtn = document.getElementById('clear-selected');
+    const runBtn = document.getElementById('run-gargantua');
+
+    let writingId = null;
+
+    function firstLine(text) {
+      const t = (text || '').trim();
+      if (!t) return '';
+      return t.split(/\r?\n/)[0];
+    }
+
+    function uniqInts(arr) {
+      const out = [];
+      const seen = new Set();
+      for (const v of arr) {
+        if (!Number.isFinite(v)) continue;
+        if (seen.has(v)) continue;
+        seen.add(v);
+        out.push(v);
+      }
+      return out;
+    }
+
+    function getSelectedIdeaWritingIds() {
+      const ids = Array.from(document.querySelectorAll('.idea-select:checked'))
+        .map(cb => Number.parseInt(cb.value, 10))
+        .filter(v => Number.isFinite(v));
+      return uniqInts(ids);
+    }
+
+    function updateTargetsSummary() {
+      const selected = getSelectedIdeaWritingIds();
+      const totalTargets = 1 + selected.length; // current writing + selected
+      targetsSummaryEl.textContent = selected.length
+        ? `Targets: current writing (#${writingId}) + ${selected.length} selected = ${totalTargets} total`
+        : `Targets: current writing (#${writingId}) only`;
+    }
+
+    async function loadWriting() {
+      if (!writingIdParam) {
+        wNameEl.textContent = '(missing writing_id)';
+        return;
+      }
+      writingId = Number.parseInt(writingIdParam, 10);
+      if (!Number.isFinite(writingId)) {
+        wNameEl.textContent = '(invalid writing_id)';
+        return;
+      }
+
+      wMetaEl.textContent = 'Loading…';
+      try {
+        const res = await fetch(`/api/writings/${encodeURIComponent(writingId)}`);
+        if (!res.ok) throw new Error('Failed to load writing');
+        const data = await res.json();
+
+        wNameEl.textContent = data.name || '(untitled)';
+        wDescEl.textContent = data.description || '';
+        wMetaEl.textContent = data.created_at ? `Created ${data.created_at}` : '';
+        wTypeEl.textContent = data.type ? `Type: ${data.type}` : '';
+
+        updateTargetsSummary();
+      } catch (err) {
+        wMetaEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    function renderRuns(runs) {
+      runsEl.textContent = '';
+
+      // keep same filtering behavior as writing.html uses for runs display
+      const filtered = runs.filter(run => {
+        if (run.prompt_id) return false;
+        if (run.instruction === 'prompt_child') return false;
+        if (run.gargantua_id) return false;
+        return true;
+      });
+
+      if (!filtered.length) {
+        runsEl.textContent = 'No runs yet.';
+        return;
+      }
+
+      filtered.forEach((run) => {
+        const runDetails = document.createElement('details');
+
+        const summary = document.createElement('summary');
+        summary.textContent = firstLine(run.text_b) || '(run)';
+        runDetails.appendChild(summary);
+
+        const meta = document.createElement('div');
+        meta.className = 'muted';
+        meta.style.marginTop = '0.35rem';
+        meta.textContent = run.created_at ? `Created ${run.created_at}` : '';
+        runDetails.appendChild(meta);
+
+        const body = document.createElement('div');
+        body.style.marginTop = '0.5rem';
+
+        const resp = run.response;
+        if (resp && typeof resp === 'object' && Array.isArray(resp.ideas)) {
+          resp.ideas.forEach((idea) => {
+            const wid = idea.writing_id;
+
+            const row = document.createElement('div');
+            row.className = 'idea-row';
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'idea-select';
+            cb.value = String(wid || '');
+            cb.disabled = !wid;
+            cb.addEventListener('change', updateTargetsSummary);
+
+            const link = document.createElement('a');
+            link.href = wid ? `/writing.html?writing_id=${encodeURIComponent(wid)}` : '#';
+            link.target = '_blank';
+            link.textContent = idea.name || '(untitled)';
+
+            const small = document.createElement('div');
+            small.className = 'muted';
+            small.style.marginLeft = '0.25rem';
+            small.textContent = wid ? ` (writing_id ${wid})` : ' (no writing_id)';
+
+            row.appendChild(cb);
+            row.appendChild(link);
+            row.appendChild(small);
+            body.appendChild(row);
+          });
+        } else {
+          const pre = document.createElement('pre');
+          pre.textContent = typeof resp === 'string' ? resp : JSON.stringify(resp, null, 2);
+          body.appendChild(pre);
+        }
+
+        runDetails.appendChild(body);
+        runsEl.appendChild(runDetails);
+      });
+    }
+
+    async function loadRuns() {
+      if (!writingId) return;
+      runsEl.textContent = 'Loading...';
+      try {
+        const res = await fetch(`/api/lang?parent_writing_id=${encodeURIComponent(writingId)}`);
+        if (!res.ok) throw new Error('Failed to load runs');
+        const data = await res.json();
+        renderRuns(data || []);
+        updateTargetsSummary();
+      } catch (err) {
+        runsEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function loadGargantua() {
+      gargantuaListEl.innerHTML = '';
+      gargantuaMetaEl.textContent = 'Loading…';
+      try {
+        const res = await fetch('/api/gargantua');
+        if (!res.ok) throw new Error('Failed to load gargantua entries');
+        const data = await res.json();
+
+        if (!data.length) {
+          gargantuaMetaEl.textContent = 'No gargantua entries yet.';
+          return;
+        }
+
+        data.forEach((g) => {
+          const label = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = String(g.id);
+          cb.dataset.type = g.type || '';
+
+          const span = document.createElement('span');
+          span.textContent = g.name || `(id ${g.id})`;
+
+          label.appendChild(cb);
+          label.appendChild(span);
+          gargantuaListEl.appendChild(label);
+        });
+
+        gargantuaMetaEl.textContent = 'Pick one or more entries; each selection will create child writings.';
+        gargantuaListEl.addEventListener('change', () => {
+          const selected = Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]:checked'));
+          const types = uniqInts([]); // dummy to avoid lint
+          const typeList = Array.from(new Set(selected.map(cb => (cb.dataset.type || '').trim()).filter(Boolean)));
+          gargantuaMetaEl.textContent = typeList.length
+            ? `Child writing types: ${typeList.join(', ')}`
+            : 'Child writing types: (none)';
+        });
+      } catch (err) {
+        gargantuaMetaEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    function getSelectedGargantuaIds() {
+      const ids = Array.from(gargantuaListEl.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(cb => Number.parseInt(cb.value, 10))
+        .filter(v => Number.isFinite(v));
+      return uniqInts(ids);
+    }
+
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', () => {
+        Array.from(document.querySelectorAll('.idea-select')).forEach(cb => {
+          if (!cb.disabled) cb.checked = true;
+        });
+        updateTargetsSummary();
+      });
+    }
+
+    if (clearSelectedBtn) {
+      clearSelectedBtn.addEventListener('click', () => {
+        Array.from(document.querySelectorAll('.idea-select')).forEach(cb => cb.checked = false);
+        updateTargetsSummary();
+      });
+    }
+
+    if (runBtn) {
+      runBtn.addEventListener('click', async () => {
+        if (!writingId) {
+          statusEl.textContent = 'Writing is not ready yet.';
+          return;
+        }
+
+        const gargantuaIds = getSelectedGargantuaIds();
+        if (!gargantuaIds.length) {
+          statusEl.textContent = 'Select at least one gargantua entry.';
+          return;
+        }
+
+        const selectedIdeaIds = getSelectedIdeaWritingIds();
+
+        // Targets = current writing + selected children/ideas
+        const targetWritingIds = uniqInts([writingId, ...selectedIdeaIds]);
+
+        const totalTasks = targetWritingIds.length * gargantuaIds.length;
+
+        try {
+          statusEl.textContent = `Queuing ${totalTasks} task(s)…`;
+
+          const results = [];
+          for (const targetId of targetWritingIds) {
+            for (const gargId of gargantuaIds) {
+              const res = await fetch(`/api/writings/${encodeURIComponent(targetId)}/gargantua-run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gargantua_id: gargId }),
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Failed to queue gargantua task (writing ${targetId}, gargantua ${gargId})`);
+              }
+              results.push(await res.json());
+            }
+          }
+
+          const queued = results.filter(r => r && r.task_id).map(r => r.task_id);
+          statusEl.textContent = queued.length
+            ? `Queued tasks ${queued.join(', ')}. Check /queue.html for status.`
+            : 'Tasks queued. Check /queue.html for status.';
+        } catch (err) {
+          statusEl.textContent = `Error: ${err.message}`;
+        }
+      });
+    }
+
+    (async function init() {
+      await loadWriting();
+      await loadRuns();
+      await loadGargantua();
+    })();
+  </script>
+</body>
+</html>
