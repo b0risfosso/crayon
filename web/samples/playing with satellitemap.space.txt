@@ -1,0 +1,63 @@
+Playing with satellitemap.space
+
+Preparation
+1. Choose a device and connection
+   - Use a computer, tablet, or smartphone with an up-to-date web browser (Chrome, Firefox, Safari, Edge).
+   - Make sure you have a stable internet connection.
+
+2. Optional: decide how you want the website to know your location
+   - The site may ask to use your device’s location to show nearby satellite passes. Allowing this is optional. You can still use the site without sharing location.
+
+Main actions — get started
+3. Open the site
+   - Go to satellitemap.space in your browser.
+
+4. Familiarize yourself with the screen
+   - Take a quick look: you should see a world map or globe with moving points (satellites). Look for a search box, a timeline/play control, and a panel or icons for settings, layers, or filters.
+
+Exploring satellites
+5. Move and zoom the map
+   - Drag to pan around the Earth. Pinch or use the zoom controls (or scroll wheel) to zoom in and out. Explore different regions and watch satellites move overhead.
+
+6. Identify a satellite
+   - Click or tap on a moving dot to open its information card. Typical details include the satellite’s name, altitude, speed, and sometimes operator or mission type.
+
+7. Search by name
+   - Use the search box to find a specific satellite (for example “ISS” or another name). Select it to center and highlight it on the map.
+
+Time controls and animation
+8. Use the play/pause and time slider
+   - Use the play button to see satellite motion over time, or pause to freeze the scene. A time slider often lets you jump forward or backward to see past or future positions.
+
+9. Change animation speed
+   - Look for a speed control to speed up or slow down the time simulation. This helps you watch orbits more quickly or in slow motion.
+
+Filters and layers
+10. Turn layers on or off
+    - Open the layers or settings menu to show or hide elements such as orbital tracks, ground tracks, constellations, labels, or night/day shading. Try different combinations to find what you like visually.
+
+11. Filter by type or operator
+    - If available, use filters to show only certain groups (e.g., the International Space Station, communication satellites, Starlink, or active vs inactive satellites).
+
+Following and predictions
+12. Follow a satellite
+    - Use a “follow” or “center” option to keep the map centered on a chosen satellite as it moves.
+
+13. Check pass predictions
+    - Look for a “pass” or prediction feature to see when a satellite will pass over your location (or a selected location). This often shows start and end times, elevation, and direction of the pass.
+
+Customization and extra tools
+14. Adjust map appearance and units
+    - Explore settings to change units (kilometers/miles), map theme (dark/light), or map style. This makes the display easier to read for you.
+
+15. Take screenshots or share views
+    - Use your device’s screenshot function or a share button (if available) to save or share a particular view or satellite track.
+
+Completion and review
+16. Wrap up and reflect
+    - When you’re finished, pause the animation and close the site or bookmark it for future visits. Note any satellites or passes you want to watch again.
+
+17. Safety and privacy check
+    - If you allowed location access and want to remove it later, you can revoke the site permission in your browser or device settings.
+
+Enjoy exploring — try watching the same area at different simulated times, following a favorite satellite, or comparing how many satellites are visible over different parts of the world.
